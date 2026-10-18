@@ -1,0 +1,34 @@
+streamlit>=1.44,<2
+pandas>=2.0,<3
+numpy>=1.26,<3
+torch>=2.2,<3
+pypdf>=5,<7
+python-docx>=1.1,<2
+Pillow>=10,<13
+google-genai>=1.0,<3
+python-dotenv>=1.0,<2
+
+gTTS>=2.5,<3
+openai>=1.99,<4
+anthropic>=0.50,<2
+mistralai>=1.0,<3
+
+# SKY Studio 3D y vista interactiva
+trimesh>=4.4,<5
+plotly>=5.22,<7
+# OpenCV permite separación asistida GrabCut de cada elemento
+opencv-python-headless>=4.10,<5
+
+# SKY Engine API + Metaverso v6.0
+fastapi>=0.115,<1
+uvicorn>=0.34,<1
+httpx>=0.27,<1
+
+# SKY v8 Office Studio
+python-pptx>=1.0,<2
+reportlab>=4.4,<5
+XlsxWriter>=3.2,<4
+
+# SKY v9.7: subida segura de archivos a Creative Studio (requisito de FastAPI)
+python-multipart>=0.0.18,<1
+# FFmpeg y ffprobe deben instalarse como ejecutables del sistema operativo.

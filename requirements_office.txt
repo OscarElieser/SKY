@@ -1,0 +1,6 @@
+-r requirements_social.txt
+python-docx>=1.1,<2
+python-pptx>=1.0,<2
+reportlab>=4.4,<5
+XlsxWriter>=3.2,<4
+# Para el panel Streamlit completo: pip install -r requirements.txt

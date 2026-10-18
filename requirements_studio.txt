@@ -1,0 +1,3 @@
+-r requirements_office.txt
+# v9.7: FastAPI UploadFile para biblioteca de imágenes y video.
+python-multipart>=0.0.18,<1

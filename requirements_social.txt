@@ -1,0 +1,17 @@
+# Componentes mínimos del servidor comunitario y metaverso.
+fastapi>=0.115,<1
+uvicorn>=0.34,<1
+python-dotenv>=1.0,<2
+numpy>=1.26,<3
+trimesh>=4.4,<5
+Pillow>=10,<13
+httpx>=0.27,<1
+# Para ejecutar las pruebas: pip install pytest
+# Funciones opcionales de foto 2.5D: opencv-python-headless>=4.10,<5
+# Modelos de IA externos: consultar requirements.txt o instalar sus SDK.
+
+# SKY v8 Office Studio
+python-pptx>=1.0,<2
+reportlab>=4.4,<5
+XlsxWriter>=3.2,<4
+python-docx>=1.1,<2
