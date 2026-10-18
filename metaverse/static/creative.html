@@ -1,0 +1,44 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SKY Creative Studio</title><link rel="stylesheet" href="/static/creative.css"></head><body>
+<header><a class="brand" href="/sky">✦ SKY IA</a><span>Creative Studio <small>v9.8</small></span><a href="/sky" class="toplink">← Volver a SKY</a></header>
+<main>
+<section class="intro"><h1>Tu estudio creativo, dentro de SKY.</h1><p>Importá tus archivos, combiná capas o clips, revisá el resultado y exportá sin perder los originales.</p></section>
+<section class="workspace">
+  <aside class="side">
+    <h2>Biblioteca personal</h2><label class="upload">＋ Importar imagen, video o audio<input type="file" id="upload" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,video/x-matroska,audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/flac,audio/aac" multiple hidden></label>
+    <p class="hint">Hasta 80 MB por archivo. La biblioteca es privada del creador.</p>
+    <div class="ai-generate"><label for="ai-prompt">Generación opcional con Gemini</label><textarea id="ai-prompt" rows="2" maxlength="3500" placeholder="Describí la imagen que querés crear..."></textarea><button id="generate-ai">Generar imagen con IA</button><p class="hint">Solo bajo tu solicitud. Puede consumir cuota de la API configurada.</p></div><div id="assets" class="assets"></div>
+    <label class="upload">↑ Importar proyecto editable (.skyzip)<input type="file" id="bundle-upload" accept=".skyzip" hidden></label><h2>Mis proyectos</h2><div id="projects" class="project-list"></div>
+  </aside>
+  <section class="work">
+    <div class="toolbar"><div><label>Proyecto <input id="project-name" maxlength="120" value="Mi creación con SKY"></label></div><div class="tools"><button id="new-image">Nueva imagen</button><button id="new-video">Nuevo video</button><button id="save" disabled>Guardar edición</button><button id="export-bundle" disabled>Exportar proyecto editable</button></div></div>
+    <section class="command"><label for="instruction">Pedile a SKY un cambio en español</label><div class="tools"><input id="instruction" maxlength="700" placeholder="Ej.: agregá texto SKY IA, subí el contraste a 1.4, pon texto Hola en clip 1"><button id="apply-command">Aplicar instrucción</button></div><p class="hint">Las órdenes locales admitidas son específicas y verificables. Cada cambio queda en una versión nueva.</p></section>
+    <div class="modes"><button id="mode-image" class="active" type="button">Imagen y capas</button><button id="mode-video" type="button">Video y línea de tiempo</button><span id="project-state">Sin proyecto</span></div>
+    <div class="canvas"><img id="image-preview" hidden alt="Vista previa del diseño generado"><video id="video-preview" controls hidden playsinline></video><div id="empty-preview">Seleccioná un archivo de la biblioteca o creá un nuevo proyecto.</div></div>
+    <div id="image-editor" class="editor">
+      <h3>Capas editables</h3><div class="grid-form">
+        <label>Texto <input id="layer-text" placeholder="Escribí un título"></label>
+        <label>Color del texto <input id="layer-color" type="color" value="#ffffff"></label>
+        <label>Tamaño <input id="layer-size" type="number" min="8" max="250" value="54"></label>
+        <label>Brillo <input id="brightness" type="range" min="0" max="3" step=".1" value="1"></label>
+        <label>Contraste <input id="contrast" type="range" min="0" max="3" step=".1" value="1"></label>
+        <label>Saturación <input id="saturation" type="range" min="0" max="3" step=".1" value="1"></label>
+      </div><div class="tools"><button id="add-text">＋ Capa de texto</button><button id="add-image">＋ Imagen seleccionada</button><button id="apply-image">Aplicar ajustes</button><button id="render-image">Exportar imagen</button></div>
+      <details class="advanced-options"><summary>Máscaras y selección de objetos</summary>
+<p class="hint">Seleccioná una imagen de la biblioteca y escribí un rectángulo interior (x, y, ancho y alto). SKY intentará separar el primer plano con GrabCut. Podés asignar la máscara a una capa sin perder la imagen original.</p>
+<div class="grid-form"><label>X <input id="mask-x" type="number" min="0" value="20"></label><label>Y <input id="mask-y" type="number" min="0" value="20"></label><label>Ancho <input id="mask-w" type="number" min="3" value="200"></label><label>Alto <input id="mask-h" type="number" min="3" value="200"></label></div>
+<div class="tools"><button id="make-mask" type="button">Crear máscara asistida</button><button id="apply-mask" type="button">Aplicar máscara a última capa de imagen</button></div>
+<p id="mask-result" class="hint"></p></details><ol id="layers"></ol><p class="hint">Cada capa puede ajustarse por posición y opacidad. Guardar crea una versión sin alterar los archivos originales.</p>
+    </div>
+    <div id="video-editor" class="editor" hidden>
+      <h3>Línea de tiempo</h3><p class="hint">Seleccioná un video de la biblioteca para añadirlo, después configurá el recorte de cada clip.</p>
+      <div class="tools"><button id="add-clip">＋ Añadir clip</button><button id="set-music">♫ Usar audio seleccionado como música</button><button id="render-video">Renderizar MP4</button></div>
+      <details class="advanced-options"><summary>Animación avanzada en línea de tiempo</summary><p class="hint">Configurá el movimiento del título entre dos posiciones y su fundido. Las posiciones usan píxeles del video y los tiempos, segundos.</p>
+<div class="grid-form"><label>Clip <input id="motion-clip" type="number" min="1" value="1"></label><label>X inicial <input id="motion-x0" type="number" value="-150"></label><label>X final <input id="motion-x1" type="number" value="0"></label><label>Y inicial <input id="motion-y0" type="number" value="50"></label><label>Y final <input id="motion-y1" type="number" value="50"></label><label>Entrada <input id="motion-in" type="number" min="0" max="3" step=".1" value=".3"></label><label>Salida <input id="motion-out" type="number" min="0" max="3" step=".1" value=".3"></label></div><button id="motion-apply" type="button">Aplicar fotogramas clave</button></details><div id="clips" class="clips"></div>
+    </div>
+    <h3>Historial del proyecto editable</h3><div id="version-history"></div><h3>Versiones exportadas</h3><div id="exports" class="exports"></div>
+    <h3>Renders y progreso</h3><div id="jobs" class="jobs"></div>
+  </section>
+</section>
+<div id="login" class="modal"><div class="login-inner"><h2>SKY · Acceso privado</h2><p>El editor y los archivos se guardan en tu equipo. Solo el creador puede gestionarlos.</p><input id="key" type="password" placeholder="Clave privada SKY" autocomplete="current-password"><button id="connect">Entrar al estudio</button><p id="auth-error" role="alert"></p></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+</main><script src="/static/creative.js" defer></script></body></html>
