@@ -1,0 +1,69 @@
+{
+  "nombre": "NeuralT Personal v1.0 \u2014 MLP + GRU Engine Sensor",
+  "procedencia": "demo_sensores.csv",
+  "huella_datos": "dbddf5f4ec65d498fc1fdcd534ab7a7016281b8a9ba6e18e2defe971381c3e5b",
+  "registros": 1200,
+  "entrenamiento": 936,
+  "validacion": 240,
+  "epocas": 10,
+  "mae_validacion_por_sensor": {
+    "temperatura_c": 1.0582,
+    "vibracion_mm_s": 0.1269,
+    "rpm": 27.5771,
+    "corriente_a": 0.1762,
+    "presion_bar": 0.0556
+  },
+  "historial": [
+    {
+      "epoca": 1,
+      "entrenamiento": 0.33488,
+      "validacion": 0.19727
+    },
+    {
+      "epoca": 2,
+      "entrenamiento": 0.1368,
+      "validacion": 0.16543
+    },
+    {
+      "epoca": 3,
+      "entrenamiento": 0.11292,
+      "validacion": 0.14737
+    },
+    {
+      "epoca": 4,
+      "entrenamiento": 0.09826,
+      "validacion": 0.13019
+    },
+    {
+      "epoca": 5,
+      "entrenamiento": 0.08651,
+      "validacion": 0.1216
+    },
+    {
+      "epoca": 6,
+      "entrenamiento": 0.0836,
+      "validacion": 0.1199
+    },
+    {
+      "epoca": 7,
+      "entrenamiento": 0.08158,
+      "validacion": 0.11744
+    },
+    {
+      "epoca": 8,
+      "entrenamiento": 0.07968,
+      "validacion": 0.1169
+    },
+    {
+      "epoca": 9,
+      "entrenamiento": 0.07967,
+      "validacion": 0.11557
+    },
+    {
+      "epoca": 10,
+      "entrenamiento": 0.07838,
+      "validacion": 0.11608
+    }
+  ],
+  "advertencia": "Uso experimental. No sustituye sensores certificados ni sistemas de seguridad."
+}
