@@ -1,0 +1,63 @@
+{
+  "asset_id": "asset_8f61ef7003734a61b5ab",
+  "box": [
+    85,
+    110,
+    55,
+    55
+  ],
+  "keyframes": [
+    {
+      "t": 0.0,
+      "x": 85,
+      "y": 110,
+      "confidence": 1
+    },
+    {
+      "t": 0.3,
+      "x": 115,
+      "y": 116,
+      "confidence": 0.998
+    },
+    {
+      "t": 0.6,
+      "x": 145,
+      "y": 121,
+      "confidence": 0.994
+    },
+    {
+      "t": 0.9,
+      "x": 175,
+      "y": 123,
+      "confidence": 0.993
+    },
+    {
+      "t": 1.2,
+      "x": 205,
+      "y": 122,
+      "confidence": 0.994
+    },
+    {
+      "t": 1.5,
+      "x": 235,
+      "y": 118,
+      "confidence": 0.994
+    },
+    {
+      "t": 1.8,
+      "x": 265,
+      "y": 111,
+      "confidence": 0.994
+    },
+    {
+      "t": 2.1,
+      "x": 295,
+      "y": 106,
+      "confidence": 0.993
+    }
+  ],
+  "lost_samples": 0,
+  "samples": 8,
+  "method": "opencv-template-matching",
+  "limitations": "Seguimiento local aproximado; revisá los resultados antes del render"
+}

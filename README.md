@@ -2,9 +2,9 @@
 
 **Visión del proyecto: Oscar Elieser Chamorro Guzmán.**
 
-La versión integrada actual es **v9.9**. La plataforma incluye asistencia multi-IA opcional, proyectos, memoria, metaverso, comunidad, Office Studio, diseño visual, Creative Studio y API privada. El estudio añade máscaras guiadas y movimiento de títulos con hasta 16 fotogramas clave.
+La versión integrada actual es **v10.0**. La plataforma incluye asistencia multi-IA opcional, proyectos, memoria, metaverso, comunidad, Office Studio, diseño visual, Creative Studio y API privada. El estudio añade seguimiento de objetos mediante OpenCV, composición de varias capas, fotogramas clave y previsualización exacta de videos renderizados.
 
-**Instalación y pruebas:** [README_V9_9_INICIO.md](README_V9_9_INICIO.md) · [CHANGELOG_V9_9.md](CHANGELOG_V9_9.md) · [VALIDACION_V9_9.md](VALIDACION_V9_9.md)
+**Instalación y pruebas:** [README_V10_INICIO.md](README_V10_INICIO.md) · [CHANGELOG_V10.md](CHANGELOG_V10.md) · [VALIDACION_V10.md](VALIDACION_V10.md)
 
 La plataforma no está certificada para producción pública y requiere permisos administrativos para herramientas privadas; BAQUEANO solo debe ser visible al creador autenticado.
 

@@ -41,3 +41,14 @@ Una imagen editable admite capas `image`, `text`, `rectangle` y `adjustments` (b
 La API de creación de video acepta por clip `caption_keyframes` (lista de 2 a 16 objetos `{t,x,y}` en segundos efectivos y píxeles) y `caption_easing` (`linear` o `smooth`). La alternativa heredada `caption_motion` continúa funcionando. El render siempre usa la receta congelada cuando se aprueba, sin sobrescribir proyectos.
 
 `POST /api/creative/assets/{id}/selection` puede recibir, además del rectángulo, `foreground:[[x,y],...]`, `background:[[x,y],...]` y `brush_radius:4` (1–20). Los puntos no son órdenes de reconstrucción semántica: guían GrabCut, sujeto a contraste e iluminación.
+
+
+## SKY v10.0 — Tracking, capas y previsualización
+
+- `POST /api/creative/assets/{aid}/track`: seguimiento local del área `[x,y,w,h]` sobre video; `start`, `end`, `step`, `width`, `height`, `speed`. Devuelve `keyframes` con confianza por muestra. Exige clave privada.
+- Los clips de video admiten `overlays: [{asset_id,width,x,y,opacity,from,to,keyframes:[{t,x,y,confidence}]}]` (hasta 8 capas). Se guardan en versiones y paquetes `.skyzip`.
+- `GET /api/creative/projects/{pid}/video/frame?t=1.0`: PNG extraído del último render MP4 **de la misma versión del proyecto**; responde 409 si aún no está exportada. Requiere clave privada.
+- `POST /api/creative/gemini/check`: verificación real de Gemini bajo solicitud de propietario, consume cuota; sin clave responde 503.
+- Edición local en español: `mueve capa 1 del clip 1 a x 50 y 40` / `opacidad capa 1 del clip 1 a 0.6`.
+
+Limitaciones: seguimiento aproximado por plantilla, no identificación semántica ni generación de largometrajes.

@@ -30,6 +30,15 @@ class Selection(BaseModel):
     background:list[list[int]]=Field(default_factory=list,max_length=100)
     brush_radius:int=Field(default=4,ge=1,le=20)
 
+class TrackRequest(BaseModel):
+    rectangle:list[int]=Field(min_length=4,max_length=4)
+    start:float=Field(default=0,ge=0)
+    end:float=Field(default=3,gt=0)
+    step:float=Field(default=.3,ge=.12,le=2)
+    width:int=Field(default=640,ge=128,le=1280)
+    height:int=Field(default=360,ge=128,le=720)
+    speed:float=Field(default=1,ge=.5,le=2)
+
 class Revision(BaseModel):
     spec:dict[str,Any]
     expected_version:int=Field(ge=1)
@@ -43,6 +52,17 @@ def capabilities():
     return {'image':True,'video':bool(shutil.which('ffmpeg') and shutil.which('ffprobe')),
             'formats':{'image':['png','jpg','webp'],'video':['mp4']},'non_destructive':True,
             'advanced_AI_generation':False,'layer_masks':True,'caption_keyframes':16,'guided_grabcut':True,'assisted_grabcut':True,'limits':{'upload_bytes':cr.MAX_IMPORT,'video_seconds':600}}
+
+@router.post('/api/creative/gemini/check',dependencies=[Depends(require_key)])
+def verify_gemini_live():
+    # Esta operación realiza una petición real a Gemini SOLO si el propietario la invoca.
+    # Nunca devuelve claves, cookies ni información del sistema.
+    from neural_core.gemini_provider import responder_gemini,GeminiError
+    try:
+        answer=responder_gemini([{'role':'system','content':'Respondé en una sola palabra en español.'},
+            {'role':'user','content':'Decí listo para confirmar que esta conexión funciona.'}],max_tokens=24)
+        return {'connected':True,'provider':'gemini','response':answer[:120]}
+    except GeminiError as ex:raise HTTPException(503,str(ex)[:180]) from ex
 
 @router.post('/api/creative/generate-image',dependencies=[Depends(require_key)],status_code=201)
 def ai_image(body:GenerateVisual):
@@ -87,6 +107,13 @@ def assisted_selection(aid:str,body:Selection):
     try:return cutout_mask(aid,body.rectangle,body.iterations,body.foreground,body.background,body.brush_radius)
     except KeyError:raise HTTPException(404,'Recurso no encontrado')
     except ValueError as ex:raise HTTPException(422,str(ex)) from ex
+    except RuntimeError as ex:raise HTTPException(503,str(ex)) from ex
+
+@router.post('/api/creative/assets/{aid}/track',dependencies=[Depends(require_key)])
+def object_tracking(aid:str,body:TrackRequest):
+    from neural_core.sky_creative_v10 import track_object
+    try:return track_object(aid,body.rectangle,body.start,body.end,body.step,body.width,body.height,speed=body.speed)
+    except (ValueError,KeyError) as ex:raise HTTPException(422,str(ex)) from ex
     except RuntimeError as ex:raise HTTPException(503,str(ex)) from ex
 
 @router.post('/api/creative/projects',dependencies=[Depends(require_key)],status_code=201)
@@ -143,6 +170,26 @@ def image_render(pid:str,format:str='png'):
     try:return cr.image_export(pid,format)
     except (KeyError,FileNotFoundError):raise HTTPException(404,'Proyecto o archivo inexistente')
     except (RuntimeError,ValueError) as ex:raise HTTPException(422,str(ex))
+
+@router.get('/api/creative/projects/{pid}/video/frame',dependencies=[Depends(require_key)])
+def video_frame(pid:str,t:float=Query(default=.5,ge=0,le=600)):
+    from fastapi.responses import Response
+    import subprocess
+    project=cr.get_project(pid)
+    if not project or project['kind']!='video':raise HTTPException(404,'Proyecto de video inexistente')
+    record=next((item for item in cr.exports(pid) if item['version']==project['version']),None)
+    if not record:raise HTTPException(409,'Primero renderizá la versión actual del video para obtener una vista exacta')
+    try:
+        path,asset=cr.asset_path(record['asset_id'])
+        if asset['kind']!='video':raise HTTPException(409,'No existe render de video para la versión')
+        if t>asset['duration']:raise HTTPException(422,'El tiempo supera la duración renderizada')
+        command=[cr._ffbin('ffmpeg'),'-v','error','-ss',str(t),'-i',str(path),'-frames:v','1',
+                 '-f','image2pipe','-vcodec','png','pipe:1']
+        res=subprocess.run(command,capture_output=True,timeout=20)
+        if res.returncode or not res.stdout:raise HTTPException(503,'No se pudo extraer el fotograma')
+        return Response(res.stdout,media_type='image/png',headers={'Cache-Control':'private,no-store'})
+    except (KeyError,FileNotFoundError):raise HTTPException(404,'Render no disponible')
+    except subprocess.TimeoutExpired:raise HTTPException(503,'Tiempo agotado al extraer fotograma')
 
 @router.post('/api/creative/projects/{pid}/video/render',dependencies=[Depends(require_key)])
 def video_render(pid:str):

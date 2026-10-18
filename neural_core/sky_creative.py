@@ -215,6 +215,8 @@ def validate_spec(kind,spec):
             start=_num(clip.get('start',0),0,1800,'Inicio')
             end=_num(clip.get('end',5 if asset['kind']=='image' else asset['duration']),0,1800,'Fin')
             speed=_num(clip.get('speed',1),0.5,2,'Velocidad')
+            from .sky_creative_v10 import validate_overlays
+            validate_overlays(clip,(end-start)/speed)
             if 'caption_motion' in clip:
                 motion=clip['caption_motion']
                 if not isinstance(motion,dict):raise ValueError('Animación no válida')
@@ -418,6 +420,12 @@ def render_video(spec,output:Path,progress=lambda value:None):
             if clip.get('sticker_asset_id'):
                 sticker,_=asset_path(clip['sticker_asset_id']);sticker_index=current_input;current_input+=1
                 command+=['-loop','1','-framerate',str(fps),'-i',str(sticker)]
+            overlays=clip.get('overlays',[])
+            overlay_inputs=[]
+            for entry in overlays:
+                pic,_=asset_path(entry['asset_id'])
+                overlay_inputs.append(current_input);current_input+=1
+                command+=['-loop','1','-framerate',str(fps),'-i',str(pic)]
             streams,_=_probe(source) if asset['kind']=='video' else (set(),0)
             silence=not ('audio' in streams and not clip.get('mute',False))
             if silence:
@@ -461,7 +469,11 @@ def render_video(spec,output:Path,progress=lambda value:None):
                 filters.append(f'[{sticker_index}:v]scale={size}:-1,format=rgba[sticker]')
                 filters.append(f'[{prior}][sticker]overlay=x={x:.2f}:y={y:.2f}:shortest=1[v{stage+1}]')
                 prior=f'v{stage+1}'
-            if caption_index is not None or sticker_index is not None:
+            if overlay_inputs:
+                from .sky_creative_v10 import build_overlay_filters
+                prior,new_filters=build_overlay_filters(overlays,overlay_inputs,prior,stage+2,effective)
+                filters.extend(new_filters)
+            if caption_index is not None or sticker_index is not None or overlay_inputs:
                 command+=['-filter_complex',';'.join(filters),'-map',f'[{prior}]']
             else:command+=['-vf',base,'-map','0:v:0']
             if silence:command+=['-map',f'{silence_index}:a:0']
@@ -542,18 +554,28 @@ def interpret_edit(kind,spec,instruction):
             layer['rotate']=(float(layer.get('rotate',0))+int(m.group(1)))%360
         else:raise ValueError('Orden no reconocida. Ejemplos: Agregá texto Bienvenidos, brillo 1.3, contraste 1.2, fondo #112233')
     elif kind=='video':
-        m=re.search(r'(?:pon|cambia|agrega)\s+(?:el\s+)?texto\s+(.+?)\s+en\s+(?:el\s+)?clip\s+(\d+)',original,re.I)
-        if m:
-            index=int(m.group(2))-1
-            if not 0<=index<len(result['clips']):raise ValueError('No existe ese clip')
-            result['clips'][index]['caption']=m.group(1).strip(' "”\'')
-        elif (m:=re.search(r'(?:velocidad|rapidez)\s+(?:del\s+)?clip\s+(\d+)\s+(?:a\s+)?(\d+(?:[\.,]\d+)?)',cmd)):
-            i=int(m.group(1))-1
-            if not 0<=i<len(result['clips']):raise ValueError('No existe ese clip')
-            result['clips'][i]['speed']=float(m.group(2).replace(',','.'))
-        elif (m:=re.search(r'(?:volumen|musica)\s+(?:a\s+)?(\d+(?:[\.,]\d+)?)',cmd)):
-            result['music_volume']=float(m.group(1).replace(',','.'))
-        else:raise ValueError('Orden no reconocida. Ejemplos: Pon texto Bienvenidos en clip 1, velocidad clip 2 a 1.5')
+        move=re.search(r'(?:mueve|ubica|coloca)\s+(?:la\s+)?(?:capa|superposicion)\s+(\d+)\s+(?:del\s+)?clip\s+(\d+)\s+a\s+x\s+(-?\d+)\s+y\s+(-?\d+)',cmd)
+        opacity=re.search(r'opacidad\s+(?:de\s+)?(?:la\s+)?(?:capa|superposicion)\s+(\d+)\s+(?:del\s+)?clip\s+(\d+)\s+a\s+(\d+(?:[\.,]\d+)?)',cmd)
+        if move or opacity:
+            match=move or opacity;layer_number=int(match.group(1))-1;clip_number=int(match.group(2))-1
+            if not 0<=clip_number<len(result['clips']):raise ValueError('Clip inexistente')
+            layers=result['clips'][clip_number].get('overlays',[])
+            if not 0<=layer_number<len(layers):raise ValueError('Capa de video inexistente')
+            if move:layers[layer_number].update({'x':int(match.group(3)),'y':int(match.group(4)),'keyframes':[]})
+            else:layers[layer_number]['opacity']=float(match.group(3).replace(',','.'))
+        else:
+            m=re.search(r'(?:pon|cambia|agrega)\s+(?:el\s+)?texto\s+(.+?)\s+en\s+(?:el\s+)?clip\s+(\d+)',original,re.I)
+            if m:
+                index=int(m.group(2))-1
+                if not 0<=index<len(result['clips']):raise ValueError('No existe ese clip')
+                result['clips'][index]['caption']=m.group(1).strip(' "”\'')
+            elif (m:=re.search(r'(?:velocidad|rapidez)\s+(?:del\s+)?clip\s+(\d+)\s+(?:a\s+)?(\d+(?:[\.,]\d+)?)',cmd)):
+                i=int(m.group(1))-1
+                if not 0<=i<len(result['clips']):raise ValueError('No existe ese clip')
+                result['clips'][i]['speed']=float(m.group(2).replace(',','.'))
+            elif (m:=re.search(r'(?:volumen|musica)\s+(?:a\s+)?(\d+(?:[\.,]\d+)?)',cmd)):
+                result['music_volume']=float(m.group(1).replace(',','.'))
+            else:raise ValueError('Orden no reconocida. Ejemplos: Pon texto Bienvenidos en clip 1, velocidad clip 2 a 1.5')
     validate_spec(kind,result)
     return result
 
@@ -571,7 +593,7 @@ def export_portable(pid):
     if not project:raise KeyError('Proyecto inexistente')
     spec=project['spec'];refs=[]
     if project['kind']=='image':refs=[id for x in spec.get('layers',[]) if x['type']=='image' for id in (x.get('asset_id'),x.get('mask_asset_id')) if id]
-    else:refs=[id for x in spec.get('clips',[]) for id in (x.get('asset_id'),x.get('sticker_asset_id')) if id]+([spec['music_asset_id']] if spec.get('music_asset_id') else [])
+    else:refs=[aid for x in spec.get('clips',[]) for aid in ([x.get('asset_id'),x.get('sticker_asset_id')]+[layer.get('asset_id') for layer in x.get('overlays',[])]) if aid]+([spec['music_asset_id']] if spec.get('music_asset_id') else [])
     items=[];total=0;raw=io.BytesIO()
     with zipfile.ZipFile(raw,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=6) as z:
         for aid in dict.fromkeys(refs):
@@ -615,5 +637,6 @@ def import_portable(data:bytes,sky_project_id=None):
         for clip in spec.get('clips',[]):
             clip['asset_id']=ids[clip['asset_id']]
             if clip.get('sticker_asset_id'):clip['sticker_asset_id']=ids[clip['sticker_asset_id']]
+            for layer in clip.get('overlays',[]):layer['asset_id']=ids[layer['asset_id']]
         if spec.get('music_asset_id'):spec['music_asset_id']=ids[spec['music_asset_id']]
     return create_project(manifest['kind'],manifest['name'],spec,sky_project_id)

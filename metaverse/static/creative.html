@@ -1,12 +1,12 @@
 <!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SKY Creative Studio</title><link rel="stylesheet" href="/static/creative.css"></head><body>
-<header><a class="brand" href="/sky">✦ SKY IA</a><span>Creative Studio <small>v9.8</small></span><a href="/sky" class="toplink">← Volver a SKY</a></header>
+<header><a class="brand" href="/sky">✦ SKY IA</a><span>Creative Studio <small>v10.0</small></span><a href="/sky" class="toplink">← Volver a SKY</a></header>
 <main>
 <section class="intro"><h1>Tu estudio creativo, dentro de SKY.</h1><p>Importá tus archivos, combiná capas o clips, revisá el resultado y exportá sin perder los originales.</p></section>
 <section class="workspace">
   <aside class="side">
     <h2>Biblioteca personal</h2><label class="upload">＋ Importar imagen, video o audio<input type="file" id="upload" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,video/x-matroska,audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/flac,audio/aac" multiple hidden></label>
     <p class="hint">Hasta 80 MB por archivo. La biblioteca es privada del creador.</p>
-    <div class="ai-generate"><label for="ai-prompt">Generación opcional con Gemini</label><textarea id="ai-prompt" rows="2" maxlength="3500" placeholder="Describí la imagen que querés crear..."></textarea><button id="generate-ai">Generar imagen con IA</button><p class="hint">Solo bajo tu solicitud. Puede consumir cuota de la API configurada.</p></div><div id="assets" class="assets"></div>
+    <div class="ai-generate"><label for="ai-prompt">Generación opcional con Gemini</label><textarea id="ai-prompt" rows="2" maxlength="3500" placeholder="Describí la imagen que querés crear..."></textarea><button id="generate-ai">Generar imagen con IA</button><p class="hint">Solo bajo tu solicitud. Puede consumir cuota de la API configurada.</p><button id="v10-gemini-check" type="button">Probar conexión real Gemini (opcional)</button></div><div id="assets" class="assets"></div>
     <label class="upload">↑ Importar proyecto editable (.skyzip)<input type="file" id="bundle-upload" accept=".skyzip" hidden></label><h2>Mis proyectos</h2><div id="projects" class="project-list"></div>
   </aside>
   <section class="work">
@@ -40,6 +40,13 @@
 <label>Fotogramas en JSON <textarea id="kf-json" rows="3">[{"t":0,"x":0,"y":12},{"t":0.7,"x":70,"y":25},{"t":1.4,"x":140,"y":42}]</textarea></label>
 <label>Interpolación<select id="kf-ease"><option value="linear">Lineal</option><option value="smooth">Suave</option></select></label>
 <button type="button" id="apply-keyframes">Aplicar fotogramas a la versión editable</button></details>
+<details class="advanced-options"><summary>SKY v10 · Seguimiento de objetos y capas de video</summary>
+<p class="hint">Seleccioná un video de la biblioteca. Marcá su región inicial sobre el tamaño de salida. Los puntos resultantes se pueden revisar y modificar.</p>
+<div class="grid-form"><label>Clip número <input id="v10-clip" type="number" min="1" value="1"></label><label>Imagen de capa (ID de biblioteca) <input id="v10-layer" placeholder="asset_..."></label><label>X <input id="v10-x" type="number" value="20"></label><label>Y <input id="v10-y" type="number" value="20"></label><label>Ancho <input id="v10-w" type="number" value="90"></label><label>Alto de región <input id="v10-h" type="number" value="70"></label><label>Duración seguimiento (s) <input id="v10-duration" type="number" step=".1" value="2"></label><label>Opacidad <input id="v10-opacity" type="number" min="0" max="1" step=".1" value="1"></label></div>
+<button type="button" id="v10-add-layer">Añadir capa de imagen</button>
+<button type="button" id="v10-track">Seguir objeto en el clip y aplicar trayectoria a última capa</button>
+<p class="hint">El seguimiento se basa en similitud visual, no identifica personas u objetos semánticamente. Revisá los puntos antes de exportar.</p>
+<label>Fotograma exacto (s) <input id="v10-time" type="number" min="0" step=".1" value=".5"></label><button type="button" id="v10-preview">Vista previa del último render guardado</button></details>
 <div id="clips" class="clips"></div>
     </div>
     <h3>Historial del proyecto editable</h3><div id="version-history"></div><h3>Versiones exportadas</h3><div id="exports" class="exports"></div>
