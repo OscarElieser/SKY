@@ -1,0 +1,48 @@
+{
+  "width": 1280,
+  "height": 720,
+  "background": "#0b1830",
+  "layers": [
+    {
+      "type": "image",
+      "asset_id": "asset_0e2fff1e61cf46dbb47c",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 720,
+      "opacity": 1
+    },
+    {
+      "type": "text",
+      "text": "SKY CREATIVE STUDIO",
+      "size": 57,
+      "color": "#ffffff",
+      "x": 155,
+      "y": 255,
+      "opacity": 1
+    },
+    {
+      "type": "text",
+      "text": "Diseña • Edita • Crea",
+      "size": 34,
+      "color": "#66dcf6",
+      "x": 155,
+      "y": 342,
+      "opacity": 1
+    },
+    {
+      "type": "text",
+      "text": "v9.7 · Proyecto editable y exportable",
+      "size": 24,
+      "color": "#bacbdc",
+      "x": 155,
+      "y": 434,
+      "opacity": 1
+    }
+  ],
+  "adjustments": {
+    "brightness": 1.05,
+    "contrast": 1.05,
+    "saturation": 1.1
+  }
+}
