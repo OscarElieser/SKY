@@ -55,7 +55,6 @@ $('motion-apply').onclick=()=>{if(!project||project.kind!=='video')return toast(
  y0:Number($('motion-y0').value),y1:Number($('motion-y1').value),fade_in:Number($('motion-in').value),fade_out:Number($('motion-out').value)};
  redraw();toast('Movimiento preparado: guardá y renderizá para verificarlo.')};
 $('set-music').onclick=()=>{if(project?.kind!=='video')return;const a=assets.find(x=>x.id===selected);if(!a||a.kind!=='audio')return toast('Seleccioná un archivo de audio');project.spec.music_asset_id=a.id;project.spec.music_volume=.2;toast('Música añadida. Guardá y renderizá.')};
-})();
 
 // SKY v10 — Las opciones avanzadas quedan plegadas; no alteran la portada principal.
 $('v10-add-layer').onclick=()=>{try{if(!project||project.kind!=='video')throw Error('Abrí un proyecto de video');const n=Number($('v10-clip').value)-1;if(!project.spec.clips[n])throw Error('Clip no válido');const asset=assets.find(x=>x.id===$('v10-layer').value.trim())||assets.find(x=>x.id===selected&&x.kind==='image');if(!asset||asset.kind!=='image')throw Error('Seleccioná un recurso de imagen de la biblioteca');const clip=project.spec.clips[n];clip.overlays=clip.overlays||[];clip.overlays.push({asset_id:asset.id,width:Number($('v10-w').value),opacity:Number($('v10-opacity').value),x:Number($('v10-x').value),y:Number($('v10-y').value)});toast('Capa agregada. Guardá para crear una nueva versión.')}catch(e){err(e)}};
@@ -63,3 +62,27 @@ $('v10-track').onclick=async()=>{try{if(!project||project.kind!=='video')throw E
 $('v10-preview').onclick=async()=>{try{if(!project||project.kind!=='video')throw Error('Abrí un proyecto de video');const t=Number($('v10-time').value);await binary('/api/creative/projects/'+project.id+'/video/frame?t='+encodeURIComponent(t),'fotograma.png',true)}catch(e){err(e)}};
 
 $('v10-gemini-check').onclick=async()=>{try{const r=await api('/api/creative/gemini/check','POST');toast('Gemini respondió: '+r.response)}catch(e){err(e)}};
+
+// SKY v10.1: pistas gráficas sobre todo el montaje, con máscaras animadas.
+$('v101-add-track').onclick=()=>{try{
+ if(!project||project.kind!=='video')throw Error('Abrí un proyecto de video');
+ const aid=$('v101-track-asset').value.trim()||selected;
+ if(!assets.some(a=>a.id===aid&&a.kind==='image'))throw Error('Elegí una imagen de la biblioteca');
+ const duration=project.spec.clips.reduce((total,c)=>total+(Number(c.end)-Number(c.start))/Number(c.speed||1),0);
+ const from=Number($('v101-track-from').value),to=Number($('v101-track-to').value);
+ if(!Number.isFinite(from)||!Number.isFinite(to)||from<0||to<=from||to>duration)throw Error('Intervalo de pista fuera del montaje');
+ project.spec.tracks=project.spec.tracks||[];
+ if(project.spec.tracks.length>=8)throw Error('Límite: ocho pistas globales');
+ project.spec.tracks.push({asset_id:aid,width:Number($('v101-track-width').value),opacity:1,x:0,y:0,from,to});
+ text($('v101-track-summary'),'Pistas preparadas: '+project.spec.tracks.length+' (guardá la edición)');
+ toast('Pista global añadida; guardá y renderizá');
+ }catch(e){err(e)}};
+$('v101-set-masks').onclick=()=>{try{
+ if(!project||project.kind!=='video'||!project.spec.tracks?.length)throw Error('Primero agregá una pista global');
+ const frames=JSON.parse($('v101-masks').value);
+ if(!Array.isArray(frames)||!frames.length||frames.length>8)throw Error('Máscaras: 1 a 8 fotogramas');
+ project.spec.tracks.at(-1).mask_keyframes=frames;
+ toast('Máscaras animadas preparadas; guardá y renderizá para validarlas');
+ }catch(e){err(e)}};
+
+})();

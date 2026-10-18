@@ -217,6 +217,10 @@ def validate_spec(kind,spec):
             speed=_num(clip.get('speed',1),0.5,2,'Velocidad')
             from .sky_creative_v10 import validate_overlays
             validate_overlays(clip,(end-start)/speed)
+            from .sky_creative_v101 import validate_masks
+            if sum(bool(layer.get('mask_keyframes')) for layer in clip.get('overlays',[]))>2:
+                raise ValueError('Máximo dos capas con máscara animada por clip')
+            for layer in clip.get('overlays',[]):validate_masks(layer,(end-start)/speed)
             if 'caption_motion' in clip:
                 motion=clip['caption_motion']
                 if not isinstance(motion,dict):raise ValueError('Animación no válida')
@@ -251,6 +255,8 @@ def validate_spec(kind,spec):
             if len(str(clip.get('caption','')))>250:raise ValueError('Texto de clip demasiado largo')
         if sum((c.get('end',(get_asset(c['asset_id'])['duration'] or 5))-c.get('start',0))/c.get('speed',1) for c in clips)>600:
             raise ValueError('Máximo 10 minutos de video exportado')
+        from .sky_creative_v101 import validate_global_tracks
+        validate_global_tracks(spec)
         music=spec.get('music_asset_id')
         if music and (not get_asset(music) or get_asset(music)['kind']!='audio'):
             raise ValueError('La música debe estar en la biblioteca de audio')
@@ -422,10 +428,15 @@ def render_video(spec,output:Path,progress=lambda value:None):
                 command+=['-loop','1','-framerate',str(fps),'-i',str(sticker)]
             overlays=clip.get('overlays',[])
             overlay_inputs=[]
-            for entry in overlays:
-                pic,_=asset_path(entry['asset_id'])
+            for overlay_n,entry in enumerate(overlays):
                 overlay_inputs.append(current_input);current_input+=1
-                command+=['-loop','1','-framerate',str(fps),'-i',str(pic)]
+                if entry.get('mask_keyframes'):
+                    from .sky_creative_v101 import create_mask_frames
+                    pattern,_=create_mask_frames(entry,effective,fps,folder,f'clip_{index}_mask_{overlay_n}')
+                    command+=['-framerate',str(fps),'-start_number','0','-i',pattern]
+                else:
+                    pic,_=asset_path(entry['asset_id'])
+                    command+=['-loop','1','-framerate',str(fps),'-i',str(pic)]
             streams,_=_probe(source) if asset['kind']=='video' else (set(),0)
             silence=not ('audio' in streams and not clip.get('mute',False))
             if silence:
@@ -486,6 +497,8 @@ def render_video(spec,output:Path,progress=lambda value:None):
         joined=folder/'joined.mp4'
         _execute([ff,'-hide_banner','-loglevel','error','-y','-f','concat','-safe','0','-i',str(playlist),
                 '-c','copy','-movflags','+faststart',str(joined)],timeout=120)
+        from .sky_creative_v101 import apply_global_tracks
+        joined=apply_global_tracks(spec,joined,folder,ff,fps)
         progress(88)
         if spec.get('music_asset_id'):
             music,_=asset_path(spec['music_asset_id']);vol=float(spec.get('music_volume',0.2))

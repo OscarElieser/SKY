@@ -83,7 +83,7 @@ async def lifespan(app):
             try:await pump
             except asyncio.CancelledError:pass
 
-app=FastAPI(title='SKY Engine API',version='9.7.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
+app=FastAPI(title='SKY Engine API',version='10.1.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
 app.mount('/static',StaticFiles(directory=STATIC),name='static')
 
 @app.get('/office')
@@ -182,7 +182,7 @@ def baqueano_owner_page():return FileResponse(STATIC/'baqueano-owner.html')
 def metaverse_world():return FileResponse(STATIC/'index.html')
 
 @app.get('/api/health')
-def health():return {'service':'SKY Engine API','status':'ok','version':'9.7.0','private':'key required for data'}
+def health():return {'service':'SKY Engine API','status':'ok','version':'10.1.0','private':'key required for data'}
 
 @app.get('/api/capabilities',dependencies=[Depends(require_key)])
 def capabilities():
@@ -408,3 +408,10 @@ app.include_router(sky_intelligent_router)
 # SKY v9.7: editor profesional por capas + renders multimedia, propietario solamente.
 from .creative_api import router as creative_router
 app.include_router(creative_router)
+
+
+# SKY v10.1: idiomas y protección HTTP por defecto.
+from .language_api import router as sky_language_router
+app.include_router(sky_language_router)
+from .security_v101 import install as install_sky_security
+install_sky_security(app)

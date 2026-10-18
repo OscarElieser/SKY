@@ -18,9 +18,12 @@ def modelo_activo():
     except (OSError, ValueError, KeyError):
         return []
 
-def responder(pregunta, area, historial=None, modelo=None, fuentes_externas=None, proveedor='auto'):
+def responder(pregunta, area, historial=None, modelo=None, fuentes_externas=None, proveedor='auto', idioma=None):
     if len(pregunta) > 7000:
         raise ValueError('Pregunta demasiado larga (máximo 7000 caracteres)')
+    from neural_core.sky_languages import normalize, get_preference, script_hint
+    selected=normalize(idioma or get_preference())
+    script=script_hint(pregunta)['hint']
     evidencias = buscar_documentos(pregunta)
     recuerdos = memorias()[:12]
     fuentes_externas = (fuentes_externas or [])[:6]
@@ -28,7 +31,10 @@ def responder(pregunta, area, historial=None, modelo=None, fuentes_externas=None
     contexto = '\n\n'.join(f'[Documento {i+1}: {x["nombre"]}]\n{x["contenido"]}' for i,x in enumerate(evidencias))[:7500]
     perfil = '\n'.join('- '+x['texto'] for x in recuerdos)[:2500]
     feedback = '\n'.join('- '+f"{x['module']}: {x['score']}/5; {x['note'][:220]}" for x in feedback_reciente())[:2000]
-    reglas = f'''Eres SKY, un asistente personal multi-IA de uso personal en español.
+    reglas = f'''Eres SKY, un asistente personal multi-IA de uso personal y multilingüe.
+Idioma preferido configurado: {selected}. Pista de escritura del mensaje: {script or 'no concluyente'}.
+Respondé en el idioma solicitado explícitamente por el usuario; si no se indica, respondé en el idioma del mensaje cuando puedas identificarlo con confianza, y si no en el idioma preferido. Conservá nombres propios, referencias y cifras.
+Nunca afirmes dominar de forma nativa todas las lenguas ni traducir perfectamente dialectos minoritarios. Si hay incertidumbre lingüística, señalala brevemente.
 Fecha del equipo: {date.today().isoformat()}. Especialidad de esta solicitud: {area}.
 Responde con precisión, en español natural, y reconoce límites e incertidumbre.
 Nunca afirmes que has consultado Internet, noticias, bancos o APIs si no hubo una consulta real.

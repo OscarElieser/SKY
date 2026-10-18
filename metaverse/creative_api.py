@@ -62,7 +62,7 @@ def verify_gemini_live():
         answer=responder_gemini([{'role':'system','content':'Respondé en una sola palabra en español.'},
             {'role':'user','content':'Decí listo para confirmar que esta conexión funciona.'}],max_tokens=24)
         return {'connected':True,'provider':'gemini','response':answer[:120]}
-    except GeminiError as ex:raise HTTPException(503,str(ex)[:180]) from ex
+    except GeminiError as ex:raise HTTPException(503,'Gemini no disponible. Verificá la clave y la cuota desde los registros privados.') from ex
 
 @router.post('/api/creative/generate-image',dependencies=[Depends(require_key)],status_code=201)
 def ai_image(body:GenerateVisual):
@@ -73,7 +73,7 @@ def ai_image(body:GenerateVisual):
         ext={'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp'}.get(mime)
         if not ext:raise HTTPException(422,'Formato de imagen generado no compatible')
         return cr.ingest(binary,'SKY_IA_generada'+ext)
-    except GeminiError as ex:raise HTTPException(503,str(ex)[:350]) from ex
+    except GeminiError as ex:raise HTTPException(503,'No se pudo generar la imagen con Gemini. Revisá la configuración privada.') from ex
     except ValueError as ex:raise HTTPException(422,str(ex)) from ex
 
 @router.post('/api/creative/assets',dependencies=[Depends(require_key)],status_code=201)

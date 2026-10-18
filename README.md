@@ -27,3 +27,8 @@ SKY es un asistente personal de software con memoria local, IA opcional, herrami
 Empezá por [README_V9_6_INICIO.md](README_V9_6_INICIO.md). API nueva: [SKY_CONTEXTUAL_API.md](SKY_CONTEXTUAL_API.md). Validación: [VALIDACION_V9_6.md](VALIDACION_V9_6.md).
 
 **Estado:** piloto local funcional, no certificación de producción pública ni inteligencia ilimitada. BAQUEANO requiere la clave privada del creador; no se modificó su web en producción.
+
+---
+## SKY v10.1 — Multilingual Creative Security
+
+Consulta [README_V10_1_INICIO.md](README_V10_1_INICIO.md), [CHANGELOG_V10_1.md](CHANGELOG_V10_1.md) y [SEGURIDAD_V10_1.md](SEGURIDAD_V10_1.md) para los cambios de idiomas, pistas de edición global, máscaras animadas, worker y controles de seguridad. Las funciones anteriores se conservan.

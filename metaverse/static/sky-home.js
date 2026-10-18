@@ -49,6 +49,6 @@ $('chat-form').addEventListener('submit',async e=>{e.preventDefault();const text
  res=await fetch('/api/community/me/ask',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+userToken},body:JSON.stringify({message:text})})}
  const d=await res.json();if(!res.ok)throw Error(d.detail||'Error de respuesta');msg('SKY',d.answer||'Sin respuesta');if(isOwner&&d.type==='proposal'&&d.request){renderWork(d.request);window.skyActiveProject=d.request.project_id||window.skyActiveProject}
  }catch(err){msg('SKY','No se pudo procesar tu solicitud: '+err.message)}finally{$('send').disabled=false}});
-$('mic').addEventListener('click',()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){msg('SKY','El navegador no admite dictado. Podés escribir tu solicitud.');return}const r=new SR();r.lang='es-NI';r.onresult=e=>{$('prompt').value=($('prompt').value+' '+e.results[0][0].transcript).trim()};r.onerror=()=>msg('SKY','No se pudo acceder al micrófono. Verificá los permisos.');r.start()});
+$('mic').addEventListener('click',()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){msg('SKY','El navegador no admite dictado. Podés escribir tu solicitud.');return}const r=new SR();r.lang=document.documentElement.lang==='es'?'es-NI':(document.documentElement.lang||'es-NI');r.onresult=e=>{$('prompt').value=($('prompt').value+' '+e.results[0][0].transcript).trim()};r.onerror=()=>msg('SKY','No se pudo acceder al micrófono. Verificá los permisos.');r.start()});
 setMode('guest');
 })();

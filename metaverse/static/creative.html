@@ -1,7 +1,7 @@
 <!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SKY Creative Studio</title><link rel="stylesheet" href="/static/creative.css"></head><body>
-<header><a class="brand" href="/sky">✦ SKY IA</a><span>Creative Studio <small>v10.0</small></span><a href="/sky" class="toplink">← Volver a SKY</a></header>
+<header><a class="brand" href="/sky">✦ SKY IA</a><span><span data-sky-i18n="studio">Estudio creativo</span> <small>v10.1</small></span><a href="/sky" class="toplink">← Volver a SKY</a></header>
 <main>
-<section class="intro"><h1>Tu estudio creativo, dentro de SKY.</h1><p>Importá tus archivos, combiná capas o clips, revisá el resultado y exportá sin perder los originales.</p></section>
+<section class="intro"><h1 data-sky-i18n="studio">Estudio creativo</h1><p>Importá tus archivos, combiná capas o clips, revisá el resultado y exportá sin perder los originales.</p></section>
 <section class="workspace">
   <aside class="side">
     <h2>Biblioteca personal</h2><label class="upload">＋ Importar imagen, video o audio<input type="file" id="upload" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,video/x-matroska,audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/flac,audio/aac" multiple hidden></label>
@@ -10,7 +10,7 @@
     <label class="upload">↑ Importar proyecto editable (.skyzip)<input type="file" id="bundle-upload" accept=".skyzip" hidden></label><h2>Mis proyectos</h2><div id="projects" class="project-list"></div>
   </aside>
   <section class="work">
-    <div class="toolbar"><div><label>Proyecto <input id="project-name" maxlength="120" value="Mi creación con SKY"></label></div><div class="tools"><button id="new-image">Nueva imagen</button><button id="new-video">Nuevo video</button><button id="save" disabled>Guardar edición</button><button id="export-bundle" disabled>Exportar proyecto editable</button></div></div>
+    <div class="toolbar"><div><label>Proyecto <input id="project-name" maxlength="120" value="Mi creación con SKY"></label></div><div class="tools"><button id="new-image">Nueva imagen</button><button id="new-video">Nuevo video</button><button id="save" disabled data-sky-i18n="save">Guardar</button><button id="export-bundle" disabled>Exportar proyecto editable</button></div></div>
     <section class="command"><label for="instruction">Pedile a SKY un cambio en español</label><div class="tools"><input id="instruction" maxlength="700" placeholder="Ej.: agregá texto SKY IA, subí el contraste a 1.4, pon texto Hola en clip 1"><button id="apply-command">Aplicar instrucción</button></div><p class="hint">Las órdenes locales admitidas son específicas y verificables. Cada cambio queda en una versión nueva.</p></section>
     <div class="modes"><button id="mode-image" class="active" type="button">Imagen y capas</button><button id="mode-video" type="button">Video y línea de tiempo</button><span id="project-state">Sin proyecto</span></div>
     <div class="canvas"><img id="image-preview" hidden alt="Vista previa del diseño generado"><video id="video-preview" controls hidden playsinline></video><div id="empty-preview">Seleccioná un archivo de la biblioteca o creá un nuevo proyecto.</div></div>
@@ -47,7 +47,13 @@
 <button type="button" id="v10-track">Seguir objeto en el clip y aplicar trayectoria a última capa</button>
 <p class="hint">El seguimiento se basa en similitud visual, no identifica personas u objetos semánticamente. Revisá los puntos antes de exportar.</p>
 <label>Fotograma exacto (s) <input id="v10-time" type="number" min="0" step=".1" value=".5"></label><button type="button" id="v10-preview">Vista previa del último render guardado</button></details>
-<div id="clips" class="clips"></div>
+<details class="advanced-options"><summary>SKY v10.1 · Pistas globales y máscaras animadas</summary>
+  <p class="hint">Añadí una pista gráfica independiente de los clips. Podés definir su intervalo, moverla mediante fotogramas clave y aplicar máscaras que cambian entre dos momentos. El resultado queda guardado en el proyecto.</p>
+  <div class="grid-form"><label>Imagen de pista (ID de biblioteca)<input id="v101-track-asset" placeholder="asset_..."></label><label>Inicio (s)<input id="v101-track-from" type="number" step=".1" min="0" value="0"></label><label>Fin (s)<input id="v101-track-to" type="number" step=".1" min=".1" value="2"></label><label>Ancho de pista<input id="v101-track-width" type="number" min="1" max="1500" value="120"></label></div>
+  <button id="v101-add-track" type="button">Añadir pista global</button><p id="v101-track-summary" class="hint"></p>
+  <label>Máscaras de la última pista: JSON de tiempos e ID de imágenes de máscara<textarea id="v101-masks" rows="3" placeholder='[{"t":0,"mask_asset_id":"asset_..."},{"t":1,"mask_asset_id":"asset_..."}]'></textarea></label>
+  <button id="v101-set-masks" type="button">Aplicar máscaras interpoladas</button>
+  </details><div id="clips" class="clips"></div>
     </div>
     <h3>Historial del proyecto editable</h3><div id="version-history"></div><h3>Versiones exportadas</h3><div id="exports" class="exports"></div>
     <h3>Renders y progreso</h3><div id="jobs" class="jobs"></div>
@@ -55,4 +61,4 @@
 </section>
 <div id="login" class="modal"><div class="login-inner"><h2>SKY · Acceso privado</h2><p>El editor y los archivos se guardan en tu equipo. Solo el creador puede gestionarlos.</p><input id="key" type="password" placeholder="Clave privada SKY" autocomplete="current-password"><button id="connect">Entrar al estudio</button><p id="auth-error" role="alert"></p></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
-</main><script src="/static/creative.js" defer></script></body></html>
+</main><script src="/static/creative.js" defer></script><script src="/static/sky-language-ui.js" defer></script></body></html>

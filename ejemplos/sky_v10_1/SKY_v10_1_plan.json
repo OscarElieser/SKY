@@ -1,0 +1,45 @@
+{
+  "width": 320,
+  "height": 180,
+  "fps": 15,
+  "clips": [
+    {
+      "asset_id": "asset_926e9602a5e746e598d9",
+      "start": 0,
+      "end": 2,
+      "caption": "SKY IA 10.1"
+    }
+  ],
+  "tracks": [
+    {
+      "asset_id": "asset_f6d7d8a5023348bc8bba",
+      "width": 80,
+      "x": 110,
+      "y": 40,
+      "from": 0,
+      "to": 1.9,
+      "keyframes": [
+        {
+          "t": 0,
+          "x": 80,
+          "y": 40
+        },
+        {
+          "t": 1.5,
+          "x": 160,
+          "y": 40
+        }
+      ],
+      "mask_keyframes": [
+        {
+          "t": 0,
+          "mask_asset_id": "asset_772e894f185347c08652"
+        },
+        {
+          "t": 1.5,
+          "mask_asset_id": "asset_8be2a7f62c00407da00e"
+        }
+      ]
+    }
+  ]
+}
