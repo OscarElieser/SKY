@@ -1,0 +1,8 @@
+{
+  "health_http": "ok",
+  "proposal_http": "ok",
+  "revision_http": "ok",
+  "approval_http": "ok",
+  "chromium": "ok",
+  "page_errors": []
+}
