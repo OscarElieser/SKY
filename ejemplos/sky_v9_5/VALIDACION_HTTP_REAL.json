@@ -1,0 +1,16 @@
+{
+  "server": "uvicorn HTTP localhost",
+  "status": "completed",
+  "stages": 4,
+  "deliverables": 4,
+  "export_files": [
+    "entregables/01_Crear_mundo_virtual_inicial_para__mi_proyecto_completo_de_aula_virtual_con_mundo_3D__dise_o_y_docume_world.json",
+    "entregables/01_Crear_mundo_virtual_inicial_para__mi_proyecto_completo_de_aula_virtual_con_mundo_3D__dise_o_y_docume_world.glb",
+    "entregables/02_Crear_dise_o_visual_editable_para__Crea_mi_proyecto_completo_de_aula_virtual_con_mundo_3D__dise_o_y_experience.html",
+    "entregables/02_Crear_dise_o_visual_editable_para__Crea_mi_proyecto_completo_de_aula_virtual_con_mundo_3D__dise_o_y_experience_spec.json",
+    "entregables/03_Generar_borrador_de_mi_proyecto_completo_de_aula_virtual_con_mundo_3D__dise_o_y_documento_a_partir_d_sky-648a40e126cc4ad0_mi_proyecto_completo_de_aula_virtual_con_mundo_3d_diseno_y_docume.docx",
+    "proyecto.json"
+  ],
+  "client_isolation": "owner API key",
+  "tests": "real server / real workflow engine / real ZIP result"
+}

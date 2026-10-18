@@ -1,0 +1,25 @@
+{
+  "name": "Preparar un curso de innovación",
+  "steps": [
+    {
+      "agent": "planificador",
+      "action": "plan",
+      "task": "Planificar actividades didácticas para un curso de innovación",
+      "params": {}
+    },
+    {
+      "agent": "documentalista",
+      "action": "document",
+      "task": "Crear guía de aprendizaje sobre innovación y prototipos",
+      "params": {
+        "document": {
+          "kind": "docx",
+          "title": "Guía de innovación",
+          "content": "# Objetivo\nDiseñar un prototipo y evaluar los resultados.\n# Actividades\nTrabajo colaborativo, construcción y reflexión."
+        }
+      }
+    }
+  ],
+  "run_at": null,
+  "interval_minutes": null
+}

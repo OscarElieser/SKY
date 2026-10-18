@@ -1,0 +1,22 @@
+{
+  "type": "sky-experience",
+  "schema_version": 1,
+  "title": "Academia SKY · Innovación",
+  "description": "Crear un portal educativo inmersivo de turismo y tecnología para Nicaragua",
+  "template": "classroom",
+  "palette": "sky",
+  "sections": [
+    "Cursos",
+    "Lecciones",
+    "Recursos",
+    "Progreso"
+  ],
+  "design_dna": {
+    "theme": "SKY",
+    "responsive": true,
+    "fonts": "system-ui",
+    "editable": true
+  },
+  "generated_by": "SKY Visual Creator local - plantilla estructurada",
+  "limitation": "Diseño generado por reglas; no imágenes ni modelos 3D fotorrealistas."
+}

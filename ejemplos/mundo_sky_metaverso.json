@@ -1,0 +1,827 @@
+{
+  "prompt": "Ciudad con laboratorios de innovación y tecnología",
+  "theme": "ciudad",
+  "seed": 19,
+  "objects": [
+    {
+      "id": "4e2d3058257446c395260a59fbdd3c82",
+      "name": "Terreno SKY",
+      "kind": "platform",
+      "position": [
+        0.0,
+        -0.3,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        38.0,
+        0.35,
+        38.0
+      ],
+      "color": "#526373"
+    },
+    {
+      "id": "c77a36b82d90495997aeeb13dfb9599d",
+      "name": "Avenida central",
+      "kind": "platform",
+      "position": [
+        0.0,
+        -0.08,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        3.0,
+        0.09,
+        38.0
+      ],
+      "color": "#293E55"
+    },
+    {
+      "id": "718b296e11e6479fbdf284ea9ddcecc2",
+      "name": "Edificio -3:-3",
+      "kind": "tower",
+      "position": [
+        -13.5,
+        0.0,
+        -13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        8.352431779762217,
+        2.8
+      ],
+      "color": "#6C91BA"
+    },
+    {
+      "id": "7a4495a4a8c4424ab443046b5ce8fd6f",
+      "name": "Edificio -3:-2",
+      "kind": "tower",
+      "position": [
+        -13.5,
+        0.0,
+        -9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        6.994231960444733,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "f4330bb717664c4d8560b877b3f1a1ca",
+      "name": "Edificio -3:-1",
+      "kind": "tower",
+      "position": [
+        -13.5,
+        0.0,
+        -4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        5.646784491642555,
+        2.8
+      ],
+      "color": "#52677B"
+    },
+    {
+      "id": "0543697b15a649c78d32b9279599274a",
+      "name": "Edificio -3:1",
+      "kind": "tower",
+      "position": [
+        -13.5,
+        0.0,
+        4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        7.59458995026149,
+        2.8
+      ],
+      "color": "#52677B"
+    },
+    {
+      "id": "ee440ac632d44e9aaf8386bb318c20be",
+      "name": "Edificio -3:2",
+      "kind": "tower",
+      "position": [
+        -13.5,
+        0.0,
+        9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        3.682876190063245,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "9172300cbd7041ee8c90632615efd371",
+      "name": "Edificio -3:3",
+      "kind": "tower",
+      "position": [
+        -13.5,
+        0.0,
+        13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        5.484409522545808,
+        2.8
+      ],
+      "color": "#52677B"
+    },
+    {
+      "id": "227aeec122e44fdf8e08347e5a208ae4",
+      "name": "Edificio -2:-3",
+      "kind": "tower",
+      "position": [
+        -9.0,
+        0.0,
+        -13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        9.64297429682821,
+        2.8
+      ],
+      "color": "#52677B"
+    },
+    {
+      "id": "3769eaca461a4a32975a4b75760a86aa",
+      "name": "Edificio -2:-2",
+      "kind": "tower",
+      "position": [
+        -9.0,
+        0.0,
+        -9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        10.15705183707724,
+        2.8
+      ],
+      "color": "#6C91BA"
+    },
+    {
+      "id": "e2185e21a62d4e11b9010c291a936efd",
+      "name": "Edificio -2:-1",
+      "kind": "tower",
+      "position": [
+        -9.0,
+        0.0,
+        -4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        7.467768130185819,
+        2.8
+      ],
+      "color": "#9CACBE"
+    },
+    {
+      "id": "6d00304eb1c44674bd51a4c1f4f09f86",
+      "name": "Edificio -2:1",
+      "kind": "tower",
+      "position": [
+        -9.0,
+        0.0,
+        4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        10.00899300709709,
+        2.8
+      ],
+      "color": "#9CACBE"
+    },
+    {
+      "id": "a7c5b6e34c66450ea6bc597f1c7fcf03",
+      "name": "Edificio -2:2",
+      "kind": "tower",
+      "position": [
+        -9.0,
+        0.0,
+        9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        3.7339109826686174,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "628186eafb9e4b37932eb0afeb91c7d7",
+      "name": "Edificio -2:3",
+      "kind": "tower",
+      "position": [
+        -9.0,
+        0.0,
+        13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        5.9862068750111455,
+        2.8
+      ],
+      "color": "#6C91BA"
+    },
+    {
+      "id": "d80354bc6eab45e8b741abcf306848c6",
+      "name": "Edificio -1:-3",
+      "kind": "tower",
+      "position": [
+        -4.5,
+        0.0,
+        -13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        9.385088178572282,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "7687a598352a4a5a9278e441039e2fd8",
+      "name": "Edificio -1:-2",
+      "kind": "tower",
+      "position": [
+        -4.5,
+        0.0,
+        -9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        2.937781277408741,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "e07809d9c5204eb1855a748cbc5f2de0",
+      "name": "Edificio -1:-1",
+      "kind": "tower",
+      "position": [
+        -4.5,
+        0.0,
+        -4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        8.996437752194193,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "5b9ef9d98bb743939e366524a180f89f",
+      "name": "Edificio -1:1",
+      "kind": "tower",
+      "position": [
+        -4.5,
+        0.0,
+        4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        6.410471059366852,
+        2.8
+      ],
+      "color": "#52677B"
+    },
+    {
+      "id": "8a36e5a098b64372a56e18d9b86d9683",
+      "name": "Edificio -1:2",
+      "kind": "tower",
+      "position": [
+        -4.5,
+        0.0,
+        9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        7.480040130780088,
+        2.8
+      ],
+      "color": "#9CACBE"
+    },
+    {
+      "id": "584f7285e666433bb461d1db44ff9bcf",
+      "name": "Edificio -1:3",
+      "kind": "tower",
+      "position": [
+        -4.5,
+        0.0,
+        13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        9.294096790432906,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "36e40fae705042d8bd982d86807c92bb",
+      "name": "Edificio 1:-3",
+      "kind": "tower",
+      "position": [
+        4.5,
+        0.0,
+        -13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        4.709298629704722,
+        2.8
+      ],
+      "color": "#6C91BA"
+    },
+    {
+      "id": "37b115169ff045a3a91750e258c9b475",
+      "name": "Edificio 1:-2",
+      "kind": "tower",
+      "position": [
+        4.5,
+        0.0,
+        -9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        9.37208874747214,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "62eb138713c34d979906a49b1ca8bd33",
+      "name": "Edificio 1:-1",
+      "kind": "tower",
+      "position": [
+        4.5,
+        0.0,
+        -4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        4.370409984410231,
+        2.8
+      ],
+      "color": "#9CACBE"
+    },
+    {
+      "id": "dc7df5caf06e461ab638ba3b41ecdb08",
+      "name": "Edificio 1:1",
+      "kind": "tower",
+      "position": [
+        4.5,
+        0.0,
+        4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        7.935801950432978,
+        2.8
+      ],
+      "color": "#6C91BA"
+    },
+    {
+      "id": "137d9965fe2f4330aa3ffd56d13eccb0",
+      "name": "Edificio 1:2",
+      "kind": "tower",
+      "position": [
+        4.5,
+        0.0,
+        9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        7.287167256950965,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "3c8ed6aeb6d344f5b4af3488e352eac8",
+      "name": "Edificio 1:3",
+      "kind": "tower",
+      "position": [
+        4.5,
+        0.0,
+        13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        2.8570301849184645,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "c45e0ea97d74498783c6cff2a500e17b",
+      "name": "Edificio 2:-3",
+      "kind": "tower",
+      "position": [
+        9.0,
+        0.0,
+        -13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        10.228457937642832,
+        2.8
+      ],
+      "color": "#6C91BA"
+    },
+    {
+      "id": "86ea8f6ff7da4bd6a2f03e32d4940e73",
+      "name": "Edificio 2:-2",
+      "kind": "tower",
+      "position": [
+        9.0,
+        0.0,
+        -9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        7.065434500110044,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "9bf613fbca0146fea534c72e45cfbdcf",
+      "name": "Edificio 2:-1",
+      "kind": "tower",
+      "position": [
+        9.0,
+        0.0,
+        -4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        5.826386497259595,
+        2.8
+      ],
+      "color": "#9CACBE"
+    },
+    {
+      "id": "37d5542469a44a1fb5445624257bc3fc",
+      "name": "Edificio 2:1",
+      "kind": "tower",
+      "position": [
+        9.0,
+        0.0,
+        4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        10.102384714957385,
+        2.8
+      ],
+      "color": "#9CACBE"
+    },
+    {
+      "id": "35791e1b35794b31949d3ef0c2326857",
+      "name": "Edificio 2:2",
+      "kind": "tower",
+      "position": [
+        9.0,
+        0.0,
+        9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        3.55055518755492,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "2a781b63f7174b8e8687bdf7fcd2499f",
+      "name": "Edificio 2:3",
+      "kind": "tower",
+      "position": [
+        9.0,
+        0.0,
+        13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        5.888215435331853,
+        2.8
+      ],
+      "color": "#6C91BA"
+    },
+    {
+      "id": "0a1dff5632484f0dbf1f3df96eddea10",
+      "name": "Edificio 3:-3",
+      "kind": "tower",
+      "position": [
+        13.5,
+        0.0,
+        -13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        8.341600757709841,
+        2.8
+      ],
+      "color": "#52677B"
+    },
+    {
+      "id": "4b42126209aa4a8e9b9ebf6203edf3a3",
+      "name": "Edificio 3:-2",
+      "kind": "tower",
+      "position": [
+        13.5,
+        0.0,
+        -9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        10.470330302810241,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "cbe919dc17ff42daadc9904d106ddc1e",
+      "name": "Edificio 3:-1",
+      "kind": "tower",
+      "position": [
+        13.5,
+        0.0,
+        -4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        5.126404578118283,
+        2.8
+      ],
+      "color": "#D7DFE5"
+    },
+    {
+      "id": "d1d35af910354f50807f7c941608d684",
+      "name": "Edificio 3:1",
+      "kind": "tower",
+      "position": [
+        13.5,
+        0.0,
+        4.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        5.203547300623928,
+        2.8
+      ],
+      "color": "#9CACBE"
+    },
+    {
+      "id": "09e2495376574c1b9d857562e6214b18",
+      "name": "Edificio 3:2",
+      "kind": "tower",
+      "position": [
+        13.5,
+        0.0,
+        9.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        6.580527091007307,
+        2.8
+      ],
+      "color": "#52677B"
+    },
+    {
+      "id": "4cfd8f4ab5aa4fd09a0993b573f752e6",
+      "name": "Edificio 3:3",
+      "kind": "tower",
+      "position": [
+        13.5,
+        0.0,
+        13.5
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.8,
+        5.328158065337199,
+        2.8
+      ],
+      "color": "#6C91BA"
+    },
+    {
+      "id": "6794d852818f491db580e0c5f37b0921",
+      "name": "Sede SKY",
+      "kind": "tower",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        3.2,
+        9.0,
+        3.2
+      ],
+      "color": "#48C9D6"
+    }
+  ],
+  "sky": "#9EB2CF"
+}

@@ -1,0 +1,18 @@
+{
+  "server": "HTTP real 127.0.0.1",
+  "flow": "flow_b3cadc9c780e47548a5e",
+  "steps_executed": 4,
+  "flow_status": "completed",
+  "project": "prj_d57be599717c420ba84b",
+  "world_id": "33b510bf71404f9d9ec475e3009f6354",
+  "artifact_zip": "Academia_SKY_v9_4_proyecto_real.zip",
+  "zip_entries": 6,
+  "zip_sha256": "f35f2952a5c9e97e2c7fbcbd792193923f6d2f37bce6679d9005bff5dcc18947",
+  "authorization_mismatch_rejected": true,
+  "pause_resume_verified": true,
+  "private_owner_route_test": true,
+  "browser": {
+    "status": "not_validated",
+    "reason": "Error: Page.goto: net::ERR_BLOCKED_BY_ADMINISTRATOR at http://sky-ui.test/flows\nCall log:\n  - navigating to \"http://sky-ui.test/flows\", waiting until \"networ"
+  }
+}
