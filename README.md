@@ -1,19 +1,17 @@
-# SKY IA
+# SKY IA v9.7 · Creative Studio
 
-**Proyecto tecnológico impulsado por Oscar Elieser Chamorro Guzmán.**
+**Inicio recomendado:** [README_V9_7_INICIO.md](README_V9_7_INICIO.md) · [Creative API](SKY_CREATIVE_API.md) · [Validación](VALIDACION_V9_7.md) · [Cambios](CHANGELOG_V9_7.md).
 
-Este repositorio es el origen oficial del código SKY IA. La versión local más reciente se está preparando para integrar SKY v9.8 Advanced Creative Intelligence.
+Los módulos anteriores se conservan; la pantalla principal sigue minimalista. BAQUEANO es privado del creador.
 
-## Arquitectura
+---
 
-SKY integra asistencia multi-IA, proyectos, memoria, metaverso, comunidad, creación de documentos, estudio creativo, automatizaciones y API propia. La interfaz pública mantiene una portada minimalista y BAQUEANO es una integración privada del creador.
+# SKY IA Universal v9.6 — Contextual Coordination
 
-## Seguridad y publicación
+**Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
 
-No subas archivos `.env`, claves API, tokens, bases SQLite con datos personales, carpetas `local_data/` ni sesiones privadas. Las funciones sensibles deben permanecer detrás de controles de acceso verificables en servidor.
+SKY es un asistente personal de software con memoria local, IA opcional, herramientas de creación, metaverso, comunidad y proyectos. Esta versión conecta la **interpretación contextual, revisión de planes y revisión versionada de resultados dentro de una sola conversación**, conservando los motores v9.5 y la pantalla inicial sencilla.
 
-## Estado
+Empezá por [README_V9_6_INICIO.md](README_V9_6_INICIO.md). API nueva: [SKY_CONTEXTUAL_API.md](SKY_CONTEXTUAL_API.md). Validación: [VALIDACION_V9_6.md](VALIDACION_V9_6.md).
 
-Inicialización del repositorio. El código completo no se considera publicado hasta completar y verificar su incorporación en GitHub. Consulta el historial de cambios y las pruebas antes de un despliegue de producción.
-
-La autoría del código, contribuciones y uso de componentes de terceros se rigen por sus licencias respectivas; la identificación del promotor no sustituye el registro oficial de una marca.
+**Estado:** piloto local funcional, no certificación de producción pública ni inteligencia ilimitada. BAQUEANO requiere la clave privada del creador; no se modificó su web en producción.

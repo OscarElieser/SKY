@@ -1,0 +1,972 @@
+"""SKY Universal v8.0 | asistente personal con visión, taller 3D y evolución."""
+from pathlib import Path
+from datetime import date
+import hashlib
+import os
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent / ".env")
+import streamlit as st
+import pandas as pd
+from neural_core.storage import (iniciar, guardar_movimiento, movimientos, guardar_presupuesto, presupuestos,
+    agregar_documento, documentos, guardar_memoria, memorias, eliminar_memoria,
+    guardar_tarea, tareas, completar_tarea, crear_operacion, operaciones, revisar_operacion)
+from neural_core.catalogo import MODULOS, EJEMPLOS
+from neural_core.finanzas import resumen, crecimiento_compuesto
+from neural_core.monetizacion import (crear_tablas, agregar_cliente, listar_clientes,
+                                       cambiar_etapa, resumen_comercial, simular_ventas, ETAPAS)
+from neural_core.documentos import extraer_texto
+from neural_core.sky_office import create_document, FORMATS
+from neural_core.assistant import responder, modelo_activo, ModeloNoDisponible
+from neural_core.providers import PROVIDERS, provider_ready, provider_summary, choose_provider
+from neural_core.gemini_provider import disponible as gemini_disponible, analizar_imagen, generar_imagen
+from neural_core.baqueano import (estado_web, resumen_repo, listado_repo, leer_archivo,
+    vista_diff, propuesta_pr, supabase_publico, github_token, SUPABASE_VISTAS)
+from neural_core.investigacion import wikipedia
+from neural_core.actualidad import noticias
+from neural_core.mercados import CRYPTOS, ACCIONES, cripto_precios, accion_historial, rentabilidad_historica
+from neural_core.multimedia import catalogo_itunes, convertir_imagen
+from neural_core.seguridad import revisar_archivo
+from neural_core.creadores import campana, produccion, REDES
+from neural_core.dispositivos import (paired_devices, save_device, remove_device, call_device,
+    interpret_command, APP_OPTIONS)
+from neural_core.voz import transcribir_audio, hablar_texto
+from neural_core.voz_inbox import read_inbox, dismiss_inbox
+from sensores_app import mostrar_sensores
+from neural_core.sky_3d import leer_imagen, caja_relativa, segmentar_parte, png_bytes, ensamblar_glb, crear_paquete, importar_paquete
+from neural_core.sky_vision import analizar as vision_analizar
+from neural_core.sky_evolution import (feedback as sky_feedback, feedback_resumen, nueva_meta, metas,
+    actualizar_meta, proponer_mejora, mejoras, cambiar_mejora)
+from neural_core.sky_agent import SKILLS, execute_skill, interpret_local_command
+from neural_core.sky_live import historial as sky_live_historial, ejecutar_ciclo as sky_live_check
+
+st.set_page_config(page_title="SKY Universal v8.0", page_icon="🧠", layout="wide", initial_sidebar_state="expanded")
+# Si se desea abrir el panel desde otro dispositivo mediante Tailscale, definir
+# SKY_DASHBOARD_PASSWORD de al menos 12 caracteres en .env.
+clave_panel=(os.getenv('SKY_DASHBOARD_PASSWORD') or os.getenv('NEURALT_DASHBOARD_PASSWORD','')).strip()
+if clave_panel and len(clave_panel)<12:
+    st.error('SKY_DASHBOARD_PASSWORD debe tener al menos 12 caracteres.')
+    st.stop()
+if clave_panel and not st.session_state.get('_panel_autenticado'):
+    st.title('🔒 Acceso privado a SKY')
+    with st.form('entrada_privada'):
+        candidato=st.text_input('Contraseña del panel',type='password')
+        enviar=st.form_submit_button('Acceder')
+    if enviar:
+        import hmac
+        if hmac.compare_digest(candidato,clave_panel):
+            st.session_state['_panel_autenticado']=True
+            st.rerun()
+        else: st.error('Contraseña incorrecta.')
+    st.stop()
+st.markdown("""<style>
+.block-container {padding-top:1.8rem; max-width:1500px}
+[data-testid=stMetric] {background:rgba(100,140,170,.08); padding:14px; border-radius:12px}
+.smallnote {opacity:.8; font-size:.9rem}
+</style>""", unsafe_allow_html=True)
+iniciar(); crear_tablas()
+SECCIONES=["🏠 Inicio", "🧠 IA universal", "🧬 Centro multi-IA", "👁️ SKY Visión", "🎨 SKY Studio 3D", "📁 SKY Office Studio", "🧬 SKY Evolución", "🧰 Herramientas SKY", "🔔 SKY Live", "🌐 SKY Metaverso y API", "🎙️ SKY y dispositivos", "💰 Finanzas personales", "🚀 Generar ingresos", "📈 Bolsa y Bitcoin",
+           "📰 Noticias e Internet", "📣 Redes sociales", "🎵 Música y películas", "🎞️ Imágenes y videos",
+           "🔐 Antivirus y hacking ético", "🎓 Educación e investigación", "📚 Biblioteca y memoria",
+           "🧭 BAQUEANO Control Center", "🧾 Transacciones", "📡 Engine Sensor MLP + GRU", "✅ Proyectos y tareas"]
+with st.sidebar:
+    st.title("🧠 SKY")
+    st.caption("Universal v6.0 · Asistente privado + metaverso + API")
+    seccion=st.radio("Navegación",SECCIONES, label_visibility="collapsed")
+    st.divider()
+    st.caption("Multi-IA + visión + 3D por piezas + memoria + herramientas autorizadas")
+    st.caption("Los proveedores externos sólo reciben contenido cuando los seleccionás o activás el modo automático.")
+
+
+def alerta_red():
+    st.caption("Los datos se consultan en Internet sólo al pulsar el botón; pueden estar retrasados o no disponibles. Confirma cualquier decisión importante con fuentes oficiales.")
+
+
+def ejecutar(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except Exception as exc:
+        st.error(f"No se pudo completar: {exc}")
+        return None
+
+
+def guardar_con_feedback(fn, *args, mensaje="Registro guardado", **kwargs):
+    try:
+        fn(*args, **kwargs)
+        st.success(mensaje)
+        return True
+    except Exception as exc:
+        st.error(f"No se pudo guardar: {exc}")
+        return False
+
+
+def boton_descarga(texto, nombre, etiqueta="Descargar TXT"):
+    st.download_button(etiqueta, data=texto.encode("utf-8"), file_name=nombre, mime="text/plain")
+
+
+def elegir_motor(key, area='General'):
+    """Selector compartido; nunca activa redes ni cuenta doble automáticamente."""
+    opciones=['auto', *PROVIDERS]
+    default='auto'
+    etiqueta=lambda opt: ('Automático — entre los configurados' if opt=='auto'
+                         else PROVIDERS[opt].name + (' · listo' if provider_ready(opt) else ' · configurar'))
+    elegido=st.selectbox('Motor de IA',opciones,index=opciones.index(default),
+                          format_func=etiqueta,key=key)
+    try:
+        elegido, predeterminado=choose_provider(elegido,area)
+    except Exception as exc:
+        st.warning(str(exc))
+        elegido='ollama';predeterminado=PROVIDERS['ollama'].model_default
+    if elegido=='ollama':
+        instalados=modelo_activo()
+        if not instalados: st.caption('Ollama local no detectado. Ejecutá `ollama serve` y descargá un modelo.')
+        m=st.selectbox('Modelo Ollama',instalados or [predeterminado],key='modelo_'+key)
+    else:
+        m=st.text_input('Modelo de '+PROVIDERS[elegido].name,value=predeterminado,key='modelo_'+key)
+    st.caption('Modelo seleccionado: '+PROVIDERS[elegido].name+'. Claves en .env. Pueden aplicarse tarifas y cuotas.')
+    return elegido,m
+
+
+def mostrar_chat(area="General", prompt_inicial=None):
+    proveedor,modelo=elegir_motor('motor_'+area,area)
+    clave='chat_'+area
+    if clave not in st.session_state: st.session_state[clave]=[]
+    fuente_opcional=st.selectbox('Fuentes externas para esta pregunta',
+                                 ['No consultar','Noticias RSS','Wikipedia'],key='web_'+area)
+    historia=st.session_state[clave]
+    for m in historia:
+        with st.chat_message(m['role']): st.markdown(m['content'])
+    pregunta=st.chat_input('Preguntá a SKY…',key='prompt_'+area)
+    if prompt_inicial: st.caption('Ejemplo: '+prompt_inicial)
+    st.caption('Herramientas internas sin IA: /sky calcula 250*3 · /sky metas · /sky hora · /sky mejoras')
+    if pregunta:
+        with st.chat_message('user'): st.markdown(pregunta)
+        respuesta=''
+        with st.chat_message('assistant'):
+            with st.spinner('Consultando '+PROVIDERS[proveedor].name+'…'):
+                metadatos=[]
+                if fuente_opcional!='No consultar':
+                    try:
+                        metadatos=(noticias(pregunta[:100],limite=5) if fuente_opcional=='Noticias RSS'
+                                   else wikipedia(pregunta[:100],limite=5))
+                    except Exception as ex: st.warning('No fue posible consultar fuentes: '+str(ex))
+                try:
+                    respuesta_local=interpret_local_command(pregunta)
+                    if respuesta_local is not None:
+                        respuesta,fuentes=respuesta_local,[]
+                    else:
+                        respuesta,fuentes=responder(pregunta,area,historia,modelo,metadatos,proveedor=proveedor)
+                    st.markdown(respuesta)
+                    if metadatos:
+                        st.caption('Fuentes consultadas: metadatos, no necesariamente textos completos.')
+                        for x in metadatos:
+                            st.markdown(f"- [{x.get('titulo',x.get('titular','Fuente'))}]({x.get('url',x.get('enlace',''))})")
+                    if fuentes: st.caption('Documentos: '+', '.join(dict.fromkeys(x['nombre'] for x in fuentes)))
+                except Exception as exc: st.error(f'No se pudo completar la consulta: {exc}')
+        if respuesta: historia.extend([{'role':'user','content':pregunta},{'role':'assistant','content':respuesta}])
+
+
+if seccion=="🏠 Inicio":
+    st.title("SKY Universal v8.0")
+    st.write("**Un solo SKY:** chat multi-IA, visión por cámara, piezas 3D exportables, memoria, metas de mejora, voz, dispositivos, Engine Sensor y BAQUEANO. Los datos propios se conservan localmente.")
+    panel=st.columns(4)
+    with panel[0]: st.metric("Módulos principales",len(SECCIONES)-1)
+    with panel[1]: st.metric("Documentos",len(documentos()))
+    with panel[2]: st.metric("Prospectos / clientes",len(listar_clientes()))
+    with panel[3]: st.metric("Proveedores cloud configurados",sum(1 for k,v in PROVIDERS.items() if v.cloud and provider_ready(k)))
+    st.subheader("Qué puede hacer hoy")
+    st.write("Multi-IA (Gemini, OpenAI, Anthropic Claude, Mistral, Groq, DeepSeek y Ollama) para el chat; análisis y generación de imágenes con modelos compatibles; centro de control BAQUEANO para leer estado, repo y datos públicos; propuesta de cambios GitHub vía PR; finanzas, clientes, mercados, noticias, campañas, música, cine, seguridad defensiva y sensores MLP + GRU.")
+    st.info("Configurá las claves API en .env para los proveedores y BAQUEANO. No hay acceso automático a cuentas ni garantía de ganancias. Los cambios web se proponen en una rama y se revisan antes de fusionarlos.")
+    st.subheader("Ruta para convertir ideas en ingresos")
+    st.markdown("**1.** Elegir servicio → **2.** Crear propuesta y contenido → **3.** Conseguir prospectos reales → **4.** Registrar las negociaciones → **5.** Medir ventas y gastos.")
+    st.write("Ejemplos de servicios: materiales didácticos digitales, automatización para negocios, diseño de campañas, investigación de mercado, producción de contenidos y asesoría de implementación tecnológica.")
+
+elif seccion=="🧠 IA universal":
+    st.title("🧠 IA universal")
+    area=st.selectbox("Área de conocimiento",list(MODULOS))
+    st.write(MODULOS[area]); mostrar_chat(area,EJEMPLOS.get(area))
+
+elif seccion=="🧬 Centro multi-IA":
+    st.title('🧬 Centro multi-IA — el cerebro de SKY')
+    st.write('Gestioná los proveedores, elegí un modelo y compará respuestas. No se requieren todas las claves: cada servicio se activa por separado.')
+    import pandas as _pd
+    estado=provider_summary()
+    st.dataframe(_pd.DataFrame([{'Proveedor':e['proveedor'],
+        'Estado':'Clave configurada' if e['configurado'] and e['nube'] else ('Sin clave' if e['nube'] else 'Servicio local opcional'),
+        'Modelo previsto':e['modelo'], 'Tipo':'Nube' if e['nube'] else 'Local'} for e in estado]),
+        use_container_width=True,hide_index=True)
+    st.caption('Clave configurada no significa conexión verificada. Requiere autorización en la cuenta, cuotas y red. Los modelos pueden variar de disponibilidad.')
+    st.subheader('Comparar dos modelos (bajo demanda)')
+    st.warning('Dos respuestas = hasta dos consultas cobrables. Cada proveedor recibe el texto que escribas sólo cuando pulsás Comparar.')
+    disponibles=[k for k in PROVIDERS if provider_ready(k)]
+    if len(disponibles)<2: st.info('Configurá dos proveedores o un proveedor y Ollama para compararlos.')
+    else:
+        c1,c2=st.columns(2)
+        with c1: p1=st.selectbox('Proveedor A',disponibles,index=0,format_func=lambda k:PROVIDERS[k].name)
+        with c2: p2=st.selectbox('Proveedor B',disponibles,index=1,format_func=lambda k:PROVIDERS[k].name)
+        tema=st.text_area('Consulta para comparar',max_chars=3000,placeholder='Diseñá una campaña para BAQUEANO con presupuesto bajo...')
+        with st.expander('Modelos específicos (opcional)'):
+            m1=st.text_input('Modelo A',value=choose_provider(p1)[1])
+            m2=st.text_input('Modelo B',value=choose_provider(p2)[1])
+        if st.button('Comparar respuestas',type='primary',disabled=not bool(tema.strip()) or p1==p2):
+            if p1==p2: st.warning('Elegí dos proveedores distintos.')
+            else:
+                c1,c2=st.columns(2)
+                for destino,p,m in [(c1,p1,m1),(c2,p2,m2)]:
+                    with destino:
+                        st.subheader(PROVIDERS[p].name)
+                        with st.spinner('Generando…'):
+                            result=ejecutar(responder,tema,'Comparación de modelos',[],m,proveedor=p)
+                        if result: st.markdown(result[0])
+    st.subheader('Configuración privada')
+    st.markdown('Abrí `.env` en tu computadora, ingresá las claves de los servicios que contratés y reiniciá SKY. **Nunca pegues claves en el chat, ni en el repositorio público de BAQUEANO.**')
+    st.caption('Modo automático: usa una prioridad temática simple entre proveedores configurados; no compara modelos en secreto ni hace fallback de nube después de un fallo.')
+
+elif seccion=="👁️ SKY Visión":
+    st.title('👁️ SKY Visión — foto, cámara y razonamiento')
+    st.write('Enseñale algo a SKY con la cámara o cargá una foto. Podés preguntar por objetos, texto, problemas técnicos, diseño, educación o mejoras. Solo se envía la imagen a la IA cuando pulsás **Analizar**.')
+    c1,c2=st.columns(2)
+    with c1: imagen_camara=st.camera_input('Tomar foto para SKY',key='sky_vision_cam')
+    with c2: imagen_subida=st.file_uploader('O subir imagen',type=['png','jpg','jpeg','webp'],key='sky_vision_upload')
+    elegido=imagen_subida or imagen_camara
+    if elegido:
+        datos=elegido.getvalue()
+        tipo={'image/jpg':'image/jpeg'}.get(elegido.type,elegido.type)
+        st.image(datos,caption='Imagen seleccionada',width=380)
+        motores=[p for p in ('gemini','openai','anthropic','ollama') if provider_ready(p)]
+        proveedor_vision=st.selectbox('IA que analiza la fotografía',motores or ['gemini'],
+            format_func=lambda p:PROVIDERS[p].name,key='sky_vision_model')
+        pregunta=st.text_area('Tu instrucción',value='Describí todos los elementos visibles y explicá cómo podría mejorarlos o convertirlos en un proyecto.',height=105)
+        if st.button('Analizar la imagen con SKY',type='primary'):
+            respuesta=ejecutar(vision_analizar,datos,tipo,pregunta,proveedor_vision)
+            if respuesta: st.session_state['sky_vision_result']=respuesta
+        if st.session_state.get('sky_vision_result'):
+            st.markdown(st.session_state['sky_vision_result'])
+    else: st.info('Tomá una foto o subí una imagen para comenzar.')
+    st.caption('Gemini, GPT, Claude y modelos Ollama con capacidad de visión. La disponibilidad concreta depende del modelo y tu cuenta. SKY no interpreta imágenes médicas como un diagnóstico.')
+
+elif seccion=="🎨 SKY Studio 3D":
+    st.title('🎨 SKY Studio 3D — foto → piezas → ensamblaje')
+    st.write('Capturá una imagen, aislá cada componente mediante caja y segmentación asistida, ajustá la profundidad y armá un modelo 3D editable. Descargá el ensamblaje como **GLB**, más cada pieza PNG por separado.')
+    st.warning('La conversión de una sola foto genera geometría **2.5D (siluetas extruidas)**. No reconstruye superficies ocultas ni sustituye fotogrametría o escaneo 3D de múltiples ángulos.')
+    tab_input,tab_piezas,tab_final=st.tabs(['📷 Capturar imagen','✂️ Cortar en piezas','🧩 Ensamblar y exportar'])
+    with tab_input:
+        importar=st.file_uploader('Continuar proyecto anterior (ZIP generado por SKY)',type=['zip'],key='sky3d_import')
+        if importar and st.button('Restaurar proyecto 3D'):
+            try:
+                imagen_guardada,piezas_guardadas=importar_paquete(importar.getvalue())
+                st.session_state['sky3d_original']=imagen_guardada
+                st.session_state['sky3d_parts']=piezas_guardadas
+                st.session_state.pop('sky3d_hash',None)
+                st.session_state.pop('sky3d_plot',None)
+                st.session_state.pop('sky3d_download',None)
+                st.success('Proyecto recuperado con todas sus piezas.')
+            except Exception as exc:st.error(str(exc))
+        iz,der=st.columns(2)
+        with iz: img_cam=st.camera_input('Tomar imagen del objeto',key='studio_camara')
+        with der: img_up=st.file_uploader('O subir una foto',type=['png','jpg','jpeg','webp'],key='studio_subida')
+        src=img_up or img_cam
+        if src:
+            import hashlib
+            raw=src.getvalue(); hash_actual=hashlib.sha256(raw).hexdigest()
+            if hash_actual!=st.session_state.get('sky3d_hash'):
+                ver=ejecutar(leer_imagen,raw)
+                if ver is not None:
+                    st.session_state['sky3d_hash']=hash_actual
+                    st.session_state['sky3d_original']=png_bytes(ver)
+                    st.session_state['sky3d_parts']=[]
+                    st.session_state.pop('sky3d_plot',None)
+                    st.session_state.pop('sky3d_download',None)
+            if st.session_state.get('sky3d_original'):
+                st.image(st.session_state['sky3d_original'],caption='Imagen base',width=520)
+                st.info('Foto lista. Abrí «Cortar en piezas».')
+    original=st.session_state.get('sky3d_original')
+    if original:
+        base=leer_imagen(original)
+        w,h=base.size
+        piezas=st.session_state.setdefault('sky3d_parts',[])
+        with tab_piezas:
+            st.write(f'Lienzo: {w} × {h} píxeles. Piezas añadidas: {len(piezas)} / 18.')
+            nombre=st.text_input('Nombre de la pieza',value=f'Pieza {len(piezas)+1}',key='sky3d_name')
+            col1,col2=st.columns(2)
+            with col1:
+                izquierda=st.slider('Borde izquierdo (%)',0,95,15,key='sky3d_left')
+                arriba=st.slider('Borde superior (%)',0,95,15,key='sky3d_top')
+            with col2:
+                derecha=st.slider('Borde derecho (%)',5,100,85,key='sky3d_right')
+                abajo=st.slider('Borde inferior (%)',5,100,85,key='sky3d_bottom')
+            metodo=st.radio('Método de recorte',('grabcut','rectangulo'),
+                  format_func=lambda v:'Detección asistida de primer plano (GrabCut)' if v=='grabcut' else 'Rectángulo transparente',horizontal=True)
+            try:
+                from PIL import ImageDraw
+                dibujo=base.copy()
+                rect=caja_relativa(w,h,izquierda/100,arriba/100,derecha/100,abajo/100)
+                ImageDraw.Draw(dibujo).rectangle(rect,outline='#ff6600',width=max(2,w//150))
+                dibujo.thumbnail((640,400))
+                st.image(dibujo,caption='Vista previa de la selección — recuadro naranja')
+            except ValueError:st.warning('Ajustá los bordes de la selección para que no se crucen.')
+            profundidad=st.slider('Profundidad de esta pieza (relativa)',0.01,0.50,0.08,0.01,key='sky3d_depth')
+            if st.button('Crear pieza aislada',type='primary',disabled=len(piezas)>=18):
+                try:
+                    area=caja_relativa(w,h,izquierda/100,arriba/100,derecha/100,abajo/100)
+                    recorte=segmentar_parte(base,area,modo=metodo)
+                    piezas.append({'name':nombre.strip()[:48] or f'Pieza {len(piezas)+1}',
+                        'png':png_bytes(recorte),'depth':profundidad,'dx':0.,'dy':0.,'dz':0.,'enabled':True})
+                    st.success('Pieza creada y añadida al proyecto. Podés repetir el proceso para cada elemento.')
+                except Exception as exc:st.error(str(exc))
+            for i,p in enumerate(piezas):
+                with st.expander(f'Pieza {i+1} · {p["name"]}',expanded=(i==len(piezas)-1)):
+                    st.image(p['png'],width=320)
+                    st.download_button('Descargar PNG transparente',p['png'],file_name=f'pieza_{i+1:02}.png',mime='image/png',key=f'png_{i}')
+                    if st.button('Eliminar esta pieza',key=f'piece_delete_{i}'):
+                        piezas.pop(i);st.rerun()
+        with tab_final:
+            if not piezas: st.info('Primero creá al menos una pieza en la pestaña anterior.')
+            else:
+                st.write('Ajustá cada pieza: desplazamientos X, Y y Z. Al exportar, cada pieza permanece separada dentro del archivo 3D.')
+                for i,p in enumerate(piezas):
+                    with st.expander(f'🧩 {i+1}. {p["name"]}',expanded=(i==0)):
+                        p['enabled']=st.checkbox('Incluir en el modelo final',value=p.get('enabled',True),key=f'enabled_{i}')
+                        p['dx']=st.slider('Mover X',-1.,1.,float(p.get('dx',0.)),0.02,key=f'dx_{i}')
+                        p['dy']=st.slider('Mover Y',-1.,1.,float(p.get('dy',0.)),0.02,key=f'dy_{i}')
+                        p['dz']=st.slider('Mover Z',-1.,1.,float(p.get('dz',0.)),0.02,key=f'dz_{i}')
+                        p['depth']=st.slider('Profundidad',0.01,0.5,float(p.get('depth',0.08)),0.01,key=f'de_{i}')
+                if st.button('Ver vista previa 3D',key='sky3d_render'):
+                    try:
+                        import plotly.graph_objects as go
+                        from neural_core.sky_3d import _mesh_from_rgba
+                        from io import BytesIO
+                        from PIL import Image
+                        fig=go.Figure()
+                        for i,p in enumerate(piezas):
+                            if not p.get('enabled',True):continue
+                            mesh=_mesh_from_rgba(Image.open(BytesIO(p['png'])),depth=p['depth'],max_side=28)
+                            verts=mesh.vertices.copy()
+                            verts[:,0]+=p['dx'];verts[:,1]+=p['dy'];verts[:,2]+=p['dz']
+                            color=mesh.visual.face_colors
+                            facecolor=[f'rgb({rgb[0]},{rgb[1]},{rgb[2]})' for rgb in color]
+                            fig.add_trace(go.Mesh3d(x=verts[:,0],y=verts[:,1],z=verts[:,2],
+                                i=mesh.faces[:,0],j=mesh.faces[:,1],k=mesh.faces[:,2],
+                                facecolor=facecolor,name=p['name'],opacity=1.0))
+                        fig.update_layout(scene=dict(aspectmode='data'),margin=dict(t=10,b=10,l=10,r=10),height=520)
+                        st.session_state['sky3d_plot']=fig
+                    except Exception as exc:st.error(f'No se generó la vista previa: {exc}')
+                if st.session_state.get('sky3d_plot') is not None:st.plotly_chart(st.session_state['sky3d_plot'],use_container_width=True)
+                if st.button('Preparar exportación GLB y piezas',type='primary'):
+                    try:
+                        glb=ensamblar_glb(piezas,w,h)
+                        paquete=crear_paquete(piezas,original,w,h)
+                        st.session_state['sky3d_download']={'glb':glb,'zip':paquete}
+                        st.success('Modelo y paquete generados localmente.')
+                    except Exception as exc:st.error(f'No se pudo exportar: {exc}')
+                salida=st.session_state.get('sky3d_download')
+                if salida:
+                    st.download_button('⬇️ Descargar modelo ensamblado .GLB',salida['glb'],file_name='SKY_modelo_3D.glb',mime='model/gltf-binary')
+                    st.download_button('⬇️ Descargar todas las piezas + proyecto ZIP',salida['zip'],file_name='SKY_Studio_3D_Piezas.zip',mime='application/zip')
+                st.caption('Para modelado 3D real con todas las caras y piezas mecánicas editables, trabajá con Blender y capturas desde varios ángulos.')
+    else:
+        with tab_piezas:st.info('Cargá o tomá una imagen en la primera pestaña.')
+
+elif seccion=="📁 SKY Office Studio":
+    st.title('📁 SKY Office Studio — Documentos y presentaciones')
+    st.write('Creá archivos **Word, Excel, PowerPoint y PDF reales**, editables cuando el formato lo admite. También CSV, Markdown y HTML. El proceso local no envía tus datos a otra empresa.')
+    opciones=list(FORMATS)
+    with st.form('sky_office_creator'):
+        k=st.selectbox('Formato de salida',opciones,format_func=lambda x:FORMATS[x][0])
+        name=st.text_input('Título',value='Mi proyecto con SKY',max_chars=160)
+        topic=st.text_area('Objetivo e instrucciones',placeholder='Prepará una clase sobre innovación, o una presentación de mi propuesta comercial...',height=90,max_chars=6000)
+        content=st.text_area('Contenido editable',placeholder='# Introducción\nIdea principal...\n# Desarrollo\n- Punto uno\n- Punto dos',height=210,max_chars=49000)
+        csv_text=st.text_area('Tabla en CSV (opcional para Excel, Word, PDF o diapositivas)',placeholder='Concepto,Monto,Estado\nMateriales,250,Pendiente',height=85,max_chars=28000)
+        template=st.selectbox('Plantilla',['general','presupuesto'],help='La plantilla presupuesto crea fórmulas editables en Excel.')
+        use_ai=st.checkbox('Redactar contenido con un proveedor de IA (envía el tema al proveedor seleccionado)',value=False)
+        provider=st.selectbox('Proveedor (solo se utilizará si activás la casilla de IA)',['gemini','openai','anthropic','ollama','groq','mistral','deepseek'])
+        done=st.form_submit_button('✦ Crear archivo',type='primary')
+    if done:
+        import csv as csv_mod,io as io_mod
+        spec={'kind':k,'title':name,'prompt':topic,'content':content,'csv':csv_text,'template':template}
+        if use_ai:
+            if not topic.strip():st.error('Indicá el tema para usar un proveedor de IA.')
+            else:
+                try:
+                    texto,_=responder(f'Redactá un contenido estructurado, claro y editable sobre: {topic}. '+
+                       'Usá títulos Markdown, viñetas y sin inventar datos. Tipo de archivo: '+k,
+                       'SKY Office Studio',proveedor=provider)
+                    spec['content']=texto+'\n\n'+content
+                except Exception as ex:st.error('IA no disponible: '+type(ex).__name__)
+        if not use_ai or spec['content']!=content:
+            resultado=ejecutar(create_document,spec)
+            if resultado:
+                st.session_state['sky_last_office']=resultado
+                st.success('Archivo generado correctamente: '+resultado.filename)
+    if st.session_state.get('sky_last_office'):
+        doc=st.session_state['sky_last_office']
+        st.download_button('⬇ Descargar '+doc.description,data=doc.data,file_name=doc.filename,mime=doc.media_type,type='primary')
+    st.caption('Los archivos se generan en esta sesión y se descargan a tu equipo. Las diapositivas, hojas y Word se pueden continuar editando. La redacción con IA es opcional y puede tener costo de API.')
+
+elif seccion=="🧬 SKY Evolución":
+    st.title('🧬 SKY Evolución — memoria de mejoras y objetivos')
+    st.write('SKY puede recopilar tus evaluaciones, gestionar objetivos y preparar propuestas de mejora. No modifica automáticamente su código ni tu web: las mejoras se prueban antes de instalarse.')
+    t1,t2,t3=st.tabs(['Aprender de evaluaciones','Mis metas','Evolución del software'])
+    with t1:
+        with st.form('sky_nueva_evaluacion'):
+            modulo=st.selectbox('Función que evaluás',['IA universal','Voz','Visión','Studio 3D','Finanzas','BAQUEANO','Redes','Dispositivos','Otros'])
+            valor=st.slider('¿Qué tan útil fue?',1,5,3)
+            nota=st.text_area('¿Qué funcionó y qué debería mejorar?')
+            if st.form_submit_button('Guardar evaluación'):
+                guardar_con_feedback(sky_feedback,modulo,valor,nota,mensaje='Evaluación conservada en SKY')
+        data=feedback_resumen()
+        if data:st.dataframe(pd.DataFrame(data),use_container_width=True,hide_index=True)
+    with t2:
+        with st.form('sky_new_goal'):
+            nom=st.text_input('Meta',placeholder='Conseguir 10 clientes nuevos')
+            met=st.text_input('Unidad de medida',value='clientes')
+            aim=st.number_input('Objetivo',min_value=0.01,max_value=1000000000.,value=10.)
+            if st.form_submit_button('Guardar meta'):
+                guardar_con_feedback(nueva_meta,nom,met,aim,mensaje='Meta guardada')
+        for goal in metas():
+            st.write(f'**{goal["title"]}** — {goal["actual"]:g} / {goal["target"]:g} {goal["metric"]}')
+            st.progress(min(1.0,goal['actual']/goal['target']))
+            nuevo=st.number_input('Avance registrado',min_value=0.,max_value=1e12,value=float(goal['actual']),key=f'goal_{goal["id"]}')
+            if st.button('Actualizar avance',key=f'goal_update_{goal["id"]}'):
+                guardar_con_feedback(actualizar_meta,goal['id'],nuevo)
+    with t3:
+        with st.form('sky_prop_mejora'):
+            nom=st.text_input('Nombre de mejora',placeholder='Aprender voz sin Internet')
+            detalles=st.text_area('Descripción técnica y resultado esperado')
+            if st.form_submit_button('Proponer mejora'):
+                guardar_con_feedback(proponer_mejora,nom,detalles,mensaje='Mejora propuesta; no instalada')
+        lista=mejoras()
+        if lista:
+            st.dataframe(pd.DataFrame(lista),use_container_width=True,hide_index=True)
+            st.caption('Aprobar una propuesta no instala ni ejecuta código; marca su estado para desarrollo y pruebas.')
+            opciones={m['id']:f'#{m["id"]} · {m["title"]}' for m in lista}
+            ident=st.selectbox('Mejora a revisar',list(opciones),format_func=lambda i:opciones[i])
+            estado=st.selectbox('Estado',['pendiente','aprobada_para_desarrollo','descartada'])
+            if st.button('Guardar decisión'):guardar_con_feedback(cambiar_mejora,ident,estado)
+
+elif seccion=="🧰 Herramientas SKY":
+    st.title('🧰 Núcleo de herramientas internas')
+    st.write('SKY incluye herramientas propias que funcionan sin enviar datos a ninguna IA. Elegí la capacidad y ejecutala localmente.')
+    st.dataframe(pd.DataFrame([{'Capacidad':v.name,'Función':v.description,'Confirmación':v.needs_confirmation} for v in SKILLS.values()]),hide_index=True,use_container_width=True)
+    herramienta=st.selectbox('Herramienta',list(SKILLS))
+    argumento=st.text_input('Expresión matemática (solo para calcular)',placeholder='(500 - 120) * 1.15') if herramienta=='calcular' else ''
+    if st.button('Ejecutar herramienta local',type='primary'):
+        resultado=ejecutar(execute_skill,herramienta,argumento)
+        if resultado is not None:st.write(resultado)
+    st.caption('Sin intérprete de shell, pagos ni acciones ocultas. Las tareas en otros dispositivos usan el agente de permisos existente.')
+
+elif seccion=="🔔 SKY Live":
+    st.title('🔔 SKY Live — un asistente disponible mientras está ejecutándose')
+    st.write('Este monitor local revisa de forma informativa la disponibilidad de BAQUEANO. No modifica la web, no responde mensajes ni mueve dinero. Para mantenerlo activo cerrando el navegador necesitás ejecutar el proceso SKY Live en tu computadora.')
+    st.code('python sky_live.py --intervalo 1800',language='bash')
+    st.caption('Alternativa Windows: INICIAR_SKY_LIVE_WINDOWS.bat · Linux/macOS: iniciar_sky_live_linux_mac.sh. Se detiene con Ctrl+C o apagando la computadora.')
+    if st.button('Comprobar BAQUEANO ahora',type='primary'):
+        result=ejecutar(sky_live_check)
+        if result is not None:
+            if result['ok']: st.success('BAQUEANO respondió correctamente. Estado HTTP '+str(result['http_code']))
+            else:st.warning('No se pudo verificar que BAQUEANO esté disponible. Revisá tu conexión y el sitio.')
+    rows=sky_live_historial(50)
+    if rows:st.dataframe(pd.DataFrame(rows),hide_index=True,use_container_width=True)
+    else:st.info('Todavía no hay registros del monitor SKY Live.')
+    st.caption('El monitoreo genera eventos locales; no envía notificaciones automáticas al teléfono ni garantiza disponibilidad 24/7.')
+
+elif seccion=="🌐 SKY Metaverso y API":
+    st.title('🌐 SKY Metaverso — Tu universo personal 3D')
+    st.write('Construí ciudades, espacios educativos, laboratorios, mundos naturales y escenarios propios. La escena se guarda localmente y puede exportarse como GLB para Blender. El servidor privado de SKY Engine debe estar activo.')
+    st.info('Iniciá primero `INICIAR_SKY_METAVERSO_WINDOWS.bat` (Windows) o `bash iniciar_sky_metaverso_linux_mac.sh` (Linux/macOS).')
+    st.link_button('↗ Abrir SKY Metaverso en otra pestaña', 'http://127.0.0.1:8765')
+    st.caption('Clave: archivo local_data/sky_api_token.txt del servidor. API Swagger: http://127.0.0.1:8765/docs. No pongás la clave en una URL ni la publiques.')
+    st.components.v1.iframe('http://127.0.0.1:8765', height=700, scrolling=True)
+
+elif seccion=="🎙️ SKY y dispositivos":
+    st.title('🎙️ SKY — voz y dispositivos')
+    st.write('Hablá en español, consultá a Gemini o prepará acciones para equipos tuyos y autorizados. **Ninguna acción remota se ejecuta desde una transcripción sin que la confirmés en pantalla.**')
+    tab_voz, tab_dispositivos, tab_guia = st.tabs(['🎤 Hablar con SKY','🖥️ Dispositivos emparejados','🔐 Instalación y privacidad'])
+    if 'sky_tokens' not in st.session_state: st.session_state['sky_tokens']={}
+    if 'sky_historia' not in st.session_state: st.session_state['sky_historia']=[]
+    with tab_dispositivos:
+        st.subheader('Emparejar mi computadora')
+        st.caption('Instalá primero el agente en cada computadora. Para acceso remoto usá una dirección HTTPS de Tailscale Serve; no abras puertos públicos.')
+        with st.form('parear_nuevo'):
+            n=st.text_input('Nombre',placeholder='PC de casa')
+            u=st.text_input('Dirección del agente',placeholder='https://mi-pc.mi-tailnet.ts.net')
+            t=st.text_input('Token entregado por el agente',type='password')
+            parear=st.form_submit_button('Verificar y emparejar')
+        if parear:
+            try:
+                datos=call_device(u,t, 'status')
+                if not datos.get('ok'): raise RuntimeError('El agente no confirmó su estado.')
+                save_device(n,u)
+                st.session_state['sky_tokens'][n.strip()]=t.strip()
+                st.success('Equipo emparejado: '+datos.get('device','sin nombre'))
+            except Exception as exc: st.error(str(exc))
+        dispositivos=paired_devices()
+        if dispositivos:
+            st.subheader('Administrar equipos')
+            opciones=[x['name'] for x in dispositivos]
+            seleccionado=st.selectbox('Elegir dispositivo',opciones,key='sky_dispositivo')
+            info=next(x for x in dispositivos if x['name']==seleccionado)
+            st.caption('Dirección: '+info['url'])
+            token=st.session_state['sky_tokens'].get(seleccionado,'')
+            if not token:
+                ingresado=st.text_input('Token de este dispositivo (sólo en esta sesión)',type='password',key='reponer_token')
+                if st.button('Activar acceso en esta sesión') and ingresado:
+                    st.session_state['sky_tokens'][seleccionado]=ingresado.strip()
+                    st.rerun()
+            botones=st.columns(2)
+            if botones[0].button('Consultar estado',disabled=not bool(token)):
+                try: st.json(call_device(info['url'],token,'status'))
+                except Exception as exc: st.error(str(exc))
+            if botones[1].button('Olvidar dispositivo'):
+                remove_device(seleccionado)
+                st.session_state['sky_tokens'].pop(seleccionado,None)
+                st.session_state.pop('sky_pending',None)
+                st.rerun()
+            st.subheader('Preparar una orden manual')
+            tipo=st.selectbox('Acción',['Abrir aplicación','Abrir página HTTPS'],key='sky_manual_tipo')
+            if tipo=='Abrir aplicación':
+                app=st.selectbox('Aplicación permitida',APP_OPTIONS,key='sky_app')
+                acc={'action':'launch_app','params':{'app':app},'description':'Abrir '+app}
+            else:
+                url=st.text_input('Sitio HTTPS',value='https://baqueanonicaragua.com',key='sky_url')
+                acc={'action':'open_url','params':{'url':url},'description':'Abrir '+url}
+            if st.button('Preparar orden para confirmar',disabled=not bool(token)):
+                st.session_state['sky_pending']={**acc,'device':seleccionado}
+        else: st.info('Todavía no hay equipos emparejados. Podés usar el chat de voz igualmente.')
+    with tab_voz:
+        voz_proveedor, voz_modelo = elegir_motor('sky_voz_motor','SKY voz')
+        en_cola=read_inbox()
+        if en_cola:
+            st.info(f'Tenés {len(en_cola)} propuesta(s) pendiente(s) del modo manos libres (no ejecutadas).')
+            cola=st.selectbox('Orden por voz para revisar',en_cola,format_func=lambda x:x.get('text',''))
+            c1,c2=st.columns(2)
+            if c1.button('Pasar a confirmación',key='aceptar_inbox'):
+                equipo=st.session_state.get('sky_dispositivo')
+                if not equipo: st.warning('Primero seleccioná un equipo emparejado en la pestaña Dispositivos.')
+                else:
+                    st.session_state['sky_pending']={**cola,'device':equipo}
+                    dismiss_inbox(cola['id']); st.rerun()
+            if c2.button('Descartar esta orden',key='descartar_inbox'):
+                dismiss_inbox(cola['id']); st.rerun()
+        st.caption('El audio grabado se envía a Gemini para transcribirlo (requiere GEMINI_API_KEY); la respuesta la genera el proveedor seleccionado arriba. También podés escribir sin Gemini.')
+        grabacion=st.audio_input('Hablar con SKY',sample_rate=16000,key='sky_microfono')
+        if grabacion:
+            clip=grabacion.getvalue()
+            marca=hashlib.sha256(clip).hexdigest()
+            if marca != st.session_state.get('sky_audio_procesado'):
+                st.session_state['sky_audio_procesado']=marca
+                try:
+                    with st.spinner('Reconociendo voz con Gemini…'):
+                        st.session_state['sky_entrada']=transcribir_audio(clip)
+                        st.session_state['sky_texto']=st.session_state['sky_entrada']
+                    st.success('Escuché: '+st.session_state['sky_entrada'])
+                except Exception as exc: st.error(str(exc))
+        with st.form('sky_orden'):
+            frase=st.text_input('O escribí una orden',key='sky_texto')
+            voz_salida=st.checkbox('Reproducir la respuesta en voz española (gTTS)',value=False)
+            enviar=st.form_submit_button('Enviar a SKY',type='primary')
+        if enviar and frase.strip():
+            st.session_state['sky_entrada']=''
+            orden=interpret_command(frase)
+            if orden:
+                ds=paired_devices()
+                elegido=st.session_state.get('sky_dispositivo')
+                if elegido and any(d['name']==elegido for d in ds):
+                    st.session_state['sky_pending']={**orden,'device':elegido}
+                    st.info('Orden interpretada: '+orden['description']+'. Confirmá abajo para ejecutarla.')
+                else:
+                    st.warning('La orden requiere un dispositivo emparejado. Seleccioná uno en la pestaña Dispositivos.')
+            else:
+                proveedor=voz_proveedor
+                modelo=voz_modelo
+                try:
+                    with st.spinner('SKY está respondiendo…'):
+                        local=interpret_local_command(frase)
+                        if local is not None:answer=local
+                        else:answer,_=responder(frase,'Asistente SKY personal',st.session_state['sky_historia'],modelo,proveedor=proveedor)
+                    st.session_state['sky_historia'].extend([{'role':'user','content':frase},{'role':'assistant','content':answer}])
+                    st.session_state['sky_ultima_respuesta']=answer
+                    if voz_salida:
+                        try: st.session_state['sky_audio_salida']=hablar_texto(answer)
+                        except Exception as exc: st.warning('No se generó la voz: '+str(exc))
+                    else: st.session_state.pop('sky_audio_salida',None)
+                except Exception as exc: st.error(str(exc))
+        respuesta=st.session_state.get('sky_ultima_respuesta')
+        if respuesta: st.markdown('**SKY:** '+respuesta)
+        if st.session_state.get('sky_audio_salida'):
+            st.audio(st.session_state['sky_audio_salida'],format='audio/mp3',autoplay=True)
+        st.caption('Ejemplos: «Abrí YouTube», «Abrí calculadora», «Estado de mi computadora», «Explicame qué es Gemini», «Ayudame con una campaña para BAQUEANO».')
+    pendiente=st.session_state.get('sky_pending')
+    if pendiente:
+        st.divider()
+        st.warning('Orden pendiente — NO ejecutada. Revisá el equipo y la acción antes de confirmar.')
+        st.json({'dispositivo':pendiente['device'],'acción':pendiente['action'], 'parámetros':pendiente['params']})
+        col1,col2=st.columns(2)
+        if col1.button('✅ Confirmar y ejecutar',type='primary'):
+            asociado=next((d for d in paired_devices() if d['name']==pendiente['device']),None)
+            tok=st.session_state['sky_tokens'].get(pendiente['device'])
+            if not asociado or not tok: st.error('El dispositivo no está disponible o falta su token.')
+            else:
+                try:
+                    resultado=call_device(asociado['url'],tok,pendiente['action'],pendiente['params'])
+                    st.json(resultado)
+                    st.session_state.pop('sky_pending',None)
+                except Exception as exc: st.error(str(exc))
+        if col2.button('❌ Cancelar orden'):
+            st.session_state.pop('sky_pending',None)
+            st.rerun()
+    with tab_guia:
+        st.markdown("""**En cada computadora autorizada:**
+
+```bash
+python agente_dispositivo.py
+```
+
+Guardá el token que muestra esa computadora. Para acceso desde tu móvil u otra PC, instalá Tailscale en ambos dispositivos y, en la computadora con el agente, activá:
+
+```bash
+tailscale serve 8765
+```
+
+Copiá la dirección HTTPS del agente desde Tailscale y emparejala en este panel. Para acceder al panel SKY desde el celular también necesitás Tailscale, **contraseña del panel**, HTTPS y servir su puerto 8501. No usés Tailscale Funnel para exponerlo públicamente.
+
+**Lo que funciona en esta versión:** voz pulsar-para-hablar, respuestas de Gemini/Ollama, lectura de estado, apertura de páginas HTTPS y cuatro aplicaciones permitidas en computadoras con agente. La ejecución se confirma manualmente.
+
+**Modo manos libres opcional:** instalá `vosk sounddevice pyttsx3`, descargá un modelo de voz español de Vosk e iniciá `python sky_manos_libres.py --model ruta/al/modelo`. Se activa al escuchar «SKY», se detiene con Ctrl+C y envía órdenes de equipo a una cola para confirmación. **No incluido todavía:** control nativo de Android/iOS, manejo completo del escritorio, automatización de otras apps sin API, encendido remoto de equipos apagados, movimiento de dinero y comandos de shell arbitrarios. La presencia de la herramienta no permite saltar contraseñas ni restricciones del sistema operativo.""")
+
+elif seccion=="💰 Finanzas personales":
+    st.title("💰 Gestión de dinero")
+    st.caption("Ingresos reales y gastos declarados; no se conecta a bancos. NIO y USD se calculan por separado.")
+    with st.form("nuevo_movimiento",clear_on_submit=True):
+        a,b,c,d=st.columns(4)
+        with a: tipo=st.selectbox("Tipo",["ingreso","gasto"])
+        with b: moneda=st.selectbox("Moneda",["NIO","USD"])
+        with c: categoria=st.text_input("Categoría",value="Servicios")
+        with d: monto=st.number_input("Importe",min_value=0.01,max_value=1_000_000.0,step=1.0)
+        concepto=st.text_input("Concepto")
+        if st.form_submit_button("Guardar movimiento"):
+            if concepto.strip() and categoria.strip():
+                guardar_con_feedback(guardar_movimiento,tipo,categoria,concepto,monto,moneda,mensaje="Movimiento guardado")
+            else: st.error("Ingresa categoría y concepto")
+    mes=st.text_input("Mes de análisis (AAAA-MM)",value=date.today().strftime("%Y-%m"))
+    estadisticas=resumen(mes)
+    for currency, datos in estadisticas["totales"].items():
+        col1,col2,col3=st.columns(3)
+        col1.metric(f"Ingresos {currency}",f"{datos['ingreso']/100:,.2f}")
+        col2.metric(f"Gastos {currency}",f"{datos['gasto']/100:,.2f}")
+        col3.metric(f"Saldo {currency}",f"{(datos['ingreso']-datos['gasto'])/100:,.2f}")
+    with st.expander("Crear o editar presupuesto"):
+        with st.form("ppto"):
+            cat=st.text_input("Categoría de gasto",value="Publicidad")
+            cur=st.selectbox("Moneda del presupuesto",["NIO","USD"])
+            top=st.number_input("Límite mensual",min_value=0.0,step=10.0)
+            if st.form_submit_button("Guardar presupuesto"):
+                guardar_con_feedback(guardar_presupuesto,cat,cur,top,mensaje="Presupuesto guardado")
+        st.dataframe(pd.DataFrame(presupuestos()),hide_index=True,use_container_width=True)
+    for a in estadisticas["alertas"]:
+        st.warning(f"Presupuesto alcanzado o excedido: {a['categoria']} ({a['moneda']}) gastado {a['gasto']:.2f} / {a['limite']:.2f}")
+    data=movimientos()
+    if data:
+        st.dataframe(pd.DataFrame(data).assign(monto=lambda df:df.monto_centavos/100).drop(columns="monto_centavos"),hide_index=True,use_container_width=True)
+    st.subheader("Escenario hipotético de ahorro/inversión")
+    c1,c2,c3,c4=st.columns(4)
+    with c1: cap=st.number_input("Capital inicial",0.0,1_000_000.0,100.0)
+    with c2: aporte=st.number_input("Aporte mensual",0.0,1_000_000.0,20.0)
+    with c3: tasa=st.number_input("Tasa anual supuesta (%)",-50.0,50.0,4.0)
+    with c4: meses=st.number_input("Meses",1,600,12)
+    st.metric("Resultado matemático de escenario, no pronóstico",f"{crecimiento_compuesto(cap,aporte,tasa,meses):,.2f}")
+    st.caption("No incluye impuestos, comisiones, fluctuaciones de mercado ni pérdidas superiores al supuesto usado.")
+
+elif seccion=="🚀 Generar ingresos":
+    st.title("🚀 Motor de oportunidades y ventas")
+    st.write("Herramientas para **conseguir clientes y vender trabajo real**. Los importes de las oportunidades no son ingresos cobrados.")
+    with st.form("cliente",clear_on_submit=True):
+        ca,cb,cc=st.columns(3)
+        with ca: n=st.text_input("Cliente o prospecto")
+        with cb: serv=st.text_input("Servicio ofrecido",value="Diseño de contenido digital")
+        with cc: valor=st.number_input("Valor posible",min_value=0.0,max_value=1_000_000.0,value=50.0)
+        da,db=st.columns(2)
+        with da: mon=st.selectbox("Moneda",["USD","NIO"])
+        with db: etapa=st.selectbox("Estado",list(ETAPAS))
+        notas=st.text_area("Notas de contacto",height=75)
+        if st.form_submit_button("Agregar oportunidad"):
+            if n.strip() and serv.strip():
+                guardar_con_feedback(agregar_cliente,n,serv,valor,mon,etapa,notas,mensaje="Oportunidad guardada")
+            else: st.error("Nombre y servicio obligatorios")
+    resumen_c=resumen_comercial()
+    for cur,dat in resumen_c.items():
+        cols=st.columns(3)
+        cols[0].metric(f"Ventas marcadas como ganadas ({cur})",f"{dat['confirmado']:,.2f}")
+        cols[1].metric(f"Potencial abierto ({cur})",f"{dat['potencial']:,.2f}")
+        cols[2].metric(f"Valor ponderado estimado ({cur})",f"{dat['estimado']:,.2f}")
+    registros=listar_clientes()
+    if registros:
+        st.dataframe(pd.DataFrame(registros).assign(valor=lambda df:df.monto_centavos/100).drop(columns="monto_centavos"),hide_index=True,use_container_width=True)
+        with st.form("cambiar_estado"):
+            eleccion=st.selectbox("Actualizar oportunidad",[x['id'] for x in registros],format_func=lambda id_:next(f"#{r['id']} · {r['nombre']}" for r in registros if r['id']==id_))
+            estado=st.selectbox("Nueva etapa",list(ETAPAS))
+            if st.form_submit_button("Actualizar estado"):
+                guardar_con_feedback(cambiar_etapa,eleccion,estado,mensaje="Estado actualizado")
+    st.subheader("Simulador de ventas (NO ingresos garantizados)")
+    a,b,c,d=st.columns(4)
+    with a: precio=st.number_input("Precio del servicio",0.0,1_000_000.0,25.0)
+    with b: contactos=st.number_input("Contactos proyectados",0,100000,100)
+    with c: conversion=st.slider("Conversión asumida (%)",0.0,100.0,5.0,0.5)
+    with d: costo=st.number_input("Costo total previsto",0.0,1_000_000.0,100.0)
+    r=simular_ventas(precio,contactos,conversion,costo)
+    st.write(r)
+    st.caption("Necesitás conseguir clientes reales, entregar valor y cobrar. Este escenario no mide demanda ni valida el mercado.")
+    st.subheader("Servicios monetizables que podés ofrecer")
+    st.markdown("• Diseño de identidad y campañas para negocios.  \n• Cursos y materiales educativos digitales.  \n• Automatización y soluciones de IA para pymes.  \n• Video corto, edición y estrategia de redes.  \n• Consultoría en presencia digital y comercio electrónico.")
+
+elif seccion=="📈 Bolsa y Bitcoin":
+    st.title("📈 Bolsa de valores y criptomonedas")
+    st.warning("Información de mercado, no asesoría personalizada. No hay compra, venta, custodia, bots de trading ni garantía de ganancias.")
+    op1,op2=st.tabs(["Bitcoin / criptomonedas", "Acciones / ETFs"])
+    with op1:
+        selec=st.multiselect("Criptomonedas",list(CRYPTOS),default=["Bitcoin","Ethereum"])
+        if st.button("Consultar precios cripto",type="primary"):
+            precios=ejecutar(cripto_precios,[CRYPTOS[s] for s in selec])
+            if precios:
+                st.dataframe(pd.DataFrame(precios),hide_index=True,use_container_width=True)
+                st.caption("Fuente: CoinGecko · se muestran tiempos de actualización publicados por el proveedor")
+    with op2:
+        stock=st.selectbox("Activo",list(ACCIONES))
+        if st.button("Consultar cierres históricos"):
+            hist=ejecutar(accion_historial,ACCIONES[stock])
+            if hist:
+                d=pd.DataFrame(hist).set_index("fecha")
+                st.line_chart(d)
+                st.metric("Rendimiento histórico del período (%)",f"{rentabilidad_historica(hist[0]['cierre_usd'],hist[-1]['cierre_usd']):+.2f}%")
+                st.dataframe(pd.DataFrame(hist[-12:]),hide_index=True)
+                st.caption("Cierres diarios históricos del proveedor Stooq, NO cotizaciones en tiempo real. No incluyen dividendos ni comisiones.")
+    alerta_red()
+
+elif seccion=="📰 Noticias e Internet":
+    st.title("📰 Noticias e investigación en Internet")
+    tema=st.text_input("Tema de actualidad",value="Inteligencia artificial Nicaragua")
+    if st.button("Buscar noticias recientes"):
+        resultados=ejecutar(noticias,tema)
+        if resultados:
+            for r in resultados:
+                st.markdown(f"**{r['titular']}**")
+                st.caption(f"{r['fuente']} · {r['fecha']}")
+                st.link_button("Abrir fuente",r['enlace'])
+    st.divider()
+    buscar=st.text_input("Buscar información enciclopédica",value="Aprendizaje automático")
+    if st.button("Consultar Wikipedia"):
+        items=ejecutar(wikipedia,buscar)
+        if items:
+            for item in items: st.markdown(f"[{item['titulo']}]({item['url']})")
+    alerta_red()
+
+elif seccion=="📣 Redes sociales":
+    st.title("📣 Social Studio — campañas y ventas")
+    with st.form("marketing"):
+        a,b=st.columns(2)
+        with a:
+            nombre=st.text_input("Nombre del negocio o marca",value="Mi emprendimiento")
+            producto=st.text_input("Producto o servicio",value="Servicios digitales")
+            precio=st.text_input("Precio o paquete",value="Desde US$25")
+        with b:
+            publico=st.text_input("Público objetivo",value="Pequeños negocios")
+            red=st.selectbox("Red social",list(REDES))
+            objetivo=st.selectbox("Objetivo",["captar clientes","obtener prospectos","ganar seguidores","presentar un lanzamiento"])
+        generar=st.form_submit_button("Crear publicación + guion",type="primary")
+    if generar:
+        resultado=ejecutar(campana,nombre,publico,producto,precio,red,objetivo)
+        if resultado:
+            st.text_area("Borrador editable",resultado,height=350)
+            boton_descarga(resultado,"campana_neuralt.txt")
+    st.caption("Podés ampliar este texto con Gemini desde IA universal o Educación e investigación.")
+
+elif seccion=="🎵 Música y películas":
+    st.title("🎵 Música, cine y entretenimiento")
+    medio=st.radio("Explorar",["Música", "Películas"],horizontal=True)
+    termino=st.text_input("Nombre de canción, artista o película",value="Nicaragua")
+    if st.button("Buscar en catálogo"):
+        items=ejecutar(catalogo_itunes,termino,"song" if medio=="Música" else "movie")
+        if items:
+            for x in items:
+                st.write(f"**{x['titulo']}** · {x['artista']} · {x['genero']} · {x['fecha']}")
+                if x['enlace'].startswith("https://"): st.link_button("Ver en catálogo",x['enlace'])
+    st.caption("Metadatos y enlaces de iTunes; no permite descargar obras comerciales ni asegura disponibilidad regional.")
+    alerta_red()
+
+elif seccion=="🎞️ Imágenes y videos":
+    st.title("🎞️ Laboratorio multimedia")
+    tip=st.selectbox("Tipo de proyecto",["Vídeo corto", "Guion de película", "Imagen publicitaria", "Música original", "Podcast", "Documental", "Video educativo"])
+    idea=st.text_area("Idea que querés producir")
+    audiencia=st.text_input("Público",value="Audiencia general")
+    if st.button("Crear plan creativo"):
+        plan=ejecutar(produccion,tip,idea,audiencia)
+        if plan:
+            st.text_area("Plan de producción",plan,height=300)
+            boton_descarga(plan,"guion_neuralt.txt")
+    st.divider()
+    st.subheader("Conversión local de imágenes")
+    adjunto=st.file_uploader("Imagen PNG, JPG o WebP",type=["png","jpg","jpeg","webp"])
+    a,b,c=st.columns(3)
+    with a: formato=st.selectbox("Salida",["WEBP","PNG","JPEG"])
+    with b: calidad=st.slider("Calidad",50,100,85)
+    with c: ancho=st.number_input("Dimensión máxima (px)",min_value=100,max_value=3840,value=1920)
+    if adjunto and st.button("Convertir imagen"):
+        resultado=ejecutar(convertir_imagen,adjunto.getvalue(),formato,calidad,int(ancho))
+        if resultado:
+            blob,tamano=resultado
+            st.image(blob,caption=f"Imagen: {tamano[0]} × {tamano[1]} px",width=350)
+            st.download_button("Descargar imagen",blob,file_name=f"imagen_neuralt.{formato.lower()}",mime=f"image/{'jpeg' if formato=='JPEG' else formato.lower()}")
+    st.divider()
+    st.subheader("Generación de imágenes con Gemini")
+    st.caption("Requiere API activa, acceso al modelo de imágenes y puede tener costos de consumo.")
+    descripcion=st.text_area("Descripción de la imagen a generar",key="prompt_imagen_gemini")
+    if st.button("Generar imagen con Gemini",key="gemini_crear_imagen"):
+        resultado=ejecutar(generar_imagen,descripcion)
+        if resultado:
+            st.session_state['ultima_imagen_generada']=resultado
+    if 'ultima_imagen_generada' in st.session_state:
+        blob,mime=st.session_state['ultima_imagen_generada']
+        st.image(blob,caption="Imagen generada por Gemini")
+        ext='jpg' if mime=='image/jpeg' else 'webp' if mime=='image/webp' else 'png'
+        st.download_button("Descargar imagen generada",blob,file_name=f"neuralt_gemini.{ext}",mime=mime)
+    st.subheader("Analizar imágenes con Gemini")
+    imagen_gemini=st.file_uploader("Imagen para análisis por IA",type=["png","jpg","jpeg","webp"],key="gemini_vision")
+    consulta_gemini=st.text_input("¿Qué querés saber de la imagen?",value="Describe la imagen y proponé mejoras",key="gemini_image_query")
+    if imagen_gemini and st.button("Analizar con Gemini"):
+        tipo={'png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','webp':'image/webp'}.get(imagen_gemini.name.lower().split('.')[-1],'')
+        txt=ejecutar(analizar_imagen,consulta_gemini,imagen_gemini.getvalue(),tipo)
+        if txt: st.write(txt)
+    st.caption("Los videos, música y podcasts disponen de planificación/guiones. La renderización directa necesita un proveedor multimedia activado.")
+
+elif seccion=="🔐 Antivirus y hacking ético":
+    st.title("🔐 Seguridad y hacking ético")
+    st.warning("Este módulo hace comprobaciones heurísticas de archivos y código, **no un análisis antivirus completo**. Nunca ejecutes archivos sospechosos para probarlos.")
+    archivo=st.file_uploader("Analizar un archivo de menos de 12 MB",type=None)
+    if archivo and st.button("Analizar archivo localmente"):
+        reporte=ejecutar(revisar_archivo,archivo.name,archivo.getvalue())
+        if reporte: st.json(reporte)
+    st.subheader("Laboratorio de seguridad autorizado")
+    st.markdown("- Aprender OWASP, contraseñas fuertes, autenticación multifactor y protección de cuentas.\n- Revisar código y dependencias propios en ambientes de prueba.\n- Hacer copias de seguridad, actualizaciones y verificaciones de permisos.\n- Practicar únicamente en máquinas o laboratorios propios o con autorización explícita.")
+    st.caption("Sin módulos para comprometer dispositivos ajenos, robar credenciales, lanzar malware o acceder a cuentas no autorizadas.")
+
+elif seccion=="🎓 Educación e investigación":
+    st.title("🎓 Educación, innovación, deportes, salud y ciencia")
+    area=st.selectbox("Elegí una especialidad",list(MODULOS),index=2)
+    st.write(MODULOS[area])
+    st.caption("El asistente puede ayudar a estudiar, planificar clases y sintetizar documentos. En salud es información general; no reemplaza a un profesional.")
+    mostrar_chat(area,EJEMPLOS.get(area))
+
+elif seccion=="📚 Biblioteca y memoria":
+    st.title("📚 Biblioteca de conocimientos y recuerdos")
+    subida=st.file_uploader("Añadir texto, PDF o DOCX",type=["txt","md","pdf","docx"])
+    if subida and st.button("Añadir a la biblioteca"):
+        contenido=ejecutar(extraer_texto,subida.name,subida.getvalue())
+        if contenido is not None:
+            idx=ejecutar(agregar_documento,Path(subida.name).name,contenido)
+            if idx is not None: st.success(f"Documento registrado #{idx}")
+    regs=documentos()
+    if regs: st.dataframe(pd.DataFrame(regs),hide_index=True,use_container_width=True)
+    st.caption("PDFs escaneados sin texto pueden necesitar OCR; este módulo sólo extrae texto digital. Los documentos se guardan en SQLite local.")
+    with st.form("memoria"):
+        texto=st.text_area("Algo que querés que recuerde SKY")
+        if st.form_submit_button("Guardar recuerdo"):
+            guardar_con_feedback(guardar_memoria,texto,mensaje="Memoria guardada")
+    for m in memorias():
+        izq,der=st.columns([8,1])
+        izq.write(m['texto'])
+        if der.button("Eliminar",key=f"memo{m['id']}"):
+            ejecutar(eliminar_memoria,m['id']); st.rerun()
+
+elif seccion=="🧭 BAQUEANO Control Center":
+    st.title("🧭 BAQUEANO Control Center")
+    st.caption("Sitio oficial baqueanonicaragua.com · Repositorio OscarElieser/APP-BAQUEANO · Propuestas de cambios revisables")
+    webtab,repotab,datostab,editartab=st.tabs(["🌐 Estado web","🗂️ GitHub","🗃️ Supabase público","✍️ Proponer cambio"])
+    with webtab:
+        st.link_button("Abrir web oficial","https://baqueanonicaragua.com/")
+        if st.button("Comprobar estado de BAQUEANO"):
+            dato=ejecutar(estado_web)
+            if dato: st.json(dato)
+        st.caption("Se comprueba HTTP y si la página contiene la marca BAQUEANO; no equivale a una auditoría de todas las funciones.")
+    with repotab:
+        st.link_button("Abrir repositorio GitHub","https://github.com/OscarElieser/APP-BAQUEANO")
+        if st.button("Consultar actividad de GitHub"):
+            dato=ejecutar(resumen_repo)
+            if dato: st.json(dato)
+        carpeta=st.text_input("Explorar carpeta (raíz, web, website, docs)",value="",key="baqueano_carpeta")
+        if st.button("Listar archivos"):
+            dato=ejecutar(listado_repo,carpeta)
+            if dato is not None: st.dataframe(pd.DataFrame(dato),hide_index=True,use_container_width=True)
+    with datostab:
+        st.caption("Lectura únicamente con clave publicable y políticas RLS. Algunas tablas no estarán expuestas a visitantes o podrían no existir.")
+        tabla=st.selectbox("Vista autorizada",list(SUPABASE_VISTAS),key="supabase_tabla")
+        limite=st.slider("Máximo de filas",1,25,10,key="supabase_limite")
+        if st.button("Consultar filas públicas"):
+            dato=ejecutar(supabase_publico,tabla,limite)
+            if dato is not None: st.dataframe(pd.DataFrame(dato),hide_index=True,use_container_width=True)
+        st.caption("Para datos privados se integrará la autenticación administrativa del propio BAQUEANO, nunca una clave service_role en el navegador.")
+    with editartab:
+        st.warning("Este flujo crea una rama y un Pull Request en GitHub. **No cambia la rama main ni publica cambios en producción.**")
+        st.write("Requiere BAQUEANO_GITHUB_TOKEN configurado en `.env`, con permisos limitados a este repositorio.")
+        ruta=st.text_input("Ruta de archivo (p. ej., website/index.html)",value="website/index.html",key="baq_ruta")
+        if st.button("Leer archivo para editar"):
+            dato=ejecutar(leer_archivo,ruta)
+            if dato:
+                st.session_state['baq_archivo']=dato
+                st.session_state['baq_nuevo']=dato['contenido']
+        actual=st.session_state.get('baq_archivo')
+        if actual and actual['ruta']==ruta:
+            nuevo=st.text_area("Contenido propuesto (editable)",key="baq_nuevo",height=260)
+            titulo=st.text_input("Título de la propuesta",value="Actualizar contenido de BAQUEANO",key="baq_titulo")
+            cambio=vista_diff(actual['contenido'],nuevo,actual['ruta'])
+            st.code(cambio[:24000] if cambio else "Sin diferencias",language="diff")
+            confirma=st.text_input("Escribe CREAR PROPUESTA para autorizar el PR",key="baq_confirmacion")
+            if st.button("Crear rama y Pull Request",disabled=not bool(cambio) or confirma!='CREAR PROPUESTA'):
+                resultado=ejecutar(propuesta_pr,ruta,nuevo,titulo,actual['sha'],confirma)
+                if resultado:
+                    st.success("Propuesta creada para revisión; producción permanece sin cambios.")
+                    st.link_button("Abrir Pull Request",resultado['pull_request'])
+                    del st.session_state['baq_archivo']
+        else:
+            st.info("Primero lee un archivo de contenido del repositorio.")
+
+elif seccion=="🧾 Transacciones":
+    st.title("🧾 Preparación de transacciones")
+    st.warning("Sólo crea **borradores locales** para tu revisión. 'Aprobada localmente' NO significa enviada, pagada o procesada.")
+    with st.form("transaccion"):
+        concepto=st.text_input("Motivo de la operación")
+        ben=st.text_input("Beneficiario o entidad")
+        monto=st.number_input("Monto",min_value=0.01,max_value=1_000_000.0)
+        cur=st.selectbox("Moneda",["NIO","USD"])
+        if st.form_submit_button("Guardar borrador"):
+            if concepto.strip() and ben.strip():
+                guardar_con_feedback(crear_operacion,concepto,ben,monto,cur,mensaje="Borrador creado; no se movió dinero")
+    ops=operaciones()
+    if ops:
+        st.dataframe(pd.DataFrame(ops),hide_index=True,use_container_width=True)
+        abiertas=[a for a in ops if a['estado']=='borrador']
+        if abiertas:
+            a=st.selectbox("Revisar borrador",[p['id'] for p in abiertas])
+            izq,der=st.columns(2)
+            if izq.button("Marcar revisado / aprobado localmente"):
+                ejecutar(revisar_operacion,a,'aprobada_local'); st.rerun()
+            if der.button("Descartar"):
+                ejecutar(revisar_operacion,a,'descartada'); st.rerun()
+
+elif seccion=="📡 Engine Sensor MLP + GRU":
+    mostrar_sensores()
+
+elif seccion=="✅ Proyectos y tareas":
+    st.title("✅ Proyectos, tareas y productividad")
+    with st.form("tarea"):
+        nombre=st.text_input("Tarea nueva")
+        area=st.selectbox("Área",list(MODULOS))
+        if st.form_submit_button("Agregar tarea"):
+            if nombre.strip():
+                guardar_con_feedback(guardar_tarea,nombre,area,mensaje="Tarea guardada")
+    for x in tareas():
+        l,r=st.columns([7,1])
+        l.write(f"{'✅' if x['estado']=='completada' else '🕒'} {x['nombre']} · {x['area']}")
+        if x['estado']!='completada' and r.button("Hecho",key=f"t{x['id']}"):
+            ejecutar(completar_tarea,x['id']); st.rerun()
+
+st.divider()
+st.caption("SKY Universal v8.0 · Prototipo personal experimental · Los datos externos necesitan conexión; los movimientos financieros son manuales y locales.")

@@ -1,0 +1,16 @@
+# SKY IA — datos personales, llaves y archivos del entorno
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.sqlite3
+*.sqlite3-*
+local_data/
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+venv/
+.idea/
+.DS_Store
