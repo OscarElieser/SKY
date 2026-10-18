@@ -224,6 +224,20 @@ def validate_spec(kind,spec):
                     if key in motion:_num(motion[key],0,3,'Duración de fundido')
                 if (motion.get('fade_in',0)+motion.get('fade_out',0))>(end-start)/speed:
                     raise ValueError('Fundidos exceden duración del clip')
+            if 'caption_keyframes' in clip:
+                frames=clip['caption_keyframes']
+                if not isinstance(frames,list) or not 2<=len(frames)<=16:
+                    raise ValueError('Se requieren de 2 a 16 fotogramas clave')
+                if clip.get('caption_easing','linear') not in ('linear','smooth'):
+                    raise ValueError('Interpolación no admitida')
+                previous=-1.0
+                for frame in frames:
+                    if not isinstance(frame,dict):raise ValueError('Fotograma clave inválido')
+                    t=_num(frame.get('t'),0,(end-start)/speed,'Tiempo de fotograma')
+                    if t<=previous:raise ValueError('Los fotogramas deben tener tiempos crecientes')
+                    previous=t
+                    _num(frame.get('x'),-4000,4000,'X de fotograma')
+                    _num(frame.get('y'),-4000,4000,'Y de fotograma')
             if clip.get('sticker_asset_id'):
                 st=get_asset(clip['sticker_asset_id'])
                 if not st or st['kind']!='image':raise ValueError('Sticker de video inválido')
@@ -417,7 +431,24 @@ def render_video(spec,output:Path,progress=lambda value:None):
                 def coordinate(name,default):
                     a=float(motion.get(name+'0',default));b=float(motion.get(name+'1',a))
                     return f'({a:.3f}+({b-a:.3f})*min(1,max(0,t/{effective:.3f})))'
-                x=coordinate('x',0);y=coordinate('y',h-_caption_png(caption,w).height-12)
+                # SKY v9.9: secuencia de hasta 16 keyframes, con interpolación
+                # acotada y valores numéricos validados previamente.
+                frames=clip.get('caption_keyframes')
+                if frames:
+                    easing=clip.get('caption_easing','linear')
+                    def path_coordinate(axis):
+                        expression=f'{float(frames[-1][axis]):.4f}'
+                        for a,b in reversed(list(zip(frames,frames[1:]))):
+                            t0=float(a['t']);t1=float(b['t'])
+                            fraction=f'min(1,max(0,(t-{t0:.4f})/{t1-t0:.4f}))'
+                            factor=f'({fraction}*{fraction}*(3-2*{fraction}))' if easing=='smooth' else fraction
+                            v0=float(a[axis]);delta=float(b[axis])-v0
+                            segment=f'({v0:.4f}+({delta:.4f})*{factor})'
+                            expression=f'if(lt(t,{t1:.4f}),{segment},{expression})'
+                        return f'if(lt(t,{float(frames[0]["t"]):.4f}),{float(frames[0][axis]):.4f},{expression})'
+                    x=path_coordinate('x');y=path_coordinate('y')
+                else:
+                    x=coordinate('x',0);y=coordinate('y',h-_caption_png(caption,w).height-12)
                 fin=float(motion.get('fade_in',0));fout=float(motion.get('fade_out',0))
                 effects=['format=rgba']
                 if fin>0:effects.append(f'fade=t=in:st=0:d={fin:.3f}:alpha=1')

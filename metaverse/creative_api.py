@@ -26,6 +26,9 @@ class EditInstruction(BaseModel):
 class Selection(BaseModel):
     rectangle:list[int]=Field(min_length=4,max_length=4)
     iterations:int=Field(default=4,ge=1,le=7)
+    foreground:list[list[int]]=Field(default_factory=list,max_length=100)
+    background:list[list[int]]=Field(default_factory=list,max_length=100)
+    brush_radius:int=Field(default=4,ge=1,le=20)
 
 class Revision(BaseModel):
     spec:dict[str,Any]
@@ -39,7 +42,7 @@ def capabilities():
     import shutil
     return {'image':True,'video':bool(shutil.which('ffmpeg') and shutil.which('ffprobe')),
             'formats':{'image':['png','jpg','webp'],'video':['mp4']},'non_destructive':True,
-            'advanced_AI_generation':False,'layer_masks':True,'caption_keyframes':True,'assisted_grabcut':True,'limits':{'upload_bytes':cr.MAX_IMPORT,'video_seconds':600}}
+            'advanced_AI_generation':False,'layer_masks':True,'caption_keyframes':16,'guided_grabcut':True,'assisted_grabcut':True,'limits':{'upload_bytes':cr.MAX_IMPORT,'video_seconds':600}}
 
 @router.post('/api/creative/generate-image',dependencies=[Depends(require_key)],status_code=201)
 def ai_image(body:GenerateVisual):
@@ -81,7 +84,7 @@ def preview_asset(aid:str):
 @router.post('/api/creative/assets/{aid}/selection',dependencies=[Depends(require_key)],status_code=201)
 def assisted_selection(aid:str,body:Selection):
     from neural_core.sky_advanced_creative import cutout_mask
-    try:return cutout_mask(aid,body.rectangle,body.iterations)
+    try:return cutout_mask(aid,body.rectangle,body.iterations,body.foreground,body.background,body.brush_radius)
     except KeyError:raise HTTPException(404,'Recurso no encontrado')
     except ValueError as ex:raise HTTPException(422,str(ex)) from ex
     except RuntimeError as ex:raise HTTPException(503,str(ex)) from ex

@@ -35,3 +35,9 @@ curl -H "X-SKY-KEY: TU_CLAVE_PRIVADA" \
 Una imagen editable admite capas `image`, `text`, `rectangle` y `adjustments` (brillo, contraste, saturación, nitidez y desenfoque). Un video editable contiene `clips` con `asset_id`, `start`, `end`, `speed` y `caption`, y música opcional mediante `music_asset_id` y `music_volume`.
 
 **Política de privacidad:** los medios **no se transmiten a proveedores externos** para editar/exportar. La única excepción es la acción explícita `/generate-image` que solicita una imagen a Gemini desde la descripción indicada. La compatibilidad con fuentes de imágenes de terceros queda sujeta a sus condiciones de licencia y derechos.
+
+## v9.9 — Fotogramas múltiples y selección guiada
+
+La API de creación de video acepta por clip `caption_keyframes` (lista de 2 a 16 objetos `{t,x,y}` en segundos efectivos y píxeles) y `caption_easing` (`linear` o `smooth`). La alternativa heredada `caption_motion` continúa funcionando. El render siempre usa la receta congelada cuando se aprueba, sin sobrescribir proyectos.
+
+`POST /api/creative/assets/{id}/selection` puede recibir, además del rectángulo, `foreground:[[x,y],...]`, `background:[[x,y],...]` y `brush_radius:4` (1–20). Los puntos no son órdenes de reconstrucción semántica: guían GrabCut, sujeto a contraste e iluminación.

@@ -1,3 +1,15 @@
+# SKY IA — Plataforma tecnológica personal
+
+**Visión del proyecto: Oscar Elieser Chamorro Guzmán.**
+
+La versión integrada actual es **v9.9**. La plataforma incluye asistencia multi-IA opcional, proyectos, memoria, metaverso, comunidad, Office Studio, diseño visual, Creative Studio y API privada. El estudio añade máscaras guiadas y movimiento de títulos con hasta 16 fotogramas clave.
+
+**Instalación y pruebas:** [README_V9_9_INICIO.md](README_V9_9_INICIO.md) · [CHANGELOG_V9_9.md](CHANGELOG_V9_9.md) · [VALIDACION_V9_9.md](VALIDACION_V9_9.md)
+
+La plataforma no está certificada para producción pública y requiere permisos administrativos para herramientas privadas; BAQUEANO solo debe ser visible al creador autenticado.
+
+---
+
 # SKY IA v9.7 · Creative Studio
 
 **Inicio recomendado:** [README_V9_7_INICIO.md](README_V9_7_INICIO.md) · [Creative API](SKY_CREATIVE_API.md) · [Validación](VALIDACION_V9_7.md) · [Cambios](CHANGELOG_V9_7.md).

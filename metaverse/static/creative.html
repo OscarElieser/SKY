@@ -26,6 +26,7 @@
       <details class="advanced-options"><summary>Máscaras y selección de objetos</summary>
 <p class="hint">Seleccioná una imagen de la biblioteca y escribí un rectángulo interior (x, y, ancho y alto). SKY intentará separar el primer plano con GrabCut. Podés asignar la máscara a una capa sin perder la imagen original.</p>
 <div class="grid-form"><label>X <input id="mask-x" type="number" min="0" value="20"></label><label>Y <input id="mask-y" type="number" min="0" value="20"></label><label>Ancho <input id="mask-w" type="number" min="3" value="200"></label><label>Alto <input id="mask-h" type="number" min="3" value="200"></label></div>
+<div class="grid-form"><label>Conservar (puntos JSON)<input id="guide-foreground" type="text" placeholder="[[70,45],[80,60]]"></label><label>Excluir (puntos JSON)<input id="guide-background" type="text" placeholder="[[5,5],[130,90]]"></label><label>Radio de guía<input id="guide-radius" type="number" min="1" max="20" value="4"></label></div>
 <div class="tools"><button id="make-mask" type="button">Crear máscara asistida</button><button id="apply-mask" type="button">Aplicar máscara a última capa de imagen</button></div>
 <p id="mask-result" class="hint"></p></details><ol id="layers"></ol><p class="hint">Cada capa puede ajustarse por posición y opacidad. Guardar crea una versión sin alterar los archivos originales.</p>
     </div>
@@ -33,7 +34,13 @@
       <h3>Línea de tiempo</h3><p class="hint">Seleccioná un video de la biblioteca para añadirlo, después configurá el recorte de cada clip.</p>
       <div class="tools"><button id="add-clip">＋ Añadir clip</button><button id="set-music">♫ Usar audio seleccionado como música</button><button id="render-video">Renderizar MP4</button></div>
       <details class="advanced-options"><summary>Animación avanzada en línea de tiempo</summary><p class="hint">Configurá el movimiento del título entre dos posiciones y su fundido. Las posiciones usan píxeles del video y los tiempos, segundos.</p>
-<div class="grid-form"><label>Clip <input id="motion-clip" type="number" min="1" value="1"></label><label>X inicial <input id="motion-x0" type="number" value="-150"></label><label>X final <input id="motion-x1" type="number" value="0"></label><label>Y inicial <input id="motion-y0" type="number" value="50"></label><label>Y final <input id="motion-y1" type="number" value="50"></label><label>Entrada <input id="motion-in" type="number" min="0" max="3" step=".1" value=".3"></label><label>Salida <input id="motion-out" type="number" min="0" max="3" step=".1" value=".3"></label></div><button id="motion-apply" type="button">Aplicar fotogramas clave</button></details><div id="clips" class="clips"></div>
+<div class="grid-form"><label>Clip <input id="motion-clip" type="number" min="1" value="1"></label><label>X inicial <input id="motion-x0" type="number" value="-150"></label><label>X final <input id="motion-x1" type="number" value="0"></label><label>Y inicial <input id="motion-y0" type="number" value="50"></label><label>Y final <input id="motion-y1" type="number" value="50"></label><label>Entrada <input id="motion-in" type="number" min="0" max="3" step=".1" value=".3"></label><label>Salida <input id="motion-out" type="number" min="0" max="3" step=".1" value=".3"></label></div><button id="motion-apply" type="button">Aplicar fotogramas clave</button></details><details class="advanced-options"><summary>Fotogramas clave múltiples · SKY v9.9</summary>
+<p class="hint">Hasta 16 puntos [t, x, y] para el título del clip, relativos a segundos del resultado. Ejemplo: 0 → 0.7 → 1.4 s.</p>
+<label>Clip (número desde 1) <input id="kf-clip" type="number" min="1" value="1"></label>
+<label>Fotogramas en JSON <textarea id="kf-json" rows="3">[{"t":0,"x":0,"y":12},{"t":0.7,"x":70,"y":25},{"t":1.4,"x":140,"y":42}]</textarea></label>
+<label>Interpolación<select id="kf-ease"><option value="linear">Lineal</option><option value="smooth">Suave</option></select></label>
+<button type="button" id="apply-keyframes">Aplicar fotogramas a la versión editable</button></details>
+<div id="clips" class="clips"></div>
     </div>
     <h3>Historial del proyecto editable</h3><div id="version-history"></div><h3>Versiones exportadas</h3><div id="exports" class="exports"></div>
     <h3>Renders y progreso</h3><div id="jobs" class="jobs"></div>

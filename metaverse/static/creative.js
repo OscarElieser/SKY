@@ -19,6 +19,12 @@ async function updateExports(){if(!project)return;const out=$('exports');out.rep
 async function updateJobs(){const jobs=await api('/api/creative/jobs');const out=$('jobs');out.replaceChildren();jobs.slice(0,15).forEach(j=>{const d=document.createElement('div');text(d,j.status+' · '+j.progress+'%'+(j.error?' · '+j.error:''));if(j.status==='completed')d.append(button('Descargar MP4',async()=>{const a=assets.find(x=>x.id===j.asset_id);await binary('/api/creative/assets/'+j.asset_id+'/download',a?.filename||'SKY_video.mp4')}));if(['failed','needs_review'].includes(j.status))d.append(button('Reintentar',async()=>{await api('/api/creative/jobs/'+j.id+'/retry','POST');await updateJobs()}));if(j.status==='queued')d.append(button('Cancelar',async()=>{await api('/api/creative/jobs/'+j.id+'/cancel','POST');await updateJobs()}));out.append(d)})}
 $('connect').onclick=async()=>{try{token=$('key').value;await api('/api/creative/capabilities');$('login').hidden=true;$('key').value='';await refresh();setInterval(()=>{if(token)updateJobs().catch(()=>{})},5500)}catch(e){text($('auth-error'),e.message)}};
 $('generate-ai').onclick=async()=>{try{if(!token)throw Error('Ingresá primero con la clave de SKY');const prompt=$('ai-prompt').value.trim();if(prompt.length<4)throw Error('Describí la imagen que querés crear');$('generate-ai').disabled=true;const a=await api('/api/creative/generate-image','POST',{prompt,provider:'gemini'});selected=a.id;await refresh();await binary('/api/creative/assets/'+a.id+'/preview',a.filename,true);toast('Imagen generada e incorporada a tu biblioteca')}catch(ex){err(ex)}finally{$('generate-ai').disabled=false}};
+
+$('apply-keyframes').onclick=()=>{try{if(!project||project.kind!=='video')throw Error('Abrí un proyecto de video');
+ const i=Number($('kf-clip').value)-1,clip=project.spec.clips[i];if(!clip)throw Error('Número de clip inválido');
+ const frames=JSON.parse($('kf-json').value);if(!Array.isArray(frames)||frames.length<2||frames.length>16)throw Error('Usá entre 2 y 16 fotogramas');
+ clip.caption_keyframes=frames;clip.caption_easing=$('kf-ease').value;toast('Fotogramas aplicados; guardá para crear una nueva versión.');}
+ catch(e){err(e)}};
 $('upload').onchange=async e=>{if(!token){toast('Ingresá primero con la clave privada');return}for(const file of e.target.files){try{let f=new FormData();f.append('file',file);await api('/api/creative/assets','POST',f,true)}catch(ex){toast(file.name+': '+ex.message)}}e.target.value='';refresh().catch(err)};
 $('apply-command').onclick=async()=>{try{if(!project)throw Error('Primero creá o abrí un proyecto');const updated=await api('/api/creative/projects/'+project.id+'/command','POST',{instruction:$('instruction').value,expected_version:project.version});project=updated;redraw();await updateVersions();text($('project-state'),'Guardado · versión '+updated.version);toast('SKY aplicó tu instrucción y conservó las versiones anteriores')}catch(e){err(e)}};
 $('export-bundle').onclick=()=>{if(project)binary('/api/creative/projects/'+project.id+'/portable',project.name.replace(/[^a-zA-Z0-9_-]+/g,'_')+'.skyzip',false).catch(err)};
@@ -34,7 +40,9 @@ let lastMask='';
 $('make-mask').onclick=async()=>{try{
  const asset=assets.find(a=>a.id===selected);if(!asset||asset.kind!=='image')throw Error('Seleccioná una imagen de la biblioteca');
  const rectangle=['mask-x','mask-y','mask-w','mask-h'].map(id=>Number($(id).value));
- const output=await api('/api/creative/assets/'+asset.id+'/selection','POST',{rectangle,iterations:4});
+ const foreground=JSON.parse($('guide-foreground').value||'[]');const background=JSON.parse($('guide-background').value||'[]');
+ const brush_radius=Number($('guide-radius').value);
+ const output=await api('/api/creative/assets/'+asset.id+'/selection','POST',{rectangle,iterations:4,foreground,background,brush_radius});
  lastMask=output.mask_asset.id;text($('mask-result'),'Máscara guardada: '+lastMask);
  await refresh();toast('Máscara GrabCut creada y guardada sin cambiar la imagen original');
  }catch(ex){err(ex)}};
