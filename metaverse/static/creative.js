@@ -120,4 +120,25 @@ $('v103-dub').onclick=async()=>{try{
   text:textValue,language:$('v102-locale').value,video_asset_id:asset.id},'SKY_video_narrado.mp4');
  text($('v102-status'),'MP4 con voz local generado; el video original se conserva.');
  }catch(ex){text($('v102-status'),ex.message)}};
+
+// SKY v10.5: private offline transcription. Only the user-selected audio is read.
+$('v105-check').onclick=async()=>{try{
+ if(!token)throw Error('Ingresá con la clave privada del creador');
+ const r=await fetch('/api/global-media/stt/capabilities',{headers:{'X-SKY-KEY':token,...window.SKYOwnerAuth.headers()},cache:'no-store'});
+ if(!r.ok)throw Error('No se pudo consultar la configuración');
+ const info=await r.json();
+ text($('v105-state'),info.available?'Modelo local listo, sin conexión externa.':'Modelo local no configurado: instalá faster-whisper y definí SKY_STT_MODEL_DIR.');
+ }catch(ex){text($('v105-state'),ex.message)}};
+$('v105-transcribe').onclick=async()=>{try{
+ if(!token)throw Error('Ingresá como creador para transcribir');
+ const audio=$('v105-audio').files?.[0];if(!audio)throw Error('Seleccioná un audio');
+ if(audio.size>10*1024*1024)throw Error('El audio supera el límite de 10 MB');
+ const fd=new FormData();fd.append('file',audio,audio.name);
+ const locale=$('v102-locale')?.value||'';if(locale)fd.append('language',locale);
+ text($('v105-state'),'Transcribiendo con modelo local...');
+ const response=await fetch('/api/global-media/stt/transcribe',{method:'POST',headers:{'X-SKY-KEY':token,...window.SKYOwnerAuth.headers()},body:fd});
+ const value=await response.json();if(!response.ok)throw Error(value.detail||'No se pudo transcribir');
+ $('v105-transcript').value=value.text||'';
+ text($('v105-state'),'Transcripción local · '+(value.detected_language||locale||'idioma detectado')+' · revisá el contenido antes de utilizarlo.');
+ }catch(ex){text($('v105-state'),ex.message)}};
 })();

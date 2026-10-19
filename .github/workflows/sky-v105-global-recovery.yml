@@ -1,0 +1,29 @@
+name: SKY v10.5 global recovery and offline STT safety
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies
+        run: |
+          python -m pip install -r requirements_studio.txt pytest cryptography
+          sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+      - name: Security scan
+        run: python scripts/security_audit_v103.py .
+      - name: JavaScript syntax
+        run: node --check metaverse/static/creative.js
+      - name: Secure recovery and offline STT tests
+        run: PYTHONPATH=. pytest -q tests/test_sky_v10_4_secure_global.py tests/test_sky_v10_5_global.py

@@ -104,3 +104,11 @@ def coverage(locale: str):
     source = glossary(locale)
     return {'reviewed_strings':len(source), 'total_static_strings':len(BASE),
             'complete': len(source) == len(BASE), 'mode':'offline_reviewed_partial' if source and len(source) < len(BASE) else ('offline_full_core' if source else 'fallback_es')}
+
+# SKY v10.5: curated high-frequency system labels. Existing translations remain
+# authoritative where already reviewed; these fill only previously missing keys.
+from .sky_i18n_v105 import REVIEWED as _V105_REVIEWED
+for _locale, _translations in _V105_REVIEWED.items():
+    EXTRA_REVIEWED.setdefault(_locale, {})
+    for _label, _translation in _translations.items():
+        EXTRA_REVIEWED[_locale].setdefault(_label, _translation)

@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SKY Creative Studio</title><link rel="stylesheet" href="/static/creative.css"><link rel="stylesheet" href="/static/sky-global-i18n.css"></head><body>
-<header><a class="brand" href="/sky">✦ SKY IA</a><span><span data-sky-i18n="studio">Estudio creativo</span> <small>v10.2</small></span><a href="/sky" class="toplink">← Volver a SKY</a></header>
+<header><a class="brand" href="/sky">✦ SKY IA</a><span><span data-sky-i18n="studio">Estudio creativo</span> <small>v10.5</small></span><a href="/sky" class="toplink">← Volver a SKY</a></header>
 <main>
 <section class="intro"><h1 data-sky-i18n="studio">Estudio creativo</h1><p>Importá tus archivos, combiná capas o clips, revisá el resultado y exportá sin perder los originales.</p></section>
 <section class="workspace">
@@ -31,6 +31,13 @@
 <p id="mask-result" class="hint"></p></details><ol id="layers"></ol><p class="hint">Cada capa puede ajustarse por posición y opacidad. Guardar crea una versión sin alterar los archivos originales.</p>
     </div>
     <div id="video-editor" class="editor" hidden>
+      <details class="advanced-options"><summary>Reconocimiento de voz local · SKY v10.5</summary>
+        <p class="hint">Funciona únicamente si instalaste faster-whisper y un modelo compatible en este equipo. SKY nunca descarga modelos ni envía la grabación a Internet. El idioma de la grabación se elige en la sección de narración.</p>
+        <label>Audio para transcribir (máximo 10 MB, hasta 60 s) <input id="v105-audio" type="file" accept=".wav,.mp3,.ogg,.flac,.m4a,.webm,.mp4,audio/*"></label>
+        <div class="tools"><button type="button" id="v105-check">Comprobar modelo local</button><button type="button" id="v105-transcribe">Transcribir audio local</button></div>
+        <p id="v105-state" class="hint" aria-live="polite"></p>
+        <label>Transcripción editable <textarea id="v105-transcript" rows="3" maxlength="20000" placeholder="La transcripción aparecerá aquí cuando exista un modelo instalado."></textarea></label>
+      </details>
       <h3>Línea de tiempo</h3><p class="hint">Seleccioná un video de la biblioteca para añadirlo, después configurá el recorte de cada clip.</p>
       <div class="tools"><button id="add-clip">＋ Añadir clip</button><button id="set-music">♫ Usar audio seleccionado como música</button><button id="render-video">Renderizar MP4</button></div>
       <details class="advanced-options"><summary>Animación avanzada en línea de tiempo</summary><p class="hint">Configurá el movimiento del título entre dos posiciones y su fundido. Las posiciones usan píxeles del video y los tiempos, segundos.</p>

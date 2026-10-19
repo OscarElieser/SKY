@@ -93,7 +93,7 @@ async def lifespan(app):
             try:await pump
             except asyncio.CancelledError:pass
 
-app=FastAPI(title='SKY Engine API',version='10.4.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
+app=FastAPI(title='SKY Engine API',version='10.5.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
 app.mount('/static',StaticFiles(directory=STATIC),name='static')
 
 @app.get('/office')
@@ -442,3 +442,7 @@ app.include_router(sky_global_media_router)
 # SKY v10.3: local voice and dubbing routes (no network or new public controls).
 from .voice_v103_api import router as sky_voice_v103_router
 app.include_router(sky_voice_v103_router)
+
+# SKY v10.5: private, explicit offline speech transcription. No model downloads.
+from .stt_v105_api import router as sky_stt_v105_router
+app.include_router(sky_stt_v105_router)

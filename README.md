@@ -1,3 +1,15 @@
+# SKY IA — Universal v10.5 | Global Continuity & Secure Recovery
+
+**Visión:** Oscar Elieser Chamorro Guzmán.
+
+Nueva recuperación cifrada de SQLite y biblioteca multimedia de Creative Studio; reconocimiento de voz local opcional (solo si el creador instala el modelo); localización revisada en ocho idiomas adicionales. Preserva los módulos v10.4 y mantiene la portada sencilla y BAQUEANO exclusivo del creador.
+
+**La transcripción real necesita un modelo local; no está validada sin él.** Las traducciones siguen siendo parciales, y la seguridad no cuenta todavía con auditoría externa.
+
+[Instalación v10.5](README_V10_5_INICIO.md) · [Cambios](CHANGELOG_V10_5.md) · [Seguridad](SEGURIDAD_V10_5.md) · [Validación](VALIDACION_V10_5.md)
+
+---
+
 # SKY IA — Universal v10.4 | Secure Recovery & Global UI
 
 **Visión:** Oscar Elieser Chamorro Guzmán.
