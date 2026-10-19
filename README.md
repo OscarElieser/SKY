@@ -84,3 +84,7 @@ Empezá por [README_V9_6_INICIO.md](README_V9_6_INICIO.md). API nueva: [SKY_CONT
 ## SKY v10.1 — Multilingual Creative Security
 
 Consulta [README_V10_1_INICIO.md](README_V10_1_INICIO.md), [CHANGELOG_V10_1.md](CHANGELOG_V10_1.md) y [SEGURIDAD_V10_1.md](SEGURIDAD_V10_1.md) para los cambios de idiomas, pistas de edición global, máscaras animadas, worker y controles de seguridad. Las funciones anteriores se conservan.
+
+## SKY v10.8 — Global Voice & Recovery Operations
+
+Ver [README_V10_8_INICIO.md](README_V10_8_INICIO.md) para respaldos cifrados programables, ensayos de recuperación, validación estática de contenedores y pruebas de voz multilingüe. No se activa ningún servicio ni se modifica BAQUEANO en producción.

@@ -1,0 +1,28 @@
+# Reference timer: install ONLY after validating the sky service account,
+# SKY data paths, filesystem permissions and backup credential location.
+[Unit]
+Description=SKY encrypted application backup (local operator)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=sky
+Group=sky
+WorkingDirectory=/opt/sky
+Environment=SKY_BACKUP_PASSPHRASE_FILE=%d/sky_backup_passphrase
+LoadCredential=sky_backup_passphrase:/etc/sky/private/backup-passphrase
+ExecStart=/opt/sky/.venv/bin/python -m scripts.backup_operations_v108 once --directory /var/backups/sky --keep 7
+UMask=0077
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+ReadWritePaths=/var/backups/sky
+ReadOnlyPaths=/opt/sky /var/lib/sky
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

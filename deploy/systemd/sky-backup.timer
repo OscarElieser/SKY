@@ -1,0 +1,11 @@
+[Unit]
+Description=SKY daily encrypted backup timer
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=30m
+Persistent=true
+Unit=sky-backup.service
+
+[Install]
+WantedBy=timers.target

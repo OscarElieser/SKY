@@ -6,3 +6,5 @@ cryptography>=43,<48
 # SKY v10.5: optional OFFLINE speech recognition (install separately):
 # pip install 'faster-whisper>=1.1,<2'
 # A local CTranslate2 model must already exist; SKY never downloads a model automatically.
+# v10.8: audit local de la configuración de contenedores sin lanzar Docker.
+PyYAML>=6.0.2,<7
