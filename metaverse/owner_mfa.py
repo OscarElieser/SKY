@@ -19,11 +19,13 @@ LIFETIME = 20 * 60
 
 
 def required() -> bool:
-    return bool(os.getenv('SKY_OWNER_MFA_SECRET', '').strip())
+    from .secrets_v107 import get_secret
+    return bool(get_secret('SKY_OWNER_MFA_SECRET'))
 
 
 def _key() -> bytes:
-    raw = os.getenv('SKY_OWNER_MFA_SECRET', '').strip().replace(' ', '').upper()
+    from .secrets_v107 import get_secret
+    raw = get_secret('SKY_OWNER_MFA_SECRET').replace(' ', '').upper()
     if not raw:
         raise RuntimeError('MFA no configurado')
     try:

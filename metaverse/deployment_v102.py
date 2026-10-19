@@ -11,7 +11,8 @@ def validate_environment():
     if not hosts or hosts.issubset({'localhost','127.0.0.1','testserver'}):
         raise RuntimeError('Modo público necesita SKY_TRUSTED_HOSTS con dominio propio')
     if '*' in hosts:raise RuntimeError('El modo público prohíbe hosts universales')
-    if not os.getenv('SKY_OWNER_MFA_SECRET'):
+    from .secrets_v107 import get_secret
+    if not get_secret('SKY_OWNER_MFA_SECRET'):
         raise RuntimeError('El modo público requiere MFA TOTP para el creador')
     from .owner_mfa import validate_configuration
     validate_configuration()
@@ -21,6 +22,8 @@ def validate_environment():
         raise RuntimeError('El modo público requiere proxy HTTPS verificado')
     if os.getenv('SKY_CREATIVE_WORKER','1') != '0':
         raise RuntimeError('El modo público requiere separar el proceso de render')
+    if not get_secret('SKY_API_KEY'):
+        raise RuntimeError('En modo público configurá SKY_API_KEY o SKY_API_KEY_FILE')
     try:
         from .distributed_limits import redis_client
         redis_client()

@@ -1,0 +1,33 @@
+name: SKY v10.7 public readiness static verification
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install isolated test dependencies
+        run: |
+          python -m pip install -r requirements_studio.txt pytest PyYAML
+          sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+      - name: Security and recovery regressions
+        run: PYTHONPATH=. pytest -q tests/test_sky_v10_6_global.py tests/test_sky_v10_7_public.py
+      - name: Disaster recovery synthetic drill
+        env:
+          SKY_BACKUP_PASSPHRASE: test-only-secret-for-ci-not-for-production
+        run: python -m scripts.disaster_recovery_v107
+      - name: Verify Docker Compose syntax without launching containers
+        run: |
+          python scripts/provision_secrets_v107.py --directory deploy/secrets
+          cp deploy/production.env.example deploy/production.env
+          docker compose --env-file deploy/production.env -f deploy/compose.yml config --quiet
+      - name: Static security scan
+        run: python scripts/security_audit_v103.py .

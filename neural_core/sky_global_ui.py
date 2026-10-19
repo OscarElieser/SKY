@@ -119,3 +119,13 @@ for _locale, _translations in _V106_REVIEWED.items():
     EXTRA_REVIEWED.setdefault(_locale, {})
     for _label, _translation in _translations.items():
         EXTRA_REVIEWED[_locale].setdefault(_label, _translation)
+
+# SKY v10.7: curated controls across creative, worlds, workflow and projects.
+from .sky_i18n_v107 import REVIEWED as _V107_REVIEWED
+BASE.update(_V107_REVIEWED['en'])
+for _locale, _translations in _V107_REVIEWED.items():
+    if _locale == 'en':
+        continue
+    EXTRA_REVIEWED.setdefault(_locale, {})
+    for _label, _translation in _translations.items():
+        EXTRA_REVIEWED[_locale].setdefault(_label, _translation)

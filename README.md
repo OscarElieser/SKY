@@ -1,3 +1,13 @@
+# SKY IA — Universal v10.7 | Production Hardening & Global Voice
+
+**Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
+
+Novedades: credenciales desde archivos privados, configuración opcional de contenedores no privilegiados, auditoría de un modelo de voz instalado, traducciones por pantalla y ensayo cifrado de recuperación. **245 pruebas automatizadas aprobaron; Docker no se ejecutó y no había modelo STT instalado.** La portada continúa minimalista y BAQUEANO es exclusivo del propietario.
+
+[Inicio v10.7](README_V10_7_INICIO.md) · [Cambios](CHANGELOG_V10_7.md) · [Seguridad](SEGURIDAD_V10_7.md) · [Validación](VALIDACION_V10_7.md)
+
+---
+
 # SKY IA — Universal v10.6 | Global Voice & Production Readiness
 
 **Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.

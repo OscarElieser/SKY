@@ -23,7 +23,8 @@ STATIC=Path(__file__).resolve().parent/'static'
 SECRET_PATH=ROOT/'local_data'/'sky_api_token.txt'
 
 def api_token():
-    val=os.getenv('SKY_API_KEY','').strip()
+    from .secrets_v107 import get_secret
+    val=get_secret('SKY_API_KEY')
     if val:
         if len(val)<24:raise RuntimeError('SKY_API_KEY debe tener 24 caracteres o más')
         return val
@@ -93,7 +94,7 @@ async def lifespan(app):
             try:await pump
             except asyncio.CancelledError:pass
 
-app=FastAPI(title='SKY Engine API',version='10.6.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
+app=FastAPI(title='SKY Engine API',version='10.7.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
 app.mount('/static',StaticFiles(directory=STATIC),name='static')
 
 @app.get('/office')
@@ -197,7 +198,7 @@ def baqueano_owner_page():return FileResponse(STATIC/'baqueano-owner.html')
 def metaverse_world():return FileResponse(STATIC/'index.html')
 
 @app.get('/api/health')
-def health():return {'service':'SKY Engine API','status':'ok','version':'10.4.0','private':'key required for data'}
+def health():return {'service':'SKY Engine API','status':'ok','version':'10.7.0','private':'key required for data'}
 
 @app.get('/api/capabilities',dependencies=[Depends(require_key)])
 def capabilities():

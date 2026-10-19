@@ -11,7 +11,11 @@ def redis_client():
         return None
     try:import redis
     except ImportError as exc:raise RuntimeError('Instalá redis para habilitar límites distribuidos') from exc
-    obj=redis.Redis.from_url(os.environ['SKY_REDIS_URL'],socket_connect_timeout=2,socket_timeout=2,decode_responses=True)
+    from .secrets_v107 import get_secret
+    password=get_secret('SKY_REDIS_PASSWORD')
+    kwargs={'socket_connect_timeout':2, 'socket_timeout':2, 'decode_responses':True}
+    if password:kwargs['password']=password
+    obj=redis.Redis.from_url(os.environ['SKY_REDIS_URL'],**kwargs)
     obj.ping()
     _REDIS=obj
     return obj
