@@ -11,3 +11,6 @@ PyYAML>=6.0.2,<7
 
 # SKY v11.0: export test reader and common spreadsheet import support
 openpyxl>=3.1,<4
+
+# SKY v11.0: Trimesh GLB export uses scipy.sparse at import time
+scipy>=1.13,<2

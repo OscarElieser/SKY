@@ -56,13 +56,4 @@ renderer_state="$(docker inspect --format '{{.State.Health.Status}}' "$(docker c
 PYTHONPATH=. python -m scripts.ci_https_load_v110 --ca deploy/integration-test-ca.crt \
     --requests 60 --concurrency 6 --p95-limit-ms 3000
 # No direct host port exposure from API, worker or Redis.
-python - <<'PY'
-import json, subprocess
-p=subprocess.check_output(['docker','compose','-f','deploy/compose.integration.yml','ps','--format','json'],text=True)
-items=[json.loads(s) for s in p.splitlines() if s.strip()]
-assert {'api','renderer','redis','proxy'} <= {item['Service'] for item in items}
-for item in items:
-    if item['Service'] in {'api','renderer','redis'}:
-        assert not item.get('Publishers'), f"Unexpected host port: {item['Service']}"
-print('Four services running; internal services have no published ports')
-PY
+docker compose -f "$file" ps --format json | PYTHONPATH=. python -m scripts.ci_exposure_audit_v110

@@ -162,3 +162,31 @@ def test_v11_version_and_isolated_drill_are_retained():
     script=(ROOT/'scripts/ci_cross_container_v109.sh').read_text()
     assert '--network none' in script and '--read-only' in script
     assert '--expected-sha256' in script
+
+
+def test_compose_exposed_ports_are_not_published():
+    from scripts.ci_exposure_audit_v110 import verify
+    config=[{'Service':n,'Publishers':[{'TargetPort':8765,'PublishedPort':0}]} for n in ('api','renderer','redis')]
+    config.append({'Service':'proxy','Publishers':[{'TargetPort':443,'PublishedPort':18443}]})
+    assert verify(config)['verified']
+
+
+def test_compose_rejects_actually_published_internal_port():
+    from scripts.ci_exposure_audit_v110 import verify
+    config=[{'Service':n,'Publishers':[]} for n in ('api','renderer','redis','proxy')]
+    config[0]['Publishers']=[{'TargetPort':8765,'PublishedPort':8765}]
+    with pytest.raises(ValueError,match='Puerto de host inesperado'):
+        verify(config)
+
+
+def test_compose_audit_accepts_json_lines_and_array():
+    from scripts.ci_exposure_audit_v110 import parse, verify
+    config=[{'Service':n,'Publishers':[]} for n in ('api','renderer','redis','proxy')]
+    assert verify(parse('\n'.join(json.dumps(x) for x in config)))['verified']
+    assert verify(parse(json.dumps(config)))['verified']
+
+
+def test_trimesh_scipy_and_ci_exposure_audit_dependencies_declared():
+    assert 'scipy>=1.13,<2' in (ROOT/'requirements_studio.txt').read_text()
+    assert 'scipy==1.17.0' in (ROOT/'requirements_verified_v110.txt').read_text()
+    assert 'scripts.ci_exposure_audit_v110' in (ROOT/'scripts/ci_stack_smoke_v109.sh').read_text()

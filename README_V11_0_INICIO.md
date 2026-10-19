@@ -39,3 +39,7 @@ La implementación de contenedores y sus checks no sustituyen revisión de segur
 ## Conexión con BAQUEANO
 
 Esta versión no modifica BAQUEANO ni su producción, base de datos, Hosting o DNS. Cualquier integración permanece privada y requiere una autorización independiente.
+
+## Resultados reales de GitHub Actions
+
+En el primer run v11, Docker arrancó los cuatro servicios saludables, Redis autenticado y certificado HTTPS comprobado; ejecutó 60 solicitudes con p95=56,88 ms y cero errores, antes de fallar un auditor de puertos que confundía EXPOSE con publicación en el host. Se corrigió. Las pruebas 3D requieren SciPy y se añadió la dependencia. El modelo Whisper base produjo WER es=1,9000, fr=0,1667, en=0,3333 (sintético); español sigue sin aprobar la prueba de calidad.
