@@ -40,6 +40,7 @@ from neural_core.sky_agent import SKILLS, execute_skill, interpret_local_command
 from neural_core.sky_sports import (orden_ver_madrid, respuesta_orden_madrid,
     partido_actual_o_proximo, descripcion_partido, plataforma_oficial,
     pronosticar_proximo, SportsDataError)
+from neural_core.sky_sports_ui import render_sports_center, mostrar_reproductor_solicitado
 from neural_core.sky_live import historial as sky_live_historial, ejecutar_ciclo as sky_live_check
 
 st.set_page_config(page_title="SKY Universal v8.0", page_icon="🧠", layout="wide", initial_sidebar_state="expanded")
@@ -168,7 +169,7 @@ def mostrar_chat(area="General", prompt_inicial=None):
                         enlace_oficial=None
                     st.markdown(respuesta)
                     if enlace_oficial:
-                        st.link_button("📺 Abrir transmisión autorizada", enlace_oficial)
+                        mostrar_reproductor_solicitado(st, enlace_oficial)
                     if metadatos:
                         st.caption('Fuentes consultadas: metadatos, no necesariamente textos completos.')
                         for x in metadatos:
@@ -199,54 +200,7 @@ elif seccion=="🧠 IA universal":
     st.write(MODULOS[area]); mostrar_chat(area,EJEMPLOS.get(area))
 
 elif seccion=="⚽ SKY Sports Center":
-    st.title("⚽ SKY Sports Center — Pasión Real Madrid")
-    st.caption("Partidos, análisis y transmisiones oficiales bajo petición. No incluye señales piratas ni reproducción automática.")
-    st.info("SKY es madridista al conversar, pero sus estadísticas y pronósticos se basan en datos. Los operadores dependen del país, torneo y suscripción.")
-    st.subheader("📺 Ver un partido por orden explícita")
-    orden_deportiva=st.text_input("Orden de texto o voz transcrita",placeholder="SKY, muéstrame el partido en vivo del Real Madrid",key="sky_sports_command")
-    if st.button("Ejecutar mi orden de ver partido",key="sky_sports_watch"):
-        if not orden_ver_madrid(orden_deportiva):
-            st.warning("Para abrir la opción de ver, decí explícitamente: «SKY, muéstrame el partido en vivo del Real Madrid».")
-        else:
-            try:
-                texto,deporte_url=respuesta_orden_madrid()
-                st.write(texto)
-                if deporte_url:
-                    st.link_button("📺 Abrir operador oficial en nueva pestaña",deporte_url)
-            except SportsDataError as ex:
-                st.warning(str(ex))
-    st.divider()
-    c1,c2,c3=st.columns(3)
-    with c1:
-        if st.button("📅 Consultar próximo partido",key="sky_sports_fixture"):
-            try:
-                vivo,proximo=partido_actual_o_proximo()
-                partido=vivo or proximo
-                st.write(descripcion_partido(partido) if partido else "Sin encuentro verificable en el proveedor.")
-            except SportsDataError as ex:
-                st.warning(str(ex))
-    with c2:
-        if st.button("📊 Predicción experimental",key="sky_sports_prediction"):
-            try:
-                proximo,pronostico=pronosticar_proximo()
-                st.write(descripcion_partido(proximo))
-                st.metric("Gana local",f"{pronostico['local']} %")
-                st.metric("Empate",f"{pronostico['empate']} %")
-                st.metric("Gana visitante",f"{pronostico['visitante']} %")
-                st.caption(f"Modelo Poisson básico; muestra de {pronostico['muestra_local']} y {pronostico['muestra_visitante']} partidos. No considera todas las variables.")
-            except SportsDataError as ex:
-                st.warning(str(ex))
-    with c3:
-        if st.button("📰 Noticias del Real Madrid",key="sky_sports_news"):
-            try:
-                noticias_madrid=noticias("Real Madrid fútbol",limite=6)
-                for articulo in noticias_madrid:
-                    st.markdown("- ["+articulo["titular"].replace("[","").replace("]","")+"]("+articulo["enlace"]+")")
-                    st.caption(articulo["fecha"])
-            except Exception as ex:
-                st.warning("No se pudieron obtener noticias deportivas: "+str(ex))
-    st.caption("Solo se consultan datos externos al pulsar un botón o enviar la orden. API requerida: SKY_FOOTBALL_DATA_TOKEN.")
-    st.markdown("Fuentes de TV: [LaLiga — operadores](https://www.laliga.com/es-US/donde-ver-laliga-easports) · [UEFA — dónde ver Champions](https://www.uefa.com/uefachampionsleague/news/0253-0d82037aaedd-f371c464f919-1000--where-to-watch-the-uefa-champions-league-tv-broadcast-partne/)")
+    render_sports_center(st)
 
 elif seccion=="🧬 Centro multi-IA":
     st.title('🧬 Centro multi-IA — el cerebro de SKY')
