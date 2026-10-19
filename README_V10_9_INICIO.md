@@ -70,3 +70,7 @@ python scripts/security_audit_v103.py .
 La suite completa de SKY se ejecuta en tres grupos en GitHub Actions para evitar bloqueos de salida detectados en pruebas multimedia del entorno local. El README y la documentación de versiones anteriores se conservan.
 
 **Pendientes:** servidor externo de recuperación, DNS/TLS público, carga concurrente real, pentest independiente y evaluación de voz natural multilingüe. Sin esas comprobaciones no se considera certificado para producción mundial.
+
+## 7. Hallazgos de integración en GitHub Actions
+
+Consultá `INCIDENCIAS_CI_V10_9.md` para los resultados de los trabajos Docker/TLS/Redis, regresión y Whisper real. El ensayo inicial detectó dependencias faltantes y un HEALTHCHECK de renderizador incorrecto, ya corregidos en el código. La calidad del modelo pequeño en español quedó por encima del umbral de errores y no debe presentarse como aprobada.
