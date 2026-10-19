@@ -208,3 +208,40 @@ def pronosticar_proximo() -> tuple[dict, dict]:
     historial_local = partidos_equipo(local_id, estado="FINISHED", limite=10)
     historial_visita = partidos_equipo(visita_id, estado="FINISHED", limite=10)
     return siguiente, pronostico_simple(siguiente, historial_local, historial_visita)
+
+
+def agenda_fecha(fecha: str) -> list[dict]:
+    """Agenda del día para el panel; respuesta informativa, sin URL de streaming.
+
+    La cobertura depende del plan y las ligas de football-data.org.
+    """
+    try:
+        datetime.strptime(fecha, "%Y-%m-%d")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Fecha incorrecta: utilizá AAAA-MM-DD") from exc
+    token = getenv("SKY_FOOTBALL_DATA_TOKEN", "").strip()
+    if not token:
+        raise SportsDataError("Configurá SKY_FOOTBALL_DATA_TOKEN para cargar la agenda real.")
+    query = urlencode({"dateFrom": fecha, "dateTo": fecha})
+    req = Request(f"{API_BASE}/matches?{query}",
+                  headers={"X-Auth-Token": token, "Accept": "application/json",
+                           "User-Agent": "SKY-Sports-Center/1.1"})
+    try:
+        with urlopen(req, timeout=10) as response:
+            payload = response.read(2500001)
+    except HTTPError as exc:
+        if exc.code == 429:
+            raise SportsDataError("Límite de consultas del proveedor; intentá más tarde.") from exc
+        raise SportsDataError(f"No se pudo obtener la agenda (HTTP {exc.code}).") from exc
+    except (URLError, TimeoutError) as exc:
+        raise SportsDataError("No se pudo conectar con la agenda deportiva.") from exc
+    if len(payload) > 2500000:
+        raise SportsDataError("Agenda demasiado grande para mostrar con seguridad")
+    try:
+        matches = json.loads(payload).get("matches")
+    except (ValueError, AttributeError) as exc:
+        raise SportsDataError("El proveedor devolvió una agenda inválida") from exc
+    if not isinstance(matches, list):
+        raise SportsDataError("Formato de agenda no reconocido")
+    return sorted((m for m in matches if isinstance(m, dict)),
+                  key=lambda m: str(m.get("utcDate") or ""))[:150]
