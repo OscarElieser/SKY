@@ -1,3 +1,5 @@
 -r requirements_office.txt
 # v9.7: FastAPI UploadFile para biblioteca de imágenes y video.
 python-multipart>=0.0.18,<1
+# SKY v10.4: AES-256-GCM backups with scrypt passphrase derivation
+cryptography>=43,<48

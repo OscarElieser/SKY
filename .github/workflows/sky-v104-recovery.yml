@@ -1,0 +1,28 @@
+name: SKY v10.4 recovery and UI regression
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  recovery-and-i18n:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies
+        run: |
+          python -m pip install -r requirements_studio.txt pytest cryptography
+      - name: Audit committed content for accidental secrets
+        run: python scripts/security_audit_v103.py .
+      - name: Validate UI JavaScript
+        run: node --check metaverse/static/sky-global-i18n.js
+      - name: Test encrypted recovery and internationalization
+        run: PYTHONPATH=. pytest -q tests/test_sky_v10_4_secure_global.py

@@ -27,9 +27,24 @@ function applyAll(){
   const key=el.dataset.skyI18nPlaceholder||el.dataset.skyOriginalPlaceholder;
   const localized=strings[key];el.placeholder=localized||el.dataset.skyOriginalPlaceholder;
  }
- for(const el of document.querySelectorAll('[data-sky-i18n-aria],[data-sky-i18n-title]')){
-  for(const kind of ['aria','title']){const attribute=kind==='aria'?'aria-label':'title',key=el.dataset[kind==='aria'?'skyI18nAria':'skyI18nTitle'];
-   if(key)el.setAttribute(attribute,strings[key]||key);}
+ // Accessible labels are part of the reviewed UI glossary. Preserve original
+ // values so switching languages never compounds a previous translation.
+ for(const el of document.querySelectorAll('[aria-label],[title],[data-sky-i18n-aria],[data-sky-i18n-title]')){
+  if(el.closest(skip))continue;
+  for(const config of [
+    ['aria-label','skyOriginalAriaLabel','skyI18nAria'],
+    ['title','skyOriginalTitle','skyI18nTitle']]){
+    const [attribute, originalKey, explicitKey]=config;
+    const current=el.getAttribute(attribute)||'';
+    if(!el.dataset[originalKey])el.dataset[originalKey]=current;
+    const key=el.dataset[explicitKey]||el.dataset[originalKey];
+    if(key&&Object.prototype.hasOwnProperty.call(strings,key)){
+      const translation=strings[key];
+      if(current!==translation)el.setAttribute(attribute,translation);
+    }else if(current!==el.dataset[originalKey]&&el.dataset[originalKey]){
+      el.setAttribute(attribute,el.dataset[originalKey]);
+    }
+  }
  }
 }
 async function apply(code){
@@ -67,6 +82,7 @@ const observer=new MutationObserver(items=>{
    else if(node.nodeType===Node.ELEMENT_NODE&&!node.closest(skip)){
     const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);
     while(walker.nextNode())translateNode(walker.currentNode);
+    applyAll(); // also localize accessibility attributes of newly mounted panels
    }
   }
  }

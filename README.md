@@ -1,8 +1,12 @@
-# SKY IA v10.3 — Global Platform
+# SKY IA — Universal v10.4 | Secure Recovery & Global UI
 
-**Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
+**Visión:** Oscar Elieser Chamorro Guzmán.
 
-Inicio: `README_V10_3_INICIO.md` · Cambios: `CHANGELOG_V10_3.md` · Seguridad: `SEGURIDAD_V10_3.md`.
+Novedades comprobadas: copias cifradas y verificación de recuperación SQLite sin alterar bases activas; localización adicional de controles, etiquetas accesibles y títulos; 214 pruebas superadas. La cobertura lingüística sigue siendo parcial y no constituye producción certificada.
+
+[Manual de v10.4](README_V10_4_INICIO.md) · [Cambios](CHANGELOG_V10_4.md) · [Validación](VALIDACION_V10_4.md)
+
+---
 
 # SKY IA — Universal v10.2 | Global Intelligence
 
