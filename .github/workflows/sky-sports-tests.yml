@@ -1,0 +1,25 @@
+name: SKY Sports Center offline checks
+
+on:
+  pull_request:
+    paths:
+      - 'neural_core/sky_sports.py'
+      - 'neural_core/assistant.py'
+      - 'tests/test_sky_sports.py'
+      - 'app.py'
+      - '.github/workflows/sky-sports-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  sports-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Comprobar sintaxis sin dependencias
+        run: python -m compileall -q app.py neural_core/assistant.py neural_core/sky_sports.py
+      - name: Pruebas sin Internet ni claves
+        run: python -m unittest discover -s tests -p 'test_sky_sports.py' -v
