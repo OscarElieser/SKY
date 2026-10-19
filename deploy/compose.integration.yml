@@ -19,7 +19,7 @@ services:
     cap_add: [NET_BIND_SERVICE]
     pids_limit: 100
   api:
-    image: ${SKY_SMOKE_IMAGE:-sky-v109:local}
+    image: ${SKY_SMOKE_IMAGE:-sky-v110:local}
     command: ["python", "-m", "uvicorn", "metaverse.api:app", "--host", "0.0.0.0", "--port", "8765", "--proxy-headers", "--forwarded-allow-ips", "*"]
     user: "10001:10001"
     read_only: true
@@ -55,11 +55,15 @@ services:
       start_period: 60s
       retries: 12
   renderer:
-    image: ${SKY_SMOKE_IMAGE:-sky-v109:local}
+    image: ${SKY_SMOKE_IMAGE:-sky-v110:local}
     command: ["python", "sky_render_worker.py"]
-    # Dockerfile healthcheck expects API HTTP endpoint; renderer has no listener.
+    # Separate liveness probe: renderer exposes NO HTTP port or network route.
     healthcheck:
-      disable: true
+      test: ["CMD", "python", "-m", "scripts.renderer_health_v110"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
     user: "10001:10001"
     read_only: true
     tmpfs:

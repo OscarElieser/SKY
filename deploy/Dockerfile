@@ -5,8 +5,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY requirements_social.txt requirements_studio.txt requirements_office.txt requirements_production.txt ./
-RUN python -m pip install --no-cache-dir -r requirements_studio.txt -r requirements_production.txt \
+COPY requirements_social.txt requirements_studio.txt requirements_office.txt requirements_production.txt requirements_verified_v110.txt ./
+RUN python -m pip install --no-cache-dir -c requirements_verified_v110.txt \
+    -r requirements_studio.txt -r requirements_production.txt \
     'opencv-python-headless>=4.10,<5'
 COPY . .
 RUN mkdir -p /app/local_data /app/data && chown -R 10001:10001 /app/local_data /app/data

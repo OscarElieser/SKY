@@ -1,0 +1,5 @@
+# Tested v11.0 scientific/3D baseline on Python 3.11
+numpy==2.3.5
+trimesh==4.11.1
+opencv-python-headless==4.13.0.92
+openpyxl==3.1.5

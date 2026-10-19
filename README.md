@@ -92,3 +92,8 @@ Consulta [README_V10_1_INICIO.md](README_V10_1_INICIO.md), [CHANGELOG_V10_1.md](
 ## SKY v10.8 — Global Voice & Recovery Operations
 
 Ver [README_V10_8_INICIO.md](README_V10_8_INICIO.md) para respaldos cifrados programables, ensayos de recuperación, validación estática de contenedores y pruebas de voz multilingüe. No se activa ningún servicio ni se modifica BAQUEANO en producción.
+
+
+## SKY v11.0 — Global Production Readiness
+
+Leé [`README_V11_0_INICIO.md`](README_V11_0_INICIO.md). Incluye integración Docker/TLS/Redis, pruebas WER reales sin certificación automática y recuperación cifrada aislada. Código heredado conservado; BAQUEANO sin cambios.

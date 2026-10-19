@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 file=deploy/compose.integration.yml
-export SKY_SMOKE_IMAGE="${SKY_SMOKE_IMAGE:-sky-v109:local}"
+export SKY_SMOKE_IMAGE="${SKY_SMOKE_IMAGE:-sky-v110:local}"
 created_secrets=0
 cleanup() {
   docker compose -f "$file" down --volumes --remove-orphans >/dev/null 2>&1 || true
@@ -49,6 +49,12 @@ code="$(curl --noproxy '*' --silent --output /dev/null --write-out '%{http_code}
 # Renderer must be in a network namespace with no interfaces except loopback.
 docker compose -f "$file" exec -T renderer python -c \
   'from pathlib import Path; x=Path("/proc/net/route").read_text().splitlines(); assert len(x)==1, "renderer has a network route"'
+# Prove renderer has its own process healthcheck (not an HTTP endpoint).
+renderer_state="$(docker inspect --format '{{.State.Health.Status}}' "$(docker compose -f "$file" ps -q renderer)")"
+[[ "$renderer_state" == "healthy" ]] || { echo "Renderer not healthy: $renderer_state" >&2; exit 8; }
+# Bounded HTTP/TLS load: synthetic health only. This is NOT a full load certification.
+PYTHONPATH=. python -m scripts.ci_https_load_v110 --ca deploy/integration-test-ca.crt \
+    --requests 60 --concurrency 6 --p95-limit-ms 3000
 # No direct host port exposure from API, worker or Redis.
 python - <<'PY'
 import json, subprocess

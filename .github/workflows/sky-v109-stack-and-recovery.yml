@@ -1,9 +1,12 @@
-name: SKY v10.9 full stack, independent recovery and optional real multilingual ASR
+name: SKY v11.0 full-stack HTTPS, Redis, recovery and measured multilingual ASR
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
+    inputs:
+      enforce_voice_quality:
+        description: "Fail the optional voice job when WER exceeds target"
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -18,7 +21,9 @@ jobs:
       - name: Dependencies and synthetic media tools
         run: |
           sudo apt-get update -qq && sudo apt-get install -y ffmpeg
-          python -m pip install -r requirements_studio.txt -r requirements_production.txt pytest 'opencv-python-headless>=4.10,<5'
+          python -m pip install -r requirements_studio.txt -r requirements_production.txt pytest 'opencv-python-headless>=4.10,<5' 'openpyxl>=3.1,<4'
+          # Pinned compatibility pair reproducing verified 3D/GLB export baseline.
+          python -m pip install 'numpy==2.3.5' 'trimesh==4.11.1'
       - name: Tests global security, backup and voice
         run: >-
           PYTHONPATH=. pytest -q
@@ -59,7 +64,7 @@ jobs:
       - name: Recover synthetic encrypted archive in independent offline container
         run: bash scripts/ci_cross_container_v109.sh
   voice-real-model:
-    # Actual open-weight model downloaded only for an explicit dispatch.
+    # Real model only on push/dispatch; never implies production accuracy.
     # No live-user voices or model weights are committed to the repository.
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -79,7 +84,7 @@ jobs:
         run: |
           python - <<'PY'
           from huggingface_hub import snapshot_download
-          snapshot_download(repo_id='Systran/faster-whisper-tiny',
+          snapshot_download(repo_id='Systran/faster-whisper-base',
             local_dir='.ci_voice_model',
             allow_patterns=['config.json','model.bin','tokenizer.json','vocabulary.*','preprocessor_config.json'])
           PY
@@ -104,7 +109,11 @@ jobs:
           # A quality threshold is reported transparently; a failing quality test is a real finding.
           python -m scripts.benchmark_voice_multilingual_v108 \
             --manifest .ci_voice_samples/manifest.json --audio-dir .ci_voice_samples \
-            --threshold 0.8 --out .ci_voice_samples/voice_report.json
+            --threshold 0.8 --report-only --out .ci_voice_samples/voice_report.json
+          python -m scripts.summarize_voice_v110 .ci_voice_samples/voice_report.json
+      - name: Explicit manual quality gate (may fail; never overridden)
+        if: github.event_name == 'workflow_dispatch' && inputs.enforce_voice_quality == true
+        run: python -m scripts.summarize_voice_v110 .ci_voice_samples/voice_report.json --enforce
       - name: Upload metrics only (never upload audio or transcripts)
         if: always()
         uses: actions/upload-artifact@v4

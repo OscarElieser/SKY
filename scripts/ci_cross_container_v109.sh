@@ -26,7 +26,7 @@ docker run --rm --network none --read-only \
   --mount "type=bind,src=$workspace/sky-fixture.skybackup,dst=/transferred/test.skybackup,readonly" \
   --mount "type=bind,src=$workspace/secret,dst=/secrets/key,readonly" \
   --mount "type=bind,src=$workspace/restore,dst=/recovery" \
-  --entrypoint python "${SKY_SMOKE_IMAGE:-sky-v109:local}" \
+  --entrypoint python "${SKY_SMOKE_IMAGE:-sky-v110:local}" \
   -m scripts.cross_host_recovery_v109 restore \
   --file /transferred/test.skybackup --destination /recovery/restored \
   --key-file /secrets/key --expected-sha256 "$expected" > "$workspace/result.json"

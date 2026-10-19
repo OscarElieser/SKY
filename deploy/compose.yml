@@ -62,9 +62,13 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
     command: ["python", "sky_render_worker.py"]
-    # Dockerfile healthcheck expects API HTTP endpoint; renderer has no listener.
+    # Separate liveness probe: renderer exposes NO HTTP port or network route.
     healthcheck:
-      disable: true
+      test: ["CMD", "python", "-m", "scripts.renderer_health_v110"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
     restart: unless-stopped
     init: true
     user: "10001:10001"

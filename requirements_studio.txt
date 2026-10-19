@@ -8,3 +8,6 @@ cryptography>=43,<48
 # A local CTranslate2 model must already exist; SKY never downloads a model automatically.
 # v10.8: audit local de la configuración de contenedores sin lanzar Docker.
 PyYAML>=6.0.2,<7
+
+# SKY v11.0: export test reader and common spreadsheet import support
+openpyxl>=3.1,<4

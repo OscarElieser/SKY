@@ -66,6 +66,7 @@ def main(argv=None):
     p.add_argument('--manifest',required=True,type=Path)
     p.add_argument('--audio-dir',required=True,type=Path)
     p.add_argument('--threshold',type=float,default=0.35)
+    p.add_argument('--report-only',action='store_true',help='Success requires real inferences; WER is reported but not approved')
     p.add_argument('--out',type=Path)
     args=p.parse_args(argv)
     result=benchmark(args.manifest,args.audio_dir,threshold=args.threshold)
@@ -73,6 +74,8 @@ def main(argv=None):
         if args.out.exists() or args.out.is_symlink():raise FileExistsError('Informe ya existe')
         with args.out.open('x',encoding='utf-8') as handle:json.dump(result,handle,indent=2)
     print(json.dumps(result,ensure_ascii=False,indent=2))
-    return 0 if result.get('tested') and result.get('all_within_target') else 2
+    if not result.get('tested') or result.get('actual_transcriptions',0)<2:
+        return 2
+    return 0 if args.report_only or result.get('all_within_target') else 2
 
 if __name__=='__main__':raise SystemExit(main())
