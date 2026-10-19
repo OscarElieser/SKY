@@ -93,7 +93,7 @@ async def lifespan(app):
             try:await pump
             except asyncio.CancelledError:pass
 
-app=FastAPI(title='SKY Engine API',version='10.5.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
+app=FastAPI(title='SKY Engine API',version='10.6.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
 app.mount('/static',StaticFiles(directory=STATIC),name='static')
 
 @app.get('/office')

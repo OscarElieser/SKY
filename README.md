@@ -1,3 +1,13 @@
+# SKY IA — Universal v10.6 | Global Voice & Production Readiness
+
+**Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
+
+Nueva separación del reconocimiento de voz en un proceso local con timeout y sin claves API heredadas, prueba de precisión de STT que requiere un modelo instalado, ensayo aislado de copias cifradas SQLite/medios y 27 etiquetas de interfaz adicionales en nueve idiomas. **No se realizó una transcripción real: el modelo no está disponible en este entorno.** Mantiene la portada minimalista, BAQUEANO solo para el creador, los módulos existentes y las restricciones antes del despliegue público.
+
+[Instalación v10.6](README_V10_6_INICIO.md) · [Cambios](CHANGELOG_V10_6.md) · [Seguridad](SEGURIDAD_V10_6.md) · [Validación](VALIDACION_V10_6.md)
+
+---
+
 # SKY IA — Universal v10.5 | Global Continuity & Secure Recovery
 
 **Visión:** Oscar Elieser Chamorro Guzmán.

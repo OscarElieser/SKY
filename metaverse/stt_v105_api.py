@@ -2,7 +2,8 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Form
 from .api import require_key
-from neural_core.sky_stt_local import capabilities, transcribe, MAX_INPUT_BYTES
+from neural_core.sky_stt_local import MAX_INPUT_BYTES
+from neural_core.sky_stt_isolated_v106 import capabilities, isolated_transcribe
 
 router = APIRouter(prefix='/api/global-media/stt', dependencies=[Depends(require_key)])
 
@@ -17,7 +18,7 @@ async def local_transcribe(file: UploadFile = File(...), language: str = Form(de
     if len(body) > MAX_INPUT_BYTES:
         raise HTTPException(413, 'Audio supera el límite autorizado')
     try:
-        return transcribe(body, filename=file.filename or 'audio.wav', language=language or None)
+        return isolated_transcribe(body, filename=file.filename or 'audio.wav', language=language or None)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except RuntimeError as exc:

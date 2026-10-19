@@ -112,3 +112,10 @@ for _locale, _translations in _V105_REVIEWED.items():
     EXTRA_REVIEWED.setdefault(_locale, {})
     for _label, _translation in _translations.items():
         EXTRA_REVIEWED[_locale].setdefault(_label, _translation)
+
+# SKY v10.6: checked short labels shared across modules, not user-authored content.
+from .sky_i18n_v106 import REVIEWED as _V106_REVIEWED
+for _locale, _translations in _V106_REVIEWED.items():
+    EXTRA_REVIEWED.setdefault(_locale, {})
+    for _label, _translation in _translations.items():
+        EXTRA_REVIEWED[_locale].setdefault(_label, _translation)
