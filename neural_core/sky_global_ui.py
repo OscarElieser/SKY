@@ -138,3 +138,12 @@ for _locale, _translations in _V108_REVIEWED.items():
         EXTRA_REVIEWED.setdefault(_locale, {})
         for _label, _translation in _translations.items():
             EXTRA_REVIEWED[_locale].setdefault(_label, _translation)
+
+# SKY v10.9: UI labels for separate-host recovery, TLS, and measured speech quality.
+from .sky_i18n_v109 import REVIEWED as _V109_REVIEWED
+BASE.update(_V109_REVIEWED['en'])
+for _locale, _translations in _V109_REVIEWED.items():
+    if _locale != 'en':
+        EXTRA_REVIEWED.setdefault(_locale, {})
+        for _label, _translation in _translations.items():
+            EXTRA_REVIEWED[_locale].setdefault(_label, _translation)

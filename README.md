@@ -1,3 +1,7 @@
+# SKY IA v10.9 — Full Stack & Global Voice Verification
+
+Consultá `README_V10_9_INICIO.md` y `SEGURIDAD_V10_9.md` para el alcance de la versión actual.
+
 # SKY IA — Universal v10.7 | Production Hardening & Global Voice
 
 **Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.

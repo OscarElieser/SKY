@@ -1,0 +1,27 @@
+{
+  "version": "10.9.0",
+  "project": "SKY IA Universal",
+  "author_conceptual": "Oscar Elieser Chamorro Guzmán",
+  "local_tests": {
+    "international_security": 84,
+    "creative_projects": 91,
+    "legacy_engines": 94,
+    "total_passed": 269
+  },
+  "checks": {
+    "static_compose_passed": true,
+    "restore_synthetic_verified": true,
+    "tls_stack_executed_local": false,
+    "real_whisper_executed_local": false,
+    "other_physical_server_restored": false
+  },
+  "production_certified": false,
+  "previous_files_retained": true,
+  "limitations": [
+    "Docker unavailable in local environment",
+    "Whisper weights unavailable locally",
+    "No operator second-server credentials supplied",
+    "CI must be independently checked after publication"
+  ],
+  "github_head_sha_before_release": null
+}

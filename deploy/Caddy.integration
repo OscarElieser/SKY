@@ -1,0 +1,11 @@
+# CI-only TLS service. The CA root is extracted and verified by the harness.
+https://sky.test {
+    tls internal
+    encode gzip
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+    }
+    reverse_proxy api:8765
+}
