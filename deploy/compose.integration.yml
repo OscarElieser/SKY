@@ -57,6 +57,9 @@ services:
   renderer:
     image: ${SKY_SMOKE_IMAGE:-sky-v109:local}
     command: ["python", "sky_render_worker.py"]
+    # Dockerfile healthcheck expects API HTTP endpoint; renderer has no listener.
+    healthcheck:
+      disable: true
     user: "10001:10001"
     read_only: true
     tmpfs:
