@@ -18,7 +18,7 @@ jobs:
       - name: Dependencies and synthetic media tools
         run: |
           sudo apt-get update -qq && sudo apt-get install -y ffmpeg
-          python -m pip install -r requirements_studio.txt -r requirements_production.txt pytest
+          python -m pip install -r requirements_studio.txt -r requirements_production.txt pytest 'opencv-python-headless>=4.10,<5'
       - name: Tests global security, backup and voice
         run: >-
           PYTHONPATH=. pytest -q
