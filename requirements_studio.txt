@@ -14,3 +14,6 @@ openpyxl>=3.1,<4
 
 # SKY v11.0: Trimesh GLB export uses scipy.sparse at import time
 scipy>=1.13,<2
+
+# v11.0 CI: Office PDF regression tests require pypdf (also used in main requirements.txt)
+pypdf>=5,<7
