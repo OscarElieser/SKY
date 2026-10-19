@@ -6,7 +6,7 @@ from neural_core.sky_office import create_document
 from pptx import Presentation
 from docx import Document
 from pypdf import PdfReader
-from artifact_tool import Blob,SpreadsheetFile
+from openpyxl import load_workbook
 
 KEY='skys-personal-studio-authentication-key-321'
 
@@ -43,11 +43,11 @@ def test_xlsx_data_and_safe_formulas(tmp_path):
     result=create_document({'kind':'xlsx','title':'Reporte de ingresos','headers':['Concepto','Monto'],
          'rows':[['Cursos',350],['=SUM(A1:A9)',0]]})
     path=tmp_path/'r.xlsx';path.write_bytes(result.data)
-    book=SpreadsheetFile.import_xlsx(Blob.load(str(path)))
-    tab=book.worksheets.get_item_at(0)
-    assert tab.get_range('A3:B5').values[0]==['Concepto','Monto']
-    assert tab.get_range('B4').values==[[350]]
-    assert tab.get_range('A5').values[0][0]=='=SUM(A1:A9)'
+    book=load_workbook(path, read_only=True, data_only=False)
+    tab=book.worksheets[0]
+    assert [tab['A3'].value, tab['B3'].value]==['Concepto','Monto']
+    assert tab['B4'].value==350
+    assert tab['A5'].value=='=SUM(A1:A9)'
     from zipfile import ZipFile
     with ZipFile(BytesIO(result.data)) as z:
         xml=z.read('xl/worksheets/sheet1.xml').decode()
