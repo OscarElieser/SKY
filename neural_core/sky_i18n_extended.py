@@ -1,0 +1,116 @@
+"""Manually reviewed system UI terms used by SKY 10.3.
+
+These are STATIC control strings, never translations of a user's projects, chat,
+files, errors containing personal data, or subtitles. Language coverage is exact.
+"""
+EXTRA_BASE={
+ 'Sin proyecto':'No project', 'Seleccioná un archivo de la biblioteca o creá un nuevo proyecto.':'Select a file from the library or create a new project.',
+ 'Capas editables':'Editable layers','Color del texto':'Text color','Tamaño':'Size','Brillo':'Brightness',
+ 'Contraste':'Contrast','Saturación':'Saturation','Exportar imagen':'Export image',
+ 'Añadir clip':'Add clip','Línea de tiempo':'Timeline','Renderizar MP4':'Render MP4',
+ 'Imagen y capas':'Image and layers','Video y línea de tiempo':'Video and timeline',
+ 'Aplicar instrucción':'Apply instruction','Nueva versión':'New version',
+ 'Mis archivos':'My files','Seleccionar':'Select','Abrir':'Open','Cargar':'Upload',
+ 'Archivos recientes':'Recent files','Mis mundos':'My worlds','Añadir capa de imagen':'Add image layer',
+ 'Seguimiento de objetos y capas de video':'Object tracking and video layers',
+ 'Pistas globales y máscaras animadas':'Global tracks and animated masks',
+ 'Máscaras y selección de objetos':'Masks and object selection',
+ 'Seleccioná un video de la biblioteca para añadirlo, después configurá el recorte de cada clip.':'Choose a video from your library, then configure each clip trim.',
+ 'Nueva conversación':'New conversation','Inicio':'Home','Opciones':'Options',
+ 'Acceder':'Access','Acceso exclusivo':'Exclusive access','Cuenta':'Account',
+ 'Editar proyecto':'Edit project','Historial':'History','Restaurar':'Restore',
+ 'Idioma de interfaz':'Interface language','Cobertura lingüística':'Language coverage',
+ 'Narración local':'Local narration','Subtítulos y doblaje':'Subtitles and dubbing',
+ 'Idioma no disponible':'Language unavailable','Traducción pendiente':'Translation pending',
+ 'Aprobación necesaria':'Approval required','Guardar versión':'Save version',
+}
+
+# Explicitly checked terms. Languages not in this table show the source-language
+# label for the remaining controls. No machine-translation status is implied.
+EXTRA_REVIEWED={
+ 'pt':{
+ 'Sin proyecto':'Sem projeto','Capas editables':'Camadas editáveis','Color del texto':'Cor do texto','Tamaño':'Tamanho',
+ 'Brillo':'Brilho','Contraste':'Contraste','Saturación':'Saturação','Exportar imagen':'Exportar imagem',
+ 'Añadir clip':'Adicionar clipe','Línea de tiempo':'Linha do tempo','Renderizar MP4':'Renderizar MP4',
+ 'Imagen y capas':'Imagem e camadas','Video y línea de tiempo':'Vídeo e linha do tempo',
+ 'Aplicar instrucción':'Aplicar instrução','Nueva versión':'Nova versão','Mis archivos':'Meus arquivos',
+ 'Seleccionar':'Selecionar','Abrir':'Abrir','Cargar':'Enviar arquivo','Archivos recientes':'Arquivos recentes',
+ 'Mis mundos':'Meus mundos','Añadir capa de imagen':'Adicionar camada de imagem','Nueva conversación':'Nova conversa',
+ 'Inicio':'Início','Opciones':'Opções','Acceder':'Acessar','Cuenta':'Conta','Editar proyecto':'Editar projeto',
+ 'Historial':'Histórico','Restaurar':'Restaurar','Idioma de interfaz':'Idioma da interface',
+ 'Cobertura lingüística':'Cobertura de idiomas','Narración local':'Narração local',
+ 'Subtítulos y doblaje':'Legendas e dublagem','Idioma no disponible':'Idioma indisponível',
+ 'Traducción pendiente':'Tradução pendente','Aprobación necesaria':'Aprovação necessária',
+ 'Guardar versión':'Salvar versão','Máscaras y selección de objetos':'Máscaras e seleção de objetos',
+ 'Seguimiento de objetos y capas de video':'Rastreamento de objetos e camadas de vídeo',
+ },
+ 'fr':{
+ 'Sin proyecto':'Aucun projet','Capas editables':'Calques modifiables','Color del texto':'Couleur du texte',
+ 'Tamaño':'Taille','Brillo':'Luminosité','Contraste':'Contraste','Saturación':'Saturation',
+ 'Exportar imagen':'Exporter une image','Añadir clip':'Ajouter un clip','Línea de tiempo':'Chronologie',
+ 'Renderizar MP4':'Exporter en MP4','Imagen y capas':'Image et calques','Video y línea de tiempo':'Vidéo et chronologie',
+ 'Aplicar instrucción':'Appliquer l’instruction','Nueva versión':'Nouvelle version','Mis archivos':'Mes fichiers',
+ 'Seleccionar':'Sélectionner','Abrir':'Ouvrir','Cargar':'Importer','Archivos recientes':'Fichiers récents',
+ 'Mis mundos':'Mes mondes','Añadir capa de imagen':'Ajouter un calque image','Nueva conversación':'Nouvelle conversation',
+ 'Inicio':'Accueil','Opciones':'Options','Acceder':'Accéder','Cuenta':'Compte','Editar proyecto':'Modifier le projet',
+ 'Historial':'Historique','Restaurar':'Restaurer','Idioma de interfaz':'Langue de l’interface',
+ 'Cobertura lingüística':'Couverture linguistique','Narración local':'Narration locale',
+ 'Subtítulos y doblaje':'Sous-titres et doublage','Idioma no disponible':'Langue indisponible',
+ 'Traducción pendiente':'Traduction en attente','Aprobación necesaria':'Approbation requise',
+ 'Guardar versión':'Enregistrer la version','Máscaras y selección de objetos':'Masques et sélection d’objets'
+ },
+ 'ar':{
+ 'Sin proyecto':'لا يوجد مشروع','Capas editables':'طبقات قابلة للتحرير','Color del texto':'لون النص',
+ 'Tamaño':'الحجم','Brillo':'السطوع','Contraste':'التباين','Saturación':'التشبع',
+ 'Exportar imagen':'تصدير الصورة','Añadir clip':'إضافة مقطع','Línea de tiempo':'الخط الزمني',
+ 'Renderizar MP4':'تصدير MP4','Imagen y capas':'الصورة والطبقات','Video y línea de tiempo':'الفيديو والخط الزمني',
+ 'Aplicar instrucción':'تطبيق التعليمات','Nueva versión':'نسخة جديدة','Mis archivos':'ملفاتي',
+ 'Seleccionar':'اختيار','Abrir':'فتح','Cargar':'رفع','Archivos recientes':'الملفات الأخيرة',
+ 'Mis mundos':'عوالمِي','Añadir capa de imagen':'إضافة طبقة صورة','Nueva conversación':'محادثة جديدة',
+ 'Inicio':'الرئيسية','Opciones':'الخيارات','Acceder':'الدخول','Cuenta':'الحساب','Editar proyecto':'تعديل المشروع',
+ 'Historial':'السجل','Restaurar':'استعادة','Idioma de interfaz':'لغة الواجهة',
+ 'Cobertura lingüística':'تغطية اللغات','Narración local':'سرد محلي',
+ 'Subtítulos y doblaje':'الترجمة والدبلجة','Idioma no disponible':'اللغة غير متاحة',
+ 'Traducción pendiente':'الترجمة قيد الانتظار','Aprobación necesaria':'الموافقة مطلوبة',
+ 'Guardar versión':'حفظ النسخة','Máscaras y selección de objetos':'الأقنعة وتحديد العناصر'
+ },
+ 'zh':{
+ 'Sin proyecto':'无项目','Capas editables':'可编辑图层','Color del texto':'文字颜色','Tamaño':'大小','Brillo':'亮度',
+ 'Contraste':'对比度','Saturación':'饱和度','Exportar imagen':'导出图片','Añadir clip':'添加片段',
+ 'Línea de tiempo':'时间轴','Renderizar MP4':'渲染 MP4','Imagen y capas':'图片与图层',
+ 'Video y línea de tiempo':'视频与时间轴','Aplicar instrucción':'应用指令','Nueva versión':'新版本',
+ 'Mis archivos':'我的文件','Seleccionar':'选择','Abrir':'打开','Cargar':'上传',
+ 'Archivos recientes':'最近文件','Mis mundos':'我的世界','Nueva conversación':'新对话','Inicio':'首页',
+ 'Opciones':'选项','Cuenta':'账户','Editar proyecto':'编辑项目','Historial':'历史记录',
+ 'Restaurar':'恢复','Idioma de interfaz':'界面语言','Cobertura lingüística':'语言覆盖范围',
+ 'Narración local':'本地配音','Subtítulos y doblaje':'字幕与配音',
+ 'Idioma no disponible':'语言不可用','Aprobación necesaria':'需要批准','Guardar versión':'保存版本'
+ },
+ 'ja':{
+ 'Sin proyecto':'プロジェクトなし','Capas editables':'編集可能なレイヤー','Color del texto':'文字色',
+ 'Tamaño':'サイズ','Brillo':'明るさ','Contraste':'コントラスト','Saturación':'彩度',
+ 'Exportar imagen':'画像を出力','Añadir clip':'クリップを追加','Línea de tiempo':'タイムライン',
+ 'Renderizar MP4':'MP4を書き出す','Imagen y capas':'画像とレイヤー',
+ 'Video y línea de tiempo':'動画とタイムライン','Aplicar instrucción':'指示を適用',
+ 'Nueva versión':'新しいバージョン','Mis archivos':'マイファイル','Seleccionar':'選択',
+ 'Abrir':'開く','Cargar':'アップロード','Archivos recientes':'最近のファイル',
+ 'Mis mundos':'マイワールド','Nueva conversación':'新しい会話','Inicio':'ホーム',
+ 'Opciones':'オプション','Cuenta':'アカウント','Editar proyecto':'プロジェクトを編集',
+ 'Historial':'履歴','Restaurar':'復元','Idioma de interfaz':'表示言語',
+ 'Cobertura lingüística':'言語対応状況','Narración local':'ローカル音声',
+ 'Subtítulos y doblaje':'字幕と吹き替え','Idioma no disponible':'言語を利用できません',
+ 'Aprobación necesaria':'承認が必要','Guardar versión':'バージョンを保存'
+ },
+ 'sw':{
+ 'Sin proyecto':'Hakuna mradi','Capas editables':'Tabaka zinazoharirika',
+ 'Color del texto':'Rangi ya maandishi','Tamaño':'Ukubwa','Brillo':'Mwangaza',
+ 'Contraste':'Utofauti','Saturación':'Kiwango cha rangi','Exportar imagen':'Hamisha picha',
+ 'Añadir clip':'Ongeza klipu','Línea de tiempo':'Ratiba ya muda',
+ 'Imagen y capas':'Picha na tabaka','Nueva versión':'Toleo jipya','Mis archivos':'Faili zangu',
+ 'Seleccionar':'Chagua','Abrir':'Fungua','Cargar':'Pakia','Inicio':'Mwanzo',
+ 'Opciones':'Chaguo','Cuenta':'Akaunti','Historial':'Historia','Restaurar':'Rejesha',
+ 'Idioma de interfaz':'Lugha ya kiolesura','Narración local':'Usimulizi wa ndani',
+ 'Subtítulos y doblaje':'Manukuu na uigizaji wa sauti',
+ 'Aprobación necesaria':'Idhini inahitajika','Guardar versión':'Hifadhi toleo'
+ },
+}

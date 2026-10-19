@@ -77,3 +77,11 @@ def global_ui(locale:str='es'):
             'translations':mapped, 'coverage':coverage(code),
             'completeness':'core' if glossary(code) else 'fallback',
             'private_content_translated':False, 'provider_called':False}
+
+
+@router.get('/api/i18n/coverage',dependencies=[Depends(require_key)])
+def i18n_coverage():
+    from pathlib import Path
+    from neural_core.sky_i18n_audit import report
+    from .api import STATIC
+    return report(Path(STATIC))

@@ -1,3 +1,9 @@
+# SKY IA v10.3 — Global Platform
+
+**Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
+
+Inicio: `README_V10_3_INICIO.md` · Cambios: `CHANGELOG_V10_3.md` · Seguridad: `SEGURIDAD_V10_3.md`.
+
 # SKY IA — Universal v10.2 | Global Intelligence
 
 **Visión y autoría conceptual: Oscar Elieser Chamorro Guzmán.**

@@ -1,0 +1,30 @@
+name: SKY security and global regression
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  static-and-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install video and voice tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak
+      - name: Install scoped test dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -r requirements_studio.txt pytest opencv-python-headless
+      - name: Detect accidentally committed secrets
+        run: python scripts/security_audit_v103.py .
+      - name: Validate JavaScript syntax
+        run: |
+          node --check metaverse/static/sky-global-i18n.js
+          node --check metaverse/static/creative.js
+      - name: Test internationalization and voice features
+        run: PYTHONPATH=. pytest -q tests/test_sky_v10_3_global.py

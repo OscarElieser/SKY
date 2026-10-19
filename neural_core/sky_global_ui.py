@@ -90,11 +90,14 @@ EXTRA = {
 }
 
 
+from .sky_i18n_extended import EXTRA_BASE, EXTRA_REVIEWED
+BASE.update(EXTRA_BASE)
+
 def glossary(locale: str):
     root = locale.lower().split('-')[0]
     if root == 'es': return {k:k for k in BASE}
     if root == 'en': return dict(BASE)
-    return CORE_MAP.get(root, {})
+    return {**CORE_MAP.get(root, {}), **EXTRA_REVIEWED.get(root, {})}
 
 
 def coverage(locale: str):

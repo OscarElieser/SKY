@@ -106,4 +106,18 @@ $('v102-narrate').onclick=async()=>{try{
  }catch(ex){text($('v102-status'),ex.message)}};
 window.addEventListener('sky:languagechange',event=>{$('v102-locale').value=event.detail.language});
 
+
+$('v103-voice').onclick=async()=>{try{
+ const textValue=$('v102-narration').value.trim();if(!textValue||textValue.length>800)throw Error('Usá entre 1 y 800 caracteres para la voz local');
+ await skyV102Media('/api/global-media/voice/local-wav',{
+  text:textValue,language:$('v102-locale').value},'SKY_voz_local.wav');
+ text($('v102-status'),'Voz WAV producida sin proveedor externo.');
+ }catch(ex){text($('v102-status'),ex.message)}};
+$('v103-dub').onclick=async()=>{try{
+ const asset=assets.find(a=>a.id===selected&&a.kind==='video');if(!asset)throw Error('Seleccioná primero un video en la biblioteca');
+ const textValue=$('v102-narration').value.trim();if(!textValue||textValue.length>800)throw Error('Usá entre 1 y 800 caracteres');
+ await skyV102Media('/api/global-media/voice/dub-mp4',{
+  text:textValue,language:$('v102-locale').value,video_asset_id:asset.id},'SKY_video_narrado.mp4');
+ text($('v102-status'),'MP4 con voz local generado; el video original se conserva.');
+ }catch(ex){text($('v102-status'),ex.message)}};
 })();

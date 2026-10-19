@@ -93,7 +93,7 @@ async def lifespan(app):
             try:await pump
             except asyncio.CancelledError:pass
 
-app=FastAPI(title='SKY Engine API',version='10.2.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
+app=FastAPI(title='SKY Engine API',version='10.3.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
 app.mount('/static',StaticFiles(directory=STATIC),name='static')
 
 @app.get('/office')
@@ -197,7 +197,7 @@ def baqueano_owner_page():return FileResponse(STATIC/'baqueano-owner.html')
 def metaverse_world():return FileResponse(STATIC/'index.html')
 
 @app.get('/api/health')
-def health():return {'service':'SKY Engine API','status':'ok','version':'10.2.0','private':'key required for data'}
+def health():return {'service':'SKY Engine API','status':'ok','version':'10.3.0','private':'key required for data'}
 
 @app.get('/api/capabilities',dependencies=[Depends(require_key)])
 def capabilities():
@@ -438,3 +438,7 @@ app.include_router(sky_security_router)
 # SKY v10.2: private subtitle and multilingual narration tools.
 from .global_media_api import router as sky_global_media_router
 app.include_router(sky_global_media_router)
+
+# SKY v10.3: local voice and dubbing routes (no network or new public controls).
+from .voice_v103_api import router as sky_voice_v103_router
+app.include_router(sky_voice_v103_router)

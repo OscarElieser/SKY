@@ -72,6 +72,11 @@
  <textarea id="v102-narration" rows="3" maxlength="2500" placeholder="Texto para narrar"></textarea>
  <label><input id="v102-consent" type="checkbox"> Autorizo enviar este texto al proveedor de voz externo gTTS</label>
  <button type="button" id="v102-narrate">↓ Generar narración MP3</button>
+ <details class="advanced-options"><summary>🔊 Narración local y doblaje sin nube · SKY v10.3</summary>
+ <p>Usa eSpeak instalado en tu equipo. La voz es sintética, la disponibilidad varía por idioma y ningún texto se envía fuera de SKY. El doblaje sustituye el audio del MP4 exportado; el video de origen permanece intacto.</p>
+ <div class="tools"><button type="button" id="v103-voice">Descargar voz WAV local</button><button type="button" id="v103-dub">Crear MP4 con voz local</button></div>
+ <p>Para doblar, seleccioná antes un recurso de video en la biblioteca. Se usarán hasta 800 caracteres del cuadro de narración.</p>
+ </details>
  <p id="v102-status" role="status" aria-live="polite"></p>
 </details>
 </main><script src="/static/creative.js" defer></script><script src="/static/sky-language-ui.js" defer></script><script src="/static/sky-security-ui.js" defer></script><script src="/static/sky-global-i18n.js" defer></script></body></html>

@@ -3,27 +3,33 @@
 (()=>{'use strict';
 const KEY='sky_ui_language';
 const skip='script,style,code,pre,textarea,option,svg,[contenteditable],.conversation,.bubble,.answer,.project-chat,.assets,.event-list,#messages,#memories';
-const original=new WeakMap();
+const original=new WeakMap(),lastRendered=new WeakMap();
 let strings={},language='es',loaded=false,userToken='';
 const saved=()=>{try{return localStorage.getItem(KEY)}catch{return null}};
 function remember(code){try{localStorage.setItem(KEY,code)}catch{}}
 function isHumanText(node){const parent=node.parentElement;if(!parent||parent.closest(skip))return false;return Boolean(node.textContent.trim())&&node.textContent.trim().length<=120;}
 function translateNode(node){if(!isHumanText(node))return;
- if(!original.has(node))original.set(node,node.textContent);
+ const current=node.textContent;
+ if(!original.has(node)|| (lastRendered.has(node)&&lastRendered.get(node)!==current)) original.set(node,current);
  const value=original.get(node),word=value.trim();
  if(!word)return;
  const translated=strings[word];
- if(!translated){if(node.textContent!==value)node.textContent=value;return}
+ if(!translated){if(node.textContent!==value)node.textContent=value;lastRendered.set(node,value);return}
  const leading=(value.match(/^\s*/)||[''])[0],trailing=(value.match(/\s*$/)||[''])[0];
- const next=leading+translated+trailing;if(node.textContent!==next)node.textContent=next;
+ const next=leading+translated+trailing;if(node.textContent!==next)node.textContent=next;lastRendered.set(node,next);
 }
 function applyAll(){
  const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);const nodes=[];
  while(walker.nextNode())nodes.push(walker.currentNode);
  for(const node of nodes)translateNode(node);
- for(const el of document.querySelectorAll('[data-sky-i18n-placeholder]')){
-  const value=strings[el.getAttribute('data-sky-i18n-placeholder')]||null;
-  if(value){if(!el.dataset.skyOriginalPlaceholder)el.dataset.skyOriginalPlaceholder=el.placeholder;el.placeholder=value}
+ for(const el of document.querySelectorAll('input[placeholder],textarea[placeholder],[data-sky-i18n-placeholder]')){
+  if(!el.dataset.skyOriginalPlaceholder)el.dataset.skyOriginalPlaceholder=el.getAttribute('placeholder')||'';
+  const key=el.dataset.skyI18nPlaceholder||el.dataset.skyOriginalPlaceholder;
+  const localized=strings[key];el.placeholder=localized||el.dataset.skyOriginalPlaceholder;
+ }
+ for(const el of document.querySelectorAll('[data-sky-i18n-aria],[data-sky-i18n-title]')){
+  for(const kind of ['aria','title']){const attribute=kind==='aria'?'aria-label':'title',key=el.dataset[kind==='aria'?'skyI18nAria':'skyI18nTitle'];
+   if(key)el.setAttribute(attribute,strings[key]||key);}
  }
 }
 async function apply(code){
@@ -55,7 +61,8 @@ async function start(){
 const observer=new MutationObserver(items=>{
  if(!loaded)return;
  for(const record of items){
-  if(record.type==='childList')for(const node of record.addedNodes){
+  if(record.type==='characterData')translateNode(record.target);
+ if(record.type==='childList')for(const node of record.addedNodes){
    if(node.nodeType===Node.TEXT_NODE)translateNode(node);
    else if(node.nodeType===Node.ELEMENT_NODE&&!node.closest(skip)){
     const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);
@@ -65,7 +72,7 @@ const observer=new MutationObserver(items=>{
  }
 });
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
-observer.observe(document.documentElement,{subtree:true,childList:true});
+observer.observe(document.documentElement,{subtree:true,childList:true,characterData:true});
 window.addEventListener('sky:auth',async event=>{userToken=event.detail?.role==='user'?(event.detail.token||''):'';if(!userToken)return;try{const r=await fetch('/api/community/me/language',{headers:{Authorization:'Bearer '+userToken}});if(r.ok){const data=await r.json();{const root=(data.explicit?data.language:navigator.language||'es').split('-')[0];const select=document.getElementById('sky-global-language');if(select&&[...select.options].some(x=>x.value===root)){select.value=root;await apply(root)}}}}catch{}});
 window.SKYGlobalI18N={apply,locale:()=>language};
 })();
