@@ -6,7 +6,7 @@ let registering=false,rtc=null,media=null,remoteAudio=null,callTo='',view=null;
 const avatarColors={cielo:'#51C8DF',aurora:'#55D2A6',coral:'#FA846C',violeta:'#A78AFA',bosque:'#70B66E',dorado:'#E5BA60'};
 function alertSky(message){let el=$('alert');el.textContent=message;el.style.display='block';clearTimeout(alertSky.t);alertSky.t=setTimeout(()=>el.style.display='none',4200)}
 async function request(path,method='GET',data,owner=false){
- let headers={'Content-Type':'application/json'};if(owner)headers['X-SKY-KEY']=$('owner-key').value.trim();else if(token)headers.Authorization='Bearer '+token;
+ let headers={'Content-Type':'application/json'};if(owner)headers['X-SKY-KEY']=$('owner-key').value.trim();if(owner)Object.assign(headers,window.SKYOwnerAuth.headers());else if(token)headers.Authorization='Bearer '+token;
  let opts={method,headers};if(data!==undefined)opts.body=JSON.stringify(data);
  let resp=await fetch(path,opts);let value=await resp.json().catch(()=>null);
  if(!resp.ok)throw Error(typeof value?.detail==='string'?value.detail:'Error '+resp.status);

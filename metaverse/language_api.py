@@ -18,9 +18,9 @@ class Translation(BaseModel):
 
 @router.get('/api/i18n/languages')
 def languages(request:Request):
-    return {'languages':[{'code':k,'name':v,'ui_offline':k in lang.PHRASES} for k,v in lang.LANGUAGES.items()],
+    return {'languages':[{'code':k,'name':v,'ui_offline':bool(lang.glossary(k)), 'ui_coverage':lang.coverage(k)['reviewed_strings']} for k,v in lang.LANGUAGES.items()],
             'negotiated':lang.negotiate(request.headers.get('accept-language')),
-            'fallback':'es','automatic_translation_requires_consent':True}
+            'fallback':'es','automatic_translation_requires_consent':True, 'catalogue_is_not_full_translation':True}
 
 @router.get('/api/i18n/phrases')
 def phrases(locale:str='es'):
@@ -64,3 +64,16 @@ def identify_script(body:dict):
     text=body.get('text','')
     if not isinstance(text,str) or len(text)>6000:raise HTTPException(422,'Texto inválido')
     return lang.script_hint(text)
+
+
+@router.get('/api/i18n/ui')
+def global_ui(locale:str='es'):
+    """Same-origin reviewed STATIC interface labels only; never user content."""
+    try:code=lang.normalize(locale,strict=True)
+    except ValueError as exc:raise HTTPException(422,str(exc)) from exc
+    from neural_core.sky_global_ui import glossary, coverage
+    mapped={**lang.PHRASES.get(code.split('-')[0],{}), **glossary(code)}
+    return {'locale':code, 'direction':'rtl' if code.split('-')[0] in ('ar','he','fa','ur','ps') else 'ltr',
+            'translations':mapped, 'coverage':coverage(code),
+            'completeness':'core' if glossary(code) else 'fallback',
+            'private_content_translated':False, 'provider_called':False}

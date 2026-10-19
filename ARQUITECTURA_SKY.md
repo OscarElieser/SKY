@@ -108,3 +108,12 @@ La UI y el API administrativo de BAQUEANO continúan restringidos a la clave mae
 `metaverse/creative_api.py` introduce rutas privadas que llaman a `neural_core/sky_creative.py` para almacenar medios por hash SHA-256 y preservar proyectos `image` y `video` independientes del resto del ecosistema. `sky_projects.py` reconoce vínculos `creative` y exporta sus recetas con versiones. `sky_backup.py` agrega opcionalmente la biblioteca completa a las copias locales. La página `metaverse/static/creative.html` es interna y está accesible desde **Espacios**, sin nuevos accesos principales.
 
 La ruta de publicación de documentos y mundos y el control de BAQUEANO no cambian. Los renders se realizan en un worker local con una instantánea aprobada de receta; los procesos interrumpidos quedan a revisión conservadora para no modificar silenciosamente el resultado. El procesamiento creativo es local con Pillow y FFmpeg, salvo generación externa Gemini solicitada expresamente.
+
+## SKY Global Intelligence v10.2 — arquitectura integrada
+
+- `neural_core/sky_languages.py` negocia BCP-47 y pistas de escritura (no sustituye reconocimiento semántico). `neural_core/sky_global_ui.py` centraliza glosarios públicos con cobertura explícita.
+- `metaverse/language_api.py` entrega catálogo y preferencias. `community_api.py` persiste el idioma de cada usuario comunitario por separado en SQLite.
+- `metaverse/static/sky-global-i18n.js` aplica glosario estático en las páginas de SKY; el texto privado y los chats no se envían a traductores automáticamente. `sky-global-i18n.css` cubre RTL.
+- `neural_core/sky_subtitles.py` y `metaverse/global_media_api.py` reutilizan los medios del Creative Studio para SRT/VTT, MP4 y narración bajo consentimiento.
+- `metaverse/owner_mfa.py`, `security_api.py`, `deployment_v102.py` y `distributed_limits.py` refuerzan el acceso privado y bloquean arranques públicos incompletos. La verificación de autenticidad y cifrado del proxy y un WAF deben quedar fuera del proceso Python.
+- El resto de los módulos y BAQUEANO no se sustituyen ni se modifican; BAQUEANO conserva acceso reservado al creador.

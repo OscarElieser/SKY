@@ -121,6 +121,7 @@ class AssistInput(BaseModel):
     message:str=Field(min_length=2,max_length=6000)
     provider:str=Field(default='local',max_length=30)
     include_memory:bool=False
+    language:str='es'
     project_id:str|None=None
     share_project_context:bool=False
     save_to_project:bool=False
@@ -133,6 +134,9 @@ def assist(body:AssistInput):
     Los roles y planes operan sin nube. Un proveedor externo se usa solo si fue
     seleccionado; la memoria opt-in debe activarse para compartirla.
     """
+    from neural_core.sky_languages import normalize
+    try:requested_language=normalize(body.language,strict=True)
+    except ValueError as exc:raise HTTPException(422,str(exc)) from exc
     selected=select_roles(body.message)
     from neural_core import sky_projects as ph
     brief_text=''
@@ -149,7 +153,7 @@ def assist(body:AssistInput):
     if body.provider not in {'gemini','openai','anthropic','ollama','mistral','groq','deepseek'}:
         raise HTTPException(422,'Proveedor no permitido')
     system=('Sos SKY IA, asistente personal especializado. Adaptate a los siguientes roles: '
-            +', '.join(r['title'] for r in selected)+'. Respondé en español con soluciones precisas y accionables. '
+            +', '.join(r['title'] for r in selected)+'. Respondé en el idioma '+requested_language+' con soluciones precisas y accionables. '
             'No afirmés haber creado archivos, desplegado software ni consultado datos en vivo si no lo hiciste. '
             'Si el pedido implica tareas sensibles, explicá qué autorizaciones necesitarías. '
             'No se ejecutan acciones mediante esta ruta. ')

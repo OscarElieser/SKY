@@ -1,0 +1,5 @@
+# Optional production-only services; never expose SKY locally to the public directly.
+-r requirements_social.txt
+redis>=5.0,<7
+# Deployment additionally requires a dedicated TLS proxy, MFA, WAF,
+# private storage isolation and an independent security audit.

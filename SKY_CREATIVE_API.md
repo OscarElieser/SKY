@@ -52,3 +52,7 @@ La API de creación de video acepta por clip `caption_keyframes` (lista de 2 a 1
 - Edición local en español: `mueve capa 1 del clip 1 a x 50 y 40` / `opacidad capa 1 del clip 1 a 0.6`.
 
 Limitaciones: seguimiento aproximado por plantilla, no identificación semántica ni generación de largometrajes.
+
+## SKY v10.2 — Subtítulos y narración multilingües
+
+Los módulos creativos pueden exportar WebVTT Unicode o quemar subtítulos SRT sobre un video MP4 local, usando únicamente la biblioteca privada del creador. El nuevo apartado en el editor es plegable. La narración MP3 con gTTS requiere consentimiento expreso. Rutas, tipos y limitaciones: [SKY_GLOBAL_API.md](SKY_GLOBAL_API.md).

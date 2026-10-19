@@ -17,6 +17,8 @@ LANGUAGES={
  'he':'עברית','fa':'فارسی','bn':'বাংলা','ur':'اردو','ta':'தமிழ்','yo':'Yorùbá',
  'ht':'Kreyòl ayisyen'
 }
+from .sky_global_ui import EXTRA, glossary, coverage
+LANGUAGES.update(EXTRA)
 # Only these locales have hand-reviewed OFFLINE UI labels. Others may be
 # selected and preserved but fall back to Spanish for untranslated strings.
 PHRASES={
@@ -45,11 +47,22 @@ def normalize(value: str|None, *,strict=False)->str:
     return tag if root in LANGUAGES else 'es'
 
 def negotiate(header:str|None):
-    ordered=[]
-    for entry in (header or '')[:400].split(','):
-        part=entry.split(';')[0].strip()
-        if part and part!='*':ordered.append(normalize(part))
-    return next((lang for lang in ordered if lang.split('-')[0] in PHRASES),'es')
+    """Respect q weights; skip unsupported tags rather than prematurely picking es."""
+    candidates=[]
+    for idx,entry in enumerate((header or '')[:600].split(',')[:20]):
+        part,*attributes=entry.strip().split(';')
+        part=part.strip()
+        if not TAG.fullmatch(part):continue
+        root=part.lower().split('-')[0]
+        if root not in LANGUAGES:continue
+        quality=1.0
+        for attr in attributes:
+            if attr.strip().lower().startswith('q='):
+                try:quality=float(attr.strip()[2:])
+                except ValueError:quality=0
+                break
+        if 0<quality<=1:candidates.append((quality,-idx,part.lower()))
+    return sorted(candidates,reverse=True)[0][2] if candidates else 'es'
 
 def phrase(code:str,language:str='es'):
     root=normalize(language).split('-')[0]
@@ -79,10 +92,23 @@ def set_preference(language:str):
     return tag
 
 def script_hint(text:str):
-    # A script hint is NOT full language detection. Avoid pretending otherwise.
-    scripts=[('ar',r'[\u0600-\u06ff]'),('zh',r'[\u4e00-\u9fff]'),
-             ('ja',r'[\u3040-\u30ff]'),('ko',r'[\uac00-\ud7af]'),
-             ('ru',r'[\u0400-\u04ff]'),('hi',r'[\u0900-\u097f]')]
+    """Only identify the dominant *script*; not a reliable spoken language.
+
+    Several languages share scripts (Arabic/Persian/Urdu; Han/Chinese/Japanese;
+    Latin for many world languages). Explicit language selection takes priority.
+    """
+    scripts=[('ja',r'[\u3040-\u30ff]'),('ko',r'[\uac00-\ud7af]'),
+             ('ar',r'[\u0600-\u06ff]'),('he',r'[\u0590-\u05ff]'),
+             ('hi',r'[\u0900-\u097f]'),('bn',r'[\u0980-\u09ff]'),
+             ('pa',r'[\u0a00-\u0a7f]'),('gu',r'[\u0a80-\u0aff]'),
+             ('ta',r'[\u0b80-\u0bff]'),('te',r'[\u0c00-\u0c7f]'),
+             ('kn',r'[\u0c80-\u0cff]'),('ml',r'[\u0d00-\u0d7f]'),
+             ('th',r'[\u0e00-\u0e7f]'),('lo',r'[\u0e80-\u0eff]'),
+             ('km',r'[\u1780-\u17ff]'),('my',r'[\u1000-\u109f]'),
+             ('si',r'[\u0d80-\u0dff]'),('am',r'[\u1200-\u137f]'),
+             ('ka',r'[\u10a0-\u10ff]'),('hy',r'[\u0530-\u058f]'),
+             ('el',r'[\u0370-\u03ff]'),('bo',r'[\u0f00-\u0fff]'),
+             ('ru',r'[\u0400-\u04ff]'),('zh',r'[\u4e00-\u9fff]')]
     for code,pattern in scripts:
         if re.search(pattern,text):return {'hint':code,'confidence':'script_only'}
     return {'hint':None,'confidence':'unknown'}

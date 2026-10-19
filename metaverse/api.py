@@ -37,9 +37,15 @@ def api_token():
     return token
 
 scheme=APIKeyHeader(name='X-SKY-KEY',auto_error=False)
-def require_key(token:Optional[str]=Depends(scheme)):
+def require_owner_key_only(token:Optional[str]=Depends(scheme)):
     if not token or not secrets.compare_digest(token,api_token()):
-        raise HTTPException(401,detail='Clave SKY incorrecta',headers={'WWW-Authenticate':'APIKey'})
+        raise HTTPException(401,detail='Credenciales inválidas',headers={'WWW-Authenticate':'APIKey'})
+    return True
+
+def require_key(request:Request, owner_key:bool=Depends(require_owner_key_only)):
+    from . import owner_mfa
+    if owner_mfa.required() and not owner_mfa.valid(request.headers.get('X-SKY-SESSION')):
+        raise HTTPException(401,detail='Se requiere sesión de segundo factor del creador')
     return True
 
 async def _workflow_pump():
@@ -64,6 +70,10 @@ async def _creative_pump():
 @asynccontextmanager
 async def lifespan(app):
     api_token()
+    from .owner_mfa import validate_configuration
+    from .deployment_v102 import validate_environment
+    validate_configuration()
+    validate_environment()
     demo_world()
     from neural_core.sky_creative import mark_interrupted
     mark_interrupted()
@@ -83,7 +93,7 @@ async def lifespan(app):
             try:await pump
             except asyncio.CancelledError:pass
 
-app=FastAPI(title='SKY Engine API',version='10.1.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
+app=FastAPI(title='SKY Engine API',version='10.2.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
 app.mount('/static',StaticFiles(directory=STATIC),name='static')
 
 @app.get('/office')
@@ -98,6 +108,7 @@ class OfficeRequest(BaseModel):
     headers: list=Field(default_factory=list,max_length=40)
     rows: list=Field(default_factory=list,max_length=300)
     template: str='general'
+    language: str='es'
     ai_provider: str='none'  # SOLO bajo solicitud explícita, no fallback oculto
 
 @app.get('/api/office/formats',dependencies=[Depends(require_key)])
@@ -110,6 +121,9 @@ def office_formats():
 def office_generate(request:OfficeRequest):
     from neural_core.sky_office import create_document
     spec=request.model_dump()
+    from neural_core.sky_languages import normalize
+    try:document_language=normalize(request.language,strict=True)
+    except ValueError as exc:raise HTTPException(422,str(exc)) from exc
     provider=request.ai_provider.lower()
     if provider!='none':
         if provider not in ('gemini','openai','anthropic','ollama','mistral','groq','deepseek'):
@@ -117,7 +131,7 @@ def office_generate(request:OfficeRequest):
         if not request.prompt.strip():raise HTTPException(422,'Añadí un tema para redactar con IA.')
         try:
             from neural_core.assistant import responder
-            instructions=(f'Redactá un borrador estructurado en español para un documento tipo {request.kind} titulado '
+            instructions=(f'Redactá un borrador estructurado en el idioma {document_language} para un documento tipo {request.kind} titulado '
                           f'{request.title}. Tema: {request.prompt}. Devolvé texto con encabezados Markdown (#) '
                           'y contenido claro, preciso y editable. No inventés cifras ni fuentes.')
             result,_=responder(instructions,'SKY Office Studio',proveedor=provider)
@@ -148,6 +162,7 @@ class PromptRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message:str=Field(min_length=1,max_length=6000)
+    language:str='es'
     provider:str='local'
     area:str='Metaverso'
 
@@ -182,7 +197,7 @@ def baqueano_owner_page():return FileResponse(STATIC/'baqueano-owner.html')
 def metaverse_world():return FileResponse(STATIC/'index.html')
 
 @app.get('/api/health')
-def health():return {'service':'SKY Engine API','status':'ok','version':'10.1.0','private':'key required for data'}
+def health():return {'service':'SKY Engine API','status':'ok','version':'10.2.0','private':'key required for data'}
 
 @app.get('/api/capabilities',dependencies=[Depends(require_key)])
 def capabilities():
@@ -268,7 +283,7 @@ def chat(body:ChatRequest):
         return {'provider':'sky-local','answer':'SKY local puede generar mundos por descripción, guardar escenarios, exportar GLB y usar /sky calcula, /sky metas o /sky hora. Para diálogo abierto, configurá Ollama, Gemini, OpenAI u otro motor en SKY y elegilo aquí.'}
     try:
         from neural_core.assistant import responder
-        answer,_=responder(body.message,body.area,proveedor=body.provider)
+        answer,_=responder(body.message,body.area,proveedor=body.provider,idioma=body.language)
         return {'provider':body.provider,'answer':answer}
     except Exception as exc:
         # No leaked credentials or SDK tracebacks
@@ -415,3 +430,11 @@ from .language_api import router as sky_language_router
 app.include_router(sky_language_router)
 from .security_v101 import install as install_sky_security
 install_sky_security(app)
+
+# SKY 10.2: optional creator TOTP + short-lived server-side sessions.
+from .security_api import router as sky_security_router
+app.include_router(sky_security_router)
+
+# SKY v10.2: private subtitle and multilingual narration tools.
+from .global_media_api import router as sky_global_media_router
+app.include_router(sky_global_media_router)

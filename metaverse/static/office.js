@@ -8,10 +8,10 @@ $('use-ai').addEventListener('change',()=>{$('ai-settings').classList.toggle('hi
 function preview(){$('prev-title').textContent=$('title').value||'Sin título';$('prev-content').textContent=($('content').value||$('prompt').value||'Escribí el contenido para verlo aquí...').slice(0,2500)};
 ['title','content','prompt'].forEach(id=>$(id).addEventListener('input',preview));
 function notify(msg,ok){$('result').replaceChildren();const el=document.createElement('div');el.className=ok?'file-ready':'notice';el.id=ok?'done':'err';el.textContent=msg;$('result').append(el)}
-async function get(path,opts={}){let res=await fetch(path,{...opts,headers:{'X-SKY-KEY':privateKey,...opts.headers}});if(!res.ok){let message='Error '+res.status;try{message=(await res.json()).detail||message}catch{}throw Error(message)}return res}
-async function connect(){privateKey=$('key').value.trim();try{await get('/api/office/formats');$('gate').classList.add('hidden');$('key').value=''}catch(e){$('gate-error').textContent=e.message;privateKey=''}}
+async function get(path,opts={}){let res=await fetch(path,{...opts,headers:{'X-SKY-KEY':privateKey,...window.SKYOwnerAuth.headers(),...opts.headers}});if(!res.ok){let message='Error '+res.status;try{message=(await res.json()).detail||message}catch{}throw Error(message)}return res}
+async function connect(){privateKey=$('key').value.trim();try{await window.SKYOwnerAuth.begin(privateKey);await get('/api/office/formats');$('gate').classList.add('hidden');$('key').value=''}catch(e){$('gate-error').textContent=e.message;privateKey=''}}
 $('connect').addEventListener('click',connect);$('key').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();connect()}})
-$('logout').addEventListener('click',()=>{privateKey='';$('gate').classList.remove('hidden');$('result').replaceChildren()});
+$('logout').addEventListener('click',()=>{window.SKYOwnerAuth.logout(privateKey);privateKey='';$('gate').classList.remove('hidden');$('result').replaceChildren()});
 $('make').addEventListener('submit',async e=>{
   e.preventDefault();if(!privateKey){notify('Primero iniciá sesión.');return}
   const btn=$('generate');btn.disabled=true;btn.textContent='Generando archivo...';$('result').replaceChildren();
@@ -23,5 +23,5 @@ $('make').addEventListener('submit',async e=>{
     notify('Archivo real creado: '+filename+' ('+Math.ceil(blob.size/1024)+' KB). Ya podés editarlo o compartirlo.',true);
   }catch(err){notify('No se pudo generar: '+err.message,false)}finally{btn.disabled=false;btn.textContent='✦ Crear y descargar'}
 });
-$('mic').addEventListener('click',()=>{const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Recognition){notify('Este navegador no ofrece dictado. Podés escribir tus instrucciones.');return}const sr=new Recognition();sr.lang='es-NI';sr.onresult=e=>{$('prompt').value=( $('prompt').value+' '+e.results[0][0].transcript).trim();preview()};sr.onerror=()=>notify('No se pudo utilizar el micrófono. Revisá permisos.');sr.start()});
+$('mic').addEventListener('click',()=>{const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Recognition){notify('Este navegador no ofrece dictado. Podés escribir tus instrucciones.');return}const sr=new Recognition();sr.lang=window.SKYGlobalI18N?.locale()||'es-NI';sr.onresult=e=>{$('prompt').value=( $('prompt').value+' '+e.results[0][0].transcript).trim();preview()};sr.onerror=()=>notify('No se pudo utilizar el micrófono. Revisá permisos.');sr.start()});
 choose('docx');

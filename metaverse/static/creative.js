@@ -2,8 +2,8 @@
 const $=id=>document.getElementById(id);let token='',assets=[],selected=null,project=null,view='image',previewUrl='';
 function toast(m){$('toast').textContent=m;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',5000)}
 function err(e){toast(e?.message||String(e))}
-async function api(path,method='GET',body,form=false){const opts={method,headers:{'X-SKY-KEY':token}};if(body){if(form)opts.body=body;else{opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body)}}const r=await fetch(path,opts);if(!r.ok){let msg=await r.text();try{msg=JSON.parse(msg).detail||msg}catch{}throw Error(msg)}return r.json()}
-async function binary(path,name,display=false){const r=await fetch(path,{headers:{'X-SKY-KEY':token}});if(!r.ok)throw Error('No se pudo obtener el archivo');const b=await r.blob();const url=URL.createObjectURL(b);if(display){if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=url;const elt=b.type.startsWith('video/')?$('video-preview'):$('image-preview');$('video-preview').hidden=true;$('image-preview').hidden=true;elt.src=url;elt.hidden=false;$('empty-preview').hidden=true}else{let a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}}
+async function api(path,method='GET',body,form=false){const opts={method,headers:{'X-SKY-KEY':token,...window.SKYOwnerAuth.headers()}};if(body){if(form)opts.body=body;else{opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body)}}const r=await fetch(path,opts);if(!r.ok){let msg=await r.text();try{msg=JSON.parse(msg).detail||msg}catch{}throw Error(msg)}return r.json()}
+async function binary(path,name,display=false){const r=await fetch(path,{headers:{'X-SKY-KEY':token,...window.SKYOwnerAuth.headers()}});if(!r.ok)throw Error('No se pudo obtener el archivo');const b=await r.blob();const url=URL.createObjectURL(b);if(display){if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=url;const elt=b.type.startsWith('video/')?$('video-preview'):$('image-preview');$('video-preview').hidden=true;$('image-preview').hidden=true;elt.src=url;elt.hidden=false;$('empty-preview').hidden=true}else{let a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}}
 function button(label,callback){const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>Promise.resolve(callback()).catch(err);return b}
 function text(el,s){el.textContent=s}
 async function refresh(){assets=await api('/api/creative/assets');const list=$('assets');list.replaceChildren();assets.forEach(a=>{const el=document.createElement('div');el.className='asset'+(a.id===selected?' selected':'');const name=document.createElement('div');const title=document.createElement('strong');text(title,a.filename);const kind=document.createElement('small');text(kind,a.kind+(a.duration?' · '+a.duration.toFixed(1)+' s':''));name.append(title,kind);el.append(name,button('Vista',()=>binary('/api/creative/assets/'+a.id+'/preview',a.filename,true)));el.addEventListener('click',()=>{selected=a.id;refresh().catch(err)});list.append(el)});const ps=$('projects');ps.replaceChildren();(await api('/api/creative/projects')).forEach(p=>ps.append(button(p.name+' · v'+p.version,()=>openProject(p.id))))}
@@ -17,7 +17,7 @@ async function renderVideo(){await save();const job=await api('/api/creative/pro
 async function updateVersions(){if(!project)return;const area=$('version-history');area.replaceChildren();(await api('/api/creative/projects/'+project.id+'/versions')).forEach(v=>{const d=document.createElement('div');d.className='version-item';text(d,'Versión '+v.version+' · '+v.saved_at+' ');d.append(button('Cargar al editor',()=>{if(!window.confirm('¿Reemplazar los cambios no guardados por esta revisión?'))return;project.spec=JSON.parse(v.spec);redraw();toast('Revisión cargada. Guardá para crear una nueva versión.')}));area.append(d)})}
 async function updateExports(){if(!project)return;const out=$('exports');out.replaceChildren();(await api('/api/creative/projects/'+project.id+'/exports')).forEach(async v=>{let el=document.createElement('div');text(el,'Exportación de la versión '+v.version+' · '+v.created_at+' ');el.append(button('Descargar',async()=>{const a=assets.find(x=>x.id===v.asset_id)||await api('/api/creative/assets').then(x=>x.find(a=>a.id===v.asset_id));await binary('/api/creative/assets/'+v.asset_id+'/download',a?.filename||'SKY_media',false)}));out.append(el)})}
 async function updateJobs(){const jobs=await api('/api/creative/jobs');const out=$('jobs');out.replaceChildren();jobs.slice(0,15).forEach(j=>{const d=document.createElement('div');text(d,j.status+' · '+j.progress+'%'+(j.error?' · '+j.error:''));if(j.status==='completed')d.append(button('Descargar MP4',async()=>{const a=assets.find(x=>x.id===j.asset_id);await binary('/api/creative/assets/'+j.asset_id+'/download',a?.filename||'SKY_video.mp4')}));if(['failed','needs_review'].includes(j.status))d.append(button('Reintentar',async()=>{await api('/api/creative/jobs/'+j.id+'/retry','POST');await updateJobs()}));if(j.status==='queued')d.append(button('Cancelar',async()=>{await api('/api/creative/jobs/'+j.id+'/cancel','POST');await updateJobs()}));out.append(d)})}
-$('connect').onclick=async()=>{try{token=$('key').value;await api('/api/creative/capabilities');$('login').hidden=true;$('key').value='';await refresh();setInterval(()=>{if(token)updateJobs().catch(()=>{})},5500)}catch(e){text($('auth-error'),e.message)}};
+$('connect').onclick=async()=>{try{token=$('key').value;await window.SKYOwnerAuth.begin(token);await api('/api/creative/capabilities');$('login').hidden=true;$('key').value='';await refresh();setInterval(()=>{if(token)updateJobs().catch(()=>{})},5500)}catch(e){text($('auth-error'),e.message)}};
 $('generate-ai').onclick=async()=>{try{if(!token)throw Error('Ingresá primero con la clave de SKY');const prompt=$('ai-prompt').value.trim();if(prompt.length<4)throw Error('Describí la imagen que querés crear');$('generate-ai').disabled=true;const a=await api('/api/creative/generate-image','POST',{prompt,provider:'gemini'});selected=a.id;await refresh();await binary('/api/creative/assets/'+a.id+'/preview',a.filename,true);toast('Imagen generada e incorporada a tu biblioteca')}catch(ex){err(ex)}finally{$('generate-ai').disabled=false}};
 
 $('apply-keyframes').onclick=()=>{try{if(!project||project.kind!=='video')throw Error('Abrí un proyecto de video');
@@ -84,5 +84,26 @@ $('v101-set-masks').onclick=()=>{try{
  project.spec.tracks.at(-1).mask_keyframes=frames;
  toast('Máscaras animadas preparadas; guardá y renderizá para validarlas');
  }catch(e){err(e)}};
+
+
+// SKY v10.2: subtitles (SRT/VTT/MP4) and opt-in multilingual narration.
+async function skyV102Media(endpoint,payload,filename){
+ if(!token)throw Error('Ingresá con la clave privada del creador');
+ const response=await fetch(endpoint,{method:'POST',headers:{'X-SKY-KEY':token,...window.SKYOwnerAuth.headers(),'Content-Type':'application/json'},body:JSON.stringify(payload)});
+ if(!response.ok){let detail='No se pudo completar la operación';try{detail=(await response.json()).detail||detail}catch{}throw Error(detail)}
+ const url=URL.createObjectURL(await response.blob());const link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),2500);
+}
+$('v102-vtt').onclick=async()=>{try{await skyV102Media('/api/global-media/subtitles/vtt',{srt:$('v102-srt').value,language:$('v102-locale').value},'SKY_subtitulos.vtt');text($('v102-status'),'Subtítulos WebVTT exportados.')}catch(ex){text($('v102-status'),ex.message)}};
+$('v102-caption-video').onclick=async()=>{try{
+ const asset=assets.find(a=>a.id===selected&&a.kind==='video')||assets.find(a=>a.id===project?.spec?.clips?.[0]?.asset_id&&a.kind==='video');
+ if(!asset)throw Error('Seleccioná un video de la biblioteca para subtitular');
+ await skyV102Media('/api/global-media/subtitles/render',{video_asset_id:asset.id,srt:$('v102-srt').value,language:$('v102-locale').value},'SKY_video_subtitulado.mp4');
+ text($('v102-status'),'MP4 generado con subtítulos incorporados; el original sigue intacto.');
+ }catch(ex){text($('v102-status'),ex.message)}};
+$('v102-narrate').onclick=async()=>{try{
+ await skyV102Media('/api/global-media/narration/mp3',{text:$('v102-narration').value,language:$('v102-locale').value,provider:'gtts',external_consent:$('v102-consent').checked},'SKY_narracion.mp3');
+ text($('v102-status'),'Narración MP3 generada.');
+ }catch(ex){text($('v102-status'),ex.message)}};
+window.addEventListener('sky:languagechange',event=>{$('v102-locale').value=event.detail.language});
 
 })();

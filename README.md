@@ -1,8 +1,18 @@
+# SKY IA — Universal v10.2 | Global Intelligence
+
+**Visión y autoría conceptual: Oscar Elieser Chamorro Guzmán.**
+
+Esta entrega conecta idiomas, voz y subtítulos con la plataforma completa, refuerza el acceso privado del creador con MFA opcional y conserva todos los motores anteriores. **90 idiomas catalogados no equivalen a 90 interfaces íntegramente traducidas.**
+
+[Manual v10.2](README_V10_2_INICIO.md) · [Cambios v10.2](CHANGELOG_V10_2.md) · [Seguridad](SEGURIDAD_V10_2.md) · [Validación](VALIDACION_V10_2.md)
+
+---
+
 # SKY IA — Plataforma tecnológica personal
 
 **Visión del proyecto: Oscar Elieser Chamorro Guzmán.**
 
-La versión integrada actual es **v10.0**. La plataforma incluye asistencia multi-IA opcional, proyectos, memoria, metaverso, comunidad, Office Studio, diseño visual, Creative Studio y API privada. El estudio añade seguimiento de objetos mediante OpenCV, composición de varias capas, fotogramas clave y previsualización exacta de videos renderizados.
+La versión integrada actual es **v10.2**. La plataforma incluye asistencia multi-IA opcional, proyectos, memoria, metaverso, comunidad, Office Studio, diseño visual, Creative Studio y API privada. El estudio añade seguimiento de objetos mediante OpenCV, composición de varias capas, fotogramas clave y previsualización exacta de videos renderizados.
 
 **Instalación y pruebas:** [README_V10_INICIO.md](README_V10_INICIO.md) · [CHANGELOG_V10.md](CHANGELOG_V10.md) · [VALIDACION_V10.md](VALIDACION_V10.md)
 

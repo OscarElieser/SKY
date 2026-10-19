@@ -21,6 +21,30 @@ def install(app):
     @app.middleware('http')
     async def secure_response(request:Request,call_next):
         path=request.url.path
+        # Protect state changes when browsers include an Origin header.
+        if request.method in ('POST','PUT','PATCH','DELETE') and request.headers.get('origin'):
+            from urllib.parse import urlsplit
+            origin=request.headers['origin']
+            host=request.headers.get('host','')
+            try:origin_host=urlsplit(origin).netloc
+            except ValueError:origin_host=''
+            if origin_host != host:
+                return JSONResponse({'detail':'Origen no autorizado'},status_code=403)
+        if os.getenv('SKY_DEPLOYMENT_MODE')=='public' and os.getenv('SKY_BEHIND_TLS_PROXY')=='1':
+            # Only valid when a trusted TLS reverse proxy sets the ASGI scheme.
+            if request.url.scheme!='https':
+                return JSONResponse({'detail':'HTTPS obligatorio'},status_code=403)
+        if path.startswith(('/api/','/v1/')):
+            try:
+                from .distributed_limits import allowed
+                remote=request.client.host if request.client else 'unknown'
+                rate=20 if path.startswith(('/api/community/login','/api/security/owner-mfa/')) else 90
+                if not allowed(remote,'login' if rate==20 else 'api',max_requests=rate):
+                    return JSONResponse({'detail':'Cuota temporal alcanzada'},status_code=429,headers={'Retry-After':'60'})
+            except Exception:
+                # A broken Redis must not silently disable abuse protection for public SKY.
+                if os.getenv('SKY_DEPLOYMENT_MODE')=='public':
+                    return JSONResponse({'detail':'Limitador de solicitudes no disponible'},status_code=503)
         if path.startswith('/api/') or path.startswith('/v1/'):
             content_length=request.headers.get('content-length')
             if content_length:
@@ -28,8 +52,19 @@ def install(app):
                 except ValueError:size=-1
                 if size<0 or size>120*1024*1024:
                     return JSONResponse({'detail':'Carga demasiado grande'},status_code=413)
-            if request.headers.get('content-type','').startswith('application/json') and content_length and int(content_length)>2*1024*1024:
-                return JSONResponse({'detail':'JSON demasiado grande'},status_code=413)
+            is_json=request.headers.get('content-type','').startswith('application/json')
+            allowed_bytes=2*1024*1024 if is_json else 90*1024*1024
+            if content_length and int(content_length)>allowed_bytes:
+                return JSONResponse({'detail':'Solicitud excede el límite permitido'},status_code=413)
+            if request.method in ('POST','PUT','PATCH') and not content_length:
+                # Bound transfer-encoded requests that omit Content-Length.
+                chunks=[];received=0
+                async for chunk in request.stream():
+                    received+=len(chunk)
+                    if received>allowed_bytes:
+                        return JSONResponse({'detail':'Carga excede el límite permitido'},status_code=413)
+                    chunks.append(chunk)
+                request._body=b''.join(chunks)
         # Failed-auth throttle is intentionally best effort; distributed
         # limits belong in gateway/Redis. Identity never uses untrusted XFF.
         ip=request.client.host if request.client else 'unknown'

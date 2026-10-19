@@ -1,5 +1,5 @@
-<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SKY Creative Studio</title><link rel="stylesheet" href="/static/creative.css"></head><body>
-<header><a class="brand" href="/sky">✦ SKY IA</a><span><span data-sky-i18n="studio">Estudio creativo</span> <small>v10.1</small></span><a href="/sky" class="toplink">← Volver a SKY</a></header>
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SKY Creative Studio</title><link rel="stylesheet" href="/static/creative.css"><link rel="stylesheet" href="/static/sky-global-i18n.css"></head><body>
+<header><a class="brand" href="/sky">✦ SKY IA</a><span><span data-sky-i18n="studio">Estudio creativo</span> <small>v10.2</small></span><a href="/sky" class="toplink">← Volver a SKY</a></header>
 <main>
 <section class="intro"><h1 data-sky-i18n="studio">Estudio creativo</h1><p>Importá tus archivos, combiná capas o clips, revisá el resultado y exportá sin perder los originales.</p></section>
 <section class="workspace">
@@ -61,4 +61,17 @@
 </section>
 <div id="login" class="modal"><div class="login-inner"><h2>SKY · Acceso privado</h2><p>El editor y los archivos se guardan en tu equipo. Solo el creador puede gestionarlos.</p><input id="key" type="password" placeholder="Clave privada SKY" autocomplete="current-password"><button id="connect">Entrar al estudio</button><p id="auth-error" role="alert"></p></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
-</main><script src="/static/creative.js" defer></script><script src="/static/sky-language-ui.js" defer></script></body></html>
+
+<details id="sky-v102-media" class="v102-media" style="margin:18px auto;max-width:1120px;padding:16px;border:1px solid #34536c;border-radius:14px">
+ <summary style="cursor:pointer">🌐 Subtítulos y narración multilingüe · SKY Global</summary>
+ <p>Pegá subtítulos SRT ya transcritos. SKY puede exportar VTT o crear un MP4 subtitulado. No se transcribe el audio automáticamente.</p>
+ <label for="v102-locale">Idioma del contenido</label><input id="v102-locale" maxlength="32" value="es" placeholder="ar, sw, zh, fr, es-NI...">
+ <label for="v102-srt">Subtítulos SRT</label><textarea id="v102-srt" rows="6" maxlength="32000" placeholder="1&#10;00:00:00,000 --> 00:00:02,000&#10;Bienvenidos a SKY"></textarea>
+ <div class="tools"><button type="button" id="v102-vtt">↓ Exportar VTT</button><button type="button" id="v102-caption-video">🎬 Crear MP4 con subtítulos</button></div>
+ <p>Para narración, SKY puede crear un MP3 a partir del texto escrito. gTTS usa un servicio externo; no se envía contenido sin autorización.</p>
+ <textarea id="v102-narration" rows="3" maxlength="2500" placeholder="Texto para narrar"></textarea>
+ <label><input id="v102-consent" type="checkbox"> Autorizo enviar este texto al proveedor de voz externo gTTS</label>
+ <button type="button" id="v102-narrate">↓ Generar narración MP3</button>
+ <p id="v102-status" role="status" aria-live="polite"></p>
+</details>
+</main><script src="/static/creative.js" defer></script><script src="/static/sky-language-ui.js" defer></script><script src="/static/sky-security-ui.js" defer></script><script src="/static/sky-global-i18n.js" defer></script></body></html>

@@ -1,7 +1,7 @@
 (()=>{'use strict';const $=id=>document.getElementById(id);let key='';
 const AGENTS={planificador:'plan',creador_3d:'world',diseñador:'experience',documentalista:'document',memoria:'memory'};
 function elem(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n}
-async function req(url,method='GET',body){const opt={method,headers:{'X-SKY-KEY':key}};if(body!==undefined){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(body)}const r=await fetch(url,opt);const d=await r.json();if(!r.ok)throw Error(d.detail||r.statusText);return d}
+async function req(url,method='GET',body){const opt={method,headers:{'X-SKY-KEY':key,...window.SKYOwnerAuth.headers()}};if(body!==undefined){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(body)}const r=await fetch(url,opt);const d=await r.json();if(!r.ok)throw Error(d.detail||r.statusText);return d}
 function msg(x,err=false){$('message').textContent=x;$('message').style.color=err?'#ffaca7':'#85e8d5'}
 function newStep(){if($('steps').children.length>=8){msg('Máximo 8 pasos por flujo.',true);return}const card=elem('div',undefined,'step-card');const bar=elem('div',undefined,'step-bar');const title=elem('h4','Paso '+($('steps').children.length+1));const del=elem('button','Quitar');del.addEventListener('click',()=>{card.remove();renumber()});bar.append(title,del);card.append(bar);
 const select=elem('select');select.className='agent';for(const a of Object.keys(AGENTS)){const o=new Option(({planificador:'Planificación',creador_3d:'Crear mundo 3D',diseñador:'Crear diseño web',documentalista:'Crear documento',memoria:'Guardar memoria'}[a]),a);select.append(o)}
@@ -27,7 +27,7 @@ async function action(id,name,body){if(name==='approve') {
  if(name==='retry'&&!confirm('¿Reintentar? Revisá antes si el paso anterior pudo crear algún resultado.'))return;
  if(name==='cancel'&&!confirm('¿Cancelar este flujo?'))return;
  const data=await req('/api/sky/workflows/'+id+'/'+name,'POST',body);msg('Flujo '+data.name+' · '+data.status);await refresh()}
-async function fileDownload(id,filename){const r=await fetch('/api/sky/files/'+id,{headers:{'X-SKY-KEY':key}});if(!r.ok)throw Error('No se pudo recuperar el archivo');const url=URL.createObjectURL(await r.blob());const a=elem('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}
+async function fileDownload(id,filename){const r=await fetch('/api/sky/files/'+id,{headers:{'X-SKY-KEY':key,...window.SKYOwnerAuth.headers()}});if(!r.ok)throw Error('No se pudo recuperar el archivo');const url=URL.createObjectURL(await r.blob());const a=elem('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}
 async function refresh(){const jobs=await req('/api/sky/workflows');const root=$('jobs');root.replaceChildren();if(!jobs.length){root.append(elem('p','No hay flujos creados todavía.'));return}
  for(const job of jobs){const card=elem('article',undefined,'workflow-card');const head=elem('div',undefined,'workflow-title');head.append(elem('h3',job.name),elem('span',job.status,'flow-status'));card.append(head);card.append(elem('p','Pasos: '+job.current_step+'/'+job.steps.length+' · Ejecución '+job.run_number+(job.interval_minutes?' · cada '+job.interval_minutes+' min':'')+' · '+job.id));if(job.last_error)card.append(elem('p','Último error: '+job.last_error));
  const buttons=elem('div',undefined,'workflow-buttons');const b=(title,fn)=>{const el=elem('button',title);el.addEventListener('click',()=>fn().catch(e=>msg(e.message,true)));buttons.append(el)};
@@ -48,7 +48,7 @@ async function continuity(){
  for(const flow of report.workflows.slice(0,12)){root.append(elem('p','Flujo '+flow.name+' · '+flow.status+' · '+flow.progress.done+'/'+flow.progress.total));}
 }
 $('continuity-refresh').addEventListener('click',()=>continuity().catch(e=>msg(e.message,true)));
-$('login').addEventListener('click',async()=>{key=$('key').value.trim();try{const val=await req('/api/sky/workflows/status');$('gate').hidden=true;$('content').hidden=false;$('key').value='';$('engine-state').textContent=val.engine+' · '+val.persistence;
+$('login').addEventListener('click',async()=>{key=$('key').value.trim();await window.SKYOwnerAuth.begin(key);try{const val=await req('/api/sky/workflows/status');$('gate').hidden=true;$('content').hidden=false;$('key').value='';$('engine-state').textContent=val.engine+' · '+val.persistence;
  const projects=await req('/api/sky/projects');for(const p of projects)$('project').append(new Option(p.title,p.id));await refresh();if(!$('steps').children.length)newStep();}
  catch(e){key='';$('gate-error').textContent='Clave incorrecta o servidor no disponible.'}});
 $('key').addEventListener('keydown',e=>{if(e.key==='Enter')$('login').click()});$('add-step').addEventListener('click',newStep);$('create').addEventListener('click',()=>create().catch(e=>msg(e.message,true)));$('refresh').addEventListener('click',()=>refresh().catch(e=>msg(e.message,true)));

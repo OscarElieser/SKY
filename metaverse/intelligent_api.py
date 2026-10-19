@@ -10,6 +10,7 @@ router=APIRouter(prefix='/api/sky/intelligent',dependencies=[Depends(require_key
 class Message(BaseModel):
     message:str=Field(min_length=2,max_length=5000)
     provider:str='local'
+    language:str='es'
     project_id:str|None=None
     share_project_context:bool=False
     share_project_history:bool=False
@@ -32,6 +33,9 @@ class Approval(BaseModel):
 
 @router.post('/message')
 def message(body:Message):
+    from neural_core.sky_languages import normalize
+    try:requested_language=normalize(body.language,strict=True)
+    except ValueError as exc:raise HTTPException(422,str(exc)) from exc
     if intelligent.creation_intent(body.message):
         try:
             draft=intelligent.prepare(body.message,body.project_id)
@@ -40,7 +44,7 @@ def message(body:Message):
         return {'type':'proposal','request':intelligent.status(draft['id']),
                 'answer':'Preparé un plan local con etapas y resultados previstos. Revisá la propuesta antes de autorizar la ejecución.'}
     return {'type':'answer',**assist(AssistInput(message=body.message,provider=body.provider,
-                       project_id=body.project_id,share_project_context=body.share_project_context,
+                       project_id=body.project_id,language=requested_language,share_project_context=body.share_project_context,
                        share_project_history=body.share_project_history,save_to_project=bool(body.project_id)))}
 
 @router.get('/requests')

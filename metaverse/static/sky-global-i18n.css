@@ -1,0 +1,8 @@
+/* SKY v10.2: global multilingual typography and bidi behavior. */
+html[dir="rtl"] body { direction: rtl; }
+html[dir="rtl"] .sky-global-locale { direction: ltr; }
+html[dir="rtl"] input[type="url"], html[dir="rtl"] input[type="email"],
+html[dir="rtl"] input[type="number"],html[dir="rtl"] code,
+html[dir="rtl"] pre { direction: ltr; text-align: left; }
+textarea,.bubble,.conversation,.answer,[data-sky-user-content] { unicode-bidi: plaintext; }
+.sky-global-locale select:focus-visible {outline: 2px solid #7dd3fc;outline-offset:2px;}
