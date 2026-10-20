@@ -1,99 +1,55 @@
-# SKY IA v10.9 — Full Stack & Global Voice Verification
-
-Consultá `README_V10_9_INICIO.md` y `SEGURIDAD_V10_9.md` para el alcance de la versión actual.
-
-# SKY IA — Universal v10.7 | Production Hardening & Global Voice
+# 🌌 SKY IA — Universal v10.2 | Global Intelligence
 
 **Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
 
-Novedades: credenciales desde archivos privados, configuración opcional de contenedores no privilegiados, auditoría de un modelo de voz instalado, traducciones por pantalla y ensayo cifrado de recuperación. **245 pruebas automatizadas aprobaron; Docker no se ejecutó y no había modelo STT instalado.** La portada continúa minimalista y BAQUEANO es exclusivo del propietario.
-
-[Inicio v10.7](README_V10_7_INICIO.md) · [Cambios](CHANGELOG_V10_7.md) · [Seguridad](SEGURIDAD_V10_7.md) · [Validación](VALIDACION_V10_7.md)
+Plataforma tecnológica personal que integra asistencia multi-IA privada, metaverso 3D, flujos de trabajo autónomos, estudio creativo de video/animación, generación de documentos de oficina (Word, Excel, PowerPoint, PDF) y agente de dispositivos locales.
 
 ---
 
-# SKY IA — Universal v10.6 | Global Voice & Production Readiness
+## ⚡ Inicio Rápido (Windows)
 
-**Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
-
-Nueva separación del reconocimiento de voz en un proceso local con timeout y sin claves API heredadas, prueba de precisión de STT que requiere un modelo instalado, ensayo aislado de copias cifradas SQLite/medios y 27 etiquetas de interfaz adicionales en nueve idiomas. **No se realizó una transcripción real: el modelo no está disponible en este entorno.** Mantiene la portada minimalista, BAQUEANO solo para el creador, los módulos existentes y las restricciones antes del despliegue público.
-
-[Instalación v10.6](README_V10_6_INICIO.md) · [Cambios](CHANGELOG_V10_6.md) · [Seguridad](SEGURIDAD_V10_6.md) · [Validación](VALIDACION_V10_6.md)
-
----
-
-# SKY IA — Universal v10.5 | Global Continuity & Secure Recovery
-
-**Visión:** Oscar Elieser Chamorro Guzmán.
-
-Nueva recuperación cifrada de SQLite y biblioteca multimedia de Creative Studio; reconocimiento de voz local opcional (solo si el creador instala el modelo); localización revisada en ocho idiomas adicionales. Preserva los módulos v10.4 y mantiene la portada sencilla y BAQUEANO exclusivo del creador.
-
-**La transcripción real necesita un modelo local; no está validada sin él.** Las traducciones siguen siendo parciales, y la seguridad no cuenta todavía con auditoría externa.
-
-[Instalación v10.5](README_V10_5_INICIO.md) · [Cambios](CHANGELOG_V10_5.md) · [Seguridad](SEGURIDAD_V10_5.md) · [Validación](VALIDACION_V10_5.md)
+Para iniciar cualquier componente de SKY, ejecuta el menú interactivo unificado:
+```cmd
+SKY_INICIAR.bat
+```
+Desde este panel podrás elegir fácilmente:
+1. **Metaverso y API:** [http://127.0.0.1:8765/sky](http://127.0.0.1:8765/sky)
+2. **Panel General Streamlit:** [http://127.0.0.1:8501](http://127.0.0.1:8501)
+3. **Estudio Creativo de Video:** [http://127.0.0.1:8765/creative](http://127.0.0.1:8765/creative)
+4. **Office Studio (Documentos):** [http://127.0.0.1:8765/office](http://127.0.0.1:8765/office)
+5. **Agente de Dispositivo Local:** `agente_dispositivo.py`
+6. **Diagnóstico del Motor:** `sky_preflight.py`
+7. **Suite de Pruebas Automatizadas:** 199 tests en `pytest`
 
 ---
 
-# SKY IA — Universal v10.4 | Secure Recovery & Global UI
+## 📁 Estructura del Proyecto
 
-**Visión:** Oscar Elieser Chamorro Guzmán.
-
-Novedades comprobadas: copias cifradas y verificación de recuperación SQLite sin alterar bases activas; localización adicional de controles, etiquetas accesibles y títulos; 214 pruebas superadas. La cobertura lingüística sigue siendo parcial y no constituye producción certificada.
-
-[Manual de v10.4](README_V10_4_INICIO.md) · [Cambios](CHANGELOG_V10_4.md) · [Validación](VALIDACION_V10_4.md)
-
----
-
-# SKY IA — Universal v10.2 | Global Intelligence
-
-**Visión y autoría conceptual: Oscar Elieser Chamorro Guzmán.**
-
-Esta entrega conecta idiomas, voz y subtítulos con la plataforma completa, refuerza el acceso privado del creador con MFA opcional y conserva todos los motores anteriores. **90 idiomas catalogados no equivalen a 90 interfaces íntegramente traducidas.**
-
-[Manual v10.2](README_V10_2_INICIO.md) · [Cambios v10.2](CHANGELOG_V10_2.md) · [Seguridad](SEGURIDAD_V10_2.md) · [Validación](VALIDACION_V10_2.md)
-
----
-
-# SKY IA — Plataforma tecnológica personal
-
-**Visión del proyecto: Oscar Elieser Chamorro Guzmán.**
-
-La versión integrada actual es **v10.2**. La plataforma incluye asistencia multi-IA opcional, proyectos, memoria, metaverso, comunidad, Office Studio, diseño visual, Creative Studio y API privada. El estudio añade seguimiento de objetos mediante OpenCV, composición de varias capas, fotogramas clave y previsualización exacta de videos renderizados.
-
-**Instalación y pruebas:** [README_V10_INICIO.md](README_V10_INICIO.md) · [CHANGELOG_V10.md](CHANGELOG_V10.md) · [VALIDACION_V10.md](VALIDACION_V10.md)
-
-La plataforma no está certificada para producción pública y requiere permisos administrativos para herramientas privadas; BAQUEANO solo debe ser visible al creador autenticado.
+```text
+SKY/
+├── SKY_INICIAR.bat        # Lanzador central interactivo para Windows
+├── app.py                 # Panel de control Streamlit (puerto 8501)
+├── requirements.txt       # Dependencias principales del proyecto
+├── .env                   # Variables de entorno y llaves de acceso local
+├── metaverse/             # Motor FastAPI, WebSockets y vistas web del metaverso
+├── neural_core/           # Núcleo de inteligencia, 3D, oficina, flujos y video
+├── tests/                 # Suite de pruebas automatizadas (199 tests aprobados)
+├── local_data/            # Bases de datos SQLite locales y token de autenticación
+└── docs/                  # Documentación organizada
+    ├── guias/             # Manuales de inicio y validaciones por versión
+    ├── changelogs/        # Registro de cambios (v9.0 a v10.2)
+    ├── api/               # Especificaciones de arquitectura y APIs
+    ├── manifiestos/       # Manifiestos de integridad y hashes SHA-256
+    ├── legal/             # Documentos de autoría y propiedad conceptual
+    └── capturas/          # Capturas de pantalla e imágenes de muestra
+```
 
 ---
 
-# SKY IA v9.7 · Creative Studio
+## 📚 Documentación
 
-**Inicio recomendado:** [README_V9_7_INICIO.md](README_V9_7_INICIO.md) · [Creative API](SKY_CREATIVE_API.md) · [Validación](VALIDACION_V9_7.md) · [Cambios](CHANGELOG_V9_7.md).
-
-Los módulos anteriores se conservan; la pantalla principal sigue minimalista. BAQUEANO es privado del creador.
-
----
-
-# SKY IA Universal v9.6 — Contextual Coordination
-
-**Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
-
-SKY es un asistente personal de software con memoria local, IA opcional, herramientas de creación, metaverso, comunidad y proyectos. Esta versión conecta la **interpretación contextual, revisión de planes y revisión versionada de resultados dentro de una sola conversación**, conservando los motores v9.5 y la pantalla inicial sencilla.
-
-Empezá por [README_V9_6_INICIO.md](README_V9_6_INICIO.md). API nueva: [SKY_CONTEXTUAL_API.md](SKY_CONTEXTUAL_API.md). Validación: [VALIDACION_V9_6.md](VALIDACION_V9_6.md).
-
-**Estado:** piloto local funcional, no certificación de producción pública ni inteligencia ilimitada. BAQUEANO requiere la clave privada del creador; no se modificó su web en producción.
-
----
-## SKY v10.1 — Multilingual Creative Security
-
-Consulta [README_V10_1_INICIO.md](README_V10_1_INICIO.md), [CHANGELOG_V10_1.md](CHANGELOG_V10_1.md) y [SEGURIDAD_V10_1.md](SEGURIDAD_V10_1.md) para los cambios de idiomas, pistas de edición global, máscaras animadas, worker y controles de seguridad. Las funciones anteriores se conservan.
-
-## SKY v10.8 — Global Voice & Recovery Operations
-
-Ver [README_V10_8_INICIO.md](README_V10_8_INICIO.md) para respaldos cifrados programables, ensayos de recuperación, validación estática de contenedores y pruebas de voz multilingüe. No se activa ningún servicio ni se modifica BAQUEANO en producción.
-
-
-## SKY v11.0 — Global Production Readiness
-
-Leé [`README_V11_0_INICIO.md`](README_V11_0_INICIO.md). Incluye integración Docker/TLS/Redis, pruebas WER reales sin certificación automática y recuperación cifrada aislada. Código heredado conservado; BAQUEANO sin cambios.
+* **Guías de versiones:** [docs/guias/](docs/guias/)
+* **Historial de cambios:** [docs/changelogs/](docs/changelogs/)
+* **Especificaciones de APIs:** [docs/api/](docs/api/)
+* **Manifiestos SHA256:** [docs/manifiestos/](docs/manifiestos/)
+* **Expediente de Autoría:** [docs/legal/](docs/legal/)

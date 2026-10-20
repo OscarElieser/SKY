@@ -1,5 +1,5 @@
 @echo off
+setlocal
 cd /d "%~dp0"
-set SKY_CREATIVE_WORKER=0
-python sky_render_worker.py
-pause
+if not exist ".venv\Scripts\python.exe" exit /b 1
+".venv\Scripts\python.exe" sky_render_worker.py

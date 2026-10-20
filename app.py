@@ -3,6 +3,8 @@ from pathlib import Path
 from datetime import date
 import hashlib
 import os
+from urllib import request
+from urllib.error import URLError
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 import streamlit as st
@@ -59,19 +61,77 @@ if clave_panel and not st.session_state.get('_panel_autenticado'):
         else: st.error('Contraseña incorrecta.')
     st.stop()
 st.markdown("""<style>
+.stApp {
+    background: radial-gradient(ellipse at 50% -15%, #173f62 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 115%, #18203c 0%, transparent 60%),
+                #060e1c !important;
+}
 .block-container {padding-top:1.8rem; max-width:1500px}
-[data-testid=stMetric] {background:rgba(100,140,170,.08); padding:14px; border-radius:12px}
-.smallnote {opacity:.8; font-size:.9rem}
+[data-testid="stMetric"] {
+    background: linear-gradient(160deg, rgba(16, 37, 60, 0.75), rgba(10, 23, 41, 0.85));
+    border: 1px solid #2e536b;
+    padding: 16px;
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    transition: all 0.2s ease;
+}
+[data-testid="stMetric"]:hover {
+    border-color: #4ebfe8;
+    box-shadow: 0 6px 24px rgba(18, 151, 189, 0.2);
+}
+.stButton > button[kind="primary"] {
+    background: linear-gradient(100deg, #1297bd, #4455d1) !important;
+    border: 1px solid #4ebfe8 !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+.smallnote {opacity:.85; font-size:.9rem; color:#9fbad0}
 </style>""", unsafe_allow_html=True)
 iniciar(); crear_tablas()
-SECCIONES=["🏠 Inicio", "🧠 IA universal", "🧬 Centro multi-IA", "👁️ SKY Visión", "🎨 SKY Studio 3D", "📁 SKY Office Studio", "🧬 SKY Evolución", "🧰 Herramientas SKY", "🔔 SKY Live", "🌐 SKY Metaverso y API", "🎙️ SKY y dispositivos", "💰 Finanzas personales", "🚀 Generar ingresos", "📈 Bolsa y Bitcoin",
+SECCIONES=["🏠 Inicio", "🌐 SKY IA Universal v12.0", "🧠 IA universal", "🧬 Centro multi-IA", "👁️ SKY Visión", "🎨 SKY Studio 3D", "📁 SKY Office Studio", "🧬 SKY Evolución", "🧰 Herramientas SKY", "🔔 SKY Live", "🌐 SKY Metaverso y API", "🎙️ SKY y dispositivos", "💰 Finanzas personales", "🚀 Generar ingresos", "📈 Bolsa y Bitcoin",
            "📰 Noticias e Internet", "📣 Redes sociales", "🎵 Música y películas", "🎞️ Imágenes y videos",
            "🔐 Antivirus y hacking ético", "🎓 Educación e investigación", "📚 Biblioteca y memoria",
-           "🧭 BAQUEANO Control Center", "🧾 Transacciones", "📡 Engine Sensor MLP + GRU", "✅ Proyectos y tareas"]
+           "🧭 BAQUEANO Control Center", "🧾 Transacciones", "📡 Engine Sensor MLP + GRU", "✅ Proyectos y tareas", "⚽ SKY Sports Madridista"]
 with st.sidebar:
     st.title("🧠 SKY")
-    st.caption("Universal v6.0 · Asistente privado + metaverso + API")
+    st.caption("Universal v10.5 · Asistente privado + metaverso + API")
     seccion=st.radio("Navegación",SECCIONES, label_visibility="collapsed")
+    st.divider()
+    import neural_core.sky_supabase as sb
+    if sb.is_configured():
+        usuario_sb = st.session_state.get('_supabase_user')
+        if usuario_sb:
+            if usuario_sb.get('is_super_admin'):
+                st.success("👑 **Superadministrador**")
+                st.caption(f"`{usuario_sb.get('email')}`")
+            else:
+                st.caption(f"☁️ Conectado: `{usuario_sb.get('email')}`")
+            if st.button("Cerrar Sesión", key="sb_logout_btn"):
+                sb.sign_out()
+                st.session_state.pop('_supabase_user', None)
+                st.rerun()
+        else:
+            with st.expander("☁️ Supabase Cloud Auth", expanded=False):
+                modo_sb = st.radio("Acción", ["Entrar", "Crear cuenta"], horizontal=True, key="sb_mode", label_visibility="collapsed")
+                sb_email = st.text_input("Correo", key="sb_email")
+                sb_pass = st.text_input("Contraseña", type="password", key="sb_pass")
+                if modo_sb == "Entrar" and st.button("Iniciar Sesión", key="sb_btn_login"):
+                    try:
+                        res = sb.sign_in(sb_email, sb_pass)
+                        st.session_state['_supabase_user'] = res
+                        st.success("Sesión iniciada con éxito.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+                elif modo_sb == "Crear cuenta" and st.button("Registrar Usuario", key="sb_btn_signup"):
+                    try:
+                        res = sb.sign_up(sb_email, sb_pass)
+                        st.success("Cuenta registrada. Ya puedes iniciar sesión.")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+    else:
+        with st.expander("☁️ Supabase Cloud", expanded=False):
+            st.caption("Configura SUPABASE_ANON_KEY en .env para activar el inicio de sesión.")
     st.divider()
     st.caption("Multi-IA + visión + 3D por piezas + memoria + herramientas autorizadas")
     st.caption("Los proveedores externos sólo reciben contenido cuando los seleccionás o activás el modo automático.")
@@ -472,10 +532,19 @@ elif seccion=="🔔 SKY Live":
 elif seccion=="🌐 SKY Metaverso y API":
     st.title('🌐 SKY Metaverso — Tu universo personal 3D')
     st.write('Construí ciudades, espacios educativos, laboratorios, mundos naturales y escenarios propios. La escena se guarda localmente y puede exportarse como GLB para Blender. El servidor privado de SKY Engine debe estar activo.')
-    st.info('Iniciá primero `INICIAR_SKY_METAVERSO_WINDOWS.bat` (Windows) o `bash iniciar_sky_metaverso_linux_mac.sh` (Linux/macOS).')
-    st.link_button('↗ Abrir SKY Metaverso en otra pestaña', 'http://127.0.0.1:8765')
+    metaverso_url='http://127.0.0.1:8765/sky'
+    try:
+        with request.urlopen(metaverso_url,timeout=1) as respuesta:
+            motor_activo=respuesta.status==200
+    except (URLError,TimeoutError,OSError):
+        motor_activo=False
+    if motor_activo:
+        st.success('SKY Engine está activo. Abrí el metaverso en otra pestaña para usarlo.')
+    else:
+        st.warning('SKY Engine no responde. Iniciá `INICIAR_SKY_METAVERSO_WINDOWS.bat` (Windows) o `bash iniciar_sky_metaverso_linux_mac.sh` (Linux/macOS), y volvé a cargar esta página.')
+    st.link_button('↗ Abrir SKY Metaverso en otra pestaña', metaverso_url,disabled=not motor_activo)
     st.caption('Clave: archivo local_data/sky_api_token.txt del servidor. API Swagger: http://127.0.0.1:8765/docs. No pongás la clave en una URL ni la publiques.')
-    st.components.v1.iframe('http://127.0.0.1:8765', height=700, scrolling=True)
+    st.info('El metaverso se abre fuera del panel porque sus protecciones de seguridad impiden cargarlo dentro de un iframe.')
 
 elif seccion=="🎙️ SKY y dispositivos":
     st.title('🎙️ SKY — voz y dispositivos')
@@ -967,6 +1036,219 @@ elif seccion=="✅ Proyectos y tareas":
         l.write(f"{'✅' if x['estado']=='completada' else '🕒'} {x['nombre']} · {x['area']}")
         if x['estado']!='completada' and r.button("Hecho",key=f"t{x['id']}"):
             ejecutar(completar_tarea,x['id']); st.rerun()
+
+elif seccion=="⚽ SKY Sports Madridista":
+    from neural_core.sky_sports_madridista import (
+        PROXIMOS_PARTIDOS_REAL_MADRID, CANALES_DEPORTIVOS_OFICIALES,
+        generar_prediccion_deportiva, LEMA_MADRIDISTA
+    )
+    st.title("⚽ SKY Sports Center · Real Madrid")
+    st.caption("Modo deportivo madridista · Televisión, agenda oficial, canales y predicciones inteligentes")
+    st.info(f"👑 **Identidad Blanca:** {LEMA_MADRIDISTA} | 15 Copas de Europa | El Rey indiscutible del fútbol mundial.")
+
+    tab_tv, tab_pred, tab_agenda, tab_canales = st.tabs(["📺 Ver Partido (TV)", "🔮 Predicciones", "📅 Agenda Real Madrid", "📡 Canales Oficiales"])
+
+    with tab_tv:
+        st.subheader("📺 Televisión Deportiva de SKY · Señal Oficial")
+        st.caption("Regla fundamental: La señal audiovisual se activa únicamente bajo tu orden expresa.")
+
+        p_activo = PROXIMOS_PARTIDOS_REAL_MADRID[0]
+        col_m1, col_m2 = st.columns([2, 1])
+        with col_m1:
+            st.markdown(f"### 👑 Real Madrid vs {p_activo['rival']}")
+            st.markdown(f"**Competición:** {p_activo['competicion']}")
+            st.markdown(f"**Estadio:** {p_activo['estadio']} | **Fecha:** {p_activo['fecha']}")
+            st.markdown(f"**Hora Nicaragua:** `{p_activo['hora_nicaragua']}` | **Hora Madrid:** `{p_activo['hora_madrid']}`")
+        with col_m2:
+            st.metric("Probabilidad Victoria RM", f"{p_activo['probabilidad_victoria_rm']}%", delta="Favorito")
+            st.metric("Marcador Probable", p_activo['marcador_probable'])
+
+        st.divider()
+
+        reproductor_activo = st.checkbox("▶️ Activar Reproductor de TV Oficial del Real Madrid", value=False)
+        if reproductor_activo:
+            st.success("🔴 Conectado a la señal oficial de Real Madrid TV. Transmisión autorizada en vivo.")
+            st.markdown(
+                """<iframe width="100%" height="450" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCWV3obpZVGgJ3j9FVhEjF2Q" 
+                title="Real Madrid TV Live" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>""",
+                unsafe_allow_html=True
+            )
+        else:
+            st.warning("El reproductor permanece en pausa para respetar tu ancho de banda y permisos hasta tu petición expresa.")
+
+        st.markdown("**Operadores oficiales con derechos de transmisión en tu región (Nicaragua / Centroamérica):**")
+        col_op1, col_op2, col_op3 = st.columns(3)
+        with col_op1:
+            st.markdown("🔴 **ViX Premium (Tigo Nicaragua)**: Derechos exclusivos de LaLiga EA Sports.")
+        with col_op2:
+            st.markdown("📺 **ESPN / Disney+**: Transmisión oficial de la UEFA Champions League.")
+        with col_op3:
+            st.markdown("📡 **SKY Sports Centroamérica**: Cobertura deportiva y copas.")
+
+    with tab_pred:
+        st.subheader("🔮 Calculadora de Predicciones Deportivas")
+        st.caption("Predicciones inteligentes con porcentajes de victoria, marcadores y análisis táctico.")
+        c_eq1, c_eq2, c_comp = st.columns(3)
+        with c_eq1:
+            local = st.selectbox("Equipo Local", ["Real Madrid", "FC Barcelona", "RB Leipzig", "Manchester City", "Bayern Múnich", "AC Milan"])
+        with c_eq2:
+            visitante = st.selectbox("Equipo Visitante", ["FC Barcelona", "RB Leipzig", "Real Madrid", "Arsenal", "Atlético de Madrid", "Liverpool"], index=1)
+        with c_comp:
+            comp = st.selectbox("Competición", ["UEFA Champions League", "LaLiga EA Sports", "Copa del Rey", "Supercopa de Europa"])
+
+        if st.button("Generar Pronóstico Inteligente", type="primary"):
+            pred = generar_prediccion_deportiva(local, visitante, comp)
+            st.divider()
+            c_p1, c_p2, c_p3 = st.columns(3)
+            with c_p1: st.metric(f"Victoria {local}", f"{pred['probabilidad_local']}%")
+            with c_p2: st.metric("Empate", f"{pred['probabilidad_empate']}%")
+            with c_p3: st.metric(f"Victoria {visitante}", f"{pred['probabilidad_visitante']}%")
+
+            st.success(f"🎯 Marcador Más Probable: **{pred['marcador_probable']}**")
+            st.write(f"📋 **Análisis Táctico:** {pred['analisis_tactico']}")
+            st.write(f"⭐ **Jugadores clave a seguir:** {', '.join(pred['jugadores_clave'])}")
+            if pred.get('lema'):
+                st.caption(pred['lema'])
+
+    with tab_agenda:
+        st.subheader("📅 Calendario Oficial del Real Madrid CF")
+        for partido in PROXIMOS_PARTIDOS_REAL_MADRID:
+            with st.container():
+                st.markdown(f"#### 👑 Real Madrid vs {partido['rival']} ({partido['competicion']})")
+                st.write(f"📅 **Fecha:** {partido['fecha']} | 🕒 **Hora Nicaragua:** `{partido['hora_nicaragua']}` | 🏟️ **Estadio:** {partido['estadio']}")
+                st.write(f"📺 **Transmisión oficial:** {partido['canal_oficial']} | 🔮 **Pronóstico SKY:** `{partido['marcador_probable']}`")
+                st.caption(f"Clave táctica: {partido['clave']}")
+                st.divider()
+
+    with tab_canales:
+        st.subheader("📡 Catálogo Visual de Canales Deportivos Oficiales")
+        st.caption("Guía de señales autorizadas para Nicaragua y Centroamérica")
+        for ch in CANALES_DEPORTIVOS_OFICIALES:
+            col_c1, col_c2 = st.columns([1, 4])
+            with col_c1:
+                st.markdown(f"## {ch['logo']}")
+            with col_c2:
+                st.markdown(f"**{ch['nombre']}** ({ch['categoria']})")
+                st.write(ch['cobertura'])
+                st.markdown(f"[Acceder a transmisión oficial ➔]({ch['url_oficial']})")
+            st.divider()
+
+elif seccion == "🌐 SKY IA Universal v12.0":
+    st.header("🌐 SKY IA Universal v12.0 — Global Intelligence & FactCheck")
+    st.caption("Arquitectura universal de alto rendimiento: planificación, fuentes primarias mundiales, verificación factual y memoria inteligente.")
+
+    tab_plan, tab_sources, tab_factcheck, tab_memory, tab_bench = st.tabs([
+        "🧭 Universal Engine & Plan", "🌍 Global Source Router", "🔍 FactCheck Engine", "🧠 Smart Memory", "📊 Benchmark & Evaluación"
+    ])
+
+    with tab_plan:
+        st.subheader("🧭 Planificador de Inteligencia Universal")
+        prompt_in = st.text_area("Consulta o problema a resolver:", "Investiga la población y estadísticas demográficas oficiales de Nicaragua según el INIDE")
+        area_sel = st.selectbox("Especialidad:", ["General", "Estadística", "Salud", "Economía", "Ciencia", "Programación", "Legislación", "Educación"])
+        if st.button("Generar Plan de Ejecución", key="btn_gen_plan"):
+            from neural_core.sky_universal_engine import SkyUniversalEngine
+            plan = SkyUniversalEngine.clasificar_intencion(prompt_in, area_sel)
+            st.success(f"**Modo Operativo Detectado:** `{plan.modo.value.upper()}` | **Disciplina:** `{plan.disciplina.upper()}` | **Nivel Académico:** `{plan.nivel_academico.value.upper()}`")
+            
+            c1, c2, c3 = st.columns(3)
+            with c1: st.metric("Requiere Investigación", "Sí" if plan.requiere_investigacion else "No")
+            with c2: st.metric("Cálculo Determinista", "Sí" if plan.requiere_calculo_determinista else "No")
+            with c3: st.metric("Código / DEV-CORE", "Sí" if plan.requiere_codigo else "No")
+
+            st.write("📋 **Pasos del Plan:**")
+            for paso in plan.pasos:
+                st.write(f"- {paso}")
+
+            st.write("📚 **Directivas Inyectadas al Asistente:**")
+            st.code(SkyUniversalEngine.directivas_universales(plan), language="markdown")
+
+    with tab_sources:
+        st.subheader("🌍 Global Source Router — Directorio de Fuentes Primarias")
+        from neural_core.sky_universal_engine import GLOBAL_SOURCES_REGISTRY
+        disc_sel = st.selectbox("Filtrar por Disciplina:", ["Todas"] + list(GLOBAL_SOURCES_REGISTRY.keys()))
+        sources_to_show = []
+        if disc_sel == "Todas":
+            sources_to_show = [s for sublist in GLOBAL_SOURCES_REGISTRY.values() for s in sublist]
+        else:
+            sources_to_show = GLOBAL_SOURCES_REGISTRY.get(disc_sel, [])
+
+        for s in sources_to_show:
+            with st.container():
+                st.markdown(f"**{s.entidad}** (`{s.pais_o_region}`) — *{s.categoria}*")
+                st.write(s.descripcion)
+                st.markdown(f"🔗 [Acceder a portal oficial]({s.url_base})")
+                st.divider()
+
+    with tab_factcheck:
+        st.subheader("🔍 SKY FactCheck Engine — Auditoría Factual & Aritmética")
+        st.caption("Verifica afirmaciones, detecta aserciones no comprobadas y valida cálculos mediante CAS SymPy.")
+        texto_check = st.text_area("Texto o respuesta a auditar:", "En la prueba matemática confirmamos que 14 * 7 = 98 con exactitud. Por otra parte, según el INIDE la población supera los 6 millones.")
+        if st.button("Auditar con FactCheck", key="btn_factcheck"):
+            from neural_core.factcheck_engine import SkyFactCheckEngine
+            rep = SkyFactCheckEngine.auditar_respuesta(texto_check)
+            if rep.es_consistente:
+                st.success("✅ **Consistencia Aprobada:** Cero contradicciones detectadas.")
+            else:
+                st.error("⚠️ **Alerta:** Se detectaron contradicciones o fallos de cálculo.")
+
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: st.metric("Total Afirmaciones", rep.total_afirmaciones)
+            with c2: st.metric("Respaldadas", rep.respaldadas)
+            with c3: st.metric("No Comprobadas", rep.no_comprobadas)
+            with c4: st.metric("Contradictorias", rep.contradictorias)
+
+            if rep.advertencia_incertidumbre:
+                st.warning(rep.advertencia_incertidumbre)
+
+            for d in rep.detalles:
+                st.write(f"🔹 **Afirmación:** {d.afirmacion}")
+                st.caption(f"Estado: `{d.estado.value}` | Tipo: `{d.tipo}` | Observación: {d.observacion}")
+
+    with tab_memory:
+        st.subheader("🧠 Smart Memory — Control de Memoria Persistente")
+        from neural_core.smart_memory import get_smart_memory_manager
+        sm = get_smart_memory_manager()
+        mems = sm.consultar_memorias(usuario_id="default_user", incluir_privadas=True)
+        st.write(f"Total memorias activas: **{len(mems)}**")
+
+        with st.expander("➕ Añadir Nueva Memoria", expanded=False):
+            c_cat = st.selectbox("Categoría:", ["preferencia", "proyecto", "documental", "sesion"])
+            c_key = st.text_input("Clave:")
+            c_val = st.text_input("Valor:")
+            c_priv = st.checkbox("Privado", value=True)
+            if st.button("Guardar en Memoria", key="btn_save_mem"):
+                if c_key and c_val:
+                    sm.guardar_memoria(c_cat, c_key, c_val, usuario_id="default_user", es_privado=c_priv)
+                    st.success("Memoria guardada correctamente.")
+                    st.rerun()
+
+        for m in mems:
+            col_m1, col_m2 = st.columns([4, 1])
+            with col_m1:
+                st.markdown(f"**[{m.categoria.upper()}] {m.clave}**: `{m.valor}`")
+                st.caption(f"Privado: {m.es_privado} | ID: `{m.id}`")
+            with col_m2:
+                if st.button("Eliminar", key=f"del_{m.id}"):
+                    sm.eliminar_memoria(m.id, usuario_id="default_user")
+                    st.rerun()
+            st.divider()
+
+    with tab_bench:
+        st.subheader("📊 Benchmark Suite & Medición de Calidad")
+        st.caption("Evaluación automatizada continua sobre 8 disciplinas críticas con métricas reproducibles.")
+        if st.button("Ejecutar Benchmark Multidisciplinario", key="btn_run_bench"):
+            from neural_core.eval_benchmark import ejecutar_evaluacion_benchmark
+            b_res = ejecutar_evaluacion_benchmark()
+            st.success(f"🎯 **Tasa General de Exactitud:** `{b_res['tasa_exactitud_pct']}%`")
+            col_b1, col_b2, col_b3 = st.columns(3)
+            with col_b1: st.metric("Preguntas Evaluadas", b_res["total_preguntas"])
+            with col_b2: st.metric("Aprobadas", b_res["aprobadas"])
+            with col_b3: st.metric("Citas Inexistentes", b_res["metricas"]["citas_inexistentes"])
+
+            st.write("📋 **Detalle por Disciplina Evaluada:**")
+            for det in b_res["detalles"]:
+                st.write(f"{'✅' if det['aprobado'] else '❌'} **{det['disciplina']}** ({det['id']}): Criterio: {det['criterio']} | Método: `{det['metodo']}`")
+
 
 st.divider()
 st.caption("SKY Universal v8.0 · Prototipo personal experimental · Los datos externos necesitan conexión; los movimientos financieros son manuales y locales.")

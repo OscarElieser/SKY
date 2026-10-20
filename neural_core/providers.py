@@ -38,9 +38,9 @@ DOMAIN_PREF = {
     'investigación': ('gemini','anthropic','openai'),
     'programación': ('anthropic','openai','gemini'),
     'código': ('anthropic','openai','gemini'),
-    'negocios': ('openai','anthropic','gemini'),
-    'marketing': ('openai','gemini','anthropic'),
-    'finanzas': ('openai','anthropic','gemini'),
+    'negocios': ('gemini','openai','anthropic'),
+    'marketing': ('gemini','openai','anthropic'),
+    'finanzas': ('gemini','openai','anthropic'),
     'sky voz': ('gemini','openai','anthropic'),
 }
 
@@ -57,7 +57,7 @@ def provider_summary() -> list[dict]:
             for k,v in PROVIDERS.items()]
 
 def choose_provider(name: str='auto', area: str='General') -> tuple[str,str]:
-    if name=='auto':
+    if name in ('auto', 'sky'):
         a=area.casefold()
         preferred=next((pref for token,pref in DOMAIN_PREF.items() if token in a),AUTO_ORDER)
         candidates=tuple(preferred)+tuple(k for k in AUTO_ORDER if k not in preferred)
@@ -93,7 +93,7 @@ def _openai_sdk(key, base_url=None):
     if base_url: kw['base_url']=base_url
     return OpenAI(**kw)
 
-def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_tokens: int=1800):
+def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_tokens: int=2500):
     if provider=='auto': provider,chosen=choose_provider('auto')
     else: provider,chosen=choose_provider(provider)
     model=(model or chosen).strip()
@@ -120,11 +120,13 @@ def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_
                 return _result('\n'.join(getattr(b,'text','') for b in resp.content if getattr(b,'type','')=='text'),provider)
             finally: client.close()
         if provider=='mistral':
-            try: from mistralai import Mistral
-            except ImportError as exc: raise ProviderError('Falta SDK Mistral: instalá requirements.txt.') from exc
+            try: from mistralai.client import Mistral
+            except ImportError:
+                try: from mistralai import Mistral
+                except ImportError as exc: raise ProviderError('Falta SDK Mistral: instalá requirements.txt.') from exc
             client=Mistral(api_key=os.environ['MISTRAL_API_KEY'])
             messages=[{'role':'system','content':system},*turns]
-            resp=client.chat.complete(model=model,messages=messages,max_tokens=max_output_tokens)
+            resp=client.chat.complete(model=model,messages=messages,max_tokens=max_output_tokens,temperature=0.2)
             parts=resp.choices[0].message.content
             return _result(parts if isinstance(parts,str) else ''.join(str(p.get('text','')) if isinstance(p,dict) else str(getattr(p,'text','')) for p in parts),provider)
         if provider in ('groq','deepseek'):
@@ -134,13 +136,13 @@ def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_
             client=_openai_sdk(api_key,base)
             try:
                 resp=client.chat.completions.create(model=model,messages=[{'role':'system','content':system},*turns],
-                                                   max_tokens=max_output_tokens)
+                                                   max_tokens=max_output_tokens,temperature=0.2)
                 return _result(resp.choices[0].message.content,provider)
             finally: client.close()
         if provider=='ollama':
             # Sólo localhost: no permitir URLs arbitrarias ni exposición accidental de contenido.
             payload=json.dumps({'model':model,'messages':[{'role':'system','content':system},*turns],
-                                'stream':False,'options':{'num_predict':max_output_tokens}}).encode('utf8')
+                                'stream':False,'options':{'num_predict':max_output_tokens,'temperature':0.2}}).encode('utf8')
             req=request.Request('http://127.0.0.1:11434/api/chat',data=payload,
                                 headers={'Content-Type':'application/json'},method='POST')
             try:

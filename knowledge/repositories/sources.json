@@ -1,0 +1,69 @@
+{
+  "version": "1.0",
+  "mode": "read_only",
+  "repositories": [
+    {
+      "name": "SKY",
+      "repository": "OscarElieser/SKY",
+      "type": "project",
+      "description": "Núcleo y arquitectura de SKY IA",
+      "default_branch": "main"
+    },
+    {
+      "name": "Python",
+      "repository": "python/cpython",
+      "type": "reference",
+      "description": "Lenguaje de programación Python y biblioteca estándar",
+      "default_branch": "main"
+    },
+    {
+      "name": "TypeScript",
+      "repository": "microsoft/TypeScript",
+      "type": "reference",
+      "description": "Compilador y tipado estático de TypeScript",
+      "default_branch": "main"
+    },
+    {
+      "name": "React",
+      "repository": "facebook/react",
+      "type": "reference",
+      "description": "Biblioteca web reactiva para interfaces de usuario",
+      "default_branch": "main"
+    },
+    {
+      "name": "Next.js",
+      "repository": "vercel/next.js",
+      "type": "reference",
+      "description": "Framework de React Full Stack y producción web",
+      "default_branch": "canary"
+    },
+    {
+      "name": "Flutter",
+      "repository": "flutter/flutter",
+      "type": "reference",
+      "description": "SDK multiplataforma para Android, iOS, Desktop y Web",
+      "default_branch": "master"
+    },
+    {
+      "name": "FastAPI",
+      "repository": "fastapi/fastapi",
+      "type": "reference",
+      "description": "Framework web moderno para APIs de alto rendimiento en Python",
+      "default_branch": "master"
+    },
+    {
+      "name": "Supabase",
+      "repository": "supabase/supabase",
+      "type": "reference",
+      "description": "Plataforma Backend as a Service basada en PostgreSQL",
+      "default_branch": "master"
+    },
+    {
+      "name": "Redis",
+      "repository": "redis/redis",
+      "type": "reference",
+      "description": "Almacenamiento en memoria en clave-valor y estructuras de datos",
+      "default_branch": "unstable"
+    }
+  ]
+}

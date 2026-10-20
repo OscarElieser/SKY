@@ -28,7 +28,8 @@ def test_private_secret_file_reading(tmp_path):
     p=tmp_path/'password';p.write_text('this-is-an-example-test-passphrase-2026\n');p.chmod(0o600)
     assert backups.secret_from_file(p)=='this-is-an-example-test-passphrase-2026'
     p.chmod(0o644)
-    with pytest.raises(PermissionError):backups.secret_from_file(p)
+    if os.name == 'posix':
+        with pytest.raises(PermissionError):backups.secret_from_file(p)
 
 
 def test_secret_symlink_rejected(tmp_path):

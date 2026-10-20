@@ -32,9 +32,12 @@ def run_drill(*, installed: bool = False, passphrase: str | None = None,
         if not installed:
             origin = sandbox / 'source'; origin.mkdir()
             dbpath = origin / 'test.sqlite3'
-            with sqlite3.connect(dbpath) as connection:
+            connection = sqlite3.connect(dbpath)
+            try:
                 connection.execute('CREATE TABLE recovery_probe (id INTEGER PRIMARY KEY, value TEXT)')
                 connection.execute('INSERT INTO recovery_probe (value) VALUES (?)', ('private-smoke-test',))
+            finally:
+                connection.close()
             mediapath = origin / 'assets'; mediapath.mkdir()
             (mediapath / 'example.png').write_bytes(b'\x89PNG\r\n\x1a\nSKY-private-fixture')
             databases = {'example': dbpath}
@@ -70,9 +73,12 @@ def run_drill(*, installed: bool = False, passphrase: str | None = None,
                     raise AssertionError('El respaldo expuso texto multimedia sin cifrar')
         for name, original in origins.items():
             if name.startswith('db/'):
-                with sqlite3.connect(restored / name) as conn:
+                conn = sqlite3.connect(restored / name)
+                try:
                     if conn.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                         raise AssertionError('SQLite recuperado inválido')
+                finally:
+                    conn.close()
             elif _digest((restored / name).read_bytes()) != before[name]:
                 raise AssertionError('El recurso recuperado difiere del original')
         after = {name: _digest(p.read_bytes()) for name, p in origins.items()}

@@ -1,0 +1,33 @@
+{
+	admin 127.0.0.1:2019
+	auto_https disable_redirects
+}
+
+https://127.0.0.1:8443 {
+	bind 127.0.0.1
+	tls internal
+	@bad_host {
+		not host 127.0.0.1
+	}
+	respond @bad_host 403
+
+	@forbidden path /.env /.git/* /local_data/* /data/*.sqlite /data/*.sqlite3
+	respond @forbidden 404
+
+	@unsafe_methods method TRACE TRACK CONNECT
+	respond @unsafe_methods 405
+
+	request_body {
+		max_size 100MB
+	}
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+
+	reverse_proxy 127.0.0.1:18765
+}

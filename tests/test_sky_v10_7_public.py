@@ -4,6 +4,7 @@ Passing these checks never implies containers were run or a pentest passed.
 """
 from __future__ import annotations
 import base64
+import os
 from pathlib import Path
 import pytest
 import yaml
@@ -57,7 +58,8 @@ def test_secrets_provision_no_overwrite_or_log(tmp_path):
     assert 'redis.conf' in status['created']
     assert 'requirepass ' in (target/'redis.conf').read_text()
     assert 'redis.conf' not in str(status.get('directory'))
-    assert (target/'sky_api_key.txt').stat().st_mode & 0o077 == 0
+    if os.name == 'posix':
+        assert (target/'sky_api_key.txt').stat().st_mode & 0o077 == 0
     with pytest.raises(FileExistsError):provision(target)
 
 

@@ -7,7 +7,7 @@ import os,secrets,time,asyncio,json,math
 from pathlib import Path
 from typing import Optional
 from contextlib import asynccontextmanager
-from fastapi import FastAPI,HTTPException,Depends,WebSocket,WebSocketDisconnect,Request,Query
+from fastapi import FastAPI,HTTPException,Depends,WebSocket,WebSocketDisconnect,Request,Query,File,UploadFile
 from fastapi.responses import FileResponse,Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import APIKeyHeader
@@ -94,8 +94,11 @@ async def lifespan(app):
             try:await pump
             except asyncio.CancelledError:pass
 
-app=FastAPI(title='SKY Engine API',version='10.9.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
+app=FastAPI(title='SKY Engine API',version='10.5.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
 app.mount('/static',StaticFiles(directory=STATIC),name='static')
+
+from .telemetria_api import router as telemetria_router
+app.include_router(telemetria_router)
 
 @app.get('/office')
 def office_home():return FileResponse(STATIC/'office.html')
@@ -162,10 +165,11 @@ class PromptRequest(BaseModel):
     version:int=Field(ge=1)
 
 class ChatRequest(BaseModel):
-    message:str=Field(min_length=1,max_length=6000)
+    message:str=Field(min_length=1,max_length=15000)
     language:str='es'
     provider:str='local'
     area:str='Metaverso'
+    file_context:Optional[str]=None
 
 class SkillRequest(BaseModel):
     name:str
@@ -183,10 +187,16 @@ class PositionMessage(BaseModel):
     z:float=0
 
 @app.get('/')
-def index():return FileResponse(STATIC/'sky.html')
+def index():
+    resp = FileResponse(STATIC/'sky.html')
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
 
 @app.get('/sky')
-def sky_home():return FileResponse(STATIC/'sky.html')
+def sky_home():
+    resp = FileResponse(STATIC/'sky.html')
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
 
 @app.get('/flows')
 def workflows_page():return FileResponse(STATIC/'flows.html')
@@ -198,7 +208,7 @@ def baqueano_owner_page():return FileResponse(STATIC/'baqueano-owner.html')
 def metaverse_world():return FileResponse(STATIC/'index.html')
 
 @app.get('/api/health')
-def health():return {'service':'SKY Engine API','status':'ok','version':'10.9.0','private':'key required for data'}
+def health():return {'service':'SKY Engine API','status':'ok','version':'10.4.0','private':'key required for data'}
 
 @app.get('/api/capabilities',dependencies=[Depends(require_key)])
 def capabilities():
@@ -275,6 +285,95 @@ def run_tool(body:SkillRequest):
     except Exception as exc:raise HTTPException(422,'Argumento inválido: '+type(exc).__name__) from exc
     return {'tool':body.name,'result':result}
 
+UPLOADS_DIR = ROOT / 'local_data' / 'sky_uploads'
+GENERATED_DIR = ROOT / 'local_data' / 'sky_generated'
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+GENERATED_DIR.mkdir(parents=True, exist_ok=True)
+
+@app.get('/api/media/uploads/{filename}')
+def get_uploaded_media(filename: str):
+    p = (UPLOADS_DIR / filename).resolve()
+    if not p.is_file() or not p.is_relative_to(UPLOADS_DIR.resolve()):
+        raise HTTPException(404, 'Archivo no encontrado')
+    return FileResponse(p)
+
+@app.get('/api/media/generated/{filename}')
+def get_generated_media(filename: str):
+    p = (GENERATED_DIR / filename).resolve()
+    if not p.is_file() or not p.is_relative_to(GENERATED_DIR.resolve()):
+        raise HTTPException(404, 'Archivo generado no encontrado')
+    return FileResponse(p)
+
+@app.post('/api/chat/upload',dependencies=[Depends(require_key)])
+async def upload_chat_file(file:UploadFile=File(...)):
+    """Sube un archivo de cualquier tipo (Video, Música, Audio, PDF, DOCX, XLSX, CSV, TXT, Código, etc.) sin restricciones."""
+    from neural_core.documentos import extraer_texto
+    from neural_core.storage import agregar_documento, guardar_memoria
+    from neural_core.sky_evolution import feedback
+    data = await file.read()
+    filename = file.filename or 'archivo_adjunto'
+    ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else ''
+    
+    # Guardar copia física local en sky_uploads para reproducción inmediata
+    safe_name = f"{secrets.token_hex(4)}_{Path(filename).name}"
+    local_path = UPLOADS_DIR / safe_name
+    try:
+        local_path.write_bytes(data)
+    except Exception:
+        pass
+
+    media_type = 'document'
+    if ext in ('mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv'):
+        media_type = 'video'
+    elif ext in ('mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'):
+        media_type = 'audio'
+    elif ext in ('png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'):
+        media_type = 'image'
+
+    try:
+        texto = extraer_texto(filename, data)
+    except Exception as exc:
+        texto = f"[Archivo {filename} ({len(data)} bytes) listo para procesamiento]"
+
+    doc_id = None
+    try:
+        doc_id = agregar_documento(filename, texto[:245000])
+    except Exception:
+        pass
+    try:
+        guardar_memoria(f"Archivo asimilado: '{filename}' ({media_type.upper()}, {round(len(data)/1024, 1)} KB). Conocimiento integrado.")
+        feedback("aprendizaje_documental", 5, f"Incorporado conocimiento desde archivo {filename}")
+    except Exception:
+        pass
+    return {
+        'ok': True,
+        'filename': filename,
+        'size_bytes': len(data),
+        'media_type': media_type,
+        'media_url': f'/api/media/uploads/{safe_name}',
+        'doc_id': doc_id,
+        'chars_extracted': len(texto),
+        'summary': texto[:800],
+        'full_text': texto[:30000]
+    }
+
+@app.get('/api/evolution/stats',dependencies=[Depends(require_key)])
+def evolution_stats():
+    from neural_core.storage import memorias, documentos
+    from neural_core.sky_evolution import feedback_resumen, metas
+    mems = len(memorias())
+    docs = len(documentos())
+    fb = feedback_resumen()
+    evals = sum(x.get('evaluaciones', 0) for x in fb)
+    return {
+        'status': 'Evolución Activa',
+        'level': 'Nivel Adaptativo Autónomo',
+        'total_memories': mems,
+        'total_documents': docs,
+        'total_interactions': evals,
+        'active_goals': len(metas()),
+    }
+
 @app.post('/api/chat',dependencies=[Depends(require_key)])
 def chat(body:ChatRequest):
     from neural_core.sky_agent import interpret_local_command
@@ -282,12 +381,29 @@ def chat(body:ChatRequest):
     if local is not None:return {'provider':'sky-local','answer':local}
     if body.provider=='local':
         return {'provider':'sky-local','answer':'SKY local puede generar mundos por descripción, guardar escenarios, exportar GLB y usar /sky calcula, /sky metas o /sky hora. Para diálogo abierto, configurá Ollama, Gemini, OpenAI u otro motor en SKY y elegilo aquí.'}
+    
+    prompt = body.message
+    if body.file_context:
+        prompt = f"Archivos y documentos adjuntos por el usuario:\n{body.file_context}\n\nInstrucción o solicitud del usuario sobre estos datos:\n{body.message}"
+    
+    prov = 'auto' if body.provider in ('auto', 'sky') else body.provider
     try:
         from neural_core.assistant import responder
-        answer,_=responder(body.message,body.area,proveedor=body.provider,idioma=body.language)
-        return {'provider':body.provider,'answer':answer}
+        answer, evidencias = responder(prompt, body.area, proveedor=prov, idioma=body.language)
+        try:
+            from neural_core.sky_evolution import feedback
+            feedback("asistente_unificado", 5, f"Consulta procesada con éxito por SKY")
+        except Exception:
+            pass
+        return {'provider':'SKY Autónomo','answer':answer,'evidencias':[e.get('nombre') for e in evidencias] if evidencias else []}
     except Exception as exc:
-        # No leaked credentials or SDK tracebacks
+        if prov != 'ollama':
+            try:
+                from neural_core.assistant import responder
+                answer, evidencias = responder(prompt, body.area, proveedor='ollama', idioma=body.language)
+                return {'provider':'SKY Autónomo (Local)','answer':answer,'evidencias':[e.get('nombre') for e in evidencias] if evidencias else []}
+            except Exception:
+                pass
         raise HTTPException(503,'Motor no disponible ('+type(exc).__name__+'). Revisá configuración y conectividad.') from exc
 
 # Compatibilidad básica de chat para aplicaciones propias que usan cliente estilo OpenAI.
@@ -447,3 +563,331 @@ app.include_router(sky_voice_v103_router)
 # SKY v10.5: private, explicit offline speech transcription. No model downloads.
 from .stt_v105_api import router as sky_stt_v105_router
 app.include_router(sky_stt_v105_router)
+
+# Telemetría industrial y hardware físico real (COM / IoT / Arduino)
+from .telemetria_api import router as sky_telemetria_router
+app.include_router(sky_telemetria_router)
+
+@app.get('/api/client/bootstrap')
+def client_bootstrap(request: Request):
+    """Inicializa la sesión directa del creador/superadministrador en localhost."""
+    client_ip = request.client.host if request.client else '127.0.0.1'
+    is_local = client_ip in ('127.0.0.1', '::1', 'localhost', 'testserver')
+    return {
+        'superadmin': 'oscarelieser.informatica.inatec@gmail.com',
+        'key': api_token() if is_local else '',
+        'local': is_local,
+        'ollama_active': True,
+        'gemini_active': bool(os.getenv('GEMINI_API_KEY')),
+        'mistral_active': bool(os.getenv('MISTRAL_API_KEY')),
+        'deepseek_active': bool(os.getenv('DEEPSEEK_API_KEY')),
+        'ia_gratis_active': bool(os.getenv('IA_GRATIS_TOKEN'))
+    }
+
+@app.post('/api/tools/image')
+def tool_image(body: dict):
+    """Genera imágenes mediante el token de ia.gratis y las guarda localmente para prevenir enlaces rotos."""
+    from neural_core.sky_ia_gratis import generar_imagen
+    prompt = body.get('prompt', '')
+    res = generar_imagen(prompt)
+    if res.get('ok') and res.get('result') and len(res['result']):
+        try:
+            import urllib.request
+            img_url = res['result'][0]
+            token = secrets.token_hex(6)
+            local_name = f"flux_{token}.jpg"
+            dest = GENERATED_DIR / local_name
+            req = urllib.request.Request(img_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=15) as r, open(dest, 'wb') as f:
+                f.write(r.read())
+            res['result'] = [f'/api/media/generated/{local_name}']
+            res['local_url'] = f'/api/media/generated/{local_name}'
+        except Exception:
+            pass
+    return res
+
+@app.post('/api/tools/video')
+def tool_video(body: dict):
+    """Genera video en duraciones de 1, 3, 5, 8 o 10 minutos."""
+    from neural_core.sky_video_gen import generar_video_sky
+    prompt = body.get('prompt', '')
+    minutos = body.get('minutes')
+    return generar_video_sky(prompt, minutos=minutos)
+
+@app.post('/api/tools/search')
+def tool_search(body: dict):
+    """Realiza búsquedas web con resumen mediante ia.gratis o motor universal."""
+    from neural_core.sky_media_tools import universal_web_search
+    query = body.get('query', '')
+    return universal_web_search(query)
+
+@app.post('/api/tools/remove-bg')
+async def tool_remove_bg(body: dict):
+    """Quitar fondo transparente estilo remove.bg (imagen local, adjunta o url)."""
+    from neural_core.sky_media_tools import remove_background
+    image_ref = body.get('image', '') or body.get('filename', '')
+    return remove_background(image_ref)
+
+@app.post('/api/tools/download-video')
+async def tool_download_video(body: dict):
+    """Descargar video multimedia estilo savefrom.net / ssstik.io (TikTok, YouTube, etc.)."""
+    from neural_core.sky_media_tools import download_multimedia_video
+    url = body.get('url', '')
+    extract_audio = body.get('audio_only', False)
+    return download_multimedia_video(url, extract_audio=extract_audio)
+
+@app.post('/api/tools/icon')
+async def tool_icon(body: dict):
+    """Generación de iconos vectoriales SVG y PNG de alta definición estilo flaticon.es."""
+    from neural_core.sky_media_tools import generate_vector_icon
+    concept = body.get('concept', '') or body.get('prompt', 'star')
+    primary = body.get('primary', '#38bdf8')
+    secondary = body.get('secondary', '#0284c7')
+    return generate_vector_icon(concept, color_primary=primary, color_secondary=secondary)
+
+@app.post('/api/tools/upscale')
+async def tool_upscale(body: dict):
+    """Super-resolución, mejora de nitidez y escalado x2/x4 estilo magnific.com."""
+    from neural_core.sky_media_tools import enhance_upscale_image
+    image_ref = body.get('image', '') or body.get('filename', '')
+    scale = body.get('scale', 2)
+    return enhance_upscale_image(image_ref, scale_factor=scale)
+
+# ==============================================================================
+# SKY DEVELOPER INTELLIGENCE CORE ENDPOINTS
+# ==============================================================================
+@app.get('/api/developer/sources')
+def developer_sources():
+    """Devuelve el catálogo de repositorios de referencia autorizados."""
+    from neural_core.github_reader import list_reference_repositories
+    return {'ok': True, 'sources': list_reference_repositories()}
+
+@app.post('/api/developer/consult')
+def developer_consult(body: dict):
+    """Consulta código o documentación de referencia desde un repositorio oficial."""
+    from neural_core.github_reader import fetch_file_content, search_reference_code
+    repo = body.get('repository', '')
+    path = body.get('path', '')
+    query = body.get('query', '')
+    if path:
+        return fetch_file_content(repo, path)
+    if query:
+        return search_reference_code(query, repo_identifier=repo or None)
+    return {'ok': False, 'error': 'Se requiere "path" o "query" para la consulta.'}
+
+@app.post('/api/developer/analyze')
+def developer_analyze(body: dict):
+    """Analiza la solicitud y devuelve stack tecnológico y plan de ingeniería."""
+    from neural_core.developer_core import analyze_tech_stack
+    text = body.get('prompt', '') or body.get('text', '')
+    return {'ok': True, 'analysis': analyze_tech_stack(text)}
+
+# ==============================================================================
+# SKY UNIVERSAL KNOWLEDGE & EDUCATION ENGINE ENDPOINTS
+# ==============================================================================
+@app.get('/api/academic/engines')
+def academic_engines():
+    """Devuelve la lista de los 25 motores especializados de educación y ciencia."""
+    from neural_core.academic_core import list_academic_engines
+    return {'ok': True, 'engines': list_academic_engines()}
+
+@app.post('/api/academic/analyze')
+def academic_analyze(body: dict):
+    """Analiza una solicitud educativa o técnica identificando nivel y pedagogía."""
+    from neural_core.academic_core import analyze_academic_request
+    text = body.get('prompt', '') or body.get('text', '')
+    return {'ok': True, 'analysis': analyze_academic_request(text)}
+
+# ==============================================================================
+# SKY DETERMINISTIC CAS & CODE EXECUTION ENDPOINTS
+# ==============================================================================
+@app.post('/api/math/cas')
+def math_cas(body: dict):
+    """Ejecuta cálculo simbólico determinista con SymPy (derivadas, integrales, límites, ecuaciones)."""
+    from neural_core.math_engine import ejecutar_cas
+    expr = body.get('expresion', '') or body.get('expression', '')
+    op = body.get('operacion', 'auto')
+    var = body.get('variable', 'x')
+    punto = float(body.get('punto', 0.0))
+    if not expr:
+        return {'ok': False, 'error': 'Se requiere "expresion" para el cálculo.'}
+    return ejecutar_cas(expr, operacion=op, variable=var, punto=punto)
+
+@app.post('/api/developer/repl')
+def developer_repl(body: dict):
+    """Ejecuta código en el sandbox seguro Python REPL con SymPy, NumPy y SciPy."""
+    from neural_core.math_engine import ejecutar_python_repl
+    code = body.get('code', '') or body.get('codigo', '')
+    timeout = float(body.get('timeout', 3.0))
+    if not code:
+        return {'ok': False, 'error': 'Se requiere "code" para ejecutar en REPL.'}
+    return ejecutar_python_repl(code, timeout_segundos=timeout)
+
+@app.post('/api/developer/audit')
+def developer_audit(body: dict):
+    """Audita código contra directivas DEV-CORE (Zero Placeholders, defensivo, Big-O)."""
+    from neural_core.math_engine import auditar_codigo_fuente
+    code = body.get('code', '') or body.get('codigo', '')
+    lang = body.get('language', 'python')
+    if not code:
+        return {'ok': False, 'error': 'Se requiere "code" para auditar.'}
+    return auditar_codigo_fuente(code, lenguaje=lang)
+
+# ==============================================================================
+# SKY SPORTS CENTER · REAL MADRID ENDPOINTS
+# ==============================================================================
+@app.get('/api/sports/madrid/match')
+def sports_madrid_match():
+    """Devuelve el partido en vivo o próximo del Real Madrid y canales oficiales."""
+    from neural_core.sky_sports_madridista import consultar_partido_actual_madrid
+    return {"ok": True, **consultar_partido_actual_madrid()}
+
+@app.get('/api/sports/channels')
+def sports_channels():
+    """Devuelve la guía oficial de canales deportivos (ViX, ESPN, SKY Sports, RMTV)."""
+    from neural_core.sky_sports_madridista import CANALES_DEPORTIVOS_OFICIALES
+    return {"ok": True, "channels": CANALES_DEPORTIVOS_OFICIALES}
+
+@app.post('/api/sports/predict')
+def sports_predict(body: dict):
+    """Calcula predicción deportiva con probabilidades de victoria y marcador probable."""
+    from neural_core.sky_sports_madridista import generar_prediccion_deportiva
+    local = body.get('equipo_local', 'Real Madrid')
+    visitante = body.get('equipo_visitante', 'RB Leipzig')
+    competicion = body.get('competicion', 'UEFA Champions League')
+    return {"ok": True, "prediccion": generar_prediccion_deportiva(local, visitante, competicion)}
+
+# ==============================================================================
+# SKY IA UNIVERSAL v12.0 ENDPOINTS
+# ==============================================================================
+@app.post('/api/universal/plan')
+def universal_plan(body: dict):
+    """Genera el plan de ejecución y fuentes recomendadas por el Universal Engine."""
+    from neural_core.sky_universal_engine import SkyUniversalEngine
+    pregunta = body.get('prompt') or body.get('pregunta', '')
+    area = body.get('area', 'General')
+    plan = SkyUniversalEngine.clasificar_intencion(pregunta, area)
+    return {
+        "ok": True,
+        "modo": plan.modo.value,
+        "disciplina": plan.disciplina,
+        "nivel_academico": plan.nivel_academico.value,
+        "requiere_investigacion": plan.requiere_investigacion,
+        "requiere_calculo_determinista": plan.requiere_calculo_determinista,
+        "requiere_codigo": plan.requiere_codigo,
+        "fuentes_recomendadas": [
+            {"entidad": f.entidad, "pais_o_region": f.pais_o_region, "url": f.url_base, "descripcion": f.descripcion}
+            for f in plan.fuentes_recomendadas
+        ],
+        "pasos": plan.pasos
+    }
+
+@app.post('/api/universal/factcheck')
+def universal_factcheck(body: dict):
+    """Audita afirmaciones, contrasta fuentes y valida cálculos deterministas."""
+    from neural_core.factcheck_engine import SkyFactCheckEngine
+    texto = body.get('texto', '')
+    report = SkyFactCheckEngine.auditar_respuesta(texto)
+    return {
+        "ok": True,
+        "total_afirmaciones": report.total_afirmaciones,
+        "respaldadas": report.respaldadas,
+        "contradictorias": report.contradictorias,
+        "no_comprobadas": report.no_comprobadas,
+        "desactualizadas": report.desactualizadas,
+        "es_consistente": report.es_consistente,
+        "calculos_verificados": report.calculos_verificados,
+        "advertencia_incertidumbre": report.advertencia_incertidumbre,
+        "detalles": [
+            {
+                "afirmacion": c.afirmacion,
+                "tipo": c.tipo,
+                "estado": c.estado.value,
+                "fuente": c.fuente_corroborante,
+                "observacion": c.observacion
+            }
+            for c in report.detalles
+        ]
+    }
+
+@app.get('/api/universal/sources')
+def universal_sources(disciplina: str = None):
+    """Consulta el directorio mundial del Global Source Router."""
+    from neural_core.sky_universal_engine import GLOBAL_SOURCES_REGISTRY
+    if disciplina and disciplina.lower() in GLOBAL_SOURCES_REGISTRY:
+        sources = GLOBAL_SOURCES_REGISTRY[disciplina.lower()]
+    else:
+        # Combinar todas las disciplinas
+        sources = [s for sublist in GLOBAL_SOURCES_REGISTRY.values() for s in sublist]
+    return {
+        "ok": True,
+        "sources": [
+            {"entidad": s.entidad, "pais_o_region": s.pais_o_region, "categoria": s.categoria, "url": s.url_base, "descripcion": s.descripcion}
+            for s in sources
+        ]
+    }
+
+@app.post('/api/universal/memory/save')
+def memory_save(body: dict):
+    """Guarda una memoria de proyecto o preferencia bajo control del usuario."""
+    from neural_core.smart_memory import get_smart_memory_manager
+    categoria = body.get('categoria', 'preferencia')
+    clave = body.get('clave', 'general')
+    valor = body.get('valor', '')
+    usuario_id = body.get('usuario_id', 'default_user')
+    es_privado = body.get('es_privado', True)
+    sm = get_smart_memory_manager()
+    entry = sm.guardar_memoria(categoria, clave, valor, usuario_id, es_privado)
+    return {"ok": True, "memoria_id": entry.id, "categoria": entry.categoria, "clave": entry.clave}
+
+@app.get('/api/universal/memory/list')
+def memory_list(usuario_id: str = 'default_user', categoria: str = None):
+    """Recupera la lista de memorias de un usuario autorizado."""
+    from neural_core.smart_memory import get_smart_memory_manager
+    sm = get_smart_memory_manager()
+    mems = sm.consultar_memorias(usuario_id=usuario_id, categoria=categoria)
+    return {
+        "ok": True,
+        "total": len(mems),
+        "memorias": [
+            {"id": m.id, "categoria": m.categoria, "clave": m.clave, "valor": m.valor, "es_privado": m.es_privado, "modificado": m.modificado}
+            for m in mems
+        ]
+    }
+
+@app.delete('/api/universal/memory/{mem_id}')
+def memory_delete(mem_id: str, usuario_id: str = 'default_user'):
+    """Elimina una memoria específica por orden del usuario."""
+    from neural_core.smart_memory import get_smart_memory_manager
+    sm = get_smart_memory_manager()
+    eliminado = sm.eliminar_memoria(mem_id, usuario_id)
+    return {"ok": eliminado}
+
+@app.get('/api/universal/memory/export')
+def memory_export(usuario_id: str = 'default_user'):
+    """Exporta en JSON el conjunto completo de memorias de un usuario."""
+    from neural_core.smart_memory import get_smart_memory_manager
+    from fastapi.responses import Response
+    sm = get_smart_memory_manager()
+    json_data = sm.exportar_memorias_json(usuario_id)
+    return Response(
+        content=json_data,
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename=sky_memories_{usuario_id}.json"}
+    )
+
+@app.get('/api/universal/benchmark')
+def universal_benchmark():
+    """Ejecuta la suite de evaluación benchmark multidisciplinaria."""
+    from neural_core.eval_benchmark import ejecutar_evaluacion_benchmark
+    resultados = ejecutar_evaluacion_benchmark()
+    return {"ok": True, **resultados}
+
+
+
+
+
+
+
+
+

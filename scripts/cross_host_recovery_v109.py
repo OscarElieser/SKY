@@ -55,10 +55,13 @@ def make_fixture(archive: Path, key_file: Path) -> dict:
     with tempfile.TemporaryDirectory(prefix='sky-v109-source-') as folder:
         root=Path(folder)
         db=root/'synthetic.sqlite3'
-        with sqlite3.connect(db) as con:
+        con = sqlite3.connect(db)
+        try:
             con.execute('CREATE TABLE dummy (name TEXT)')
             con.execute('INSERT INTO dummy VALUES (?)', ('restauracion-sintetica',))
             con.commit()
+        finally:
+            con.close()
         media=root/'images';media.mkdir()
         # Minimal synthetic 1x1 PNG, never customer data.
         import base64

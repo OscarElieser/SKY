@@ -20,7 +20,7 @@ def _cliente():
     return genai.Client(api_key=key)
 
 
-def responder_gemini(mensajes, modelo=None, max_tokens=1800):
+def responder_gemini(mensajes, modelo=None, max_tokens=2500):
     """Mensajes estilo [{role,content}]; sin ejecutar herramientas externas."""
     modelo = modelo or os.getenv('GEMINI_MODEL','gemini-flash-latest')
     if not mensajes or mensajes[0].get('role') != 'system':
@@ -37,7 +37,7 @@ def responder_gemini(mensajes, modelo=None, max_tokens=1800):
         res=client.models.generate_content(
             model=modelo, contents=historial,
             config=types.GenerateContentConfig(system_instruction=system,
-                temperature=0.4, max_output_tokens=max_tokens))
+                temperature=0.2, max_output_tokens=max_tokens))
         texto=(res.text or '').strip()
         if not texto:
             raise GeminiError('Gemini devolvió una respuesta vacía; revisa límites y filtros del proveedor.')

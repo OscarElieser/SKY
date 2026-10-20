@@ -1,68 +1,118 @@
 {
   "nombre": "NeuralT Personal v1.0 \u2014 MLP + GRU Engine Sensor",
   "procedencia": "demo_sensores.csv",
-  "huella_datos": "dbddf5f4ec65d498fc1fdcd534ab7a7016281b8a9ba6e18e2defe971381c3e5b",
+  "huella_datos": "1883c80a27f404dc4702f0acdb26596b2593f642aca6f03e7b44e289b546de29",
   "registros": 1200,
   "entrenamiento": 936,
   "validacion": 240,
-  "epocas": 10,
+  "epocas": 20,
   "mae_validacion_por_sensor": {
-    "temperatura_c": 1.0582,
-    "vibracion_mm_s": 0.1269,
-    "rpm": 27.5771,
-    "corriente_a": 0.1762,
-    "presion_bar": 0.0556
+    "temperatura_c": 0.9016,
+    "vibracion_mm_s": 0.1295,
+    "rpm": 24.0692,
+    "corriente_a": 0.1675,
+    "presion_bar": 0.054
   },
   "historial": [
     {
       "epoca": 1,
-      "entrenamiento": 0.33488,
-      "validacion": 0.19727
+      "entrenamiento": 0.31303,
+      "validacion": 0.20203
     },
     {
       "epoca": 2,
-      "entrenamiento": 0.1368,
-      "validacion": 0.16543
+      "entrenamiento": 0.13398,
+      "validacion": 0.16076
     },
     {
       "epoca": 3,
-      "entrenamiento": 0.11292,
-      "validacion": 0.14737
+      "entrenamiento": 0.10427,
+      "validacion": 0.132
     },
     {
       "epoca": 4,
-      "entrenamiento": 0.09826,
-      "validacion": 0.13019
+      "entrenamiento": 0.08732,
+      "validacion": 0.12311
     },
     {
       "epoca": 5,
-      "entrenamiento": 0.08651,
-      "validacion": 0.1216
+      "entrenamiento": 0.08443,
+      "validacion": 0.12088
     },
     {
       "epoca": 6,
-      "entrenamiento": 0.0836,
-      "validacion": 0.1199
+      "entrenamiento": 0.08181,
+      "validacion": 0.12028
     },
     {
       "epoca": 7,
-      "entrenamiento": 0.08158,
-      "validacion": 0.11744
+      "entrenamiento": 0.07985,
+      "validacion": 0.11963
     },
     {
       "epoca": 8,
-      "entrenamiento": 0.07968,
-      "validacion": 0.1169
+      "entrenamiento": 0.08107,
+      "validacion": 0.12138
     },
     {
       "epoca": 9,
-      "entrenamiento": 0.07967,
-      "validacion": 0.11557
+      "entrenamiento": 0.07975,
+      "validacion": 0.11635
     },
     {
       "epoca": 10,
-      "entrenamiento": 0.07838,
-      "validacion": 0.11608
+      "entrenamiento": 0.0786,
+      "validacion": 0.11601
+    },
+    {
+      "epoca": 11,
+      "entrenamiento": 0.0776,
+      "validacion": 0.11441
+    },
+    {
+      "epoca": 12,
+      "entrenamiento": 0.0754,
+      "validacion": 0.11431
+    },
+    {
+      "epoca": 13,
+      "entrenamiento": 0.07471,
+      "validacion": 0.11161
+    },
+    {
+      "epoca": 14,
+      "entrenamiento": 0.07373,
+      "validacion": 0.11249
+    },
+    {
+      "epoca": 15,
+      "entrenamiento": 0.07337,
+      "validacion": 0.10957
+    },
+    {
+      "epoca": 16,
+      "entrenamiento": 0.07256,
+      "validacion": 0.10966
+    },
+    {
+      "epoca": 17,
+      "entrenamiento": 0.07251,
+      "validacion": 0.11094
+    },
+    {
+      "epoca": 18,
+      "entrenamiento": 0.07234,
+      "validacion": 0.11084
+    },
+    {
+      "epoca": 19,
+      "entrenamiento": 0.07166,
+      "validacion": 0.11206
+    },
+    {
+      "epoca": 20,
+      "entrenamiento": 0.07108,
+      "validacion": 0.1098
     }
   ],
   "advertencia": "Uso experimental. No sustituye sensores certificados ni sistemas de seguridad."

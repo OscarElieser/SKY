@@ -67,8 +67,10 @@ def _snapshot(source: Path) -> bytes:
         raise ValueError('Base SQLite supera el límite de tamaño')
     # Online backup API provides a consistent snapshot while SKY can still read.
     uri = source.resolve().as_uri() + '?mode=ro'
-    with sqlite3.connect(uri, uri=True, timeout=10) as original:
-        with sqlite3.connect(':memory:') as isolated:
+    original = sqlite3.connect(uri, uri=True, timeout=10)
+    try:
+        isolated = sqlite3.connect(':memory:')
+        try:
             original.backup(isolated, pages=256, sleep=0.1)
             if isolated.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                 raise ValueError('La base de origen no supera integrity_check')
@@ -79,6 +81,10 @@ def _snapshot(source: Path) -> bytes:
             if raw[18:20] == b'\x02\x02':
                 raw[18:20] = b'\x01\x01'
             content = bytes(raw)
+        finally:
+            isolated.close()
+    finally:
+        original.close()
     if len(content) > MAX_DB_BYTES:
         raise ValueError('Instantánea supera el límite de tamaño')
     return content

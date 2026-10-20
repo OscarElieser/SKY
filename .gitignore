@@ -12,10 +12,13 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+.infra/
+backups_hardened/
+security_reports/
 .idea/
 .DS_Store
-
-# SKY v10.7 public deployment secrets and credentials
-deploy/secrets/
-deploy/production.env
-*.skybackup
+.agents/
+.claude/
+.snapshots/
+.vscode/
+.streamlit/

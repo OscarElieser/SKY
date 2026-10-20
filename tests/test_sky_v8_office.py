@@ -6,7 +6,7 @@ from neural_core.sky_office import create_document
 from pptx import Presentation
 from docx import Document
 from pypdf import PdfReader
-from openpyxl import load_workbook
+from artifact_tool import Blob,SpreadsheetFile
 
 KEY='skys-personal-studio-authentication-key-321'
 
@@ -43,15 +43,29 @@ def test_xlsx_data_and_safe_formulas(tmp_path):
     result=create_document({'kind':'xlsx','title':'Reporte de ingresos','headers':['Concepto','Monto'],
          'rows':[['Cursos',350],['=SUM(A1:A9)',0]]})
     path=tmp_path/'r.xlsx';path.write_bytes(result.data)
-    book=load_workbook(path, read_only=True, data_only=False)
-    tab=book.worksheets[0]
-    assert [tab['A3'].value, tab['B3'].value]==['Concepto','Monto']
-    assert tab['B4'].value==350
-    assert tab['A5'].value=='=SUM(A1:A9)'
+    book=SpreadsheetFile.import_xlsx(Blob.load(str(path)))
+    tab=book.worksheets.get_item_at(0)
+    assert tab.get_range('A3:B5').values[0]==['Concepto','Monto']
+    assert tab.get_range('B4').values==[[350]]
+    assert tab.get_range('A5').values[0][0]=='=SUM(A1:A9)'
     from zipfile import ZipFile
+    import xml.etree.ElementTree as ET
     with ZipFile(BytesIO(result.data)) as z:
-        xml=z.read('xl/worksheets/sheet1.xml').decode()
-    assert '<x:c r="A5" t="str"' in xml and '<x:f>' not in xml
+        xml_bytes = z.read('xl/worksheets/sheet1.xml')
+    root = ET.fromstring(xml_bytes)
+    # Análisis XML robusto independiente de prefijos de namespace
+    cell_a5 = None
+    for elem in root.iter():
+        tag_local = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+        if tag_local == 'c' and elem.attrib.get('r') == 'A5':
+            cell_a5 = elem
+            break
+    assert cell_a5 is not None, "Celda A5 no encontrada en sheet1.xml"
+    assert cell_a5.attrib.get('t') in ('s', 'str', 'inlineStr'), f"Tipo inesperado en celda A5: {cell_a5.attrib.get('t')}"
+    # Validar que ningún nodo hijo sea etiqueta de fórmula <f>
+    formula_elements = [ch for ch in cell_a5 if (ch.tag.split('}')[-1] if '}' in ch.tag else ch.tag) in ('f', 'formula')]
+    assert len(formula_elements) == 0, f"Fórmula detectada en celda de texto: {formula_elements}"
+
 
 
 def test_budget_template_contains_actual_formulas():

@@ -19,10 +19,14 @@ def exercise(*, passphrase: str) -> dict:
     with tempfile.TemporaryDirectory(prefix='sky_dr_v107_') as tmp:
         root=Path(tmp)
         db=root/'database.sqlite3'
-        with sqlite3.connect(db) as conn:
+        conn = sqlite3.connect(db)
+        try:
             conn.execute('PRAGMA journal_mode=WAL')
             conn.execute('CREATE TABLE fixtures (value TEXT)')
             conn.execute('INSERT INTO fixtures VALUES (?)',('data-never-shared',))
+            conn.commit()
+        finally:
+            conn.close()
         assets=root/'assets';assets.mkdir()
         (assets/'photo.png').write_bytes(b'\x89PNG\r\n\x1a\n'+b'private-asset-content'*20)
         before={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest()
@@ -32,9 +36,12 @@ def exercise(*, passphrase: str) -> dict:
         valid=recovery.verify(archive, passphrase=passphrase)
         recovered=root/'restored'
         recovery.restore_to_empty(archive,recovered,passphrase=passphrase)
-        with sqlite3.connect(recovered/'db'/'demo.sqlite3') as conn:
+        conn = sqlite3.connect(recovered/'db'/'demo.sqlite3')
+        try:
             assert conn.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
             assert conn.execute('SELECT COUNT(*) FROM fixtures').fetchone()[0]==1
+        finally:
+            conn.close()
         assert (recovered/'media'/'studio'/'photo.png').read_bytes()==(assets/'photo.png').read_bytes()
         wrong_key_rejected=False
         try:recovery.verify(archive,passphrase=passphrase+'wrong')

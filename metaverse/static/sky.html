@@ -1,16 +1,231 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#070f1e"><title>SKY IA · Tu espacio</title><link rel="stylesheet" href="/static/sky-home.css"><link rel="stylesheet" href="/static/sky-global-i18n.css"></head>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#060911">
+  <title>SKY IA · Asistente Personal Unificado</title>
+  <link rel="stylesheet" href="/static/sky-home.css?v=12.0">
+  <link rel="stylesheet" href="/static/sky-global-i18n.css">
+  <!-- KaTeX para renderizado de fórmulas LaTeX estrictas ($...$ y $$...$$) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <!-- Puter.js SDK oficial en el navegador -->
+  <script src="https://js.puter.com/v2/"></script>
+</head>
 <body>
-<header class="top"><a class="brand" href="/sky" aria-label="SKY Inicio"><span class="brand-star">✦</span> SKY <span class="brand-sub">IA</span></a><div class="right-top"><span class="subtitle" data-sky-i18n="hello">¿Qué querés crear hoy?</span><button id="more-btn" type="button" aria-expanded="false">☰ <span data-sky-i18n="spaces">Espacios</span></button></div></header>
+
+<div class="app-layout">
+  <!-- SIDEBAR (Estilo ChatGPT Moderno) -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <a class="sidebar-brand" href="/sky"><span class="brand-star">✦</span> SKY <span class="brand-sub">IA</span></a>
+      <button id="sidebar-close" class="sidebar-close-btn" type="button" title="Cerrar panel">✕</button>
+    </div>
+
+    <div class="sidebar-actions">
+      <button id="btn-new-chat" class="sidebar-btn new-chat-btn" type="button">
+        <span class="icon">✏️</span> <span class="label">Chat nuevo</span>
+      </button>
+    </div>
+
+    <!-- Navegación e Historial (Estilo ChatGPT) -->
+    <div class="sidebar-nav">
+      <div id="history-list" class="history-list"></div>
+    </div>
+
+
+    <!-- TARJETA INFERIOR: PERFIL DE USUARIO Y CONFIGURACIÓN (Como en ChatGPT) -->
+    <div class="sidebar-footer">
+      <div id="user-profile-card" class="user-profile-card" title="Abrir configuración y perfil">
+        <div class="user-avatar">OE</div>
+        <div class="user-meta">
+          <div class="user-name">Oscar Elieser Chamorro</div>
+          <div class="user-role">Superadmin · Plus</div>
+        </div>
+        <button id="btn-settings" class="settings-gear-btn" type="button" title="Configuración">⚙️</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CONTENIDO PRINCIPAL (Chat) -->
+  <div class="main-content">
+    <header class="chat-top-bar">
+      <button id="sidebar-toggle" class="sidebar-toggle-btn" type="button" aria-label="Abrir barra lateral">☰</button>
+      <div class="top-title">✦ SKY IA</div>
+      <button id="top-new-chat" class="top-action-btn" type="button" title="Chat nuevo">✏️</button>
+    </header>
+
+    <main class="chat-viewport">
+      <section class="welcome">
+        <div class="orb" aria-hidden="true"><div class="orb-inside">✦</div></div>
+        <div class="overline">SKY · ASISTENTE PERSONAL</div>
+        <h1>¿Qué imaginás<br><span>hacer hoy?</span></h1>
+        <p>Describí lo que necesitás. SKY coordinará sus capacidades internas y documentos sin saturar tu pantalla.</p>
+      </section>
+
+      <section class="chat-panel" aria-label="Conversación con SKY">
+        <div id="conversation" class="conversation" aria-live="polite">
+          <div class="bubble sky-bubble">Hola, soy SKY. Contame qué querés crear, investigar u organizar. Tus herramientas y documentos están disponibles cuando los necesitás.</div>
+        </div>
+
+        <form id="chat-form">
+          <div id="attached-chips" class="attached-chips" style="display:none;"></div>
+          <label for="prompt" class="sr-only">Escribí a SKY</label>
+          <textarea id="prompt" rows="2" maxlength="6000" placeholder="Preguntame, creá algo, analizá datos o pedí un video..." data-sky-i18n-placeholder="write"></textarea>
+          <div class="compose-footer">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <button id="mic" type="button" title="Dictado por voz">🎙 Voz</button>
+              <input type="file" id="attach-input" multiple style="display:none;">
+              <button id="btn-attach" type="button" class="btn-attach" title="Adjuntar cualquier tipo de archivo (Videos, Música, Documentos, Código, Imágenes...)">📎 Adjuntar archivo</button>
+              <div id="sky-referente-badge" class="sky-referente-pill" title="SKY es el referente central. Coordina y ejecuta automáticamente los motores de cómputo en segundo plano.">
+                <span class="sky-sparkle">✦</span>
+                <span class="sky-pill-label">SKY es el referente</span>
+                <span class="sky-pill-dot">●</span>
+                <span class="sky-pill-status">Multi-motor autónomo</span>
+              </div>
+              <input type="hidden" id="provider" value="auto">
+            </div>
+            <div class="send-actions">
+              <button class="primary" id="send" type="submit">Enviar <span aria-hidden="true">➜</span></button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section id="workspace-activity" class="workspace-activity" hidden aria-label="Trabajo en curso">
+        <div id="workspace-details"></div>
+        <div id="workspace-actions" class="workspace-actions"></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- NAVEGACIÓN ACCESIBLE Y PANELES AUXILIARES (Auditoría Global i18n) -->
 <nav id="more-menu" class="more-menu" hidden aria-label="Espacios disponibles"><a href="/community">Comunidad y mundos compartidos</a><a href="/world">Metaverso 3D</a><a href="/studio">Estudio privado y documentos</a><a href="/office">Office Studio</a><a href="/creative">Estudio creativo · imágenes y video</a><a href="/flows">Flujos de trabajo</a><a href="/docs" target="_blank" rel="noopener">Documentación API</a><div id="creator-links"></div></nav>
-<main class="main">
-<section class="welcome"><div class="orb" aria-hidden="true"><div class="orb-inside">✦</div></div><div class="overline">SKY · ASISTENTE PERSONAL</div><h1>¿Qué imaginás<br><span>hacer hoy?</span></h1><p>Describí lo que necesitás. SKY te ayudará a encontrar el camino y las herramientas, sin llenar tu pantalla de opciones.</p></section>
-<section class="chat-panel" aria-label="Conversación con SKY">
-<div id="conversation" class="conversation" aria-live="polite"><div class="bubble sky-bubble">Hola, soy SKY. Contame qué querés crear, investigar u organizar. Tus herramientas están disponibles cuando las necesitás.</div></div>
-<form id="chat-form"><label for="prompt" class="sr-only">Escribí a SKY</label><textarea id="prompt" rows="2" maxlength="6000" placeholder="Preguntame, creá algo o continuá un proyecto..." data-sky-i18n-placeholder="write"></textarea><div class="compose-footer"><button id="mic" type="button" title="Dictado por voz disponible según el navegador">🎙 Voz</button><div class="send-actions"><select id="provider" aria-label="Motor IA" hidden><option value="local">SKY Local</option><option value="gemini">Gemini</option><option value="openai">OpenAI</option><option value="anthropic">Claude</option><option value="ollama">Ollama</option></select><button class="primary" id="send" type="submit">Enviar <span aria-hidden="true">➜</span></button></div></div></form>
-</section>
-<section id="workspace-activity" class="workspace-activity" hidden aria-label="Trabajo en curso"><div id="workspace-details"></div><div id="workspace-actions" class="workspace-actions"></div></section>
-<section class="identity"><div id="session-label">Podés explorar los mundos de SKY. Para conversar, iniciá sesión.</div><button id="login-user" type="button">Entrar como usuario</button><button id="login-owner" type="button">Acceso privado</button><button id="sign-out" type="button" hidden>Cerrar sesión</button></section>
+<section class="identity" hidden><div id="session-label">Podés explorar los mundos de SKY. Para conversar, iniciá sesión.</div><button id="login-user" type="button">Entrar como usuario</button><button id="login-owner" type="button">Acceso privado</button><button id="sign-out" type="button" hidden>Cerrar sesión</button></section>
 <section id="auth-panel" class="auth-panel" hidden aria-label="Acceso SKY"><h2 id="auth-title">Ingresar a SKY</h2><p id="auth-help">Tus datos privados no se publican.</p><label id="username-wrap" for="username">Usuario<input id="username" autocomplete="username" maxlength="50"></label><label id="password-label" for="password">Contraseña<input id="password" type="password" autocomplete="current-password"></label><div class="auth-actions"><button type="button" id="auth-cancel">Cancelar</button><button type="button" id="auth-confirm" class="primary">Entrar</button></div><p id="auth-error" role="alert"></p></section>
 <section id="private-shortcuts" class="private-shortcuts" hidden><button id="open-projects" type="button">◈ Mis proyectos</button><button id="open-flows" type="button">⌁ Automatizaciones</button><button id="open-studio" type="button">✧ Espacio de trabajo</button></section>
-<footer>SKY IA · Creá, conectá y evolucioná.</footer>
-</main><script src="/static/sky-home.js" defer></script><script src="/static/sky-language-ui.js" defer></script><script src="/static/sky-security-ui.js" defer></script><script src="/static/sky-global-i18n.js" defer></script></body></html>
+<div hidden><span class="subtitle" data-sky-i18n="hello">¿Qué querés crear hoy?</span><span data-sky-i18n="spaces">Espacios</span><select id="provider-aux" aria-label="Motor IA" hidden><option value="local">SKY Local</option></select></div>
+
+<!-- MODAL DE CONFIGURACIÓN Y PERFIL COMPLETO (Panel Moderno) -->
+<div id="settings-modal" class="modal-backdrop" hidden>
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h2>⚙️ Configuración y Perfil de SKY</h2>
+      <button id="settings-close" class="modal-close-btn" type="button">✕</button>
+    </div>
+    
+    <!-- Pestañas de configuración -->
+    <div class="modal-tabs">
+      <button class="tab-btn active" data-tab="tab-profile" type="button">👤 Perfil</button>
+      <button class="tab-btn" data-tab="tab-evolution" type="button">🧬 Evolución y Memoria</button>
+      <button class="tab-btn" data-tab="tab-engines" type="button">🤖 Motores Internos</button>
+      <button class="tab-btn" data-tab="tab-prefs" type="button">🌐 Preferencias</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Tab 1: Perfil -->
+      <div id="tab-profile" class="tab-content active">
+        <div class="profile-header">
+          <div class="profile-avatar-big">OE</div>
+          <div>
+            <h3>Oscar Elieser Chamorro</h3>
+            <p class="text-sub">Superadministrador · Creador del Sistema</p>
+          </div>
+        </div>
+        <div class="info-grid">
+          <div class="info-card">
+            <span class="label">Correo Oficial</span>
+            <span class="val">oscarelieser.informatica.inatec@gmail.com</span>
+          </div>
+          <div class="info-card">
+            <span class="label">Nivel de Acceso</span>
+            <span class="val">👑 Superadmin (Control Total Local)</span>
+          </div>
+          <div class="info-card">
+            <span class="label">Estado de Cuenta</span>
+            <span class="val" style="color:#10b981;">🟢 Activo · Sesión Maestro Verificada</span>
+          </div>
+          <div class="info-card">
+            <span class="label">Almacenamiento Local</span>
+            <span class="val">local_data/neuralt.sqlite3 (Privado)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Evolución -->
+      <div id="tab-evolution" class="tab-content">
+        <div class="evolution-summary-card">
+          <div style="font-size:24px;">🧬</div>
+          <div>
+            <div style="font-weight:700; color:#38bdf8;">Núcleo Evolutivo Autónomo</div>
+            <div style="font-size:12px; color:#94a3b8;">SKY se alimenta de cada archivo e instrucción para actualizar su memoria neural continuamente.</div>
+          </div>
+        </div>
+        <div class="info-grid" style="margin-top:14px;">
+          <div class="info-card">
+            <span class="label">Estado Evolutivo</span>
+            <span class="val" style="color:#38bdf8;">Nivel Adaptativo Óptimo</span>
+          </div>
+          <div class="info-card">
+            <span class="label">Memorias Aprendidas</span>
+            <span class="val" id="modal-mem-count">Cargando...</span>
+          </div>
+          <div class="info-card">
+            <span class="label">Documentos Asimilados</span>
+            <span class="val" id="modal-doc-count">Cargando...</span>
+          </div>
+          <div class="info-card">
+            <span class="label">Interacciones y Feedback</span>
+            <span class="val" id="modal-int-count">Cargando...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Motores Internos -->
+      <div id="tab-engines" class="tab-content">
+        <p style="font-size:12px; color:#94a3b8; margin-bottom:12px;">
+          ✦ <strong>SKY es el referente único.</strong> Todos los motores externos e internos se orquestan en segundo plano de manera invisible según la especialidad de la tarea.
+        </p>
+        <div class="engine-row"><span>🦙 Ollama Local (Offline)</span><span class="status-pill green">Activo (Llama 3.2)</span></div>
+        <div class="engine-row"><span>🌟 Google Gemini</span><span class="status-pill green">Conectado (Gemini 3.5 Flash)</span></div>
+        <div class="engine-row"><span>⚡ Mistral AI</span><span class="status-pill green">Conectado (Open Mistral)</span></div>
+        <div class="engine-row"><span>🐳 DeepSeek AI</span><span class="status-pill blue">Autenticado</span></div>
+        <div class="engine-row"><span>🚀 Puter.js Cloud</span><span class="status-pill green">Integrado en Navegador</span></div>
+        <div class="engine-row"><span>🎨 ia.gratis (Flux Imagen & Búsqueda)</span><span class="status-pill green">Activo</span></div>
+      </div>
+
+      <!-- Tab 4: Preferencias -->
+      <div id="tab-prefs" class="tab-content">
+        <div class="pref-row">
+          <label>Idioma de la Interfaz</label>
+          <div id="modal-lang-container">
+            <select id="modal-lang-select" style="background:#09192b; border:1px solid #335577; padding:6px 10px; border-radius:8px; color:#e0f2fe;">
+              <option value="es" selected>Español</option>
+              <option value="en">English</option>
+              <option value="pt">Português</option>
+              <option value="fr">Français</option>
+            </select>
+          </div>
+        </div>
+        <div class="pref-row">
+          <label>Tema Visual</label>
+          <span style="color:#94a3b8; font-size:13px;">ChatGPT Modern Deep Dark (Predeterminado)</span>
+        </div>
+        <div class="pref-row">
+          <label>Estilo de Respuesta</label>
+          <span style="color:#10b981; font-size:13px;">Emojis dinámicos y sin markdown crudo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/sky-home.js?v=12.0" defer></script>
+<script src="/static/sky-language-ui.js" defer></script>
+<script src="/static/sky-security-ui.js" defer></script>
+<script src="/static/sky-global-i18n.js" defer></script>
+</body>
+</html>

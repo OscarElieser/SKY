@@ -126,11 +126,24 @@ def test_public_mode_fails_closed_without_mfa_or_redis(monkeypatch):
     from metaverse.deployment_v102 import validate_environment
     monkeypatch.setenv('SKY_DEPLOYMENT_MODE','public')
     monkeypatch.setenv('SKY_TRUSTED_HOSTS','sky.example.test')
+    monkeypatch.delenv('SKY_API_KEY',raising=False)
+    with pytest.raises(RuntimeError,match='SKY_API_KEY'):validate_environment()
+    monkeypatch.setenv('SKY_API_KEY','owner-api-key-for-public-tests-123456789')
     monkeypatch.delenv('SKY_OWNER_MFA_SECRET',raising=False)
     with pytest.raises(RuntimeError,match='MFA'):validate_environment()
     monkeypatch.setenv('SKY_OWNER_MFA_SECRET',base64.b32encode(b'01234567890123456789012345678901').decode().rstrip('='))
     monkeypatch.delenv('SKY_REDIS_URL',raising=False)
     with pytest.raises(RuntimeError,match='Redis'):validate_environment()
+
+
+def test_public_mode_rejects_reused_owner_secrets(monkeypatch):
+    from metaverse.deployment_v102 import validate_environment
+    shared=base64.b32encode(b'01234567890123456789012345678901').decode().rstrip('=')
+    monkeypatch.setenv('SKY_DEPLOYMENT_MODE','public')
+    monkeypatch.setenv('SKY_TRUSTED_HOSTS','sky.example.test')
+    monkeypatch.setenv('SKY_API_KEY',shared)
+    monkeypatch.setenv('SKY_OWNER_MFA_SECRET',shared)
+    with pytest.raises(RuntimeError,match='distintos'):validate_environment()
 
 
 def test_http_origin_block_and_no_cache(env):

@@ -15,6 +15,7 @@ mistralai>=1.0,<3
 
 # SKY Studio 3D y vista interactiva
 trimesh>=4.4,<5
+scipy>=1.14,<2
 plotly>=5.22,<7
 # OpenCV permite separación asistida GrabCut de cada elemento
 opencv-python-headless>=4.10,<5
@@ -28,7 +29,14 @@ httpx>=0.27,<1
 python-pptx>=1.0,<2
 reportlab>=4.4,<5
 XlsxWriter>=3.2,<4
+openpyxl>=3.1,<4
 
-# SKY v9.7: subida segura de archivos a Creative Studio (requisito de FastAPI)
+# SKY v9.7+: subida y renderizado seguro en Creative Studio
 python-multipart>=0.0.18,<1
-# FFmpeg y ffprobe deben instalarse como ejecutables del sistema operativo.
+static-ffmpeg>=3.0,<4
+# Respaldos y restauración cifrados (AES-GCM + scrypt)
+cryptography>=44,<51
+
+# Hardware & Industrial IoT (Sensores físicos RS485 / COM / Arduino / ESP32)
+pyserial>=3.5,<4
+pyyaml>=6.0,<7

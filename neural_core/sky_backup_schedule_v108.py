@@ -64,7 +64,20 @@ def _safe_directory(directory: str | Path, *, create: bool) -> Path:
 def _lock_backup(root: Path):
     """Non-blocking lock for local operations; fail rather than race."""
     if os.name != 'posix':
-        raise RuntimeError('Planificación automática verificada solo en POSIX; usar CLI manual')
+        target = root / '.sky-backup.lock'
+        try:
+            descriptor = os.open(target, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+        except FileExistsError as exc:
+            raise RuntimeError('Ya existe otro respaldo en ejecución') from exc
+        try:
+            yield
+        finally:
+            os.close(descriptor)
+            try:
+                target.unlink(missing_ok=True)
+            except Exception:
+                pass
+        return
     import fcntl
     target = root / '.sky-backup.lock'
     descriptor = os.open(target, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
@@ -163,7 +176,7 @@ def rehearse_latest(directory: str | Path, *, passphrase: str | None = None,
             restored = recovery.restore_to_empty(candidate, target, passphrase=password)
             # Verify actual byte identity against the authenticated bundle.
             _, manifest = recovery._bundle(candidate.read_bytes(), password)
-            if {str(p.relative_to(target)):hashlib.sha256(p.read_bytes()).hexdigest()
+            if {p.relative_to(target).as_posix():hashlib.sha256(p.read_bytes()).hexdigest()
                 for p in target.rglob('*') if p.is_file()} != {
                 name:hashlib.sha256(data).hexdigest() for name,data in manifest.items()}:
                 raise ValueError('Restauración incompleta o modificada')

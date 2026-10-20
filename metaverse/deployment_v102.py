@@ -11,19 +11,21 @@ def validate_environment():
     if not hosts or hosts.issubset({'localhost','127.0.0.1','testserver'}):
         raise RuntimeError('Modo público necesita SKY_TRUSTED_HOSTS con dominio propio')
     if '*' in hosts:raise RuntimeError('El modo público prohíbe hosts universales')
-    from .secrets_v107 import get_secret
-    if not get_secret('SKY_OWNER_MFA_SECRET'):
+    api_key=os.getenv('SKY_API_KEY','').strip()
+    if len(api_key)<32:
+        raise RuntimeError('El modo público requiere SKY_API_KEY explícita de 32 caracteres o más')
+    if not os.getenv('SKY_OWNER_MFA_SECRET'):
         raise RuntimeError('El modo público requiere MFA TOTP para el creador')
     from .owner_mfa import validate_configuration
     validate_configuration()
+    if api_key==os.getenv('SKY_OWNER_MFA_SECRET','').strip():
+        raise RuntimeError('SKY_API_KEY y SKY_OWNER_MFA_SECRET deben ser secretos distintos')
     if not os.getenv('SKY_REDIS_URL'):
         raise RuntimeError('El modo público requiere Redis para limitación distribuida')
     if os.getenv('SKY_BEHIND_TLS_PROXY') != '1':
         raise RuntimeError('El modo público requiere proxy HTTPS verificado')
     if os.getenv('SKY_CREATIVE_WORKER','1') != '0':
         raise RuntimeError('El modo público requiere separar el proceso de render')
-    if not get_secret('SKY_API_KEY'):
-        raise RuntimeError('En modo público configurá SKY_API_KEY o SKY_API_KEY_FILE')
     try:
         from .distributed_limits import redis_client
         redis_client()
