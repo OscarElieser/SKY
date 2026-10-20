@@ -52,7 +52,36 @@ def main():
         if speaking: return
         try: audio.put_nowait(bytes(indata))
         except queue.Full: pass
-    recognizer=KaldiRecognizer(Model(args.model),args.rate)
+    def create_stream_and_recognizer():
+        input_devices = [None]
+        try:
+            for idx, d in enumerate(sd.query_devices()):
+                if d.get('max_input_channels', 0) > 0:
+                    input_devices.append(idx)
+        except Exception:
+            pass
+
+        for dev_id in input_devices:
+            dev_sr = None
+            if dev_id is not None:
+                try:
+                    dev_sr = int(sd.query_devices(dev_id).get('default_samplerate', 0))
+                except Exception:
+                    pass
+            rates = [r for r in [args.rate, dev_sr, 48000, 44100, 16000] if r]
+            for candidate_rate in rates:
+                try:
+                    st = sd.RawInputStream(device=dev_id, samplerate=candidate_rate, blocksize=8000, dtype='int16', channels=1, callback=callback)
+                    st.start()
+                    rec = KaldiRecognizer(Model(args.model), candidate_rate)
+                    return st, rec
+                except Exception:
+                    continue
+        rec = KaldiRecognizer(Model(args.model), args.rate)
+        st = sd.RawInputStream(samplerate=args.rate, blocksize=8000, dtype='int16', channels=1, callback=callback)
+        return st, rec
+
+    stream, recognizer = create_stream_and_recognizer()
     print('SKY: micrófono activo; decí “SKY” antes de la pregunta. Ctrl+C para finalizar.')
     print('La voz se reconoce localmente con Vosk; el texto consulta al proveedor SKY que configuraste.')
     history=[]
@@ -69,7 +98,7 @@ def main():
                     try: audio.get_nowait()
                     except queue.Empty: break
     try:
-        with sd.RawInputStream(samplerate=args.rate,blocksize=8000,dtype='int16',channels=1,callback=callback):
+        with stream:
             while True:
                 buffer=audio.get()
                 if not recognizer.AcceptWaveform(buffer): continue

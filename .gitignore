@@ -22,3 +22,5 @@ security_reports/
 .snapshots/
 .vscode/
 .streamlit/
+modelos/vosk*
+modelos/*.zip
