@@ -12,6 +12,33 @@ Esta integración permite **ejecutar realmente** órdenes de bajo riesgo por voz
 
 También se admite el arranque manual en dos terminales: `python agente_dispositivo.py` y `python sky_manos_libres.py --model modelos/vosk-model-es --execute-safe`.
 
+## Windows: WinError 10013 al arrancar agente_dispositivo.py
+
+El puerto heredado `8765` puede estar reservado por Windows, WSL/Hyper-V u otro servicio SKY. El lanzador `INICIAR_SKY_JARVIS_WINDOWS.bat` configura por defecto `SKY_DEVICE_PORT=18765` **para el agente y la voz**, siempre que no exista ya una elección explícita en el entorno. No se cambia el puerto de SKY Engine.
+
+Si se inicia manualmente, fijar el **mismo puerto en ambas terminales** antes de iniciar los procesos:
+
+```powershell
+$env:SKY_DEVICE_PORT = "18765"
+python agente_dispositivo.py
+```
+
+En una segunda terminal PowerShell:
+
+```powershell
+$env:SKY_DEVICE_PORT = "18765"
+python sky_manos_libres.py --model modelos/vosk-model-es --execute-safe
+```
+
+Para diagnosticar bloqueos de puerto sin deshabilitar protección de Windows:
+
+```powershell
+Get-NetTCPConnection -LocalPort 8765 -ErrorAction SilentlyContinue
+netsh interface ipv4 show excludedportrange protocol=tcp
+```
+
+El puerto debe permanecer enlazado solo a `127.0.0.1`. En el panel Streamlit, si se empareja la misma PC manualmente, usar `http://127.0.0.1:18765` y el token privado del agente. Si también está bloqueado `18765`, elegir otro puerto local disponible y configurarlo de forma consistente. No abrir puertos, desactivar el firewall ni ejecutar como administrador para eludir la restricción.
+
 ## Panel Streamlit
 
 En **Dispositivos → Voz**, el usuario puede marcar la opción de ejecución directa de acciones simples cuando existe un dispositivo emparejado y autenticado. Por defecto sigue la confirmación manual. El navegador remoto no controla Windows por sí mismo: el agente debe estar ejecutándose en el PC destinatario.
