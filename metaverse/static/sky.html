@@ -71,13 +71,13 @@
         </div>
 
         <form id="chat-form">
-          <div id="attached-chips" class="attached-chips" style="display:none;"></div>
+          <div id="attached-chips" class="attached-chips is-hidden"></div>
           <label for="prompt" class="sr-only">Escribí a SKY</label>
           <textarea id="prompt" rows="2" maxlength="6000" placeholder="Preguntame, creá algo, analizá datos o pedí un video..." data-sky-i18n-placeholder="write"></textarea>
           <div class="compose-footer">
-            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <div class="compose-controls">
               <button id="mic" type="button" title="Dictado por voz">🎙 Voz</button>
-              <input type="file" id="attach-input" multiple style="display:none;">
+              <input type="file" id="attach-input" multiple class="is-hidden">
               <button id="btn-attach" type="button" class="btn-attach" title="Adjuntar cualquier tipo de archivo (Videos, Música, Documentos, Código, Imágenes...)">📎 Adjuntar archivo</button>
               <div id="sky-referente-badge" class="sky-referente-pill" title="SKY es el referente central. Coordina y ejecuta automáticamente los motores de cómputo en segundo plano.">
                 <span class="sky-sparkle">✦</span>
@@ -146,7 +146,7 @@
           </div>
           <div class="info-card">
             <span class="label">Estado de Cuenta</span>
-            <span class="val" style="color:#10b981;">🟢 Activo · Sesión Maestro Verificada</span>
+            <span class="val val-success">🟢 Activo · Sesión Maestro Verificada</span>
           </div>
           <div class="info-card">
             <span class="label">Almacenamiento Local</span>
@@ -158,16 +158,16 @@
       <!-- Tab 2: Evolución -->
       <div id="tab-evolution" class="tab-content">
         <div class="evolution-summary-card">
-          <div style="font-size:24px;">🧬</div>
+          <div class="evolution-icon">🧬</div>
           <div>
-            <div style="font-weight:700; color:#38bdf8;">Núcleo Evolutivo Autónomo</div>
-            <div style="font-size:12px; color:#94a3b8;">SKY se alimenta de cada archivo e instrucción para actualizar su memoria neural continuamente.</div>
+            <div class="evolution-title">Núcleo Evolutivo Autónomo</div>
+            <div class="evolution-desc">SKY se alimenta de cada archivo e instrucción para actualizar su memoria neural continuamente.</div>
           </div>
         </div>
-        <div class="info-grid" style="margin-top:14px;">
+        <div class="info-grid info-grid-spaced">
           <div class="info-card">
             <span class="label">Estado Evolutivo</span>
-            <span class="val" style="color:#38bdf8;">Nivel Adaptativo Óptimo</span>
+            <span class="val val-highlight">Nivel Adaptativo Óptimo</span>
           </div>
           <div class="info-card">
             <span class="label">Memorias Aprendidas</span>
@@ -186,7 +186,7 @@
 
       <!-- Tab 3: Motores Internos -->
       <div id="tab-engines" class="tab-content">
-        <p style="font-size:12px; color:#94a3b8; margin-bottom:12px;">
+        <p class="engine-intro">
           ✦ <strong>SKY es el referente único.</strong> Todos los motores externos e internos se orquestan en segundo plano de manera invisible según la especialidad de la tarea.
         </p>
         <div class="engine-row"><span>🦙 Ollama Local (Offline)</span><span class="status-pill green">Activo (Llama 3.2)</span></div>
@@ -202,7 +202,7 @@
         <div class="pref-row">
           <label>Idioma de la Interfaz</label>
           <div id="modal-lang-container">
-            <select id="modal-lang-select" style="background:#09192b; border:1px solid #335577; padding:6px 10px; border-radius:8px; color:#e0f2fe;">
+            <select id="modal-lang-select" class="modal-lang-select">
               <option value="es" selected>Español</option>
               <option value="en">English</option>
               <option value="pt">Português</option>
@@ -212,11 +212,11 @@
         </div>
         <div class="pref-row">
           <label>Tema Visual</label>
-          <span style="color:#94a3b8; font-size:13px;">ChatGPT Modern Deep Dark (Predeterminado)</span>
+          <span class="pref-hint">ChatGPT Modern Deep Dark (Predeterminado)</span>
         </div>
         <div class="pref-row">
           <label>Estilo de Respuesta</label>
-          <span style="color:#10b981; font-size:13px;">Emojis dinámicos y sin markdown crudo</span>
+          <span class="pref-active">Emojis dinámicos y sin markdown crudo</span>
         </div>
       </div>
     </div>

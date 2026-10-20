@@ -373,11 +373,11 @@ function renderAttachedChips(){
   const container=$('attached-chips');
   if(!container)return;
   if(!attachedFiles.length){
-    container.style.display='none';
+    container.classList.add('is-hidden');
     container.replaceChildren();
     return;
   }
-  container.style.display='flex';
+  container.classList.remove('is-hidden');
   container.replaceChildren();
   attachedFiles.forEach((f,idx)=>{
     const chip=document.createElement('div');
