@@ -632,6 +632,8 @@ elif seccion=="🎙️ SKY y dispositivos":
         with st.form('sky_orden'):
             frase=st.text_input('O escribí una orden',key='sky_texto')
             voz_salida=st.checkbox('Reproducir la respuesta en voz española (gTTS)',value=False)
+            auto_ejecutar=st.checkbox('Ejecutar directamente acciones simples en el equipo emparejado',value=False,
+                help='Solo estado, páginas HTTPS y aplicaciones permitidas; requiere agente y token activos.')
             enviar=st.form_submit_button('Enviar a SKY',type='primary')
         if enviar and frase.strip():
             st.session_state['sky_entrada']=''
@@ -640,8 +642,23 @@ elif seccion=="🎙️ SKY y dispositivos":
                 ds=paired_devices()
                 elegido=st.session_state.get('sky_dispositivo')
                 if elegido and any(d['name']==elegido for d in ds):
-                    st.session_state['sky_pending']={**orden,'device':elegido}
-                    st.info('Orden interpretada: '+orden['description']+'. Confirmá abajo para ejecutarla.')
+                    if auto_ejecutar and orden['action'] in ('status','open_url','launch_app'):
+                        asociado=next(d for d in ds if d['name']==elegido)
+                        tok=st.session_state['sky_tokens'].get(elegido,'')
+                        if not tok:
+                            st.warning('Falta el token de este equipo. Activá el acceso en Dispositivos.')
+                        else:
+                            try:
+                                resultado=call_device(asociado['url'],tok,orden['action'],orden['params'])
+                                if not resultado.get('ok'):
+                                    raise RuntimeError('El agente no confirmó la operación.')
+                                st.session_state['sky_ultima_respuesta']='Acción completada en '+elegido+': '+orden['description']
+                                st.success(st.session_state['sky_ultima_respuesta'])
+                            except Exception as exc:
+                                st.error('La acción no se ejecutó: '+str(exc))
+                    else:
+                        st.session_state['sky_pending']={**orden,'device':elegido}
+                        st.info('Orden interpretada: '+orden['description']+'. Confirmá abajo para ejecutarla.')
                 else:
                     st.warning('La orden requiere un dispositivo emparejado. Seleccioná uno en la pestaña Dispositivos.')
             else:
