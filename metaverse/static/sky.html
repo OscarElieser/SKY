@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#060911">
   <title>SKY IA · Asistente Personal Unificado</title>
   <link rel="stylesheet" href="/static/sky-home.css?v=12.0">
   <link rel="stylesheet" href="/static/sky-global-i18n.css">
@@ -77,7 +76,8 @@
           <div class="compose-footer">
             <div class="compose-controls">
               <button id="mic" type="button" title="Dictado por voz">🎙 Voz</button>
-              <input type="file" id="attach-input" multiple class="is-hidden">
+              <label for="attach-input" class="sr-only">Adjuntar archivos</label>
+              <input type="file" id="attach-input" multiple class="is-hidden" title="Adjuntar archivos" aria-label="Adjuntar archivos">
               <button id="btn-attach" type="button" class="btn-attach" title="Adjuntar cualquier tipo de archivo (Videos, Música, Documentos, Código, Imágenes...)">📎 Adjuntar archivo</button>
               <div id="sky-referente-badge" class="sky-referente-pill" title="SKY es el referente central. Coordina y ejecuta automáticamente los motores de cómputo en segundo plano.">
                 <span class="sky-sparkle">✦</span>
@@ -200,7 +200,7 @@
       <!-- Tab 4: Preferencias -->
       <div id="tab-prefs" class="tab-content">
         <div class="pref-row">
-          <label>Idioma de la Interfaz</label>
+          <label for="modal-lang-select">Idioma de la Interfaz</label>
           <div id="modal-lang-container">
             <select id="modal-lang-select" class="modal-lang-select">
               <option value="es" selected>Español</option>
