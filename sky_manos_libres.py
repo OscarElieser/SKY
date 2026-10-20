@@ -32,6 +32,7 @@ def main():
     parser=argparse.ArgumentParser(description='Escucha privada con Vosk; activa con “SKY”.')
     parser.add_argument('--model',required=True,help='Carpeta descargada del modelo Vosk de español')
     parser.add_argument('--rate',type=int,default=16000)
+    parser.add_argument('--execute-safe',action='store_true',help='Autoriza abrir sitios HTTPS y apps permitidas en el equipo local al oír SKY.')
     args=parser.parse_args()
     if not Path(args.model).is_dir():
         sys.exit('No existe el modelo Vosk de español. Descargá uno y pasá --model carpeta.')
@@ -81,8 +82,16 @@ def main():
                 print('Escuchado:',command)
                 intent=interpret_command(command)
                 if intent:
-                    add_inbox(command,intent)
-                    say('Preparé la orden. Abrí la sección SKY del panel para confirmarla.')
+                    if args.execute_safe:
+                        from neural_core.sky_voice_actions import execute_safe_local
+                        try:
+                            say(execute_safe_local(intent))
+                        except (ValueError, RuntimeError, OSError) as exc:
+                            say('No se pudo ejecutar la orden. Revisá que el agente local esté activo y autorizado.')
+                            print('Detalle:',str(exc))
+                    else:
+                        add_inbox(command,intent)
+                        say('Preparé la orden. Abrí la sección SKY del panel para confirmarla.')
                     continue
                 provider,modelo=choose_provider(os.getenv('SKY_VOICE_PROVIDER','auto'), 'SKY voz')
                 try:
