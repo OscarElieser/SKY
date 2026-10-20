@@ -1,6 +1,10 @@
 @echo off
 setlocal
 cd /d "%~dp0"
+rem SKY Engine ya puede usar 8765; el agente JARVIS emplea 18765 por defecto.
+rem Respetar SKY_DEVICE_PORT si el propietario ya eligio un puerto distinto.
+if not defined SKY_DEVICE_PORT set "SKY_DEVICE_PORT=18765"
+echo [SKY] Puerto del agente local: %SKY_DEVICE_PORT%
 set "PYTHON=py -3"
 if exist ".venv\Scripts\python.exe" set "PYTHON=.venv\Scripts\python.exe"
 set "VOICE_MODEL=%~1"
