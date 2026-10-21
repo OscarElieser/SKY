@@ -30,7 +30,7 @@ from neural_core.multimedia import catalogo_itunes, convertir_imagen
 from neural_core.seguridad import revisar_archivo
 from neural_core.creadores import campana, produccion, REDES
 from neural_core.dispositivos import (paired_devices, save_device, remove_device, call_device,
-    interpret_command, APP_OPTIONS)
+    interpret_command, APP_OPTIONS, norm)
 from neural_core.voz import transcribir_audio, hablar_texto
 from neural_core.voz_inbox import read_inbox, dismiss_inbox
 from sensores_app import mostrar_sensores
@@ -88,14 +88,63 @@ st.markdown("""<style>
 .smallnote {opacity:.85; font-size:.9rem; color:#9fbad0}
 </style>""", unsafe_allow_html=True)
 iniciar(); crear_tablas()
-SECCIONES=["🏠 Inicio", "🌐 SKY IA Universal v12.0", "🧠 IA universal", "🧬 Centro multi-IA", "👁️ SKY Visión", "🎨 SKY Studio 3D", "📁 SKY Office Studio", "🧬 SKY Evolución", "🧰 Herramientas SKY", "🔔 SKY Live", "🌐 SKY Metaverso y API", "🎙️ SKY y dispositivos", "💰 Finanzas personales", "🚀 Generar ingresos", "📈 Bolsa y Bitcoin",
-           "📰 Noticias e Internet", "📣 Redes sociales", "🎵 Música y películas", "🎞️ Imágenes y videos",
-           "🔐 Antivirus y hacking ético", "🎓 Educación e investigación", "📚 Biblioteca y memoria",
-           "🧭 BAQUEANO Control Center", "🧾 Transacciones", "📡 Engine Sensor MLP + GRU", "✅ Proyectos y tareas", "⚽ SKY Sports Madridista"]
+
+
+def elegir_motor(key, area='General'):
+    """Selector compartido; nunca activa redes ni cuenta doble automáticamente."""
+    opciones = ['auto', *PROVIDERS]
+    default = 'auto'
+    etiqueta = lambda opt: ('Automático — entre los configurados' if opt == 'auto'
+                            else PROVIDERS[opt].name + (' · listo' if provider_ready(opt) else ' · configurar'))
+    elegido = st.selectbox('Motor de IA', opciones, index=opciones.index(default),
+                           format_func=etiqueta, key=key)
+    try:
+        elegido, predeterminado = choose_provider(elegido, area)
+    except Exception as exc:
+        st.warning(str(exc))
+        elegido = 'ollama'
+        predeterminado = PROVIDERS['ollama'].model_default
+    if elegido == 'ollama':
+        instalados = modelo_activo()
+        if not instalados:
+            st.caption('Ollama local no detectado. Ejecutá `ollama serve` y descargá un modelo.')
+        m = st.selectbox('Modelo Ollama', instalados or [predeterminado], key='modelo_' + key)
+    else:
+        m = st.text_input('Modelo de ' + PROVIDERS[elegido].name, value=predeterminado, key='modelo_' + key)
+    st.caption('Modelo seleccionado: ' + PROVIDERS[elegido].name + '. Claves en .env. Pueden aplicarse tarifas y cuotas.')
+    return elegido, m
+
+
+SECCIONES_TECNICAS = [
+    "🏠 Tablero general (v8.0)", "🌐 SKY IA Universal v12.0", "🧠 IA universal", "🧬 Centro multi-IA", "👁️ SKY Visión", "🎨 SKY Studio 3D", "📁 SKY Office Studio", "🧬 SKY Evolución", "🧰 Herramientas SKY", "🔔 SKY Live", "🌐 SKY Metaverso y API", "🎙️ SKY y dispositivos", "💰 Finanzas personales", "🚀 Generar ingresos", "📈 Bolsa y Bitcoin",
+    "📰 Noticias e Internet", "📣 Redes sociales", "🎵 Música y películas", "🎞️ Imágenes y videos",
+    "🔐 Antivirus y hacking ético", "🎓 Educación e investigación", "📚 Biblioteca y memoria",
+    "🧭 BAQUEANO Control Center", "🧾 Transacciones", "📡 Engine Sensor MLP + GRU", "✅ Proyectos y tareas", "⚽ SKY Sports Madridista"
+]
+
 with st.sidebar:
-    st.title("🧠 SKY")
-    st.caption("Universal v10.5 · Asistente privado + metaverso + API")
-    seccion=st.radio("Navegación",SECCIONES, label_visibility="collapsed")
+    st.markdown("### 🧠 SKY Jarvis")
+    st.caption("Asistente Central · 26 módulos internos")
+    
+    modo_interfaz = st.radio(
+        "Modo de Interfaz",
+        ["🎙️ Asistente Unificado (Voz & Chat)", "🛠️ Módulos Técnicos (Modo Dev)"],
+        label_visibility="collapsed"
+    )
+    
+    if modo_interfaz == "🎙️ Asistente Unificado (Voz & Chat)":
+        seccion = "🎙️ Asistente Central"
+        st.caption("🟢 **26 módulos conectados internamente**")
+        ejecucion_dispositivo = st.checkbox("⚡ Ejecución directa en PC", value=True,
+                                            help="Permite a SKY abrir programas y páginas locales cuando se lo pidas.")
+        proveedor_jarvis, modelo_jarvis = elegir_motor('motor_jarvis', 'General')
+    else:
+        st.caption("🛠️ **Explorador de Módulos (Dev):**")
+        seccion_elegida = st.radio("Módulos", SECCIONES_TECNICAS, label_visibility="collapsed")
+        seccion = "🏠 Inicio" if seccion_elegida == "🏠 Tablero general (v8.0)" else seccion_elegida
+        ejecucion_dispositivo = True
+        proveedor_jarvis = 'auto'
+        modelo_jarvis = None
     st.divider()
     import neural_core.sky_supabase as sb
     if sb.is_configured():
@@ -163,27 +212,7 @@ def boton_descarga(texto, nombre, etiqueta="Descargar TXT"):
     st.download_button(etiqueta, data=texto.encode("utf-8"), file_name=nombre, mime="text/plain")
 
 
-def elegir_motor(key, area='General'):
-    """Selector compartido; nunca activa redes ni cuenta doble automáticamente."""
-    opciones=['auto', *PROVIDERS]
-    default='auto'
-    etiqueta=lambda opt: ('Automático — entre los configurados' if opt=='auto'
-                         else PROVIDERS[opt].name + (' · listo' if provider_ready(opt) else ' · configurar'))
-    elegido=st.selectbox('Motor de IA',opciones,index=opciones.index(default),
-                          format_func=etiqueta,key=key)
-    try:
-        elegido, predeterminado=choose_provider(elegido,area)
-    except Exception as exc:
-        st.warning(str(exc))
-        elegido='ollama';predeterminado=PROVIDERS['ollama'].model_default
-    if elegido=='ollama':
-        instalados=modelo_activo()
-        if not instalados: st.caption('Ollama local no detectado. Ejecutá `ollama serve` y descargá un modelo.')
-        m=st.selectbox('Modelo Ollama',instalados or [predeterminado],key='modelo_'+key)
-    else:
-        m=st.text_input('Modelo de '+PROVIDERS[elegido].name,value=predeterminado,key='modelo_'+key)
-    st.caption('Modelo seleccionado: '+PROVIDERS[elegido].name+'. Claves en .env. Pueden aplicarse tarifas y cuotas.')
-    return elegido,m
+
 
 
 def mostrar_chat(area="General", prompt_inicial=None):
@@ -225,7 +254,255 @@ def mostrar_chat(area="General", prompt_inicial=None):
         if respuesta: historia.extend([{'role':'user','content':pregunta},{'role':'assistant','content':respuesta}])
 
 
-if seccion=="🏠 Inicio":
+SECCIONES = SECCIONES_TECNICAS
+
+
+def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
+    st.markdown("""
+    <div style="background: radial-gradient(ellipse at 50% 0%, rgba(23, 63, 98, 0.7) 0%, rgba(10, 23, 41, 0.9) 100%);
+                border: 1px solid rgba(78, 191, 232, 0.35); border-radius: 16px; padding: 24px 28px; margin-bottom: 22px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);">
+        <h1 style="margin: 0; font-size: 2.3rem; color: #ffffff; letter-spacing: -0.5px;">
+            🧠 SKY Universal
+        </h1>
+        <p style="margin: 8px 0 0 0; color: #9fbad0; font-size: 1.05rem;">
+            Asistente inteligente multimodal. Las 26 herramientas (finanzas, visión, 3D, office, control de equipo y agentes) se ejecutan de forma interna bajo demanda por voz o texto.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Indicadores rápidos de estado
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Herramientas internas", "26 activas", help="Finanzas, 3D, Office, Visión, Dispositivo, etc.")
+    with col2:
+        st.metric("Modalidad", "Voz + Texto")
+    with col3:
+        st.metric("Motor activo", PROVIDERS[proveedor].name)
+    with col4:
+        st.metric("Control PC", "Autorizado" if ejecucion_dispositivo else "Solo lectura")
+
+    st.write("")
+
+    # Dictado por voz mediante micrófono
+    with st.expander("🎙️ Dictado por voz (Micrófono)", expanded=False):
+        st.caption("Graba una orden de voz (ej: «SKY, abre YouTube» o «SKY, cómo van mis finanzas») y el sistema la transcribirá y ejecutará:")
+        audio_clip = st.audio_input("Grabar orden de voz", key="jarvis_mic_input")
+        if audio_clip is not None:
+            audio_bytes = audio_clip.read()
+            audio_hash = hashlib.md5(audio_bytes).hexdigest()
+            if st.session_state.get('_last_audio_hash') != audio_hash:
+                st.session_state['_last_audio_hash'] = audio_hash
+                with st.spinner("Transcribiendo orden de voz..."):
+                    try:
+                        transcrito = transcribir_audio(audio_bytes, mime='audio/wav')
+                        st.session_state['_audio_pending_prompt'] = transcrito
+                        st.success(f"Voz reconocida: «{transcrito}»")
+                    except Exception as err:
+                        st.warning(f"No se pudo transcribir audio: {err}. Puedes escribir la orden abajo.")
+
+    # Sugerencias rápidas en píldoras
+    st.markdown("**Acciones rápidas:**")
+    opciones_rapidas = [
+        "Abre YouTube",
+        "Abre la calculadora",
+        "Consulta el estado de mi computadora",
+        "Cómo van mis finanzas este mes",
+        "Calcula 125 * 8",
+        "Noticias de hoy",
+        "Metas de mejora"
+    ]
+    sugerencia_clic = st.pills("Acciones", opciones_rapidas, label_visibility="collapsed")
+
+    # Historial de conversación
+    if "chat_jarvis_history" not in st.session_state:
+        st.session_state.chat_jarvis_history = [
+            {
+                "role": "assistant",
+                "content": "¡Hola Oscar! Soy **SKY**. Todos mis módulos (control de equipo, finanzas, documentos Office, diseño 3D, noticias y cálculo) operan internamente en segundo plano. ¿Qué necesitas que haga?"
+            }
+        ]
+
+    for m in st.session_state.chat_jarvis_history:
+        with st.chat_message(m["role"]):
+            st.markdown(m["content"])
+            if m.get("tipo") == "finanzas" and m.get("datos"):
+                res = m["datos"]
+                if res.get('totales'):
+                    st.dataframe(pd.DataFrame([
+                        {'Moneda': mon, 'Ingresos': vals['ingreso']/100, 'Gastos': vals['gasto']/100, 'Balance': (vals['ingreso']-vals['gasto'])/100}
+                        for mon, vals in res['totales'].items()
+                    ]), hide_index=True)
+
+    # Captura de entrada
+    prompt_usuario = st.chat_input("Escribe una orden a SKY... (ej: 'SKY, abre YouTube', 'calcula 500*12', 'resumen financiero')", submit_mode="disable")
+
+    if not prompt_usuario and st.session_state.get('_audio_pending_prompt'):
+        prompt_usuario = st.session_state.pop('_audio_pending_prompt')
+    elif not prompt_usuario and sugerencia_clic and st.session_state.get('_last_sugerencia_used') != sugerencia_clic:
+        st.session_state['_last_sugerencia_used'] = sugerencia_clic
+        prompt_usuario = sugerencia_clic
+
+    if prompt_usuario:
+        st.session_state.chat_jarvis_history.append({"role": "user", "content": prompt_usuario})
+        with st.chat_message("user"):
+            st.markdown(prompt_usuario)
+
+        with st.chat_message("assistant"):
+            with st.status(":shimmer[SKY ejecutando solicitud...]", type="compact") as status_box:
+                respuesta_texto = ""
+                tipo_extra = None
+                datos_extra = None
+                texto_limpio = norm(prompt_usuario)
+
+                # 1. Comandos de dispositivo (PC)
+                cmd_device = interpret_command(prompt_usuario)
+                if cmd_device:
+                    status_box.update(label=f"Ejecutando acción en PC: {cmd_device['description']}", state="running")
+                    if cmd_device['action'] == 'open_url':
+                        url = cmd_device['params'].get('url')
+                        if ejecucion_dispositivo and url:
+                            import webbrowser
+                            webbrowser.open(url)
+                            respuesta_texto = f"✅ He abierto **{url}** en tu navegador."
+                        else:
+                            respuesta_texto = f"Acción disponible: Abrir enlace `{url}`. (Habilita ejecución directa para abrirlo automáticamente)."
+                    elif cmd_device['action'] == 'launch_app':
+                        app_name = cmd_device['params'].get('app')
+                        if ejecucion_dispositivo and app_name:
+                            try:
+                                from neural_core.windows_controller import launch_authorized_app
+                                res_launch = launch_authorized_app(app_name)
+                                respuesta_texto = f"✅ {res_launch['message']}"
+                            except Exception as err:
+                                respuesta_texto = f"⚠️ {err}"
+                        else:
+                            respuesta_texto = f"Acción propuesta: Abrir {app_name}. (Habilita ejecución directa en PC para iniciar)."
+                    elif cmd_device['action'] == 'window_action':
+                        if ejecucion_dispositivo:
+                            try:
+                                from neural_core.windows_controller import (
+                                    list_user_windows, focus_user_window,
+                                    minimize_user_window, restore_user_window
+                                )
+                                subaction = cmd_device['params'].get('subaction', 'list')
+                                if subaction == 'list':
+                                    wins = list_user_windows()
+                                    if wins:
+                                        lista_t = "\n".join(f"- `{w['title']}`" for w in wins[:10])
+                                        respuesta_texto = f"🖥️ **Ventanas abiertas detectadas:**\n{lista_t}"
+                                    else:
+                                        respuesta_texto = "🖥️ No se detectaron ventanas abiertas de usuario."
+                                elif subaction == 'focus':
+                                    res_f = focus_user_window(cmd_device['params'].get('target', ''))
+                                    respuesta_texto = f"✅ {res_f['message']}"
+                                elif subaction == 'minimize':
+                                    res_m = minimize_user_window(cmd_device['params'].get('target'))
+                                    respuesta_texto = f"✅ {res_m['message']}"
+                                elif subaction == 'restore':
+                                    res_r = restore_user_window(cmd_device['params'].get('target'))
+                                    respuesta_texto = f"✅ {res_r['message']}"
+                            except Exception as err:
+                                respuesta_texto = f"⚠️ Error en ventana: {err}"
+                        else:
+                            respuesta_texto = "Acción sobre ventana propuesta. (Habilita ejecución directa para ejecutarla)."
+                    elif cmd_device['action'] == 'media_key':
+                        if ejecucion_dispositivo:
+                            try:
+                                from agente_dispositivo import send_media_key
+                                send_media_key(cmd_device['params'].get('key', 'play_pause'))
+                                respuesta_texto = f"🎵 Se envió la tecla multimedia `{cmd_device['params'].get('key')}` a Windows."
+                            except Exception as err:
+                                respuesta_texto = f"⚠️ Control multimedia: {err}"
+                        else:
+                            respuesta_texto = f"Tecla multimedia `{cmd_device['params'].get('key')}` propuesta."
+                    elif cmd_device['action'] == 'status':
+                        import platform
+                        respuesta_texto = f"🖥️ **Estado de tu computadora:**\n- Dispositivo: `{platform.node()}`\n- Sistema: `{platform.system()} {platform.release()}`\n- Plataforma: `{platform.platform()}`\n- Agente local: Conectado y operativo."
+
+                # 2. Comandos aritméticos o herramientas locales
+                if not respuesta_texto:
+                    resp_local = interpret_local_command(prompt_usuario)
+                    if resp_local:
+                        status_box.update(label="Herramienta local ejecutada", state="running")
+                        respuesta_texto = resp_local
+
+                # 3. Consulta de finanzas internas
+                if not respuesta_texto and any(w in texto_limpio for w in ['finanzas', 'gastos', 'ingresos', 'balance', 'presupuesto']):
+                    status_box.update(label="Consultando módulo financiero...", state="running")
+                    res_fin = resumen()
+                    tipo_extra = "finanzas"
+                    datos_extra = res_fin
+                    if res_fin and res_fin.get('totales'):
+                        lineas = [f"📊 **Resumen Financiero ({res_fin.get('mes', 'Mes Actual')}):**"]
+                        for mon, vals in res_fin['totales'].items():
+                            ing = vals['ingreso'] / 100
+                            gas = vals['gasto'] / 100
+                            bal = ing - gas
+                            lineas.append(f"- **{mon}:** Ingresos: `${ing:,.2f}` | Gastos: `${gas:,.2f}` | **Balance:** `${bal:,.2f}`")
+                        if res_fin.get('alertas'):
+                            for al in res_fin['alertas']:
+                                lineas.append(f"⚠️ *Alerta en {al['categoria']}*: Has gastado ${al['gasto']} de un límite de ${al['limite']}")
+                        respuesta_texto = "\n".join(lineas)
+                    else:
+                        respuesta_texto = "📊 El motor financiero está activo pero aún no hay transacciones registradas este mes. Puedes registrar ingresos o gastos cuando lo necesites."
+
+                # 4. Consulta de noticias
+                if not respuesta_texto and any(w in texto_limpio for w in ['noticias', 'noticia', 'actualidad']):
+                    status_box.update(label="Consultando noticias en tiempo real...", state="running")
+                    try:
+                        notis = noticias(prompt_usuario[:100], limite=5)
+                        if notis:
+                            lineas = ["📰 **Últimas noticias:**"]
+                            for n in notis:
+                                tit = n.get('titulo') or n.get('titular') or 'Noticia'
+                                url = n.get('url') or n.get('enlace') or '#'
+                                lineas.append(f"- [{tit}]({url})")
+                            respuesta_texto = "\n".join(lineas)
+                    except Exception:
+                        pass
+
+                # 5. Cerebro Multi-IA y memoria
+                if not respuesta_texto:
+                    status_box.update(label=f"Consultando {PROVIDERS[proveedor].name}...", state="running")
+                    historial_modelo = [
+                        {"role": m["role"], "content": m["content"]}
+                        for m in st.session_state.chat_jarvis_history
+                    ]
+                    try:
+                        resp_ia, fuentes = responder(
+                            prompt_usuario,
+                            area="General",
+                            historial=historial_modelo[-6:],
+                            modelo=modelo,
+                            proveedor=proveedor
+                        )
+                        respuesta_texto = resp_ia
+                        if fuentes:
+                            respuesta_texto += f"\n\n*Documentos internos consultados: {', '.join(dict.fromkeys(x['nombre'] for x in fuentes))}*"
+                    except Exception as e:
+                        respuesta_texto = f"Error al consultar el modelo de IA: {e}"
+
+                status_box.update(label="Completado", state="complete")
+
+            st.markdown(respuesta_texto)
+            if tipo_extra == "finanzas" and datos_extra and datos_extra.get('totales'):
+                st.dataframe(pd.DataFrame([
+                    {'Moneda': mon, 'Ingresos': vals['ingreso']/100, 'Gastos': vals['gasto']/100, 'Balance': (vals['ingreso']-vals['gasto'])/100}
+                    for mon, vals in datos_extra['totales'].items()
+                ]), hide_index=True)
+
+            msg_salida = {"role": "assistant", "content": respuesta_texto}
+            if tipo_extra:
+                msg_salida["tipo"] = tipo_extra
+                msg_salida["datos"] = datos_extra
+            st.session_state.chat_jarvis_history.append(msg_salida)
+
+
+if seccion == "🎙️ Asistente Central":
+    render_asistente_jarvis(proveedor_jarvis, modelo_jarvis, ejecucion_dispositivo)
+
+elif seccion == "🏠 Inicio":
     st.title("SKY Universal v8.0")
     st.write("**Un solo SKY:** chat multi-IA, visión por cámara, piezas 3D exportables, memoria, metas de mejora, voz, dispositivos, Engine Sensor y BAQUEANO. Los datos propios se conservan localmente.")
     panel=st.columns(4)

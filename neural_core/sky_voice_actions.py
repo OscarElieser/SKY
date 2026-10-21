@@ -8,9 +8,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .dispositivos import APP_OPTIONS, MEDIA_KEYS, call_device
+from .dispositivos import APP_OPTIONS, MEDIA_KEYS, WINDOW_SUBACTIONS, call_device
 
-SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key"})
+SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key", "window_action"})
 _TOKEN_PATH = Path.home() / ".neuralt" / "device_agent.token"
 
 
@@ -42,6 +42,8 @@ def execute_safe_local(intent: dict) -> str:
         raise ValueError("La aplicación no está autorizada.")
     if action == "media_key" and params.get("key") not in MEDIA_KEYS:
         raise ValueError("Tecla multimedia no autorizada.")
+    if action == "window_action" and params.get("subaction") not in WINDOW_SUBACTIONS:
+        raise ValueError("Subacción de ventana no autorizada.")
     if action == "open_url":
         from urllib.parse import urlsplit
         url = params.get("url")
@@ -57,7 +59,16 @@ def execute_safe_local(intent: dict) -> str:
     if action == "open_url":
         return "He abierto la página en el navegador de tu equipo."
     if action == "launch_app":
-        return "He solicitado abrir la aplicación en tu computadora."
+        return result.get("message") or "He solicitado abrir la aplicación en tu computadora."
     if action == "media_key":
         return "Envié la tecla multimedia a Windows. No puedo confirmar el estado del reproductor."
+    if action == "window_action":
+        subaction = params.get("subaction")
+        if subaction == "list":
+            windows = result.get("windows", [])
+            if not windows:
+                return "No se detectaron ventanas abiertas de usuario."
+            items = "\n".join(f"- {w['title']}" for w in windows[:12])
+            return f"Ventanas abiertas en tu equipo:\n{items}"
+        return result.get("message") or "Acción sobre la ventana completada."
     return "SKY está conectado con tu equipo: " + str(result.get("device", "equipo local")) + "."

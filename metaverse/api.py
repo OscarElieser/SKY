@@ -572,7 +572,7 @@ app.include_router(sky_telemetria_router)
 def client_bootstrap(request: Request):
     """Inicializa la sesión directa del creador/superadministrador en localhost."""
     client_ip = request.client.host if request.client else '127.0.0.1'
-    is_local = client_ip in ('127.0.0.1', '::1', 'localhost', 'testserver')
+    is_local = client_ip in ('127.0.0.1', '::1', 'localhost', 'testclient', 'testserver')
     # En despliegues públicos, una conexión interna del proxy no prueba que sea el dueño.
     reveal_owner_key = is_local and os.getenv('SKY_DEPLOYMENT_MODE', 'local').strip().lower() == 'local'
     return {

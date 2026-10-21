@@ -17,8 +17,14 @@ ACTION_CAPABILITIES = {
     'note_create': 'Crear nota local con confirmación',
     'note_append': 'Agregar texto a nota local con confirmación',
     'note_trash': 'Enviar una nota a la papelera recuperable con confirmación',
+    'window_action': 'Gestionar ventanas abiertas autorizadas en el equipo (Windows)',
 }
-APP_OPTIONS = ['calculator', 'text_editor', 'file_manager', 'browser']
+APP_OPTIONS = [
+    'calculator', 'text_editor', 'file_manager', 'browser',
+    'chrome', 'edge', 'firefox',
+    'word', 'excel', 'powerpoint', 'vscode'
+]
+WINDOW_SUBACTIONS = frozenset({'list', 'focus', 'minimize', 'restore'})
 MEDIA_KEYS = frozenset({'play_pause','next_track','previous_track','volume_up','volume_down','mute'})
 _REGISTRY = Path(__file__).resolve().parent.parent / 'local_data' / 'paired_devices.json'
 
@@ -128,12 +134,59 @@ def interpret_command(text: str):
         return {'action':'note_trash','params':{'name':trash.group(1)},
                 'description':'Mover nota '+trash.group(1)+' a papelera (requiere aprobación)'}
 
-    if re.search(r'\b(abre|abri|abrir|inicia|iniciar|ejecuta|ejecutar)\b', clean):
-        for term, app in [('calculadora', 'calculator'), ('bloc de notas', 'text_editor'),
-                          ('editor de texto', 'text_editor'), ('archivos', 'file_manager'),
-                          ('explorador de archivos', 'file_manager')]:
-            if term in clean:
+    # Comandos de ventanas (Windows)
+    if re.search(r'\b(que\s+ventanas|cuales\s+ventanas|lista(?:r)?\s+(?:las\s+)?ventanas|muestra(?:r)?\s+(?:las\s+)?ventanas|ver\s+ventanas|ventanas\s+abiertas)\b', clean):
+        return {'action': 'window_action', 'params': {'subaction': 'list'}, 'description': 'Listar ventanas abiertas en el equipo'}
+
+    m_focus = re.search(r'\b(?:cambia|cambiar|pasa|pasar|ve|ir|enfoca|enfocar)\s+(?:a\s+)?(?:la\s+)?(?:ventana\s+)?(?:de\s+)?([a-z0-9_\-\. ]{2,50})\b', clean)
+    if m_focus and not re.search(r'\b(abre|abri|abrir|inicia|iniciar|ejecuta|ejecutar)\b', clean):
+        target = m_focus.group(1).strip()
+        return {'action': 'window_action', 'params': {'subaction': 'focus', 'target': target}, 'description': f'Cambiar a la ventana de {target}'}
+
+    m_min = re.search(r'\b(?:minimiza|minimizar)\s+(?:la\s+ventana\s*(?:de\s*)?|ventana\s*(?:de\s*)?)?([a-z0-9_\-\. ]{2,50})?\b', clean)
+    if m_min:
+        raw_t = (m_min.group(1) or '').strip()
+        target = '' if raw_t in ('ventana', 'la ventana', '') else raw_t
+        return {'action': 'window_action', 'params': {'subaction': 'minimize', 'target': target},
+                'description': f'Minimizar ventana {target}' if target else 'Minimizar ventana en primer plano'}
+
+    m_rest = re.search(r'\b(?:restaura|restaurar|maximiza|maximizar)\s+(?:la\s+ventana\s*(?:de\s*)?|ventana\s*(?:de\s*)?)?([a-z0-9_\-\. ]{2,50})?\b', clean)
+    if m_rest:
+        raw_t = (m_rest.group(1) or '').strip()
+        target = '' if raw_t in ('ventana', 'la ventana', '') else raw_t
+        return {'action': 'window_action', 'params': {'subaction': 'restore', 'target': target},
+                'description': f'Restaurar ventana {target}' if target else 'Restaurar ventana'}
+
+    if re.search(r'\b(abre|abri|abrir|inicia|iniciar|ejecuta|ejecutar|lanza|lanzar)\b', clean):
+        app_terms = [
+            ('calculadora', 'calculator'),
+            ('bloc de notas', 'text_editor'),
+            ('editor de texto', 'text_editor'),
+            ('explorador de archivos', 'file_manager'),
+            ('explorador', 'file_manager'),
+            ('archivos', 'file_manager'),
+            ('visual studio code', 'vscode'),
+            ('vs code', 'vscode'),
+            ('vscode', 'vscode'),
+            ('powerpoint', 'powerpoint'),
+            ('presentaciones', 'powerpoint'),
+            ('excel', 'excel'),
+            ('hoja de calculo', 'excel'),
+            ('microsoft word', 'word'),
+            ('word', 'word'),
+            ('google chrome', 'chrome'),
+            ('chrome', 'chrome'),
+            ('microsoft edge', 'edge'),
+            ('edge', 'edge'),
+            ('mozilla firefox', 'firefox'),
+            ('firefox', 'firefox'),
+            ('navegador web', 'browser'),
+            ('navegador', 'browser')
+        ]
+        for term, app in app_terms:
+            if re.search(r'\b' + re.escape(term) + r'\b', clean):
                 return {'action': 'launch_app', 'params': {'app': app}, 'description': f'Abrir {term}'}
+
         sites = {'youtube': 'https://www.youtube.com', 'google': 'https://www.google.com',
                  'baqueano': 'https://baqueanonicaragua.com', 'wikipedia': 'https://www.wikipedia.org'}
         for term, url in sites.items():

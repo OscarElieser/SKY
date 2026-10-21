@@ -9,8 +9,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
-from neural_core.dispositivos import APP_OPTIONS, MEDIA_KEYS
+from neural_core.dispositivos import APP_OPTIONS, MEDIA_KEYS, WINDOW_SUBACTIONS
 from neural_core.sky_notes_local import NOTE_ACTIONS, run_note_action
+from neural_core.windows_controller import (
+    launch_authorized_app, list_user_windows, focus_user_window,
+    minimize_user_window, restore_user_window
+)
 
 CONFIG_DIR = Path.home() / '.neuralt'
 TOKEN_PATH = CONFIG_DIR / 'device_agent.token'
@@ -40,39 +44,20 @@ def audit(action, result):
 
 
 def status():
-    return {'ok':True,'device':platform.node() or 'Equipo local',
-            'platform':platform.system(),'system_version':platform.release(),
-            'capabilities':['status','open_url','launch_app','media_key'] + (sorted(NOTE_ACTIONS) if os.getenv('SKY_NOTES_ENABLED') == '1' else []),
-            'allowed_apps':APP_OPTIONS,
-            'timestamp':datetime.now(timezone.utc).isoformat()}
+    caps = ['status', 'open_url', 'launch_app', 'media_key']
+    if os.getenv('SKY_WINDOW_ACTIONS') == '1':
+        caps.append('window_action')
+    if os.getenv('SKY_NOTES_ENABLED') == '1':
+        caps.extend(sorted(NOTE_ACTIONS))
+    return {'ok': True, 'device': platform.node() or 'Equipo local',
+            'platform': platform.system(), 'system_version': platform.release(),
+            'capabilities': caps,
+            'allowed_apps': APP_OPTIONS,
+            'timestamp': datetime.now(timezone.utc).isoformat()}
 
 
 def launch_app(app):
-    if app not in APP_OPTIONS:
-        raise ValueError('Esta aplicación no está permitida en el agente.')
-    system=platform.system().lower()
-    if system=='windows':
-        mapping={'calculator':['calc.exe'],'text_editor':['notepad.exe'],
-                 'file_manager':['explorer.exe'],'browser':['explorer.exe','https://www.google.com']}
-        subprocess.Popen(mapping[app],shell=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-    elif system=='darwin':
-        mapping={'calculator':'Calculator','text_editor':'TextEdit','file_manager':'Finder','browser':'Safari'}
-        subprocess.Popen(['open','-a',mapping[app]],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-    else:
-        mapping={'calculator':['gnome-calculator','kcalc','mate-calc','galculator'],
-                 'text_editor':['gedit','kate','mousepad','xed'],
-                 'file_manager':['nautilus','thunar','dolphin','nemo'],
-                 'browser':['xdg-open']}
-        if app=='browser':
-            return webbrowser.open('https://www.google.com')
-        success=False
-        for cmd in mapping[app]:
-            try:
-                subprocess.Popen([cmd],shell=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-                success=True; break
-            except FileNotFoundError: continue
-        if not success: raise RuntimeError('No hay una aplicación compatible instalada.')
-    return True
+    return launch_authorized_app(app)
 
 
 def send_media_key(key: str) -> None:
@@ -96,8 +81,20 @@ def execute_action(action,params):
     if action=='status': return status()
     if action=='launch_app':
         app=params.get('app','')
-        launch_app(app)
-        return {'ok':True,'message':'Se solicitó abrir la aplicación '+app}
+        res=launch_app(app)
+        return res if isinstance(res, dict) else {'ok':True,'message':'Se solicitó abrir la aplicación '+app}
+    if action=='window_action':
+        subaction=params.get('subaction','list')
+        if subaction not in WINDOW_SUBACTIONS:
+            raise ValueError('Subacción de ventana no autorizada.')
+        if subaction=='list':
+            return {'ok':True,'windows':list_user_windows()}
+        if subaction=='focus':
+            return focus_user_window(params.get('target',''))
+        if subaction=='minimize':
+            return minimize_user_window(params.get('target'))
+        if subaction=='restore':
+            return restore_user_window(params.get('target'))
     if action in NOTE_ACTIONS:
         return run_note_action(action, params)
     if action=='media_key':
