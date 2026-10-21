@@ -633,7 +633,7 @@ elif seccion=="🎙️ SKY y dispositivos":
             frase=st.text_input('O escribí una orden',key='sky_texto')
             voz_salida=st.checkbox('Reproducir la respuesta en voz española (gTTS)',value=False)
             auto_ejecutar=st.checkbox('Ejecutar directamente acciones simples en el equipo emparejado',value=False,
-                help='Solo estado, páginas HTTPS y aplicaciones permitidas; requiere agente y token activos.')
+                help='Solo estado, HTTPS, aplicaciones y teclas multimedia; las notas siempre necesitan confirmación.')
             enviar=st.form_submit_button('Enviar a SKY',type='primary')
         if enviar and frase.strip():
             st.session_state['sky_entrada']=''
@@ -693,7 +693,10 @@ elif seccion=="🎙️ SKY y dispositivos":
             if not asociado or not tok: st.error('El dispositivo no está disponible o falta su token.')
             else:
                 try:
-                    resultado=call_device(asociado['url'],tok,pendiente['action'],pendiente['params'])
+                    params_para_agente={**pendiente['params']}
+                    if pendiente['action'] in ('note_create','note_append','note_trash'):
+                        params_para_agente['confirmed']=True  # botón pulsado por el usuario
+                    resultado=call_device(asociado['url'],tok,pendiente['action'],params_para_agente)
                     st.json(resultado)
                     st.session_state.pop('sky_pending',None)
                 except Exception as exc: st.error(str(exc))
