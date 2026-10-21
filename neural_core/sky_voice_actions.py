@@ -6,12 +6,29 @@ iniciar el agente en su propio PC. La ejecución manos libres es opt-in.
 from __future__ import annotations
 
 import os
+import urllib.request
+import urllib.error
 from pathlib import Path
 
 from .dispositivos import APP_OPTIONS, MEDIA_KEYS, WINDOW_SUBACTIONS, call_device
 
-SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key", "window_action", "open_file", "player_control", "task_action", "voice_control", "holographic_window"})
+SAFE_ACTIONS = frozenset({
+    "status", "open_url", "launch_app", "media_key", "window_action",
+    "open_file", "player_control", "task_action", "voice_control",
+    "holographic_window", "type_text", "organize_windows"
+})
 _TOKEN_PATH = Path.home() / ".neuralt" / "device_agent.token"
+
+
+def _check_port_active(port: int) -> bool:
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/status")
+        with urllib.request.urlopen(req, timeout=0.3) as resp:
+            return resp.status in (200, 401)
+    except urllib.error.HTTPError as err:
+        return err.code == 401
+    except Exception:
+        return False
 
 
 def local_agent_credentials() -> tuple[str, str]:
@@ -24,7 +41,19 @@ def local_agent_credentials() -> tuple[str, str]:
             pass
     if len(token) < 32:
         raise RuntimeError("El agente local no está emparejado. Iniciá agente_dispositivo.py en esta computadora.")
-    port = int(os.getenv("SKY_DEVICE_PORT") or os.getenv("NEURALT_DEVICE_PORT") or "8765")
+
+    explicit_port = os.getenv("SKY_DEVICE_PORT") or os.getenv("NEURALT_DEVICE_PORT")
+    if explicit_port:
+        port = int(explicit_port)
+    else:
+        # Detectar dinámicamente si 8766 o 8765 responde al agente local
+        if _check_port_active(8766):
+            port = 8766
+        elif _check_port_active(8765):
+            port = 8765
+        else:
+            port = 8766
+
     if not 1 <= port <= 65535:
         raise ValueError("Puerto local inválido.")
     return f"http://127.0.0.1:{port}", token
@@ -42,7 +71,7 @@ def execute_safe_local(intent: dict) -> str:
         raise ValueError("La aplicación no está autorizada.")
     if action == "media_key" and params.get("key") not in MEDIA_KEYS:
         raise ValueError("Tecla multimedia no autorizada.")
-    if action == "window_action" and params.get("subaction") not in WINDOW_SUBACTIONS:
+    if action == "window_action" and params.get("subaction") not in WINDOW_SUBACTIONS and params.get("subaction") != 'organize':
         raise ValueError("Subacción de ventana no autorizada.")
     if action == "open_url":
         from urllib.parse import urlsplit
@@ -64,7 +93,7 @@ def execute_safe_local(intent: dict) -> str:
     if action == "open_url":
         return "He abierto la página en el navegador de tu equipo."
     if action == "launch_app":
-        return result.get("message") or "He solicitado abrir la aplicación en tu computadora."
+        return result.get("message") or f"Listo, ya está abierto: '{params.get('app')}'."
     if action == "media_key":
         return "Envié la tecla multimedia a Windows. No puedo confirmar el estado del reproductor."
     if action == "window_action":
@@ -77,11 +106,15 @@ def execute_safe_local(intent: dict) -> str:
             return f"Ventanas abiertas en tu equipo:\n{items}"
         return result.get("message") or "Acción sobre la ventana completada."
     if action == "open_file":
-        return result.get("message") or "He abierto el archivo o carpeta solicitado en tu equipo."
+        return result.get("message") or "Listo, ya está abierta la carpeta o archivo solicitado."
     if action == "player_control":
         sub = params.get("subaction", "")
         return f"Comando de reproductor recibido ({sub}). Modo actualizado en el asistente."
     if action == "task_action":
         return result.get("message") or "Tarea en segundo plano procesada por SKY-IA."
+    if action == "type_text":
+        return result.get("message") or "Texto escrito en la aplicación activa."
+    if action == "organize_windows":
+        return result.get("message") or "Ventanas organizadas en el escritorio."
 
     return "SKY está conectado con tu equipo: " + str(result.get("device", "equipo local")) + "."

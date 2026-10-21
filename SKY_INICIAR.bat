@@ -15,26 +15,36 @@ echo ==============================================================
 echo                 SKY IA UNIVERSAL - PANEL DE CONTROL           
 echo ==============================================================
 echo.
+echo  [0] Iniciar SKY IA Completo Autonomo (Voz + Agente 8766 + API 8765)
 echo  [1] Iniciar Metaverso y API (Puerto 8765)
 echo  [2] Iniciar Panel de Control Streamlit (Puerto 8501)
 echo  [3] Iniciar Estudio Creativo de Video (Puerto 8765)
 echo  [4] Iniciar Estudio Office de Documentos (Puerto 8765)
-echo  [5] Iniciar Agente de Dispositivo Local
-echo  [6] Ejecutar Diagnostico de Modulos (Preflight)
+echo  [5] Iniciar Agente de Dispositivo Windows (Puerto 8766)
+echo  [6] Diagnostico de Servicios y Puertos (Status)
 echo  [7] Ejecutar Suite de Pruebas (Pytest)
-echo  [8] Salir
+echo  [8] Configurar Inicio Automatico con Windows
+echo  [9] Salir
 echo.
 echo ==============================================================
-set /p opt="Selecciona una opcion (1-8): "
+set /p opt="Selecciona una opcion (0-9): "
 
+if "%opt%"=="0" goto opt_autonomo
 if "%opt%"=="1" goto opt_metaverso
 if "%opt%"=="2" goto opt_streamlit
 if "%opt%"=="3" goto opt_creative
 if "%opt%"=="4" goto opt_office
 if "%opt%"=="5" goto opt_agente
-if "%opt%"=="6" goto opt_preflight
+if "%opt%"=="6" goto opt_status
 if "%opt%"=="7" goto opt_tests
-if "%opt%"=="8" goto opt_salir
+if "%opt%"=="8" goto opt_startup
+if "%opt%"=="9" goto opt_salir
+goto menu
+
+:opt_autonomo
+echo [SKY] Iniciando SKY IA en modo autonomo supervisado...
+".venv\Scripts\python.exe" iniciar_sky_autonomo.py
+pause
 goto menu
 
 :opt_metaverso
@@ -71,8 +81,11 @@ echo [SKY] Iniciando agente de dispositivo...
 pause
 goto menu
 
-:opt_preflight
-echo [SKY] Ejecutando diagnostico preflight...
+:opt_status
+echo [SKY] Ejecutando diagnostico de servicios y puertos...
+".venv\Scripts\python.exe" iniciar_sky_autonomo.py --status
+echo.
+echo [SKY] Ejecutando diagnostico preflight de modulos...
 ".venv\Scripts\python.exe" sky_preflight.py
 pause
 goto menu
@@ -80,6 +93,12 @@ goto menu
 :opt_tests
 echo [SKY] Ejecutando pruebas automatizadas...
 ".venv\Scripts\python.exe" -m pytest tests
+pause
+goto menu
+
+:opt_startup
+echo [SKY] Configurando inicio automatico con Windows (sesion de usuario)...
+".venv\Scripts\python.exe" iniciar_sky_autonomo.py --install-startup
 pause
 goto menu
 

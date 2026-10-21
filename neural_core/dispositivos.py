@@ -24,13 +24,15 @@ ACTION_CAPABILITIES = {
     'task_action': 'Gestionar tareas en segundo plano (presentaciones, documentos, modificaciones)',
     'voice_control': 'Control del flujo conversacional de voz (pausa, ritmo, interrupción, repetición)',
     'holographic_window': 'Control de ventanas holográficas inteligentes alrededor del núcleo 3D',
+    'type_text': 'Escribir texto dentro de una aplicación activa',
+    'organize_windows': 'Organizar y alinear ventanas en el escritorio'
 }
 APP_OPTIONS = [
     'calculator', 'text_editor', 'file_manager', 'browser',
     'chrome', 'edge', 'firefox',
-    'word', 'excel', 'powerpoint', 'vscode'
+    'word', 'excel', 'powerpoint', 'outlook', 'vscode'
 ]
-WINDOW_SUBACTIONS = frozenset({'list', 'focus', 'minimize', 'restore', 'close'})
+WINDOW_SUBACTIONS = frozenset({'list', 'focus', 'minimize', 'restore', 'close', 'organize'})
 MEDIA_KEYS = frozenset({'play_pause','next_track','previous_track','volume_up','volume_down','mute'})
 _REGISTRY = Path(__file__).resolve().parent.parent / 'local_data' / 'paired_devices.json'
 
@@ -64,7 +66,7 @@ def call_device(url: str, token: str, action: str='status', params: dict | None=
             data=payload, headers={'Authorization':'Bearer '+token.strip(), 'Content-Type':'application/json'})
     try:
         with urllib.request.urlopen(req,timeout=timeout) as resp:
-            data=resp.read(16_384)
+            data=resp.read(32_768)
             return json.loads(data)
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f'El agente respondió HTTP {exc.code}: verificá el token y los permisos.') from exc
@@ -72,30 +74,206 @@ def call_device(url: str, token: str, action: str='status', params: dict | None=
         raise RuntimeError('No se pudo conectar. Verificá que el agente y Tailscale estén activos.') from exc
 
 
-def paired_devices():
+DEVICE_PLATFORMS = {
+    'windows': {
+        'name': 'Windows 10/11',
+        'capabilities': [
+            'launch_app', 'open_file', 'window_action', 'media_key',
+            'type_text', 'organize_windows', 'open_url', 'status'
+        ],
+        'requires_elevation': False,
+        'description': 'Automatización interactiva completa de escritorio en sesión de usuario'
+    },
+    'android': {
+        'name': 'Android OS',
+        'capabilities': [
+            'open_url', 'media_key', 'status', 'notification'
+        ],
+        'requires_elevation': False,
+        'description': 'Control mediante asistente en segundo plano y Deep Links autorizados'
+    },
+    'ios': {
+        'name': 'iOS / iPadOS',
+        'capabilities': [
+            'open_url', 'status', 'notification'
+        ],
+        'requires_elevation': False,
+        'description': 'Control mediante URL Schemes y Notificaciones autorizadas'
+    },
+    'macos': {
+        'name': 'macOS',
+        'capabilities': [
+            'launch_app', 'open_url', 'media_key', 'status', 'open_file'
+        ],
+        'requires_elevation': False,
+        'description': 'Automatización de escritorio macOS con permisos de Accesibilidad'
+    },
+    'linux': {
+        'name': 'Linux (Desktop)',
+        'capabilities': [
+            'launch_app', 'open_url', 'media_key', 'status', 'open_file'
+        ],
+        'requires_elevation': False,
+        'description': 'Automatización X11 / Wayland en sesión de usuario'
+    }
+}
+
+
+def log_device_operation(device_name: str, action: str, params: dict, status: str, error: str | None = None) -> dict:
+    """Registra operaciones de dispositivos en bitácora inmutable de auditoría."""
+    entry = {
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'device': device_name,
+        'action': action,
+        'params': {k: v for k, v in (params or {}).items() if not any(s in k.lower() for s in ('token', 'key', 'secret', 'password'))},
+        'status': status,
+        'error': error
+    }
     try:
-        data=json.loads(_REGISTRY.read_text(encoding='utf-8'))
-        if not isinstance(data,list): return []
-        return [x for x in data if isinstance(x,dict) and 'name' in x and 'url' in x][:100]
-    except (OSError,ValueError): return []
+        log_dir = Path.home() / '.neuralt'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / 'device_audit_log.jsonl'
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+    except Exception:
+        pass
+    return entry
 
 
-def save_device(name: str,url: str):
-    name=name.strip()[:80]
-    if not name: raise ValueError('Introducí el nombre del dispositivo.')
-    url=validate_endpoint(url)
-    current=[x for x in paired_devices() if x['name'] != name]
-    current.append({'name':name, 'url':url,'registered_at':datetime.now(timezone.utc).isoformat()})
-    _REGISTRY.parent.mkdir(parents=True,exist_ok=True)
-    _REGISTRY.write_text(json.dumps(current,ensure_ascii=False,indent=2),encoding='utf-8')
-    try: _REGISTRY.chmod(0o600)
-    except OSError: pass
+def pair_device(name: str, url: str, platform: str = 'windows', capabilities: list | None = None) -> dict:
+    """Empareja un nuevo dispositivo de forma segura registrando su plataforma y capacidades autorizadas."""
+    name = name.strip()[:80]
+    if not name:
+        raise ValueError('Introducí el nombre del dispositivo.')
+    url = validate_endpoint(url)
+    plat = platform.lower() if platform.lower() in DEVICE_PLATFORMS else 'windows'
+    caps = capabilities or DEVICE_PLATFORMS[plat]['capabilities']
+
+    current = [x for x in paired_devices(active_only=False) if x.get('name') != name]
+    device_entry = {
+        'name': name,
+        'url': url,
+        'platform': plat,
+        'capabilities': caps,
+        'paired_at': datetime.now(timezone.utc).isoformat(),
+        'revoked': False
+    }
+    current.append(device_entry)
+    _REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    _REGISTRY.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding='utf-8')
+    try:
+        _REGISTRY.chmod(0o600)
+    except OSError:
+        pass
+    return device_entry
+
+
+def revoke_device(name: str) -> bool:
+    """Revoca el acceso de un dispositivo previamente emparejado."""
+    current = paired_devices(active_only=False)
+    found = False
+    for dev in current:
+        if dev.get('name') == name:
+            dev['revoked'] = True
+            dev['revoked_at'] = datetime.now(timezone.utc).isoformat()
+            found = True
+    if found:
+        _REGISTRY.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding='utf-8')
+    return found
+
+
+def paired_devices(active_only: bool = True):
+    try:
+        data = json.loads(_REGISTRY.read_text(encoding='utf-8'))
+        if not isinstance(data, list):
+            return []
+        items = [x for x in data if isinstance(x, dict) and 'name' in x and 'url' in x]
+        if active_only:
+            items = [x for x in items if not x.get('revoked', False)]
+        return items[:100]
+    except (OSError, ValueError):
+        return []
+
+
+def save_device(name: str, url: str):
+    name = name.strip()[:80]
+    if not name:
+        raise ValueError('Introducí el nombre del dispositivo.')
+    url = validate_endpoint(url)
+    current = [x for x in paired_devices(active_only=False) if x['name'] != name]
+    current.append({'name': name, 'url': url, 'registered_at': datetime.now(timezone.utc).isoformat()})
+    _REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    _REGISTRY.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding='utf-8')
+    try:
+        _REGISTRY.chmod(0o600)
+    except OSError:
+        pass
 
 
 def remove_device(name: str):
-    devices=[x for x in paired_devices() if x['name']!=name]
-    _REGISTRY.parent.mkdir(parents=True,exist_ok=True)
-    _REGISTRY.write_text(json.dumps(devices,ensure_ascii=False,indent=2),encoding='utf-8')
+    devices = [x for x in paired_devices(active_only=False) if x['name'] != name]
+    _REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    _REGISTRY.write_text(json.dumps(devices, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+def route_and_execute_device_command(intent: dict, target_device_name: str | None = None, token: str | None = None) -> dict:
+    """Enruta y ejecuta la orden en el dispositivo correspondiente respetando sus capacidades."""
+    target = target_device_name or intent.get('target_device')
+    action = intent.get('action')
+    params = intent.get('params', {})
+
+    # Dispositivo local / predeterminado
+    if not target or norm(target) in ('local', 'esta pc', 'este equipo', 'mi pc', 'mi computadora'):
+        from neural_core.sky_voice_actions import execute_safe_local
+        try:
+            msg = execute_safe_local(intent)
+            log_device_operation('local', action, params, 'SUCCESS')
+            return {'ok': True, 'device': 'local', 'message': msg, 'verified': True}
+        except Exception as exc:
+            log_device_operation('local', action, params, 'FAILED', str(exc))
+            return {'ok': False, 'device': 'local', 'message': str(exc), 'verified': False}
+
+    # Búsqueda en dispositivos emparejados
+    devices = paired_devices()
+    matched = None
+    target_clean = norm(target)
+    for dev in devices:
+        if norm(dev.get('name', '')) == target_clean:
+            matched = dev
+            break
+        if target_clean in norm(dev.get('name', '')):
+            matched = dev
+            break
+
+    if not matched:
+        msg = f"Dispositivo '{target}' no encontrado entre los emparejados autorizados."
+        log_device_operation(target, action, params, 'NOT_FOUND', msg)
+        return {'ok': False, 'device': target, 'message': msg, 'verified': False}
+
+    if matched.get('revoked'):
+        msg = f"El dispositivo '{matched.get('name')}' tiene el acceso revocado."
+        log_device_operation(matched.get('name'), action, params, 'REVOKED', msg)
+        return {'ok': False, 'device': matched.get('name'), 'message': msg, 'verified': False}
+
+    dev_platform = matched.get('platform', 'windows')
+    dev_caps = matched.get('capabilities', DEVICE_PLATFORMS.get(dev_platform, {}).get('capabilities', []))
+    if action not in dev_caps:
+        msg = f"La plataforma {dev_platform.title()} del dispositivo '{matched.get('name')}' no admite la acción '{action}'."
+        log_device_operation(matched.get('name'), action, params, 'CAPABILITY_UNSUPPORTED', msg)
+        return {'ok': False, 'device': matched.get('name'), 'message': msg, 'verified': False}
+
+    if not token or len(token.strip()) < 32:
+        msg = f"Se requiere token de autorización seguro para enviar órdenes a '{matched.get('name')}'."
+        log_device_operation(matched.get('name'), action, params, 'UNAUTHORIZED', msg)
+        return {'ok': False, 'device': matched.get('name'), 'message': msg, 'verified': False}
+
+    try:
+        resp = call_device(matched['url'], token=token, action=action, params=params)
+        log_device_operation(matched.get('name'), action, params, 'SUCCESS')
+        return {'ok': True, 'device': matched.get('name'), 'response': resp, 'verified': True}
+    except Exception as exc:
+        log_device_operation(matched.get('name'), action, params, 'ERROR', str(exc))
+        return {'ok': False, 'device': matched.get('name'), 'message': str(exc), 'verified': False}
 
 
 def norm(s):
@@ -104,7 +282,37 @@ def norm(s):
 
 
 def interpret_command(text: str):
-    """Propone una acción local de bajo riesgo; no ejecuta acciones directamente."""
+    """Interpreta órdenes de voz y texto admitiendo variantes nicaragüenses y universales."""
+    if not text or not str(text).strip():
+        return None
+
+    raw_text = str(text).strip()
+    clean = norm(raw_text)
+    target_device = None
+    EXCLUDED_TARGETS = {
+        'youtube', 'google', 'internet', 'web', 'pantalla completa', 'fullscreen',
+        'mini', 'miniventana', 'facebook', 'instagram', 'tiktok', 'x', 'twitter',
+        'linkedin', 'whatsapp', 'modo mini', 'modo ampliado', 'modo normal',
+        'tiempo real', 'segundo plano', 'documentos', 'descargas', 'escritorio',
+        'imagenes', 'fotos', 'videos', 'musica'
+    }
+    m_target = re.search(r'\b(?:en\s+(?:mi\s+|el\s+|la\s+)?)([a-z0-9_-]{2,25})\s*$', clean)
+    if m_target:
+        candidate = m_target.group(1).strip()
+        if candidate not in EXCLUDED_TARGETS:
+            target_device = candidate
+            sub_text = re.sub(r'\b(?:en\s+(?:mi\s+|el\s+|la\s+)?)' + re.escape(candidate) + r'\s*$', '', raw_text, flags=re.I).strip(' ,.:;')
+            if sub_text:
+                raw_text = sub_text
+
+    res = _interpret_command_core(raw_text)
+    if res and target_device:
+        res['target_device'] = target_device
+    return res
+
+
+def _interpret_command_core(text: str):
+    """Lógica interna de interpretación semántica de órdenes."""
     clean = norm(text.strip())
     if not clean:
         return None
@@ -123,8 +331,16 @@ def interpret_command(text: str):
     if re.search(r'\b(estado|informacion|informacion del|diagnostico|como esta)\b.*\b(equipo|pc|computadora|ordenador|dispositivo)\b', clean):
         return {'action': 'status', 'params': {}, 'description': 'Consultar estado del equipo'}
 
-    # Modos del reproductor SKY (Mini, Ampliado, Pantalla Completa, Normal, Cerrar)
-    if re.search(r'\b(?:muestra|mostrar|mostra|pon|pone|poner|cambia|cambiar|ver|hace|hacer|ponelo|hacelo)?\s*(?:el\s+video\s+|el\s+reproductor\s+)?(?:en\s+)?(?:mini|miniventana|pequeno|mas\s+pequeno|chico|mas\s+chico)\b|\bmodo\s+mini\b|\bmini\s+ventana\b|\bminiventana\b', clean):
+    # Organización de ventanas en Windows ("SKY, organizá las ventanas")
+    if re.search(r'\b(?:organiza|organizar|acomoda|acomodar|ordena|ordenar)\s+(?:las\s+)?ventanas\b', clean):
+        return {
+            'action': 'window_action',
+            'params': {'subaction': 'organize'},
+            'description': 'Organizar ventanas lado a lado en el escritorio'
+        }
+
+    # Modos del reproductor SKY (Mini, Ampliado, Pantalla Completa, Normal, Cerrar, Siguiente, Pausa)
+    if re.search(r'\b(?:deja|dejar)?\s*(?:a\s+|el\s+)?(?:youtube|video|reproductor)\s+(?:en\s+)?(?:mini|miniventana|flotante)\b|\b(?:muestra|mostrar|mostra|pon|pone|poner|cambia|cambiar|ver|hace|hacer|ponelo|hacelo)?\s*(?:el\s+video\s+|el\s+reproductor\s+)?(?:en\s+)?(?:mini|miniventana|pequeno|mas\s+pequeno|chico|mas\s+chico)\b|\bmodo\s+mini\b|\bmini\s+ventana\b|\bminiventana\b', clean):
         return {'action': 'player_control', 'params': {'subaction': 'mode_mini'}, 'description': 'Mostrar reproductor en mini ventana flotante'}
     if re.search(r'\b(?:amplia|ampliar|agranda|agrandar)\s+(?:la\s+)?ventana\b|\bmodo\s+ampliado\b|\bventana\s+ampliada\b|\bver\s+ampliado\b|\bmas\s+grande\b|\bponelo\s+grande\b', clean):
         return {'action': 'player_control', 'params': {'subaction': 'mode_expanded'}, 'description': 'Ampliar reproductor a vista completa'}
@@ -134,8 +350,25 @@ def interpret_command(text: str):
         return {'action': 'player_control', 'params': {'subaction': 'mode_normal'}, 'description': 'Restaurar reproductor a tamaño normal'}
     if re.search(r'\b(?:cierra|cerra|cerrar|quita|quitar|oculta|ocultar)\s+(?:el\s+)?reproductor\b', clean):
         return {'action': 'player_control', 'params': {'subaction': 'close'}, 'description': 'Cerrar reproductor multimedia'}
-    if re.search(r'\b(?:siguiente|proximo|otro)\s+video\b', clean):
-        return {'action': 'player_control', 'params': {'subaction': 'next'}, 'description': 'Reproducir siguiente video'}
+    if 'musica' not in clean and 'cancion' not in clean:
+        if re.search(r'\b(?:pone|pon|poner|pasar?|salta|saltar?)\s+(?:el\s+)?siguiente\b|\b(?:siguiente|proximo|otro)\s+video\b|\bsiguiente\b\s*$', clean):
+            return {'action': 'player_control', 'params': {'subaction': 'next'}, 'description': 'Reproducir siguiente video de la lista'}
+        if re.search(r'\b(?:pone|pon|poner|pasar?|volver?)\s+(?:el\s+)?anterior\b|\b(?:anterior|previo)\s+video\b|\banterior\b\s*$', clean):
+            return {'action': 'player_control', 'params': {'subaction': 'previous'}, 'description': 'Reproducir video anterior de la lista'}
+        if re.search(r'\b(?:pausa|pausar)\s+(?:el\s+)?(?:video|reproductor)\b|\bpausa\b\s*$', clean):
+            return {'action': 'player_control', 'params': {'subaction': 'pause'}, 'description': 'Pausar reproducción'}
+    if re.search(r'\b(?:segui|seguir)\s+(?:reproduciendo|con\s+el\s+video)?\b|\b(?:continua|continuar|reanuda|reanudar)\s+(?:la\s+reproduccion|el\s+video)?\b', clean):
+        return {'action': 'player_control', 'params': {'subaction': 'play'}, 'description': 'Continuar reproducción'}
+    if re.search(r'\b(?:reinicia|reiniciar|desde\s+el\s+principio)\s+(?:el\s+video|la\s+cancion)?\b', clean):
+        return {'action': 'player_control', 'params': {'subaction': 'restart'}, 'description': 'Reiniciar video desde el inicio'}
+
+    # Apertura de carpetas y archivos locales (Documentos, Descargas, Escritorio, Imágenes, Fotos, Videos, Música)
+    m_folder = re.search(r'\b(?:abre|abri|abrir|abreme|abrime|muestra|mostra|mostrar|mostrame|ver|accede|acceder)\s+(?:mi\s+|mis\s+|la\s+|el\s+)?(?:carpeta\s+de\s+|carpeta\s+)?(documentos|descargas|escritorio|imagenes|fotos|videos|musica)\b', clean)
+    if not m_folder:
+        m_folder = re.search(r'\b(?:mis|mi)\s+(documentos|descargas|escritorio|imagenes|fotos|videos|musica)\b', clean)
+    if m_folder:
+        fld = m_folder.group(1).strip()
+        return {'action': 'open_file', 'params': {'target': fld}, 'description': f'Abrir carpeta de {fld}'}
 
     # Comandos de gestión de ventanas holográficas inteligentes alrededor del núcleo 3D
     from neural_core.window_manager import gestor_ventanas
@@ -147,12 +380,13 @@ def interpret_command(text: str):
             'description': win_cmd.get('message', 'Gestionar ventana holográfica')
         }
 
+    # Teclas multimedia nativas
     media_phrases = (
         (r'\b(siguiente|proxima)\b.*\b(cancion|pista|video|tema)\b', 'next_track'),
         (r'\b(anterior|previa)\b.*\b(cancion|pista|video|tema)\b', 'previous_track'),
         (r'\b(sube|subir|subi|aumenta|aumentar)\b.*\bvolumen\b', 'volume_up'),
         (r'\b(baja|bajar|reduce|reducir)\b.*\bvolumen\b', 'volume_down'),
-        (r'\b(silencia|silenciar|mutea|mutear)\b', 'mute'),
+        (r'\b(silencia|silenciar|silencia|mutea|mutear)\b', 'mute'),
         (r'\b(pausa|pausar|reanuda|reanudar|continua|continuar)\b.*\b(musica|video|reproduccion|cancion)\b', 'play_pause'),
         (r'\b(reproduce|reproducir|pausa|reanuda)\b\s*$', 'play_pause'),
     )
@@ -161,7 +395,7 @@ def interpret_command(text: str):
             return {'action': 'media_key', 'params': {'key': key},
                     'description': 'Enviar tecla multimedia ' + key}
 
-    # Únicamente nombres simples; toda escritura se confirma manualmente en el panel.
+    # Creación / edición de notas
     simple = text.strip()
     create = re.fullmatch(r'(?i)(?:sky\s*[,;:]?\s*)?(?:crea|crear)\s+(?:una\s+)?nota\s+([A-Za-z0-9_-]{1,64})\s+(?:que\s+diga|con\s+el\s+texto)\s+(.{1,12000})', simple, re.S)
     if create:
@@ -176,15 +410,17 @@ def interpret_command(text: str):
         return {'action':'note_trash','params':{'name':trash.group(1)},
                 'description':'Mover nota '+trash.group(1)+' a papelera (requiere aprobación)'}
 
-    # Comandos de ventanas (Windows)
+    # Comandos de ventanas reales de Windows
     if re.search(r'\b(que\s+ventanas|cuales\s+ventanas|lista(?:r)?\s+(?:las\s+)?ventanas|muestra(?:r)?\s+(?:las\s+)?ventanas|ver\s+ventanas|ventanas\s+abiertas)\b', clean):
         return {'action': 'window_action', 'params': {'subaction': 'list'}, 'description': 'Listar ventanas abiertas en el equipo'}
 
-    m_focus = re.search(r'\b(?:cambia|cambiar|pasa|pasar|ve|ir|enfoca|enfocar)\s+(?:a\s+)?(?:la\s+)?(?:ventana\s+)?(?:de\s+)?([a-z0-9_\-\. ]{2,50})\b', clean)
+    # Traer al frente ("volvé a Word", "enfocá Chrome")
+    m_focus = re.search(r'\b(?:cambia|cambiar|pasa|pasar|ve|ir|enfoca|enfocar|volve|volver)\s+(?:a\s+)?(?:la\s+)?(?:ventana\s+)?(?:de\s+)?([a-z0-9_\-\. ]{2,50})\b', clean)
     if m_focus and not re.search(r'\b(abre|abri|abrir|inicia|iniciar|ejecuta|ejecutar)\b', clean):
         target = m_focus.group(1).strip()
         return {'action': 'window_action', 'params': {'subaction': 'focus', 'target': target}, 'description': f'Cambiar a la ventana de {target}'}
 
+    # Minimizar ventana ("minimizá Excel", "minimizá la ventana")
     m_min = re.search(r'\b(?:minimiza|minimizar)\s+(?:la\s+ventana\s*(?:de\s*)?|ventana\s*(?:de\s*)?)?([a-z0-9_\-\. ]{2,50})?\b', clean)
     if m_min:
         raw_t = (m_min.group(1) or '').strip()
@@ -192,6 +428,7 @@ def interpret_command(text: str):
         return {'action': 'window_action', 'params': {'subaction': 'minimize', 'target': target},
                 'description': f'Minimizar ventana {target}' if target else 'Minimizar ventana en primer plano'}
 
+    # Restaurar / Maximizar ventana
     m_rest = re.search(r'\b(?:restaura|restaurar|maximiza|maximizar)\s+(?:la\s+ventana\s*(?:de\s*)?|ventana\s*(?:de\s*)?)?([a-z0-9_\-\. ]{2,50})?\b', clean)
     if m_rest:
         raw_t = (m_rest.group(1) or '').strip()
@@ -199,7 +436,8 @@ def interpret_command(text: str):
         return {'action': 'window_action', 'params': {'subaction': 'restore', 'target': target},
                 'description': f'Restaurar ventana {target}' if target else 'Restaurar ventana'}
 
-    m_close = re.search(r'\b(?:cierra|cerrar|cerra)\s+(?:la\s+ventana\s*(?:de\s*)?|ventana\s*(?:de\s*)?|la\s+app\s*(?:de\s*)?|la\s+aplicacion\s*(?:de\s*)?)?([a-z0-9_\-\. ]{2,50})?\b', clean)
+    # Cerrar ventana
+    m_close = re.search(r'\b(?:cierra|cerrar|cerra|cerrame)\s+(?:la\s+ventana\s*(?:de\s*)?|ventana\s*(?:de\s*)?|la\s+app\s*(?:de\s*)?|la\s+aplicacion\s*(?:de\s*)?)?([a-z0-9_\-\. ]{2,50})?\b', clean)
     if m_close and not re.search(r'\b(reproductor|video|musica|cancion)\b', clean):
         raw_t = (m_close.group(1) or '').strip()
         target = '' if raw_t in ('ventana', 'la ventana', 'app', 'la app', '') else raw_t
@@ -230,9 +468,8 @@ def interpret_command(text: str):
         return {'action': 'task_action', 'params': {'subaction': 'create_document', 'topic': topic},
                 'description': f'Crear documento sobre {topic}'}
 
-
     # YouTube y reproducción de medios / música
-    yt_match = re.search(r'\b(?:abre|abrir|abri|pon|pone|poner|reproduce|reproducir|busca|buscar)\s+(?:en\s+)?youtube(?:\s+(?:y\s+)?(?:pon|pone|poner|busca|buscar|con|el\s+video\s+de|la\s+cancion\s+de|de)?\s*(.*))?', clean)
+    yt_match = re.search(r'\b(?:abre|abrir|abri|abrime|pon|pone|poner|poneme|reproduce|reproducir|reproduci|busca|buscar|busca)\s+(?:en\s+)?youtube(?:\s+(?:y\s+)?(?:pon|pone|poner|busca|buscar|con|el\s+video\s+de|la\s+cancion\s+de|de)?\s*(.*))?', clean)
     if not yt_match and 'youtube' in clean and any(w in clean for w in ['pon', 'pone', 'busca', 'reproduce', 'ver']):
         yt_match = re.search(r'\byoutube\s+(?:pon|pone|busca|reproduce|ver)\s+(.*)', clean)
     if yt_match:
@@ -250,9 +487,9 @@ def interpret_command(text: str):
             return {'action': 'open_url', 'params': {'url': 'https://www.youtube.com'}, 'description': 'Abrir https://www.youtube.com'}
 
     # Reproducción multimedia directa (música o videos)
-    m_music = re.search(r'\b(?:pon|pone|poner|reproduce|reproducir|toca|tocar|busca|buscar)\s+(?:musica|canciones|videos|una\s+cancion|cancion|un\s+video|video|el\s+tema|tema)\s*(?:de|a|el|la)?\s*([a-z0-9_\-\. ]{2,80})$', clean)
+    m_music = re.search(r'\b(?:pon|pone|poner|poneme|reproduce|reproducir|reproduci|toca|tocar|busca|buscar)\s+(?:musica|canciones|videos|una\s+cancion|cancion|un\s+video|video|el\s+tema|tema)\s*(?:de|a|el|la)?\s*([a-z0-9_\-\. ]{2,80})$', clean)
     if not m_music:
-        m_music = re.search(r'\b(?:pon|pone|poner|reproduce|reproducir)\s+(?:de\s+|a\s+|el\s+|la\s+)?([a-z0-9_\-\. ]{2,80})$', clean)
+        m_music = re.search(r'\b(?:pon|pone|poner|poneme|reproduce|reproducir|reproduci)\s+(?:de\s+|a\s+|el\s+|la\s+)?([a-z0-9_\-\. ]{2,80})$', clean)
     if m_music and not re.search(r'\b(nota|calculadora|bloc|explorador|ventana|archivo)\b', clean):
         query = m_music.group(1).strip()
         query = re.sub(r'^(?:de|a|el|la)\s+', '', query).strip()
@@ -266,9 +503,9 @@ def interpret_command(text: str):
             }
 
     # Búsqueda en Google / Web
-    m_search = re.search(r'\b(?:busca|buscar|investiga|investigar)\s+(?:en\s+google\s+|en\s+internet\s+|en\s+la\s+web\s+)(.+)', clean)
+    m_search = re.search(r'\b(?:busca|buscar|busca|investiga|investigar)\s+(?:en\s+google\s+|en\s+internet\s+|en\s+la\s+web\s+)(.+)', clean)
     if not m_search:
-        m_search = re.search(r'\b(?:abre|abrir)\s+google\s+y\s+(?:busca|investiga)\s+(.+)', clean)
+        m_search = re.search(r'\b(?:abre|abri|abrir)\s+google\s+y\s+(?:busca|investiga)\s+(.+)', clean)
     if m_search:
         q = m_search.group(1).strip()
         if q:
@@ -320,18 +557,21 @@ def interpret_command(text: str):
             'description': f'Crear publicación para {plat.title()}'
         }
 
-    # Apertura de carpetas y archivos locales (documentos, descargas, pdf, word, excel, imagenes, videos)
-    m_folder = re.search(r'\b(?:abre|abrir|muestra|mostrar)\s+(?:mi\s+)?(?:carpeta\s+de\s+|carpeta\s+)?(documentos|descargas|escritorio|imagenes|fotos|videos|musica)\b', clean)
+    # Apertura de carpetas y archivos locales (Documentos, Descargas, Escritorio, Imágenes, Fotos, Videos, Música)
+    m_folder = re.search(r'\b(?:abre|abri|abrir|abreme|abrime|muestra|mostra|mostrar|mostrame|ver|accede|acceder)\s+(?:mi\s+|mis\s+|la\s+|el\s+)?(?:carpeta\s+de\s+|carpeta\s+)?(documentos|descargas|escritorio|imagenes|fotos|videos|musica)\b', clean)
+    if not m_folder:
+        m_folder = re.search(r'\b(?:mis|mi)\s+(documentos|descargas|escritorio|imagenes|fotos|videos|musica)\b', clean)
     if m_folder:
         fld = m_folder.group(1).strip()
         return {'action': 'open_file', 'params': {'target': fld}, 'description': f'Abrir carpeta de {fld}'}
 
-    m_file = re.search(r'\b(?:abre|abrir|muestra|mostrar)\s+(?:el\s+)?(?:archivo|documento|pdf|informe|reporte|imagen|foto|video|presentacion|hoja\s+de\s+calculo)\s+(?:de\s+|titulado\s+|llamado\s+)?([a-z0-9_\-\. ]{2,80})', clean)
+    m_file = re.search(r'\b(?:abre|abri|abrir|abreme|abrime|muestra|mostra|mostrar|mostrame|busca|buscar)\s+(?:el\s+)?(?:archivo|documento|pdf|informe|reporte|imagen|foto|video|presentacion|hoja\s+de\s+calculo)\s+(?:de\s+|titulado\s+|llamado\s+)?([a-z0-9_\-\. ]{2,80})', clean)
     if m_file:
         fname = m_file.group(1).strip()
         return {'action': 'open_file', 'params': {'target': fname}, 'description': f'Abrir archivo {fname}'}
 
-    if re.search(r'\b(abre|abri|abrir|inicia|iniciar|ejecuta|ejecutar|lanza|lanzar)\b', clean):
+    # Apertura de aplicaciones autorizadas
+    if re.search(r'\b(abre|abri|abrir|abreme|abrime|inicia|iniciar|ejecuta|ejecutar|lanza|lanzar)\b', clean):
         app_terms = [
             ('calculadora', 'calculator'),
             ('bloc de notas', 'text_editor'),
@@ -348,6 +588,9 @@ def interpret_command(text: str):
             ('hoja de calculo', 'excel'),
             ('microsoft word', 'word'),
             ('word', 'word'),
+            ('microsoft outlook', 'outlook'),
+            ('outlook', 'outlook'),
+            ('correo', 'outlook'),
             ('google chrome', 'chrome'),
             ('chrome', 'chrome'),
             ('microsoft edge', 'edge'),
@@ -385,4 +628,5 @@ def interpret_command(text: str):
         if match:
             return {'action': 'open_url', 'params': {'url': match.group(0)},
                     'description': 'Abrir URL indicada'}
+
     return None

@@ -496,10 +496,24 @@ def render_media_card(datos):
               cursor: pointer;
               transition: all 0.2s;
             }}
-            .track-pill:hover, .track-pill.selected {{
-              border-color: #00f2ff;
-              color: #00f2ff;
-              background: rgba(0, 242, 255, 0.15);
+            .progress-bar-container {{
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-top: 8px;
+              padding: 0 4px;
+            }}
+            .progress-bar-container span {{
+              font-size: 0.72rem;
+              color: #79a6d2;
+              font-family: 'Orbitron', monospace;
+              min-width: 38px;
+            }}
+            #seek-bar {{
+              flex: 1;
+              accent-color: #00f2ff;
+              cursor: pointer;
+              height: 4px;
             }}
           </style>
           <script src="https://www.youtube.com/iframe_api"></script>
@@ -524,6 +538,12 @@ def render_media_card(datos):
               <div id="sky-yt-player"></div>
             </div>
 
+            <div class="progress-bar-container">
+              <span id="current-time-label">0:00</span>
+              <input type="range" id="seek-bar" min="0" max="100" value="0" step="0.2" oninput="onSeekInput(this.value)" onchange="onSeekChange(this.value)">
+              <span id="duration-label" style="text-align: right;">0:00</span>
+            </div>
+
             <div id="error-banner" class="error-banner">
               <div id="error-text"></div>
               <div style="margin-top: 6px; display: flex; gap: 8px;">
@@ -533,19 +553,25 @@ def render_media_card(datos):
             </div>
 
             <div class="controls-bar">
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <button class="ctrl-btn" onclick="playPrev()">⏮ Anterior</button>
+              <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+                <button class="ctrl-btn" onclick="playPrev()" title="Video Anterior">⏮ Anterior</button>
+                <button class="ctrl-btn" onclick="seekRelative(-10)" title="Retroceder 10 segundos">⏪ -10s</button>
                 <button class="ctrl-btn ctrl-btn-primary" id="play-pause-btn" onclick="togglePlay()">⏸ Pausar</button>
-                <button class="ctrl-btn" onclick="playNext()">⏭ Siguiente</button>
+                <button class="ctrl-btn" onclick="seekRelative(10)" title="Adelantar 10 segundos">⏩ +10s</button>
+                <button class="ctrl-btn" onclick="playNext()" title="Video Siguiente">⏭ Siguiente</button>
+                <button class="ctrl-btn" onclick="restartVideo()" title="Reiniciar video desde el inicio">🔄 Reiniciar</button>
                 <button class="ctrl-btn" id="mute-btn" onclick="toggleMute()">🔊 Silenciar</button>
+                <span style="font-size: 0.72rem; color: #79a6d2; margin-left: 4px;">Vol:</span>
+                <input type="range" id="volume-slider" min="0" max="100" value="100" style="width: 65px; accent-color: #00f2ff;" oninput="onVolumeChange(this.value)">
               </div>
-              <div>
-                <a class="ctrl-btn" href="{url}" target="_blank">🌐 Ver en YouTube</a>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="ctrl-btn" onclick="toggleFullscreen()">🔲 Completa</button>
+                <a class="ctrl-btn" id="yt-web-link" href="{url}" target="_blank">🌐 YouTube</a>
               </div>
             </div>
 
             <div class="playlist-panel" id="playlist-box">
-              <span class="playlist-label">Versiones Disponibles:</span>
+              <span class="playlist-label">Cola de Reproducción:</span>
             </div>
           </div>
 
@@ -556,6 +582,17 @@ def render_media_card(datos):
             var player;
             var isPlaying = true;
             var isMuted = false;
+            var isSeeking = false;
+
+            // Cola persistente en el navegador
+            try {{
+              if (candidateVideos && candidateVideos.length > 0) {{
+                localStorage.setItem('sky_yt_queue', JSON.stringify(candidateVideos));
+              }} else {{
+                var savedQ = localStorage.getItem('sky_yt_queue');
+                if (savedQ) candidateVideos = JSON.parse(savedQ);
+              }}
+            }} catch(e) {{}}
 
             function onYouTubeIframeAPIReady() {{
               player = new YT.Player('sky-yt-player', {{
@@ -591,6 +628,8 @@ def render_media_card(datos):
               }} else if (event.data === YT.PlayerState.PAUSED) {{
                 isPlaying = false;
                 btn.innerText = "▶ Reanudar";
+              }} else if (event.data === YT.PlayerState.ENDED) {{
+                playNext();
               }}
             }}
 
@@ -601,7 +640,7 @@ def render_media_card(datos):
               banner.style.display = 'block';
 
               if (event.data === 101 || event.data === 150) {{
-                errText.innerHTML = "⚠️ <strong>Restricción del propietario (Error 150/101):</strong> El sello o canal oficial de este video desactivó la reproducción en sitios externos.";
+                errText.innerHTML = "⚠️ <strong>Restricción del propietario (Error 150/101):</strong> El sello oficial desactivó la reproducción directa externa.";
                 if (candidateVideos && candidateVideos.length > currentIndex + 1) {{
                   errText.innerHTML += "<br>🔄 <em>Cambiando automáticamente a versión en vivo autorizada (" + candidateVideos[currentIndex + 1].title + ")...</em>";
                   setTimeout(function() {{
@@ -635,15 +674,78 @@ def render_media_card(datos):
               }} else {{
                 player.mute();
                 isMuted = true;
-                btn.innerText = "🔇 Activar Sonido";
+                btn.innerText = "🔇 Con Sonido";
               }}
             }}
+
+            function onVolumeChange(val) {{
+              if (!player || !player.setVolume) return;
+              player.setVolume(val);
+              if (val == 0) {{
+                isMuted = true;
+                document.getElementById('mute-btn').innerText = "🔇 Con Sonido";
+              }} else if (isMuted) {{
+                isMuted = false;
+                player.unMute();
+                document.getElementById('mute-btn').innerText = "🔊 Silenciar";
+              }}
+            }}
+
+            function seekRelative(deltaSec) {{
+              if (!player || !player.getCurrentTime) return;
+              var cur = player.getCurrentTime();
+              var target = Math.max(0, cur + deltaSec);
+              player.seekTo(target, true);
+            }}
+
+            function restartVideo() {{
+              if (!player) return;
+              player.seekTo(0, true);
+              player.playVideo();
+            }}
+
+            function onSeekInput(val) {{
+              isSeeking = true;
+            }}
+
+            function onSeekChange(val) {{
+              if (!player || !player.getDuration) return;
+              var dur = player.getDuration();
+              if (dur > 0) {{
+                var target = (val / 100.0) * dur;
+                player.seekTo(target, true);
+              }}
+              isSeeking = false;
+            }}
+
+            function formatTime(s) {{
+              var m = Math.floor(s / 60);
+              var sec = Math.floor(s % 60);
+              return m + ":" + (sec < 10 ? "0" : "") + sec;
+            }}
+
+            setInterval(function() {{
+              if (!player || !player.getCurrentTime || !player.getDuration) return;
+              try {{
+                var dur = player.getDuration();
+                var cur = player.getCurrentTime();
+                if (dur > 0) {{
+                  document.getElementById('duration-label').innerText = formatTime(dur);
+                  document.getElementById('current-time-label').innerText = formatTime(cur);
+                  if (!isSeeking) {{
+                    document.getElementById('seek-bar').value = (cur / dur) * 100;
+                  }}
+                }}
+              }} catch(e) {{}}
+            }}, 500);
 
             function loadVideo(id, title, index) {{
               currentVideoId = id;
               currentIndex = index;
+              try {{ localStorage.setItem('sky_yt_idx', index); }} catch(e) {{}}
               document.getElementById('player-title').innerText = title;
               document.getElementById('error-banner').style.display = 'none';
+              document.getElementById('yt-web-link').href = "https://www.youtube.com/watch?v=" + id;
               if (player && player.loadVideoById) {{
                 player.loadVideoById(id);
               }}
@@ -703,15 +805,31 @@ def render_media_card(datos):
             function updatePlaylistUI() {{
               var pl = document.getElementById('playlist-box');
               if (!pl || !candidateVideos || candidateVideos.length === 0) return;
-              pl.innerHTML = '<span class="playlist-label">Versiones Disponibles:</span>';
+              pl.innerHTML = '<span class="playlist-label">Cola de Reproducción:</span>';
               candidateVideos.forEach(function(vid, i) {{
                 var pill = document.createElement('span');
                 pill.className = 'track-pill' + (i === currentIndex ? ' selected' : '');
-                pill.innerText = vid.title;
+                pill.innerText = (i + 1) + ". " + vid.title;
                 pill.onclick = function() {{ loadVideo(vid.id, vid.title, i); }};
                 pl.appendChild(pill);
               }});
             }}
+
+            // Comunicación para órdenes externas o voz
+            window.addEventListener('message', function(ev) {{
+              var data = ev.data;
+              if (!data || typeof data !== 'object') return;
+              if (data.action === 'play') {{ if (player) player.playVideo(); }}
+              else if (data.action === 'pause') {{ if (player) player.pauseVideo(); }}
+              else if (data.action === 'next') {{ playNext(); }}
+              else if (data.action === 'previous') {{ playPrev(); }}
+              else if (data.action === 'mute') {{ toggleMute(); }}
+              else if (data.action === 'restart') {{ restartVideo(); }}
+              else if (data.action === 'mode_mini') {{ setMode('mini'); }}
+              else if (data.action === 'mode_normal') {{ setMode('normal'); }}
+              else if (data.action === 'mode_expanded') {{ setMode('ampliado'); }}
+              else if (data.action === 'close') {{ closePlayer(); }}
+            }});
 
             // Arrastre en modo mini
             var dragHandle = document.getElementById('drag-handle');
@@ -1730,6 +1848,10 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                                 elif subaction == 'close':
                                     res_c = close_user_window(cmd_device['params'].get('target'))
                                     respuesta_texto = f"✅ {res_c['message']}"
+                                elif subaction == 'organize':
+                                    from neural_core.windows_controller import organize_windows
+                                    res_org = organize_windows()
+                                    respuesta_texto = f"✅ {res_org['message']}"
                             except Exception as err:
                                 respuesta_texto = f"⚠️ Error en ventana: {err}"
                         else:

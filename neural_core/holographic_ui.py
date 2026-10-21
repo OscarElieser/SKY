@@ -19,19 +19,29 @@ def generate_holographic_scene_html(
 ) -> str:
     """Genera el documento HTML/Three.js del Núcleo Holográfico 3D interactivo."""
 
-    # Mapeo de estados del coordinador de voz a visuales
+    # Mapeo de estados del coordinador de voz y eventos del backend a visuales
     state_display_map = {
+        # Formatos en español internos
         "ESPERANDO_ACTIVACION": ("En espera", "#00f2ff", "slow"),
         "ESCUCHANDO": ("Escuchando...", "#00ffaa", "pulse"),
         "PROCESANDO": ("Procesando...", "#00c8ff", "fast"),
         "RESPONDIENDO": ("Respondiendo...", "#ffffff", "waves"),
         "EJECUTANDO_HERRAMIENTA": ("Ejecutando...", "#ffaa00", "fast"),
         "ESPERANDO_SIGUIENTE_INTERVENCION": ("Te escucho...", "#00ffaa", "pulse"),
-        "PAUSADO": ("Pausado", "#888888", "idle")
+        "PAUSADO": ("Pausado", "#888888", "idle"),
+        # Formatos estándar backend (IDLE, LISTENING, THINKING, SPEAKING, EXECUTING, SUCCESS, ERROR)
+        "IDLE": ("En espera", "#00f2ff", "slow"),
+        "LISTENING": ("Escuchando...", "#00ffaa", "pulse"),
+        "THINKING": ("Pensando...", "#00c8ff", "fast"),
+        "SPEAKING": ("Hablando...", "#ffffff", "waves"),
+        "EXECUTING": ("Ejecutando...", "#ffaa00", "fast"),
+        "SUCCESS": ("Acción verificada", "#00ff88", "pulse"),
+        "ERROR": ("Atención requerida", "#ff3366", "shake"),
     }
 
+    norm_state = str(voice_state or "").strip().upper()
     state_text, state_color, state_anim = state_display_map.get(
-        voice_state, ("Listo", "#00f2ff", "slow")
+        norm_state, ("Listo", "#00f2ff", "slow")
     )
     now_str = datetime.datetime.now().strftime("%H:%M")
     track_title = active_player_track or "SKY-IA Audio Engine"
@@ -586,16 +596,29 @@ def generate_holographic_scene_html(
       particles.rotation.y = t * 0.12 * speedMult;
 
       // Pulsación de energía en el glifo y esfera
-      if (animState === 'pulse' || animState === 'waves') {{
+      if (animState === 'shake') {{
+        const shake = Math.sin(t * 30.0) * 0.04;
+        centralSphere.position.x = shake;
+        coreLight.color.setHex(0xff3366);
+        coreSphereMat.emissive.setHex(0xff2244);
+        coreLight.intensity = 6.0 + Math.sin(t * 12.0) * 3.0;
+      }} else if (animState === 'pulse' || animState === 'waves') {{
+        centralSphere.position.x = 0;
         const pulse = 1.0 + Math.sin(t * 6.0) * 0.08;
         centralSphere.scale.set(pulse, pulse, pulse);
         deltaGroup.scale.set(pulse * 1.05, pulse * 1.05, pulse * 1.05);
         coreLight.intensity = 5.0 + Math.sin(t * 6.0) * 2.5;
+        if (animState === 'pulse') {{
+          coreLight.color.setHex(0x00ffaa);
+        }}
       }} else {{
+        centralSphere.position.x = 0;
         const gentle = 1.0 + Math.sin(t * 1.5) * 0.02;
         centralSphere.scale.set(gentle, gentle, gentle);
         deltaGroup.scale.set(1, 1, 1);
         coreLight.intensity = 5.0;
+        coreLight.color.setHex(0x00f2ff);
+        coreSphereMat.emissive.setHex(0x00a8ff);
       }}
 
       // Seguimiento de mouse

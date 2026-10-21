@@ -29,12 +29,17 @@ def text_after_wake(text):
 
 
 def main():
+    default_model = Path(__file__).resolve().parent / 'modelos' / 'vosk-model-es'
+    model_exists = default_model.is_dir()
     parser=argparse.ArgumentParser(description='Escucha privada con Vosk; activa con “SKY”.')
-    parser.add_argument('--model',required=True,help='Carpeta descargada del modelo Vosk de español')
+    parser.add_argument('--model', default=str(default_model) if model_exists else None,
+                        required=not model_exists, help='Carpeta descargada del modelo Vosk de español')
     parser.add_argument('--rate',type=int,default=16000)
-    parser.add_argument('--execute-safe',action='store_true',help='Autoriza abrir sitios HTTPS y apps permitidas en el equipo local al oír SKY.')
+    parser.add_argument('--execute-safe',action='store_true',
+                        default=os.getenv('SKY_EXECUTE_SAFE', '1') in ('1', 'true', 'yes'),
+                        help='Autoriza abrir sitios HTTPS y apps permitidas en el equipo local al oír SKY.')
     args=parser.parse_args()
-    if not Path(args.model).is_dir():
+    if not args.model or not Path(args.model).is_dir():
         sys.exit('No existe el modelo Vosk de español. Descargá uno y pasá --model carpeta.')
     try:
         import sounddevice as sd
