@@ -61,3 +61,14 @@ La versión no incluye todavía lectura/escritura de archivos de usuario, envío
 Con el modo seguro autorizado se pueden decir «SKY, pausa la música», «SKY, siguiente canción», «SKY, baja volumen» y «SKY, silencia». Se envían **teclas multimedia nativas de Windows**, sin ejecutar PowerShell ni comandos arbitrarios. La respuesta confirma únicamente que se envió la tecla; no garantiza que exista un reproductor activo ni que cambie su estado. El comando «reproduce» es un alternador reproducir/pausar, no busca títulos o artistas específicos.
 
 Las acciones de crear, modificar o borrar documentos **no están autorizadas en modo manos libres**. Para incorporarlas se debe crear un módulo de documentos con carpeta de trabajo limitada, vista previa, confirmación humana antes de sobrescribir/borrar, copias de seguridad y pruebas que impidan escape de rutas. La fase actual no permite borrar archivos por error de transcripción.
+
+
+## Notas locales (texto y papelera recuperable)
+
+El agente puede crear notas, agregar texto y moverlas a papelera solamente dentro de ~/.neuralt/notes (perfil local de Windows). No accede por este medio a otras carpetas.
+
+Por seguridad viene desactivado. Para activarlo hay que cerrar el agente, ejecutar set SKY_NOTES_ENABLED=1 en una ventana CMD y volver a iniciar el agente desde esa ventana. No se almacena este permiso en el repositorio.
+
+Ejemplos de órdenes: «SKY, crea una nota agenda que diga reunión el lunes», «SKY, agrega a la nota agenda el texto llevar computadora», «SKY, elimina la nota agenda». Cada acción se pone en pendiente y debe revisarse y confirmarse desde el panel de SKY. Incluso con el modo manos libres --execute-safe, las acciones de escritura nunca se ejecutan automáticamente.
+
+El contenido de una nota se limita a 12 000 caracteres por orden y el archivo a 64 KB. No se admiten nombres de ruta, extensión arbitraria ni enlaces simbólicos. La creación no sobrescribe archivos existentes y la eliminación conserva copia recuperable en .trash. No significa que SKY ya pueda editar documentos externos, aplicaciones o correos.
