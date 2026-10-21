@@ -82,7 +82,8 @@ def main():
                 print('Escuchado:',command)
                 intent=interpret_command(command)
                 if intent:
-                    if args.execute_safe:
+                    from neural_core.sky_voice_actions import SAFE_ACTIONS
+                    if args.execute_safe and intent.get('action') in SAFE_ACTIONS:
                         from neural_core.sky_voice_actions import execute_safe_local
                         try:
                             say(execute_safe_local(intent))
