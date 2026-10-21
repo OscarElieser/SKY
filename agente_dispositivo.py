@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
-from neural_core.dispositivos import APP_OPTIONS
+from neural_core.dispositivos import APP_OPTIONS, MEDIA_KEYS
 
 CONFIG_DIR = Path.home() / '.neuralt'
 TOKEN_PATH = CONFIG_DIR / 'device_agent.token'
@@ -41,7 +41,7 @@ def audit(action, result):
 def status():
     return {'ok':True,'device':platform.node() or 'Equipo local',
             'platform':platform.system(),'system_version':platform.release(),
-            'capabilities':['status','open_url','launch_app'],
+            'capabilities':['status','open_url','launch_app','media_key'],
             'allowed_apps':APP_OPTIONS,
             'timestamp':datetime.now(timezone.utc).isoformat()}
 
@@ -74,6 +74,21 @@ def launch_app(app):
     return True
 
 
+def send_media_key(key: str) -> None:
+    """Envía una tecla multimedia nativa. No simula que exista reproducción real."""
+    if key not in MEDIA_KEYS:
+        raise ValueError('Tecla multimedia no autorizada.')
+    if platform.system().lower() != 'windows':
+        raise RuntimeError('El control multimedia local requiere Windows en esta fase.')
+    # Virtual-Key Codes públicos de Windows; sin PowerShell, shell ni inyección de texto.
+    codes = {'play_pause':0xB3, 'next_track':0xB0, 'previous_track':0xB1,
+             'volume_up':0xAF, 'volume_down':0xAE, 'mute':0xAD}
+    import ctypes
+    user32 = ctypes.windll.user32
+    user32.keybd_event(codes[key], 0, 0, 0)
+    user32.keybd_event(codes[key], 0, 0x0002, 0)
+
+
 def execute_action(action,params):
     """Never executes shell commands, scripts, downloads, arbitrary paths or payments."""
     if not isinstance(params,dict): raise ValueError('Parámetros inválidos.')
@@ -82,6 +97,10 @@ def execute_action(action,params):
         app=params.get('app','')
         launch_app(app)
         return {'ok':True,'message':'Se solicitó abrir la aplicación '+app}
+    if action=='media_key':
+        key=params.get('key')
+        send_media_key(key)
+        return {'ok':True,'message':'Tecla multimedia enviada; estado del reproductor no verificable.'}
     if action=='open_url':
         url=str(params.get('url',''))
         p=urlsplit(url)
@@ -119,7 +138,7 @@ class Handler(BaseHTTPRequestHandler):
             body=json.loads(self.rfile.read(length))
             if not isinstance(body,dict): raise ValueError('Formato inválido')
             action=body.get('action','')
-            if action not in ('status','launch_app','open_url'): raise ValueError('Acción no permitida')
+            if action not in ('status','launch_app','open_url','media_key'): raise ValueError('Acción no permitida')
             result=execute_action(action,body.get('params',{}))
             audit(action,'ok')
             return self.reply(200,result)
