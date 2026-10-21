@@ -642,7 +642,7 @@ elif seccion=="🎙️ SKY y dispositivos":
                 ds=paired_devices()
                 elegido=st.session_state.get('sky_dispositivo')
                 if elegido and any(d['name']==elegido for d in ds):
-                    if auto_ejecutar and orden['action'] in ('status','open_url','launch_app'):
+                    if auto_ejecutar and orden['action'] in ('status','open_url','launch_app','media_key'):
                         asociado=next(d for d in ds if d['name']==elegido)
                         tok=st.session_state['sky_tokens'].get(elegido,'')
                         if not tok:
