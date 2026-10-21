@@ -41,3 +41,14 @@ def test_redis_from_url_reads_mounted_password(monkeypatch, tmp_path):
     assert distributed_limits.redis_client() is not None
     assert calls[0][1]["password"] == "test-redis-secret-example"
     monkeypatch.setattr(distributed_limits, "_REDIS", None)
+
+
+def test_public_bootstrap_does_not_reveal_owner_key(monkeypatch):
+    from fastapi.testclient import TestClient
+    from metaverse import api
+    monkeypatch.setattr(api, "api_token", lambda: "should-stay-private-123")
+    client = TestClient(api.app)
+    monkeypatch.setenv("SKY_DEPLOYMENT_MODE", "public")
+    assert client.get("/api/client/bootstrap").json()["key"] == ""
+    monkeypatch.setenv("SKY_DEPLOYMENT_MODE", "local")
+    assert client.get("/api/client/bootstrap").json()["key"] == "should-stay-private-123"
