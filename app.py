@@ -258,63 +258,485 @@ SECCIONES = SECCIONES_TECNICAS
 
 
 def render_media_card(datos):
+    import json
+    import streamlit.components.v1 as components
     url = datos.get('url', '')
     query = datos.get('query', '')
     service = datos.get('service', 'youtube')
     video_id = datos.get('video_id', '')
+    candidates = datos.get('candidates', [])
+    mode = datos.get('mode', 'normal')
+    title = datos.get('title') or (query.title() if query else 'YouTube en Vivo')
 
     if service == 'youtube':
         from neural_core.multimedia import resolve_youtube_video
         if not video_id and query:
             res_v = resolve_youtube_video(query)
             video_id = res_v.get('video_id', '')
+            candidates = res_v.get('candidates', [])
+            title = res_v.get('titulo', query)
             if res_v.get('url') and 'watch?v=' in res_v['url']:
                 url = res_v['url']
-        elif not url or url == 'https://www.youtube.com':
-            res_v = resolve_youtube_video("musica en vivo")
-            video_id = res_v.get('video_id', 'fJ9rUzIMcZQ')
+        elif not url or url == 'https://www.youtube.com' or not video_id:
+            res_v = resolve_youtube_video("Queen")
+            video_id = res_v.get('video_id', 'vbvyNnw8Qjg')
+            candidates = res_v.get('candidates', [])
+            title = res_v.get('titulo', 'Queen – Bohemian Rhapsody (Live Aid 1985)')
             url = res_v.get('url', f"https://www.youtube.com/watch?v={video_id}")
 
-        st.markdown(f"""
-        <div style="background: rgba(5, 14, 30, 0.95); border: 1px solid rgba(0, 242, 255, 0.45);
-                    border-radius: 14px; padding: 14px 18px 8px 18px; margin-top: 12px; margin-bottom: 12px;
-                    box-shadow: 0 0 25px rgba(0, 242, 255, 0.2);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 1.3rem;">🎬</span>
-                    <span style="color: #00f2ff; font-weight: 700; font-family: 'Orbitron', monospace; font-size: 0.95rem; letter-spacing: 0.5px;">
-                        REPRODUCTOR HOLOGRÁFICO SKY JARVIS · {query.upper() if query else 'YOUTUBE EN VIVO'}
-                    </span>
-                </div>
-                <span style="background: rgba(0, 242, 255, 0.15); color: #00f2ff; border: 1px solid #00f2ff; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
-                    🟢 EN PANTALLA & VENTANA ACTIVA
-                </span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        embed_id = video_id or "vbvyNnw8Qjg"
+        candidates_json = json.dumps(candidates if candidates else [
+            {"id": embed_id, "title": title, "embeddable": True, "url": url}
+        ])
 
-        # Reproductor IFrame oficial con strict-origin para cumplimiento de directivas de YouTube
-        import streamlit.components.v1 as components
-        embed_id = video_id or "fJ9rUzIMcZQ"
-        embed_html = f"""
-        <div style="width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid rgba(0, 242, 255, 0.35); box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);">
-            <iframe width="100%" height="420"
-                    src="https://www.youtube-nocookie.com/embed/{embed_id}?autoplay=1&enablejsapi=1&rel=0"
-                    title="{query or 'YouTube Video'}"
-                    frameborder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    referrerpolicy="strict-origin-when-cross-origin"
-                    allowfullscreen>
-            </iframe>
-        </div>
+        # Altura del componente según el modo
+        h_comp = 620 if mode == 'ampliado' else (340 if mode == 'mini' else 495)
+
+        player_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{
+              background: transparent;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              color: #e2f1ff;
+              overflow-x: hidden;
+            }}
+            
+            .player-wrapper {{
+              background: rgba(5, 14, 30, 0.95);
+              border: 1px solid rgba(0, 242, 255, 0.45);
+              border-radius: 14px;
+              padding: 12px 16px;
+              box-shadow: 0 0 30px rgba(0, 242, 255, 0.2);
+              transition: all 0.3s ease;
+              position: relative;
+            }}
+
+            .mode-normal {{
+              width: 100%;
+            }}
+            .mode-normal .video-container {{
+              height: 380px;
+            }}
+
+            .mode-ampliado {{
+              width: 100%;
+            }}
+            .mode-ampliado .video-container {{
+              height: 520px;
+            }}
+
+            .mode-mini {{
+              position: fixed;
+              bottom: 15px;
+              right: 15px;
+              width: 380px;
+              z-index: 999999;
+              border: 2px solid #00f2ff;
+              border-radius: 16px;
+              box-shadow: 0 10px 45px rgba(0, 0, 0, 0.9), 0 0 25px rgba(0, 242, 255, 0.45);
+              background: rgba(4, 12, 26, 0.98);
+            }}
+            .mode-mini .video-container {{
+              height: 200px;
+            }}
+            .mode-mini .playlist-panel {{
+              display: none;
+            }}
+
+            .header-bar {{
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 10px;
+              user-select: none;
+              flex-wrap: wrap;
+              gap: 8px;
+            }}
+            .title-box {{
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              max-width: 55%;
+            }}
+            .title-text {{
+              color: #00f2ff;
+              font-weight: 700;
+              font-size: 0.88rem;
+              letter-spacing: 0.5px;
+              text-shadow: 0 0 8px rgba(0, 242, 255, 0.5);
+            }}
+
+            .mode-btn-group {{
+              display: flex;
+              align-items: center;
+              gap: 5px;
+            }}
+            .mode-btn {{
+              background: rgba(0, 242, 255, 0.12);
+              border: 1px solid rgba(0, 242, 255, 0.35);
+              color: #00f2ff;
+              border-radius: 8px;
+              padding: 3px 8px;
+              font-size: 0.72rem;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.2s;
+            }}
+            .mode-btn:hover, .mode-btn.active {{
+              background: #00f2ff;
+              color: #030a16;
+              box-shadow: 0 0 10px #00f2ff;
+            }}
+
+            .video-container {{
+              width: 100%;
+              border-radius: 10px;
+              overflow: hidden;
+              border: 1px solid rgba(0, 242, 255, 0.3);
+              position: relative;
+              background: #000;
+            }}
+            #sky-yt-player {{
+              width: 100%;
+              height: 100%;
+              border: none;
+            }}
+
+            .error-banner {{
+              display: none;
+              background: rgba(255, 0, 60, 0.15);
+              border: 1px solid #ff003c;
+              border-radius: 10px;
+              padding: 10px 14px;
+              margin-top: 8px;
+              color: #ff99aa;
+              font-size: 0.8rem;
+            }}
+            .error-banner strong {{ color: #ff003c; }}
+
+            .controls-bar {{
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-top: 10px;
+              flex-wrap: wrap;
+              gap: 8px;
+            }}
+            .ctrl-btn {{
+              background: rgba(10, 28, 56, 0.85);
+              border: 1px solid rgba(0, 242, 255, 0.3);
+              color: #e0f2fe;
+              border-radius: 8px;
+              padding: 4px 10px;
+              font-size: 0.76rem;
+              cursor: pointer;
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+              text-decoration: none;
+              transition: all 0.2s;
+            }}
+            .ctrl-btn:hover {{
+              border-color: #00f2ff;
+              color: #00f2ff;
+              box-shadow: 0 0 10px rgba(0, 242, 255, 0.3);
+            }}
+            .ctrl-btn-primary {{
+              background: rgba(0, 242, 255, 0.2);
+              border-color: #00f2ff;
+              color: #00f2ff;
+              font-weight: 700;
+            }}
+
+            .playlist-panel {{
+              margin-top: 8px;
+              padding-top: 8px;
+              border-top: 1px solid rgba(0, 242, 255, 0.2);
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              flex-wrap: wrap;
+            }}
+            .playlist-label {{
+              font-size: 0.7rem;
+              color: #79a6d2;
+              text-transform: uppercase;
+              font-weight: 700;
+            }}
+            .track-pill {{
+              background: rgba(8, 22, 45, 0.7);
+              border: 1px solid rgba(0, 242, 255, 0.25);
+              border-radius: 12px;
+              padding: 2px 8px;
+              font-size: 0.72rem;
+              color: #9cb8d9;
+              cursor: pointer;
+              transition: all 0.2s;
+            }}
+            .track-pill:hover, .track-pill.selected {{
+              border-color: #00f2ff;
+              color: #00f2ff;
+              background: rgba(0, 242, 255, 0.15);
+            }}
+          </style>
+          <script src="https://www.youtube.com/iframe_api"></script>
+        </head>
+        <body>
+          <div id="player-box" class="player-wrapper mode-{mode}">
+            <div id="drag-handle" class="header-bar">
+              <div class="title-box">
+                <span>🎬</span>
+                <span class="title-text" id="player-title">{title}</span>
+              </div>
+              <div class="mode-btn-group">
+                <button class="mode-btn {'active' if mode == 'mini' else ''}" onclick="setMode('mini')">📱 Mini</button>
+                <button class="mode-btn {'active' if mode == 'normal' else ''}" onclick="setMode('normal')">📺 Normal</button>
+                <button class="mode-btn {'active' if mode == 'ampliado' else ''}" onclick="setMode('ampliado')">🖥️ Ampliado</button>
+                <button class="mode-btn" onclick="toggleFullscreen()">🔲 Pantalla Completa</button>
+                <button class="mode-btn" style="border-color: rgba(255, 0, 60, 0.4); color: #ff6688;" onclick="closePlayer()">✕</button>
+              </div>
+            </div>
+
+            <div class="video-container" id="video-box">
+              <div id="sky-yt-player"></div>
+            </div>
+
+            <div id="error-banner" class="error-banner">
+              <div id="error-text"></div>
+              <div style="margin-top: 6px; display: flex; gap: 8px;">
+                <button id="fallback-btn" class="ctrl-btn ctrl-btn-primary" onclick="loadNextCandidate()">🔄 Reproducir versión en vivo autorizada</button>
+                <a id="direct-link-btn" class="ctrl-btn" href="{url}" target="_blank">🖥️ Mirar en YouTube</a>
+              </div>
+            </div>
+
+            <div class="controls-bar">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="ctrl-btn" onclick="playPrev()">⏮ Anterior</button>
+                <button class="ctrl-btn ctrl-btn-primary" id="play-pause-btn" onclick="togglePlay()">⏸ Pausar</button>
+                <button class="ctrl-btn" onclick="playNext()">⏭ Siguiente</button>
+                <button class="ctrl-btn" id="mute-btn" onclick="toggleMute()">🔊 Silenciar</button>
+              </div>
+              <div>
+                <a class="ctrl-btn" href="{url}" target="_blank">🌐 Ver en YouTube</a>
+              </div>
+            </div>
+
+            <div class="playlist-panel" id="playlist-box">
+              <span class="playlist-label">Versiones Disponibles:</span>
+            </div>
+          </div>
+
+          <script>
+            var candidateVideos = {candidates_json};
+            var currentVideoId = "{embed_id}";
+            var currentIndex = 0;
+            var player;
+            var isPlaying = true;
+            var isMuted = false;
+
+            function onYouTubeIframeAPIReady() {{
+              player = new YT.Player('sky-yt-player', {{
+                height: '100%',
+                width: '100%',
+                videoId: currentVideoId,
+                playerVars: {{
+                  'autoplay': 1,
+                  'enablejsapi': 1,
+                  'playsinline': 1,
+                  'rel': 0,
+                  'modestbranding': 1,
+                  'origin': window.location.origin
+                }},
+                events: {{
+                  'onReady': onPlayerReady,
+                  'onStateChange': onPlayerStateChange,
+                  'onError': onPlayerError
+                }}
+              }});
+            }}
+
+            function onPlayerReady(event) {{
+              event.target.playVideo();
+              updatePlaylistUI();
+            }}
+
+            function onPlayerStateChange(event) {{
+              var btn = document.getElementById('play-pause-btn');
+              if (event.data === YT.PlayerState.PLAYING) {{
+                isPlaying = true;
+                btn.innerText = "⏸ Pausar";
+              }} else if (event.data === YT.PlayerState.PAUSED) {{
+                isPlaying = false;
+                btn.innerText = "▶ Reanudar";
+              }}
+            }}
+
+            function onPlayerError(event) {{
+              console.warn("YouTube Player Event Error:", event.data);
+              var banner = document.getElementById('error-banner');
+              var errText = document.getElementById('error-text');
+              banner.style.display = 'block';
+
+              if (event.data === 101 || event.data === 150) {{
+                errText.innerHTML = "⚠️ <strong>Restricción del propietario (Error 150/101):</strong> El sello o canal oficial de este video desactivó la reproducción en sitios externos.";
+                if (candidateVideos && candidateVideos.length > currentIndex + 1) {{
+                  errText.innerHTML += "<br>🔄 <em>Cambiando automáticamente a versión en vivo autorizada (" + candidateVideos[currentIndex + 1].title + ")...</em>";
+                  setTimeout(function() {{
+                    playNext();
+                  }}, 2000);
+                }}
+              }} else if (event.data === 100) {{
+                errText.innerHTML = "⚠️ <strong>Video no disponible o privado (Error 100):</strong> Probando siguiente opción...";
+                setTimeout(function() {{ playNext(); }}, 1500);
+              }} else if (event.data === 2) {{
+                errText.innerHTML = "⚠️ <strong>Parámetro de video no válido (Error 2).</strong>";
+              }}
+            }}
+
+            function togglePlay() {{
+              if (!player) return;
+              if (isPlaying) {{
+                player.pauseVideo();
+              }} else {{
+                player.playVideo();
+              }}
+            }}
+
+            function toggleMute() {{
+              if (!player) return;
+              var btn = document.getElementById('mute-btn');
+              if (isMuted) {{
+                player.unMute();
+                isMuted = false;
+                btn.innerText = "🔊 Silenciar";
+              }} else {{
+                player.mute();
+                isMuted = true;
+                btn.innerText = "🔇 Activar Sonido";
+              }}
+            }}
+
+            function loadVideo(id, title, index) {{
+              currentVideoId = id;
+              currentIndex = index;
+              document.getElementById('player-title').innerText = title;
+              document.getElementById('error-banner').style.display = 'none';
+              if (player && player.loadVideoById) {{
+                player.loadVideoById(id);
+              }}
+              updatePlaylistUI();
+            }}
+
+            function playNext() {{
+              if (!candidateVideos || candidateVideos.length === 0) return;
+              var nextIdx = (currentIndex + 1) % candidateVideos.length;
+              loadVideo(candidateVideos[nextIdx].id, candidateVideos[nextIdx].title, nextIdx);
+            }}
+
+            function playPrev() {{
+              if (!candidateVideos || candidateVideos.length === 0) return;
+              var prevIdx = (currentIndex - 1 + candidateVideos.length) % candidateVideos.length;
+              loadVideo(candidateVideos[prevIdx].id, candidateVideos[prevIdx].title, prevIdx);
+            }}
+
+            function loadNextCandidate() {{
+              playNext();
+            }}
+
+            function setMode(newMode) {{
+              var box = document.getElementById('player-box');
+              box.className = 'player-wrapper mode-' + newMode;
+              document.querySelectorAll('.mode-btn').forEach(function(b) {{
+                b.classList.remove('active');
+                if (b.innerText.toLowerCase().includes(newMode)) {{
+                  b.classList.add('active');
+                }}
+              }});
+            }}
+
+            function toggleFullscreen() {{
+              var elem = document.getElementById('video-box');
+              if (!document.fullscreenElement) {{
+                if (elem.requestFullscreen) {{
+                  elem.requestFullscreen();
+                }} else if (elem.webkitRequestFullscreen) {{
+                  elem.webkitRequestFullscreen();
+                }}
+              }} else {{
+                if (document.exitFullscreen) {{
+                  document.exitFullscreen();
+                }}
+              }}
+            }}
+
+            function closePlayer() {{
+              var box = document.getElementById('player-box');
+              box.style.display = 'none';
+              if (player && player.stopVideo) {{
+                player.stopVideo();
+              }}
+            }}
+
+            function updatePlaylistUI() {{
+              var pl = document.getElementById('playlist-box');
+              if (!pl || !candidateVideos || candidateVideos.length === 0) return;
+              pl.innerHTML = '<span class="playlist-label">Versiones Disponibles:</span>';
+              candidateVideos.forEach(function(vid, i) {{
+                var pill = document.createElement('span');
+                pill.className = 'track-pill' + (i === currentIndex ? ' selected' : '');
+                pill.innerText = vid.title;
+                pill.onclick = function() {{ loadVideo(vid.id, vid.title, i); }};
+                pl.appendChild(pill);
+              }});
+            }}
+
+            // Arrastre en modo mini
+            var dragHandle = document.getElementById('drag-handle');
+            var isDragging = false;
+            var startX, startY, origX, origY;
+            dragHandle.addEventListener('mousedown', function(e) {{
+              var box = document.getElementById('player-box');
+              if (!box.classList.contains('mode-mini')) return;
+              isDragging = true;
+              startX = e.clientX;
+              startY = e.clientY;
+              var rect = box.getBoundingClientRect();
+              origX = rect.left;
+              origY = rect.top;
+              e.preventDefault();
+            }});
+            window.addEventListener('mousemove', function(e) {{
+              if (!isDragging) return;
+              var box = document.getElementById('player-box');
+              var dx = e.clientX - startX;
+              var dy = e.clientY - startY;
+              box.style.right = 'auto';
+              box.style.bottom = 'auto';
+              box.style.left = (origX + dx) + 'px';
+              box.style.top = (origY + dy) + 'px';
+            }});
+            window.addEventListener('mouseup', function() {{
+              isDragging = false;
+            }});
+          </script>
+        </body>
+        </html>
         """
-        components.html(embed_html, height=435)
+        components.html(player_html, height=h_comp)
 
         col_m1, col_m2 = st.columns([1.2, 1.8])
         with col_m1:
-            st.link_button("🖥️ ABRIR EN VENTANA / CHROME", url, type="primary")
+          st.link_button("🖥️ ABRIR EN VENTANA / CHROME", url, type="primary")
         with col_m2:
-            st.caption("🟢 **Ventana activa en Windows**: El video se reproduce según las políticas de YouTube.")
+          st.caption("🟢 **Reproductor YouTube IFrame API**: Modos Mini (flotante), Normal, Ampliado y Pantalla Completa.")
     elif service == 'google':
         st.markdown(f"""
         <div style="background: rgba(5, 14, 30, 0.85); border: 1px solid rgba(0, 168, 255, 0.35);
@@ -446,6 +868,322 @@ def render_archivo_card(datos):
     """, unsafe_allow_html=True)
 
 
+
+
+
+def render_holographic_orb(height=360):
+    import streamlit.components.v1 as components
+    hologram_html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          background: transparent;
+          overflow: hidden;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        #container {
+          position: relative;
+          width: 100%;
+          height: 350px;
+          border-radius: 20px;
+          overflow: hidden;
+          background: radial-gradient(circle at 50% 45%, #08223d 0%, #030d1c 45%, #01040a 85%);
+          border: 1px solid rgba(0, 242, 255, 0.35);
+          box-shadow: 0 0 40px rgba(0, 242, 255, 0.2), inset 0 0 35px rgba(0, 242, 255, 0.08);
+        }
+        canvas {
+          display: block;
+          width: 100%;
+          height: 100%;
+        }
+        .hud-badge {
+          position: absolute;
+          bottom: 16px;
+          left: 50%;
+          transform: translateX(-50%);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: rgba(4, 14, 28, 0.88);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(0, 242, 255, 0.35);
+          border-radius: 24px;
+          padding: 8px 32px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 25px rgba(0, 242, 255, 0.3);
+          user-select: none;
+          pointer-events: none;
+          z-index: 10;
+        }
+        .hud-title {
+          font-family: 'Courier New', monospace;
+          font-size: 13px;
+          font-weight: 900;
+          letter-spacing: 4px;
+          color: #00f2ff;
+          text-shadow: 0 0 14px rgba(0, 242, 255, 0.9);
+        }
+        .hud-status {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 3px;
+        }
+        .hud-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #00f2ff;
+          box-shadow: 0 0 10px #00f2ff;
+          animation: pulseDot 1.8s infinite;
+        }
+        .hud-status-text {
+          font-family: 'Courier New', monospace;
+          font-size: 9px;
+          letter-spacing: 3px;
+          color: #9cb8d9;
+          font-weight: 700;
+        }
+        @keyframes pulseDot {
+          0%, 100% { transform: scale(0.85); opacity: 0.6; }
+          50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 15px #00f2ff, 0 0 25px #00a8ff; }
+        }
+      </style>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    </head>
+    <body>
+      <div id="container">
+        <canvas id="canvas"></canvas>
+        <div class="hud-badge">
+          <div class="hud-title">SKY IA UNIVERSAL</div>
+          <div class="hud-status">
+            <span class="hud-dot"></span>
+            <span class="hud-status-text">SISTEMA CONECTADO</span>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        const container = document.getElementById('container');
+        const canvas = document.getElementById('canvas');
+        const width = container.clientWidth || 800;
+        const height = container.clientHeight || 350;
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x01040a, 0.035);
+
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+        camera.position.set(0, 0, 9.5);
+
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+        // Luces
+        const ambientLight = new THREE.AmbientLight(0x0a2b4a, 1.2);
+        scene.add(ambientLight);
+
+        const cyanPointLight = new THREE.PointLight(0x00f2ff, 4.5, 20);
+        cyanPointLight.position.set(0, 0, 0);
+        scene.add(cyanPointLight);
+
+        const dirLight = new THREE.DirectionalLight(0x00f2ff, 2.0);
+        dirLight.position.set(8, 8, 8);
+        scene.add(dirLight);
+
+        // Grupo principal del holograma
+        const hologramGroup = new THREE.Group();
+        scene.add(hologramGroup);
+
+        // 1. NÚCLEO DE ENERGÍA (Esfera brillante densa en el centro)
+        const coreGeo = new THREE.SphereGeometry(1.4, 48, 48);
+        const coreMat = new THREE.MeshStandardMaterial({
+          color: 0x00f2ff,
+          emissive: 0x00d4ff,
+          emissiveIntensity: 2.8,
+          roughness: 0.15,
+          metalness: 0.85
+        });
+        const innerCore = new THREE.Mesh(coreGeo, coreMat);
+        hologramGroup.add(innerCore);
+
+        // 2. ESTRUCTURA GEOMÉTRICA (Icosaedro wireframe circundante)
+        const shellGeo = new THREE.IcosahedronGeometry(2.35, 2);
+        const shellMat = new THREE.MeshStandardMaterial({
+          color: 0x00f2ff,
+          emissive: 0x00f2ff,
+          emissiveIntensity: 1.4,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.5
+        });
+        const outerShell = new THREE.Mesh(shellGeo, shellMat);
+        hologramGroup.add(outerShell);
+
+        // 3. ANILLOS ORBITALES DE CONTENCIÓN
+        const ringsGroup = new THREE.Group();
+        hologramGroup.add(ringsGroup);
+
+        const ring1Geo = new THREE.TorusGeometry(3.1, 0.02, 16, 120);
+        const ring1Mat = new THREE.MeshStandardMaterial({
+          color: 0x00f2ff,
+          emissive: 0x00f2ff,
+          emissiveIntensity: 3.5
+        });
+        const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
+        ringsGroup.add(ring1);
+
+        const ring2Geo = new THREE.TorusGeometry(3.5, 0.015, 16, 120);
+        const ring2Mat = new THREE.MeshStandardMaterial({
+          color: 0x00f2ff,
+          emissive: 0x00f2ff,
+          emissiveIntensity: 2.2,
+          transparent: true,
+          opacity: 0.7
+        });
+        const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+        ring2.rotation.x = Math.PI / 2.3;
+        ring2.rotation.y = Math.PI / 4.5;
+        ringsGroup.add(ring2);
+
+        const ring3Geo = new THREE.TorusGeometry(3.9, 0.01, 16, 120);
+        const ring3Mat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: 0x88e5ff,
+          emissiveIntensity: 1.5,
+          transparent: true,
+          opacity: 0.4
+        });
+        const ring3 = new THREE.Mesh(ring3Geo, ring3Mat);
+        ring3.rotation.x = Math.PI / 4;
+        ring3.rotation.z = -Math.PI / 4;
+        ringsGroup.add(ring3);
+
+        // 4. PARTÍCULAS / CHISPAS CÓSMICAS ORBITANTES
+        const particleCount = 220;
+        const particleGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount; i++) {
+          const r = 2.8 + Math.random() * 4.5;
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+
+          positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+          positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+          positions[i * 3 + 2] = r * Math.cos(phi);
+
+          if (Math.random() > 0.3) {
+            colors[i * 3] = 0.0;
+            colors[i * 3 + 1] = 0.95;
+            colors[i * 3 + 2] = 1.0;
+          } else {
+            colors[i * 3] = 1.0;
+            colors[i * 3 + 1] = 1.0;
+            colors[i * 3 + 2] = 1.0;
+          }
+        }
+
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const particleMat = new THREE.PointsMaterial({
+          size: 0.075,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.85,
+          blending: THREE.AdditiveBlending
+        });
+        const particleSystem = new THREE.Points(particleGeo, particleMat);
+        hologramGroup.add(particleSystem);
+
+        // Fondo de estrellas lejanas
+        const starCount = 350;
+        const starGeo = new THREE.BufferGeometry();
+        const starPos = new Float32Array(starCount * 3);
+        for (let i = 0; i < starCount; i++) {
+          starPos[i * 3] = (Math.random() - 0.5) * 30;
+          starPos[i * 3 + 1] = (Math.random() - 0.5) * 20;
+          starPos[i * 3 + 2] = (Math.random() - 0.5) * 15 - 5;
+        }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        const starMat = new THREE.PointsMaterial({ size: 0.04, color: 0x69b5e8, transparent: true, opacity: 0.6 });
+        const stars = new THREE.Points(starGeo, starMat);
+        scene.add(stars);
+
+        // Interacción suave con mouse
+        let mouseX = 0, mouseY = 0;
+        let targetX = 0, targetY = 0;
+        container.addEventListener('mousemove', (e) => {
+          const rect = container.getBoundingClientRect();
+          mouseX = ((e.clientX - rect.left) / width - 0.5) * 1.5;
+          mouseY = ((e.clientY - rect.top) / height - 0.5) * 1.5;
+        });
+        container.addEventListener('mouseleave', () => {
+          mouseX = 0;
+          mouseY = 0;
+        });
+
+        // Bucle de animación
+        let clock = new THREE.Clock();
+        function animate() {
+          requestAnimationFrame(animate);
+          const t = clock.getElapsedTime();
+
+          // Rotación caparazón icosaedro
+          outerShell.rotation.y = t * 0.22;
+          outerShell.rotation.x = t * 0.12;
+          outerShell.rotation.z = t * 0.06;
+
+          // Rotación núcleo interno
+          innerCore.rotation.y = -t * 0.45;
+          innerCore.rotation.x = -t * 0.2;
+
+          // Rotación anillos
+          ringsGroup.rotation.x = Math.sin(t * 0.3) * 0.45 + Math.PI / 2.2;
+          ringsGroup.rotation.y = t * 0.35;
+          ringsGroup.rotation.z = t * 0.08;
+
+          // Rotación de partículas
+          particleSystem.rotation.y = t * 0.08;
+          particleSystem.rotation.x = t * 0.04;
+          stars.rotation.y = t * 0.01;
+
+          // Pulsación suave del núcleo
+          const pulse = 1 + Math.sin(t * 2.5) * 0.035;
+          innerCore.scale.set(pulse, pulse, pulse);
+          const shellPulse = 1 + Math.sin(t * 1.8) * 0.02;
+          outerShell.scale.set(shellPulse, shellPulse, shellPulse);
+
+          // Parallax suave con mouse
+          targetX += (mouseX - targetX) * 0.05;
+          targetY += (mouseY - targetY) * 0.05;
+          camera.position.x = targetX * 1.2;
+          camera.position.y = -targetY * 1.2;
+          camera.lookAt(0, 0, 0);
+
+          renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+          const newW = container.clientWidth || 800;
+          const newH = container.clientHeight || 350;
+          camera.aspect = newW / newH;
+          camera.updateProjectionMatrix();
+          renderer.setSize(newW, newH);
+        });
+      </script>
+    </body>
+    </html>
+    """
+    components.html(hologram_html, height=height)
 
 
 def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
@@ -667,28 +1405,9 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
     </style>
     """, unsafe_allow_html=True)
 
-    # Cabecera Arc Reactor Holográfico
-    st.markdown("""
-    <div class="jarvis-hud-container">
-        <div class="arc-reactor-wrapper">
-            <div class="arc-reactor">
-                <div class="arc-ring ring-outer"></div>
-                <div class="arc-ring ring-middle"></div>
-                <div class="arc-ring ring-inner"></div>
-                <div class="arc-core"></div>
-            </div>
-            <div class="jarvis-title-block">
-                <div class="jarvis-system-tag">SYSTEM ID: SKY-JARVIS // MARK VIII // ASISTENTE UNIFICADO</div>
-                <h1 class="jarvis-main-title">SKY NEURAL CORE</h1>
-                <div class="jarvis-sub-title">CONTROL TOTAL DE WINDOWS · MULTIMEDIA DIRECTA · INTELIGENCIA AUTÓNOMA</div>
-            </div>
-            <div class="jarvis-audio-waves">
-                <span></span><span></span><span></span><span></span>
-                <span></span><span></span><span></span><span></span>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # 3D Holographic Orb (KENORA 3D Neural Stage adaptado a SKY IA)
+    render_holographic_orb(height=355)
+
 
     # Deck de Telemetría HUD
     st.markdown(f"""
@@ -799,11 +1518,26 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                         query = cmd_device['params'].get('query', '')
                         service = cmd_device['params'].get('service', 'web')
 
-                        if service == 'youtube' and query:
+                        if service == 'youtube':
                             from neural_core.multimedia import resolve_youtube_video
-                            res_yt = resolve_youtube_video(query)
+                            res_yt = resolve_youtube_video(query or 'Queen')
                             if res_yt.get('url') and 'watch?v=' in res_yt['url']:
                                 url = res_yt['url']
+                            video_id = res_yt.get('video_id', '')
+                            candidates = res_yt.get('candidates', [])
+                            title = res_yt.get('titulo', query or 'Queen')
+                            cur_mode = st.session_state.get('sky_player_mode', 'normal')
+
+                            datos_extra = {
+                                'url': url,
+                                'query': query,
+                                'service': 'youtube',
+                                'video_id': video_id,
+                                'candidates': candidates,
+                                'title': title,
+                                'mode': cur_mode
+                            }
+                            st.session_state['sky_current_player'] = datos_extra
 
                         if ejecucion_dispositivo and url:
                             import webbrowser
@@ -816,11 +1550,10 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
 
                             if service == 'youtube':
                                 if query:
-                                    respuesta_texto = f"🎬 **SKY JARVIS**: He abierto YouTube en Windows y cargué el video de **«{query}»** directamente en tu pantalla."
+                                    respuesta_texto = f"🎬 **SKY JARVIS**: He cargado **«{title}»** en el reproductor integrado oficial de SKY (con controles, selección de versiones y modos)."
                                 else:
-                                    respuesta_texto = "🎬 **SKY JARVIS**: He abierto YouTube en tu navegador y en el reproductor del sistema."
+                                    respuesta_texto = "🎬 **SKY JARVIS**: He abierto YouTube en el reproductor integrado de SKY."
                                 tipo_extra = "media"
-                                datos_extra = {'url': url, 'query': query, 'service': 'youtube'}
                             elif service == 'google':
                                 respuesta_texto = f"🔍 **SKY JARVIS**: He abierto la búsqueda de Google para **«{query}»** en tu navegador."
                                 tipo_extra = "media"
@@ -880,6 +1613,69 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                                 respuesta_texto = f"⚠️ Control multimedia: {err}"
                         else:
                             respuesta_texto = f"Tecla multimedia `{cmd_device['params'].get('key')}` propuesta."
+                    elif cmd_device['action'] == 'player_control':
+                        subact = cmd_device['params'].get('subaction', 'mode_normal')
+                        cur_p = st.session_state.get('sky_current_player') or {
+                            'url': 'https://www.youtube.com/watch?v=vbvyNnw8Qjg',
+                            'query': 'Queen',
+                            'service': 'youtube',
+                            'video_id': 'vbvyNnw8Qjg',
+                            'title': 'Queen – Bohemian Rhapsody (Live Aid 1985)',
+                            'candidates': [
+                                {'id': 'vbvyNnw8Qjg', 'title': 'Queen – Bohemian Rhapsody (Live Aid 1985)', 'embeddable': True},
+                                {'id': 'frdBb9Slu1A', 'title': 'Queen – Live Aid 1985 Full Concert', 'embeddable': True},
+                                {'id': 'PadKCVBIN94', 'title': 'Queen – Bohemian Rhapsody (1981 Live Video)', 'embeddable': True},
+                                {'id': 'HgzGwKwLmgM', 'title': "Queen – Don't Stop Me Now", 'embeddable': True}
+                            ]
+                        }
+                        if subact == 'mode_mini':
+                            st.session_state['sky_player_mode'] = 'mini'
+                            cur_p['mode'] = 'mini'
+                            respuesta_texto = "🎬 **SKY JARVIS**: He cambiado el reproductor a modo **Mini ventana flotante (PiP)**. Puedes moverlo y continuar navegando."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        elif subact == 'mode_expanded':
+                            st.session_state['sky_player_mode'] = 'ampliado'
+                            cur_p['mode'] = 'ampliado'
+                            respuesta_texto = "🎬 **SKY JARVIS**: He ampliado el reproductor a **Modo Cine (Pantalla Ancha)**."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        elif subact == 'mode_fullscreen':
+                            st.session_state['sky_player_mode'] = 'ampliado'
+                            cur_p['mode'] = 'ampliado'
+                            respuesta_texto = "🎬 **SKY JARVIS**: Activando modo **Pantalla Completa**. Puedes utilizar el botón 🔲 en los controles del reproductor."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        elif subact == 'mode_normal':
+                            st.session_state['sky_player_mode'] = 'normal'
+                            cur_p['mode'] = 'normal'
+                            respuesta_texto = "🎬 **SKY JARVIS**: He restaurado el reproductor a **Tamaño Normal**."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        elif subact == 'close':
+                            st.session_state['sky_current_player'] = None
+                            respuesta_texto = "🎬 **SKY JARVIS**: He cerrado el reproductor multimedia."
+                        elif subact == 'next':
+                            cands = cur_p.get('candidates', [])
+                            if cands:
+                                cur_p['candidates'] = cands[1:] + [cands[0]]
+                                cur_p['video_id'] = cur_p['candidates'][0]['id']
+                                cur_p['title'] = cur_p['candidates'][0]['title']
+                                cur_p['url'] = f"https://www.youtube.com/watch?v={cur_p['video_id']}"
+                            respuesta_texto = f"⏭️ **SKY JARVIS**: Saltando al siguiente video: **{cur_p.get('title')}**."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        elif subact in ('pause', 'play'):
+                            try:
+                                from agente_dispositivo import send_media_key
+                                send_media_key('play_pause')
+                            except Exception:
+                                pass
+                            respuesta_texto = f"⏯️ **SKY JARVIS**: {'Pausando' if subact == 'pause' else 'Reanudando'} reproducción."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        if subact != 'close':
+                            st.session_state['sky_current_player'] = cur_p
                     elif cmd_device['action'] == 'open_file':
                         if ejecucion_dispositivo:
                             try:

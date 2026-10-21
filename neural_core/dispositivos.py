@@ -20,6 +20,7 @@ ACTION_CAPABILITIES = {
     'window_action': 'Gestionar ventanas abiertas autorizadas en el equipo (Windows)',
     'open_file': 'Abrir documentos o carpetas locales en el equipo (Windows)',
     'social_action': 'Gestionar publicaciones, mensajes y comentarios en redes sociales',
+    'player_control': 'Control del reproductor de video (modos, tamaño, pausa, cerrar)',
 }
 APP_OPTIONS = [
     'calculator', 'text_editor', 'file_manager', 'browser',
@@ -107,11 +108,25 @@ def interpret_command(text: str):
     if re.search(r'\b(estado|informacion|informacion del|diagnostico|como esta)\b.*\b(equipo|pc|computadora|ordenador|dispositivo)\b', clean):
         return {'action': 'status', 'params': {}, 'description': 'Consultar estado del equipo'}
 
+    # Modos del reproductor SKY (Mini, Ampliado, Pantalla Completa, Normal, Cerrar)
+    if re.search(r'\b(?:muestra|mostrar|pon|poner|cambia|cambiar|ver)?\s*(?:el\s+video\s+)?en\s+mini\b|\bmodo\s+mini\b|\bmini\s+ventana\b|\bminiventana\b', clean):
+        return {'action': 'player_control', 'params': {'subaction': 'mode_mini'}, 'description': 'Mostrar reproductor en mini ventana flotante'}
+    if re.search(r'\b(?:amplia|ampliar|agranda|agrandar)\s+(?:la\s+)?ventana\b|\bmodo\s+ampliado\b|\bventana\s+ampliada\b|\bver\s+ampliado\b', clean):
+        return {'action': 'player_control', 'params': {'subaction': 'mode_expanded'}, 'description': 'Ampliar reproductor a vista completa'}
+    if re.search(r'\b(?:pantalla\s+completa|fullscreen|ponelo\s+en\s+pantalla\s+completa|pon\s+pantalla\s+completa)\b', clean):
+        return {'action': 'player_control', 'params': {'subaction': 'mode_fullscreen'}, 'description': 'Activar pantalla completa en el reproductor'}
+    if re.search(r'\b(?:tamano\s+normal|modo\s+normal|volver\s+al\s+tamano\s+normal|volve\s+al\s+tamano\s+normal|restaura\s+tamano)\b', clean):
+        return {'action': 'player_control', 'params': {'subaction': 'mode_normal'}, 'description': 'Restaurar reproductor a tamaño normal'}
+    if re.search(r'\b(?:cierra|cerra|cerrar|quita|quitar|oculta|ocultar)\s+(?:el\s+)?reproductor\b', clean):
+        return {'action': 'player_control', 'params': {'subaction': 'close'}, 'description': 'Cerrar reproductor multimedia'}
+    if re.search(r'\b(?:siguiente|proximo|otro)\s+video\b', clean):
+        return {'action': 'player_control', 'params': {'subaction': 'next'}, 'description': 'Reproducir siguiente video'}
+
     media_phrases = (
         (r'\b(siguiente|proxima)\b.*\b(cancion|pista|video|tema)\b', 'next_track'),
         (r'\b(anterior|previa)\b.*\b(cancion|pista|video|tema)\b', 'previous_track'),
-        (r'\b(sube|subir|aumenta)\b.*\bvolumen\b', 'volume_up'),
-        (r'\b(baja|bajar|reduce)\b.*\bvolumen\b', 'volume_down'),
+        (r'\b(sube|subir|subi|aumenta|aumentar)\b.*\bvolumen\b', 'volume_up'),
+        (r'\b(baja|bajar|reduce|reducir)\b.*\bvolumen\b', 'volume_down'),
         (r'\b(silencia|silenciar|mutea|mutear)\b', 'mute'),
         (r'\b(pausa|pausar|reanuda|reanudar|continua|continuar)\b.*\b(musica|video|reproduccion|cancion)\b', 'play_pause'),
         (r'\b(reproduce|reproducir|pausa|reanuda)\b\s*$', 'play_pause'),
@@ -160,12 +175,12 @@ def interpret_command(text: str):
                 'description': f'Restaurar ventana {target}' if target else 'Restaurar ventana'}
 
     # YouTube y reproducción de medios / música
-    yt_match = re.search(r'\b(?:abre|abrir|abri|pon|poner|reproduce|reproducir|busca|buscar)\s+(?:en\s+)?youtube(?:\s+(?:y\s+)?(?:pon|poner|busca|buscar|con|el\s+video\s+de|la\s+cancion\s+de|de)?\s*(.*))?', clean)
-    if not yt_match and 'youtube' in clean and any(w in clean for w in ['pon', 'busca', 'reproduce', 'ver']):
-        yt_match = re.search(r'\byoutube\s+(?:pon|busca|reproduce|ver)\s+(.*)', clean)
+    yt_match = re.search(r'\b(?:abre|abrir|abri|pon|pone|poner|reproduce|reproducir|busca|buscar)\s+(?:en\s+)?youtube(?:\s+(?:y\s+)?(?:pon|pone|poner|busca|buscar|con|el\s+video\s+de|la\s+cancion\s+de|de)?\s*(.*))?', clean)
+    if not yt_match and 'youtube' in clean and any(w in clean for w in ['pon', 'pone', 'busca', 'reproduce', 'ver']):
+        yt_match = re.search(r'\byoutube\s+(?:pon|pone|busca|reproduce|ver)\s+(.*)', clean)
     if yt_match:
         raw_query = (yt_match.group(1) or '').strip()
-        raw_query = re.sub(r'^(?:y\s+pon|y\s+reproduce|pon|reproduce|busca|con|de)\s+', '', raw_query).strip()
+        raw_query = re.sub(r'^(?:y\s+pon|y\s+pone|y\s+reproduce|pon|pone|reproduce|busca|con|de)\s+', '', raw_query).strip()
         if raw_query:
             encoded = urllib.parse.quote_plus(raw_query)
             url = f"https://www.youtube.com/results?search_query={encoded}"
@@ -178,7 +193,9 @@ def interpret_command(text: str):
             return {'action': 'open_url', 'params': {'url': 'https://www.youtube.com'}, 'description': 'Abrir https://www.youtube.com'}
 
     # Reproducción multimedia directa (música o videos)
-    m_music = re.search(r'\b(?:pon|poner|reproduce|reproducir|toca|tocar)\s+(?:musica|una\s+cancion|cancion|un\s+video|video|el\s+tema|tema)?\s*(?:de|a|el|la)?\s*([a-z0-9_\-\. ]{2,80})$', clean)
+    m_music = re.search(r'\b(?:pon|pone|poner|reproduce|reproducir|toca|tocar|busca|buscar)\s+(?:musica|canciones|videos|una\s+cancion|cancion|un\s+video|video|el\s+tema|tema)\s*(?:de|a|el|la)?\s*([a-z0-9_\-\. ]{2,80})$', clean)
+    if not m_music:
+        m_music = re.search(r'\b(?:pon|pone|poner|reproduce|reproducir)\s+(?:de\s+|a\s+|el\s+|la\s+)?([a-z0-9_\-\. ]{2,80})$', clean)
     if m_music and not re.search(r'\b(nota|calculadora|bloc|explorador|ventana|archivo)\b', clean):
         query = m_music.group(1).strip()
         query = re.sub(r'^(?:de|a|el|la)\s+', '', query).strip()

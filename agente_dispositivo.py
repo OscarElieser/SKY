@@ -112,6 +112,9 @@ def execute_action(action,params):
         target = str(params.get('target', ''))
         from neural_core.windows_controller import open_local_file_or_folder
         return open_local_file_or_folder(target)
+    if action=='player_control':
+        sub = str(params.get('subaction', 'mode_normal'))
+        return {'ok': True, 'message': f'Modo de reproductor SKY actualizado a {sub}.'}
     raise ValueError('Acción no permitida.')
 
 

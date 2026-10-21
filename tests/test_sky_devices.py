@@ -105,3 +105,53 @@ def test_transcripcion_rechaza_formatos(monkeypatch):
     from neural_core import voz
     with pytest.raises(ValueError): voz.transcribir_audio(b'', 'audio/wav')
     with pytest.raises(ValueError): voz.transcribir_audio(b'datos','audio/mpeg')
+
+
+def test_resolve_youtube_queen_embeddable():
+    from neural_core.multimedia import resolve_youtube_video, KNOWN_EMBEDDING_BLOCKED
+    res = resolve_youtube_video("Queen")
+    assert res["video_id"] not in KNOWN_EMBEDDING_BLOCKED
+    assert res["embeddable"] is True
+    assert len(res["candidates"]) >= 2
+    assert "vbvyNnw8Qjg" in [c["id"] for c in res["candidates"]]
+
+
+def test_interpret_player_control_modes():
+    from neural_core.dispositivos import interpret_command
+    m1 = interpret_command("SKY, mostrá el video en mini")
+    assert m1["action"] == "player_control"
+    assert m1["params"]["subaction"] == "mode_mini"
+
+    m2 = interpret_command("SKY, ampliá la ventana")
+    assert m2["action"] == "player_control"
+    assert m2["params"]["subaction"] == "mode_expanded"
+
+    m3 = interpret_command("SKY, ponelo en pantalla completa")
+    assert m3["action"] == "player_control"
+    assert m3["params"]["subaction"] == "mode_fullscreen"
+
+    m4 = interpret_command("SKY, volvé al tamaño normal")
+    assert m4["action"] == "player_control"
+    assert m4["params"]["subaction"] == "mode_normal"
+
+    m5 = interpret_command("SKY, cerrá el reproductor")
+    assert m5["action"] == "player_control"
+    assert m5["params"]["subaction"] == "close"
+
+    m6 = interpret_command("SKY, siguiente video")
+    assert m6["action"] == "player_control"
+    assert m6["params"]["subaction"] == "next"
+
+    m7 = interpret_command("SKY, poné música de Queen")
+    assert m7["action"] == "open_url"
+    assert "queen" in m7["params"]["query"].lower()
+
+    m8 = interpret_command("SKY, poné Bohemian Rhapsody")
+    assert m8["action"] == "open_url"
+    assert "bohemian rhapsody" in m8["params"]["query"].lower()
+
+    m9 = interpret_command("SKY, buscá videos de Queen")
+    assert m9["action"] == "open_url"
+    assert "queen" in m9["params"]["query"].lower()
+
+
