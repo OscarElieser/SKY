@@ -138,6 +138,8 @@ def execute_action(action,params):
             return {'ok': True, 'task_id': t.id, 'message': f"Preparando documento sobre «{topic}»."}
     if action=='voice_control':
         return {'ok': True, 'message': params.get('message', 'Comando conversacional procesado')}
+    if action=='holographic_window':
+        return {'ok': True, 'message': params.get('message', 'Ventana holográfica actualizada')}
     raise ValueError('Acción no permitida.')
 
 
@@ -168,7 +170,7 @@ class Handler(BaseHTTPRequestHandler):
             body=json.loads(self.rfile.read(length))
             if not isinstance(body,dict): raise ValueError('Formato inválido')
             action=body.get('action','')
-            if action not in ('status','launch_app','open_url','media_key',*NOTE_ACTIONS): raise ValueError('Acción no permitida')
+            if action not in ('status','launch_app','open_url','media_key','player_control','task_action','voice_control','holographic_window',*NOTE_ACTIONS): raise ValueError('Acción no permitida')
             result=execute_action(action,body.get('params',{}))
             audit(action,'ok')
             return self.reply(200,result)

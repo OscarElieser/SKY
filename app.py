@@ -122,68 +122,83 @@ SECCIONES_TECNICAS = [
     "🧭 BAQUEANO Control Center", "🧾 Transacciones", "📡 Engine Sensor MLP + GRU", "✅ Proyectos y tareas", "⚽ SKY Sports Madridista"
 ]
 
-with st.sidebar:
-    st.markdown("### 🧠 SKY-IA")
-    st.caption("Asistente Central · 26 módulos internos")
-    
-    modo_interfaz = st.radio(
-        "Modo de Interfaz",
-        ["🎙️ Asistente Unificado (Voz & Chat)", "🛠️ Módulos Técnicos (Modo Dev)"],
-        label_visibility="collapsed"
-    )
-    
-    if modo_interfaz == "🎙️ Asistente Unificado (Voz & Chat)":
-        seccion = "🎙️ Asistente Central"
-        st.caption("🟢 **26 módulos conectados internamente**")
-        ejecucion_dispositivo = st.checkbox("⚡ Ejecución directa en PC", value=True,
-                                            help="Permite a SKY abrir programas y páginas locales cuando se lo pidas.")
-        proveedor_jarvis, modelo_jarvis = elegir_motor('motor_jarvis', 'General')
-    else:
-        st.caption("🛠️ **Explorador de Módulos (Dev):**")
-        seccion_elegida = st.radio("Módulos", SECCIONES_TECNICAS, label_visibility="collapsed")
-        seccion = "🏠 Inicio" if seccion_elegida == "🏠 Tablero general (v8.0)" else seccion_elegida
-        ejecucion_dispositivo = True
-        proveedor_jarvis = 'auto'
-        modelo_jarvis = None
-    st.divider()
-    import neural_core.sky_supabase as sb
-    if sb.is_configured():
-        usuario_sb = st.session_state.get('_supabase_user')
-        if usuario_sb:
-            if usuario_sb.get('is_super_admin'):
-                st.success("👑 **Superadministrador**")
-                st.caption(f"`{usuario_sb.get('email')}`")
-            else:
-                st.caption(f"☁️ Conectado: `{usuario_sb.get('email')}`")
-            if st.button("Cerrar Sesión", key="sb_logout_btn"):
-                sb.sign_out()
-                st.session_state.pop('_supabase_user', None)
-                st.rerun()
+if "sky_ui_view_mode" not in st.session_state:
+    st.session_state["sky_ui_view_mode"] = "holographic"
+
+if st.session_state["sky_ui_view_mode"] == "classic":
+    with st.sidebar:
+        st.markdown("### 🧠 SKY-IA")
+        st.caption("Asistente Central · 26 módulos internos")
+        
+        modo_interfaz = st.radio(
+            "Modo de Interfaz",
+            ["🎙️ Asistente Unificado (Voz & Chat)", "🛠️ Módulos Técnicos (Modo Dev)"],
+            label_visibility="collapsed"
+        )
+        
+        if modo_interfaz == "🎙️ Asistente Unificado (Voz & Chat)":
+            seccion = "🎙️ Asistente Central"
+            st.caption("🟢 **26 módulos conectados internamente**")
+            ejecucion_dispositivo = st.checkbox("⚡ Ejecución directa en PC", value=True,
+                                                help="Permite a SKY abrir programas y páginas locales cuando se lo pidas.")
+            proveedor_jarvis, modelo_jarvis = elegir_motor('motor_jarvis', 'General')
         else:
-            with st.expander("☁️ Supabase Cloud Auth", expanded=False):
-                modo_sb = st.radio("Acción", ["Entrar", "Crear cuenta"], horizontal=True, key="sb_mode", label_visibility="collapsed")
-                sb_email = st.text_input("Correo", key="sb_email")
-                sb_pass = st.text_input("Contraseña", type="password", key="sb_pass")
-                if modo_sb == "Entrar" and st.button("Iniciar Sesión", key="sb_btn_login"):
-                    try:
-                        res = sb.sign_in(sb_email, sb_pass)
-                        st.session_state['_supabase_user'] = res
-                        st.success("Sesión iniciada con éxito.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-                elif modo_sb == "Crear cuenta" and st.button("Registrar Usuario", key="sb_btn_signup"):
-                    try:
-                        res = sb.sign_up(sb_email, sb_pass)
-                        st.success("Cuenta registrada. Ya puedes iniciar sesión.")
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+            st.caption("🛠️ **Explorador de Módulos (Dev):**")
+            seccion_elegida = st.radio("Módulos", SECCIONES_TECNICAS, label_visibility="collapsed")
+            seccion = "🏠 Inicio" if seccion_elegida == "🏠 Tablero general (v8.0)" else seccion_elegida
+            ejecucion_dispositivo = True
+            proveedor_jarvis = 'auto'
+            modelo_jarvis = None
+        st.divider()
+        import neural_core.sky_supabase as sb
+        if sb.is_configured():
+            usuario_sb = st.session_state.get('_supabase_user')
+            if usuario_sb:
+                if usuario_sb.get('is_super_admin'):
+                    st.success("👑 **Superadministrador**")
+                    st.caption(f"`{usuario_sb.get('email')}`")
+                else:
+                    st.caption(f"☁️ Conectado: `{usuario_sb.get('email')}`")
+                if st.button("Cerrar Sesión", key="sb_logout_btn"):
+                    sb.sign_out()
+                    st.session_state.pop('_supabase_user', None)
+                    st.rerun()
+            else:
+                with st.expander("☁️ Supabase Cloud Auth", expanded=False):
+                    modo_sb = st.radio("Acción", ["Entrar", "Crear cuenta"], horizontal=True, key="sb_mode", label_visibility="collapsed")
+                    sb_email = st.text_input("Correo", key="sb_email")
+                    sb_pass = st.text_input("Contraseña", type="password", key="sb_pass")
+                    if modo_sb == "Entrar" and st.button("Iniciar Sesión", key="sb_btn_login"):
+                        try:
+                            res = sb.sign_in(sb_email, sb_pass)
+                            st.session_state['_supabase_user'] = res
+                            st.success("Sesión iniciada con éxito.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                    elif modo_sb == "Crear cuenta" and st.button("Registrar Usuario", key="sb_btn_signup"):
+                        try:
+                            res = sb.sign_up(sb_email, sb_pass)
+                            st.success("Cuenta registrada. Ya puedes iniciar sesión.")
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+        else:
+            with st.expander("☁️ Supabase Cloud", expanded=False):
+                st.caption("Configura SUPABASE_ANON_KEY en .env para activar el inicio de sesión.")
+        st.divider()
+        st.caption("Multi-IA + visión + 3D por piezas + memoria + herramientas autorizadas")
+        st.caption("Los proveedores externos sólo reciben contenido cuando los seleccionás o activás el modo automático.")
+else:
+    # Modo Holográfico 3D: Barra lateral oculta, pantalla limpia centrada en el Núcleo 3D
+    if "seccion_elegida_holo" in st.session_state:
+        seccion = st.session_state.pop("seccion_elegida_holo")
+        st.session_state["sky_ui_view_mode"] = "classic"
     else:
-        with st.expander("☁️ Supabase Cloud", expanded=False):
-            st.caption("Configura SUPABASE_ANON_KEY en .env para activar el inicio de sesión.")
-    st.divider()
-    st.caption("Multi-IA + visión + 3D por piezas + memoria + herramientas autorizadas")
-    st.caption("Los proveedores externos sólo reciben contenido cuando los seleccionás o activás el modo automático.")
+        seccion = "🎙️ Asistente Central"
+    ejecucion_dispositivo = True
+    proveedor_jarvis = 'auto'
+    modelo_jarvis = None
+    import neural_core.sky_supabase as sb
 
 
 def alerta_red():
@@ -1437,6 +1452,10 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
     if "sky_interaction_mode" not in st.session_state:
         st.session_state["sky_interaction_mode"] = "MODO_A"
 
+    if st.button("🌌 Cambiar a Núcleo Holográfico 3D (Pantalla Limpia)", help="Activa la nueva interfaz cinematográfica 3D centrada en el Núcleo sin paneles"):
+        st.session_state["sky_ui_view_mode"] = "holographic"
+        st.rerun()
+
     col_m1, col_m2, col_m3 = st.columns(3)
     with col_m1:
         if st.button("🎙️ Modo A: Conversación Natural",
@@ -1953,8 +1972,252 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                 pass
 
 
+def render_asistente_holografico_3d(proveedor, modelo, ejecucion_dispositivo=True):
+    from neural_core.voice_coordinator import coordinador_voz, InteractionMode, VoiceState
+    from neural_core.window_manager import gestor_ventanas
+    from neural_core.holographic_ui import generate_holographic_scene_html, get_holographic_css
+    from neural_core.voz import hablar_texto
+    from neural_core.dispositivos import interpret_command
+    import streamlit.components.v1 as components
+    import hashlib
+
+    # 1. Inyectar estilos holográficos
+    st.markdown(get_holographic_css(), unsafe_allow_html=True)
+
+    # 2. Barra Superior Discreta de Control
+    col_hdr_l, col_hdr_c, col_hdr_r = st.columns([4, 4, 4], vertical_alignment="center")
+    with col_hdr_l:
+        st.markdown("""
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-family: 'Orbitron', sans-serif; font-size: 1.25rem; font-weight: 900; color: #00f2ff; letter-spacing: 2px;">SKY-IA</span>
+            <span style="font-size: 0.72rem; color: #7dd3fc; letter-spacing: 3px; font-weight: 700;">IA UNIVERSAL</span>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_hdr_c:
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            if st.button("✦ Módulos (26)", help="Abrir ventana holográfica con los 26 módulos del ecosistema"):
+                if gestor_ventanas.windows['modules'].is_open:
+                    gestor_ventanas.close_window('modules')
+                else:
+                    gestor_ventanas.open_window('modules', win_type='modules', title='🧠 Ecosistema SKY-IA (26 Módulos)', position='center')
+                st.rerun()
+        with col_m2:
+            if st.button("📋 Modo Clásico", help="Regresar a la interfaz anterior de consola/tablero"):
+                st.session_state["sky_ui_view_mode"] = "classic"
+                st.rerun()
+    with col_hdr_r:
+        curr_mode = st.session_state.get("sky_interaction_mode", "MODO_A")
+        subcol1, subcol2, subcol3 = st.columns(3)
+        with subcol1:
+            if st.button("🎙️ Natural", type="primary" if curr_mode == "MODO_A" else "secondary", help="Modo A: Conversación Natural Continua"):
+                st.session_state["sky_interaction_mode"] = "MODO_A"
+                coordinador_voz.set_mode(InteractionMode.MODO_A_NATURAL)
+                st.rerun()
+        with subcol2:
+            if st.button("🔘 Manual", type="primary" if curr_mode == "MODO_B" else "secondary", help="Modo B: Micrófono Manual (Push-to-Talk)"):
+                st.session_state["sky_interaction_mode"] = "MODO_B"
+                coordinador_voz.set_mode(InteractionMode.MODO_B_MANUAL)
+                st.rerun()
+        with subcol3:
+            if st.button("✍️ Chat", type="primary" if curr_mode == "MODO_C" else "secondary", help="Modo C: Chat Escrito"):
+                st.session_state["sky_interaction_mode"] = "MODO_C"
+                coordinador_voz.set_mode(InteractionMode.MODO_C_TEXTO)
+                gestor_ventanas.open_window('chat', win_type='chat', title='💬 Conversación SKY-IA', position='bottom-left')
+                st.rerun()
+
+    # 3. Núcleo Holográfico 3D Principal
+    v_state = coordinador_voz.get_state().name
+    track = gestor_ventanas.windows['multimedia'].data.get('query') if gestor_ventanas.windows['multimedia'].is_open else None
+    scene_html = generate_holographic_scene_html(
+        voice_state=v_state,
+        active_player_track=track,
+        is_playing_music=gestor_ventanas.windows['multimedia'].is_open,
+        height=540
+    )
+    components.html(scene_html, height=545)
+
+    # 4. Dock de Ventanas Minimizadas
+    dock_items = gestor_ventanas.get_dock_items()
+    if dock_items:
+        st.markdown('<div class="holo-dock"><span class="holo-dock-label">Dock Holográfico:</span>', unsafe_allow_html=True)
+        cols_d = st.columns(len(dock_items) + 1)
+        for idx, item in enumerate(dock_items):
+            with cols_d[idx]:
+                if st.button(f"↗️ {item.title}", key=f"dock_restore_{item.id}"):
+                    gestor_ventanas.restore_window(item.id)
+                    st.rerun()
+        with cols_d[-1]:
+            if st.button("✕ Ocultar Todo", key="dock_hide_all"):
+                gestor_ventanas.leave_only_core()
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # 5. Ventanas Holográficas Abiertas (Alrededor del Núcleo)
+    open_wins = gestor_ventanas.get_open_windows()
+    for win in open_wins:
+        with st.container():
+            col_w_title, col_w_min, col_w_size, col_w_close = st.columns([7, 1, 1, 1], vertical_alignment="center")
+            with col_w_title:
+                st.markdown(f'<div class="holo-window-title">{win.title} <span style="font-size: 0.7rem; color: #7dd3fc; border: 1px solid #00f2ff; padding: 2px 8px; border-radius: 8px;">POSICIÓN: {win.position.upper()}</span></div>', unsafe_allow_html=True)
+            with col_w_min:
+                if st.button("➖", key=f"min_{win.id}", help="Minimizar al dock"):
+                    gestor_ventanas.minimize_window(win.id)
+                    st.rerun()
+            with col_w_size:
+                next_size = 'normal' if win.size == 'mini' else 'mini'
+                if st.button("🗖" if win.size == 'mini' else "🗗", key=f"size_{win.id}", help=f"Cambiar tamaño ({next_size})"):
+                    gestor_ventanas.resize_window(win.id, next_size)
+                    st.rerun()
+            with col_w_close:
+                if st.button("✕", key=f"close_{win.id}", help="Cerrar ventana"):
+                    gestor_ventanas.close_window(win.id)
+                    st.rerun()
+
+            # Contenido específico de cada ventana
+            if win.id == 'multimedia':
+                render_url_card(win.data)
+            elif win.id == 'chat':
+                if "chat_jarvis_history" not in st.session_state:
+                    st.session_state.chat_jarvis_history = [
+                        {"role": "assistant", "content": "¡Hola Oscar! Soy **SKY-IA**. Conversando en modo holográfico. ¿Qué necesitas que haga?"}
+                    ]
+                for m in st.session_state.chat_jarvis_history[-6:]:
+                    with st.chat_message(m["role"]):
+                        st.markdown(m["content"])
+            elif win.id == 'documents':
+                st.markdown("### 📁 SKY Office Studio")
+                st.write("Crea, edita y organiza documentos y presentaciones en segundo plano mientras conversamos.")
+                col_d1, col_d2 = st.columns(2)
+                with col_d1:
+                    topic = st.text_input("Tema del documento", value="Inteligencia Artificial y Automatización", key="holo_doc_topic")
+                    if st.button("📄 Crear Documento Word (.docx)", type="primary"):
+                        from neural_core.task_manager import gestor_tareas
+                        t = gestor_tareas.create_task('document', f"Documento: {topic}", f"Generando documento sobre {topic}", {'topic': topic})
+                        st.success(f"Tarea iniciada: {t.title}")
+                with col_d2:
+                    pres_topic = st.text_input("Tema de presentación", value="Ecosistema SKY-IA", key="holo_pres_topic")
+                    if st.button("📊 Crear Presentación (.pptx)"):
+                        from neural_core.task_manager import gestor_tareas
+                        t = gestor_tareas.create_task('presentation', f"Presentación: {pres_topic}", f"Generando presentación sobre {pres_topic}", {'topic': pres_topic})
+                        st.success(f"Tarea iniciada: {t.title}")
+            elif win.id == 'projects':
+                from neural_core.task_manager import gestor_tareas
+                tasks = gestor_tareas.get_all_tasks()
+                st.markdown("### ✅ Proyectos y Tareas Activas en Segundo Plano")
+                if tasks:
+                    for t in tasks[-5:]:
+                        st.progress(t.progress / 100.0, text=f"{t.title} ({t.status.upper()}) - {t.progress}%")
+                else:
+                    st.info("No hay tareas en segundo plano en ejecución. Pídele a SKY crear una presentación o documento.")
+            elif win.id == 'modules':
+                st.markdown("### 🧠 Ecosistema SKY-IA — Los 26 Módulos Reales")
+                st.caption("Acceso directo a cualquier módulo del sistema sin perder la sesión.")
+                cols_mod = st.columns(4)
+                for idx, mod in enumerate(SECCIONES_TECNICAS):
+                    with cols_mod[idx % 4]:
+                        if st.button(mod, key=f"btn_sec_mod_{idx}", use_container_width=True):
+                            st.session_state["sky_ui_view_mode"] = "classic"
+                            st.session_state["seccion_elegida_holo"] = mod
+                            st.rerun()
+
+    # 6. Cápsula Discreta de Entrada Inferior (Matching Image Reference)
+    prompt_usuario = None
+    curr_interaction = st.session_state.get("sky_interaction_mode", "MODO_A")
+
+    with st.container():
+        col_c_mic, col_c_input = st.columns([1.5, 10.5], vertical_alignment="center")
+
+        with col_c_mic:
+            audio_clip = st.audio_input("Habla con SKY-IA...", key="holo_capsule_mic", label_visibility="collapsed")
+            if audio_clip is not None:
+                audio_bytes = audio_clip.read()
+                audio_hash = hashlib.md5(audio_bytes).hexdigest()
+                if st.session_state.get('_last_audio_hash_holo') != audio_hash:
+                    st.session_state['_last_audio_hash_holo'] = audio_hash
+                    with st.spinner("Procesando tu voz..."):
+                        try:
+                            coordinador_voz.set_state(VoiceState.ESCUCHANDO)
+                            transcrito = transcribir_audio(audio_bytes, mime='audio/wav')
+                            prompt_usuario = transcrito
+                            coordinador_voz.set_state(VoiceState.PROCESANDO)
+                            st.toast(f"Voz detectada: «{transcrito}»")
+                        except Exception as err:
+                            st.warning(f"Error de audio: {err}")
+
+        with col_c_input:
+            text_in = st.chat_input("Habla con SKY-IA... (ej: 'SKY, pon Queen', 'abrí mis documentos', 'dejá solo el núcleo')", key="holo_text_input")
+            if text_in:
+                prompt_usuario = text_in
+
+    # 7. Ejecución centralizada de la orden de usuario
+    if prompt_usuario:
+        if "chat_jarvis_history" not in st.session_state:
+            st.session_state.chat_jarvis_history = []
+        st.session_state.chat_jarvis_history.append({"role": "user", "content": prompt_usuario})
+
+        respuesta_texto = ""
+        # Verificar comandos locales
+        intento = interpret_command(prompt_usuario)
+        if intento:
+            act = intento.get('action')
+            par = intento.get('params', {})
+            if act == 'holographic_window':
+                respuesta_texto = intento.get('description', 'Ventanas holográficas actualizadas.')
+            elif act == 'open_url' and par.get('service') == 'youtube':
+                gestor_ventanas.open_window('multimedia', win_type='multimedia', title=f"🎬 YouTube: {par.get('query', 'Música')}", data=par, position='top-right')
+                respuesta_texto = f"Voy a buscar música de {par.get('query', 'YouTube')} en el reproductor holográfico."
+            elif act == 'task_action':
+                gestor_ventanas.open_window('documents', win_type='documents', title="📁 Documentos & Office", position='right')
+                sub = par.get('subaction')
+                if sub == 'create_presentation':
+                    topic = par.get('topic', 'tema')
+                    respuesta_texto = f"Iniciando preparación de presentación sobre {topic} en Office Studio."
+                elif sub == 'create_document':
+                    topic = par.get('topic', 'documento')
+                    respuesta_texto = f"Preparando documento sobre {topic} en Office Studio."
+                else:
+                    respuesta_texto = intento.get('description', 'Tarea procesada.')
+            elif act == 'status' and par.get('greeting'):
+                respuesta_texto = par.get('message', 'Sí, te escucho. ¿Qué necesitás?')
+            elif act == 'voice_control':
+                respuesta_texto = intento.get('description', 'Control conversacional aplicado.')
+            else:
+                respuesta_texto = intento.get('description', 'Orden interpretada.')
+        else:
+            # Consulta general de IA
+            try:
+                with st.spinner("SKY-IA procesando consulta..."):
+                    contexto_chat = [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_jarvis_history[-6:]]
+                    r_ia = responder("Asistente Central", prompt_usuario, contexto=contexto_chat, proveedor=proveedor, modelo=modelo)
+                    respuesta_texto = r_ia[0] if isinstance(r_ia, (list, tuple)) else str(r_ia)
+            except Exception as e:
+                respuesta_texto = f"Comprendido: procesé tu solicitud «{prompt_usuario}»."
+
+        st.session_state.chat_jarvis_history.append({"role": "assistant", "content": respuesta_texto})
+
+        # Síntesis de voz
+        if respuesta_texto:
+            try:
+                audio_mp3 = hablar_texto(respuesta_texto)
+                if audio_mp3:
+                    st.caption("🔊 *SKY-IA respondiendo con voz:*")
+                    st.audio(audio_mp3, format="audio/mp3", autoplay=True)
+            except Exception:
+                pass
+
+        try:
+            coordinador_voz.record_turn(prompt_usuario, respuesta_texto)
+        except Exception:
+            pass
+        st.rerun()
+
+
 if seccion == "🎙️ Asistente Central":
-    render_asistente_jarvis(proveedor_jarvis, modelo_jarvis, ejecucion_dispositivo)
+    if st.session_state.get("sky_ui_view_mode", "holographic") == "holographic":
+        render_asistente_holografico_3d(proveedor_jarvis, modelo_jarvis, ejecucion_dispositivo)
+    else:
+        render_asistente_jarvis(proveedor_jarvis, modelo_jarvis, ejecucion_dispositivo)
 
 elif seccion == "🏠 Inicio":
     st.title("SKY Universal v8.0")

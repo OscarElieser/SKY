@@ -23,6 +23,7 @@ ACTION_CAPABILITIES = {
     'player_control': 'Control del reproductor de video (modos, tamaño, pausa, cerrar)',
     'task_action': 'Gestionar tareas en segundo plano (presentaciones, documentos, modificaciones)',
     'voice_control': 'Control del flujo conversacional de voz (pausa, ritmo, interrupción, repetición)',
+    'holographic_window': 'Control de ventanas holográficas inteligentes alrededor del núcleo 3D',
 }
 APP_OPTIONS = [
     'calculator', 'text_editor', 'file_manager', 'browser',
@@ -135,6 +136,16 @@ def interpret_command(text: str):
         return {'action': 'player_control', 'params': {'subaction': 'close'}, 'description': 'Cerrar reproductor multimedia'}
     if re.search(r'\b(?:siguiente|proximo|otro)\s+video\b', clean):
         return {'action': 'player_control', 'params': {'subaction': 'next'}, 'description': 'Reproducir siguiente video'}
+
+    # Comandos de gestión de ventanas holográficas inteligentes alrededor del núcleo 3D
+    from neural_core.window_manager import gestor_ventanas
+    win_cmd = gestor_ventanas.parse_window_command(text)
+    if win_cmd:
+        return {
+            'action': 'holographic_window',
+            'params': win_cmd,
+            'description': win_cmd.get('message', 'Gestionar ventana holográfica')
+        }
 
     media_phrases = (
         (r'\b(siguiente|proxima)\b.*\b(cancion|pista|video|tema)\b', 'next_track'),

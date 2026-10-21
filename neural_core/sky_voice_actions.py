@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .dispositivos import APP_OPTIONS, MEDIA_KEYS, WINDOW_SUBACTIONS, call_device
 
-SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key", "window_action", "open_file", "player_control", "task_action", "voice_control"})
+SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key", "window_action", "open_file", "player_control", "task_action", "voice_control", "holographic_window"})
 _TOKEN_PATH = Path.home() / ".neuralt" / "device_agent.token"
 
 
@@ -54,6 +54,8 @@ def execute_safe_local(intent: dict) -> str:
             raise ValueError("Solo se permiten direcciones HTTPS.")
     if action == "voice_control":
         return params.get("message") or "Control conversacional ejecutado."
+    if action == "holographic_window":
+        return params.get("message") or "Ventana holográfica actualizada."
 
     base, token = local_agent_credentials()
     result = call_device(base, token, action, params)
