@@ -37,4 +37,4 @@ jobs:
           tests/test_sky_v10_4_secure_global.py
           tests/test_sky_v10_5_global.py
           tests/test_sky_devices.py tests/test_sky_jarvis_local.py
-          tests/test_sky_public_secrets.py
+          tests/test_sky_public_secrets.py tests/test_sky_notes_local.py
