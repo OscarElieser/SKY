@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from neural_core.dispositivos import APP_OPTIONS, MEDIA_KEYS
+from neural_core.sky_notes_local import NOTE_ACTIONS, run_note_action
 
 CONFIG_DIR = Path.home() / '.neuralt'
 TOKEN_PATH = CONFIG_DIR / 'device_agent.token'
@@ -41,7 +42,7 @@ def audit(action, result):
 def status():
     return {'ok':True,'device':platform.node() or 'Equipo local',
             'platform':platform.system(),'system_version':platform.release(),
-            'capabilities':['status','open_url','launch_app','media_key'],
+            'capabilities':['status','open_url','launch_app','media_key'] + (sorted(NOTE_ACTIONS) if os.getenv('SKY_NOTES_ENABLED') == '1' else []),
             'allowed_apps':APP_OPTIONS,
             'timestamp':datetime.now(timezone.utc).isoformat()}
 
@@ -97,6 +98,8 @@ def execute_action(action,params):
         app=params.get('app','')
         launch_app(app)
         return {'ok':True,'message':'Se solicitó abrir la aplicación '+app}
+    if action in NOTE_ACTIONS:
+        return run_note_action(action, params)
     if action=='media_key':
         key=params.get('key')
         send_media_key(key)
@@ -138,11 +141,11 @@ class Handler(BaseHTTPRequestHandler):
             body=json.loads(self.rfile.read(length))
             if not isinstance(body,dict): raise ValueError('Formato inválido')
             action=body.get('action','')
-            if action not in ('status','launch_app','open_url','media_key'): raise ValueError('Acción no permitida')
+            if action not in ('status','launch_app','open_url','media_key',*NOTE_ACTIONS): raise ValueError('Acción no permitida')
             result=execute_action(action,body.get('params',{}))
             audit(action,'ok')
             return self.reply(200,result)
-        except (ValueError,RuntimeError,OSError,subprocess.SubprocessError) as exc:
+        except (ValueError,RuntimeError,PermissionError,OSError,subprocess.SubprocessError) as exc:
             audit('rejected','error')
             return self.reply(400,{'ok':False,'error':str(exc)[:250]})
     def log_message(self,*args): pass  # no registrar el token; auditoría por acción
