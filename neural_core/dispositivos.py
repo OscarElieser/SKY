@@ -14,6 +14,9 @@ ACTION_CAPABILITIES = {
     'open_url': 'Abrir un sitio web en el dispositivo',
     'launch_app': 'Abrir una aplicación permitida en el dispositivo',
     'media_key': 'Enviar tecla multimedia al reproductor del dispositivo (Windows)',
+    'note_create': 'Crear nota local con confirmación',
+    'note_append': 'Agregar texto a nota local con confirmación',
+    'note_trash': 'Enviar una nota a la papelera recuperable con confirmación',
 }
 APP_OPTIONS = ['calculator', 'text_editor', 'file_manager', 'browser']
 MEDIA_KEYS = frozenset({'play_pause','next_track','previous_track','volume_up','volume_down','mute'})
@@ -109,6 +112,21 @@ def interpret_command(text: str):
         if re.search(pattern, clean):
             return {'action': 'media_key', 'params': {'key': key},
                     'description': 'Enviar tecla multimedia ' + key}
+
+    # Únicamente nombres simples; toda escritura se confirma manualmente en el panel.
+    simple = text.strip()
+    create = re.fullmatch(r'(?i)(?:sky\s*[,;:]?\s*)?(?:crea|crear)\s+(?:una\s+)?nota\s+([A-Za-z0-9_-]{1,64})\s+(?:que\s+diga|con\s+el\s+texto)\s+(.{1,12000})', simple, re.S)
+    if create:
+        return {'action':'note_create', 'params':{'name':create.group(1),'content':create.group(2)},
+                'description':'Crear nota '+create.group(1)+' (requiere aprobación)'}
+    append = re.fullmatch(r'(?i)(?:sky\s*[,;:]?\s*)?(?:agrega|agregar|añade|anade)\s+(?:a\s+)?(?:la\s+)?nota\s+([A-Za-z0-9_-]{1,64})\s+(?:el\s+texto\s+)?(.{1,12000})', simple, re.S)
+    if append:
+        return {'action':'note_append','params':{'name':append.group(1),'content':append.group(2)},
+                'description':'Agregar texto a '+append.group(1)+' (requiere aprobación)'}
+    trash = re.fullmatch(r'(?i)(?:sky\s*[,;:]?\s*)?(?:elimina|eliminar|borra|borrar)\s+(?:la\s+)?nota\s+([A-Za-z0-9_-]{1,64})', simple)
+    if trash:
+        return {'action':'note_trash','params':{'name':trash.group(1)},
+                'description':'Mover nota '+trash.group(1)+' a papelera (requiere aprobación)'}
 
     if re.search(r'\b(abre|abri|abrir|inicia|iniciar|ejecuta|ejecutar)\b', clean):
         for term, app in [('calculadora', 'calculator'), ('bloc de notas', 'text_editor'),
