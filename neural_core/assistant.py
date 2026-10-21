@@ -18,7 +18,9 @@ def modelo_activo():
     except (OSError, ValueError, KeyError):
         return []
 
-def responder(pregunta, area, historial=None, modelo=None, fuentes_externas=None, proveedor='auto', idioma=None):
+def responder(pregunta, area, historial=None, modelo=None, fuentes_externas=None, proveedor='auto', idioma=None, contexto=None, **kwargs):
+    if historial is None and contexto is not None:
+        historial = contexto
     if len(pregunta) > 7000:
         raise ValueError('Pregunta demasiado larga (máximo 7000 caracteres)')
     from neural_core.sky_languages import normalize, get_preference, script_hint

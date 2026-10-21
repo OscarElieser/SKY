@@ -2198,7 +2198,7 @@ def render_asistente_holografico_3d(proveedor, modelo, ejecucion_dispositivo=Tru
 
             # Contenido específico de cada ventana
             if win.id == 'multimedia':
-                render_url_card(win.data)
+                render_media_card(win.data)
             elif win.id == 'chat':
                 if "chat_jarvis_history" not in st.session_state:
                     st.session_state.chat_jarvis_history = [
@@ -2311,7 +2311,7 @@ def render_asistente_holografico_3d(proveedor, modelo, ejecucion_dispositivo=Tru
             try:
                 with st.spinner("SKY-IA procesando consulta..."):
                     contexto_chat = [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_jarvis_history[-6:]]
-                    r_ia = responder("Asistente Central", prompt_usuario, contexto=contexto_chat, proveedor=proveedor, modelo=modelo)
+                    r_ia = responder(prompt_usuario, "Asistente Central", historial=contexto_chat, proveedor=proveedor, modelo=modelo)
                     respuesta_texto = r_ia[0] if isinstance(r_ia, (list, tuple)) else str(r_ia)
             except Exception as e:
                 respuesta_texto = f"Comprendido: procesé tu solicitud «{prompt_usuario}»."
