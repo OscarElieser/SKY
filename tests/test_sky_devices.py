@@ -52,7 +52,7 @@ def test_servidor_autorizacion_aislado():
         with pytest.raises(RuntimeError): dispositivos.call_device(url,'z'*48,'status')
         response=dispositivos.call_device(url,server.secret,'status')
         assert response['ok'] and 'device' in response
-        assert set(response['capabilities']) == {'status','open_url','launch_app'}
+        assert set(response['capabilities']) == {'status','open_url','launch_app','media_key'}
     finally:
         server.shutdown();server.server_close();thread.join(2)
 
