@@ -4,7 +4,7 @@ uvicorn>=0.34,<1
 python-dotenv>=1.0,<2
 numpy>=1.26,<3
 trimesh>=4.4,<5
-Pillow>=10,<13
+Pillow>=13,<14
 httpx>=0.27,<1
 # Para ejecutar las pruebas: pip install pytest
 # Funciones opcionales de foto 2.5D: opencv-python-headless>=4.10,<5
