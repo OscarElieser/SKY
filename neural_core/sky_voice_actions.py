@@ -8,9 +8,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .dispositivos import APP_OPTIONS, call_device
+from .dispositivos import APP_OPTIONS, MEDIA_KEYS, call_device
 
-SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app"})
+SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key"})
 _TOKEN_PATH = Path.home() / ".neuralt" / "device_agent.token"
 
 
@@ -40,6 +40,8 @@ def execute_safe_local(intent: dict) -> str:
         raise ValueError("Esta acción requiere un módulo específico y autorización.")
     if action == "launch_app" and params.get("app") not in APP_OPTIONS:
         raise ValueError("La aplicación no está autorizada.")
+    if action == "media_key" and params.get("key") not in MEDIA_KEYS:
+        raise ValueError("Tecla multimedia no autorizada.")
     if action == "open_url":
         from urllib.parse import urlsplit
         url = params.get("url")
@@ -55,5 +57,7 @@ def execute_safe_local(intent: dict) -> str:
     if action == "open_url":
         return "He abierto la página en el navegador de tu equipo."
     if action == "launch_app":
-        return "He abierto la aplicación solicitada en tu computadora."
+        return "He solicitado abrir la aplicación en tu computadora."
+    if action == "media_key":
+        return "Envié la tecla multimedia a Windows. No puedo confirmar el estado del reproductor."
     return "SKY está conectado con tu equipo: " + str(result.get("device", "equipo local")) + "."
