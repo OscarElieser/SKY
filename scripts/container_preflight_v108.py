@@ -64,6 +64,9 @@ def docker_smoke(*, runtime:bool=False) -> dict:
         report['docker_executed']=True
         report['runtime_status']='passed' if run.returncode==0 and 'sky-offline-import-ok' in run.stdout else 'failed'
         report['container_no_network']=True
+        if report['runtime_status'] == 'failed':
+            # Solo el smoke aislado, sin secretos; exposición mínima de la causa, no credenciales.
+            report['offline_import_error_tail'] = run.stderr.strip()[-900:]
     except (subprocess.TimeoutExpired,OSError):
         report['runtime_status']='failed_or_timeout'
     return report
