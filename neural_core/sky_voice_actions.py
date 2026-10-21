@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .dispositivos import APP_OPTIONS, MEDIA_KEYS, WINDOW_SUBACTIONS, call_device
 
-SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key", "window_action"})
+SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key", "window_action", "open_file"})
 _TOKEN_PATH = Path.home() / ".neuralt" / "device_agent.token"
 
 
@@ -71,4 +71,6 @@ def execute_safe_local(intent: dict) -> str:
             items = "\n".join(f"- {w['title']}" for w in windows[:12])
             return f"Ventanas abiertas en tu equipo:\n{items}"
         return result.get("message") or "Acción sobre la ventana completada."
+    if action == "open_file":
+        return result.get("message") or "He abierto el archivo o carpeta solicitado en tu equipo."
     return "SKY está conectado con tu equipo: " + str(result.get("device", "equipo local")) + "."

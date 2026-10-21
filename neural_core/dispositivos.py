@@ -18,6 +18,8 @@ ACTION_CAPABILITIES = {
     'note_append': 'Agregar texto a nota local con confirmación',
     'note_trash': 'Enviar una nota a la papelera recuperable con confirmación',
     'window_action': 'Gestionar ventanas abiertas autorizadas en el equipo (Windows)',
+    'open_file': 'Abrir documentos o carpetas locales en el equipo (Windows)',
+    'social_action': 'Gestionar publicaciones, mensajes y comentarios en redes sociales',
 }
 APP_OPTIONS = [
     'calculator', 'text_editor', 'file_manager', 'browser',
@@ -204,6 +206,57 @@ def interpret_command(text: str):
                 'description': f'Buscar "{q}" en Google'
             }
 
+    # Acciones de redes sociales (comentar, enviar mensaje, publicar)
+    m_com = re.search(r'\b(?:comenta|comentar)\b\s*(?:en\s+(?:la\s+publicacion|el\s+post|redes|facebook|instagram|tiktok|x|twitter))?\s*(?:diciendo|con|que\s+diga)?\s*(.*)', clean)
+    if m_com and not re.search(r'\b(nota|calculadora)\b', clean):
+        plat = 'redes'
+        for p_cand in ['facebook', 'instagram', 'tiktok', 'twitter', 'x', 'linkedin', 'whatsapp']:
+            if p_cand in clean:
+                plat = p_cand
+                break
+        body = m_com.group(1).strip()
+        return {
+            'action': 'social_action',
+            'params': {'subaction': 'comment', 'platform': plat, 'comment': body},
+            'description': f'Comentar en {plat.title()}'
+        }
+
+    m_msg = re.search(r'\b(?:responde|responder|contesta|contestar|envia\s+mensaje|enviar\s+mensaje|manda\s+mensaje)\b\s*(?:a|al|por\s+whatsapp\s+a)?\s*([a-z0-9_\-\. ]+?)\s*(?:diciendo|con\s+el\s+texto|que\s+diga)?\s*(.*)', clean)
+    if m_msg and any(w in clean for w in ['mensaje', 'whatsapp', 'responde', 'contesta']):
+        recip = m_msg.group(1).strip()
+        body = m_msg.group(2).strip()
+        return {
+            'action': 'social_action',
+            'params': {'subaction': 'message', 'platform': 'whatsapp', 'recipient': recip, 'message': body},
+            'description': f'Enviar/Responder mensaje a {recip}'
+        }
+
+    m_post = re.search(r'\b(?:publica|publicar|postea|postear|crea\s+(?:un\s+)?post|crear\s+(?:un\s+)?post|crea\s+publicacion|crear\s+publicacion|sube\s+(?:una\s+)?foto|subir\s+(?:una\s+)?foto)\b\s*(?:en\s+|para\s+|a\s+)?(facebook|instagram|tiktok|twitter|x|linkedin|whatsapp)?\s*(.*)', clean)
+    if m_post and (m_post.group(1) or m_post.group(2)):
+        plat = (m_post.group(1) or 'general').strip()
+        body = m_post.group(2).strip()
+        if plat == 'general':
+            for p_cand in ['facebook', 'instagram', 'tiktok', 'twitter', 'x', 'linkedin', 'whatsapp']:
+                if re.search(r'\b(?:en|a|para)\s+' + p_cand + r'\b', clean):
+                    plat = p_cand
+                    break
+        return {
+            'action': 'social_action',
+            'params': {'subaction': 'post', 'platform': plat, 'content': body},
+            'description': f'Crear publicación para {plat.title()}'
+        }
+
+    # Apertura de carpetas y archivos locales (documentos, descargas, pdf, word, excel, imagenes, videos)
+    m_folder = re.search(r'\b(?:abre|abrir|muestra|mostrar)\s+(?:mi\s+)?(?:carpeta\s+de\s+|carpeta\s+)?(documentos|descargas|escritorio|imagenes|fotos|videos|musica)\b', clean)
+    if m_folder:
+        fld = m_folder.group(1).strip()
+        return {'action': 'open_file', 'params': {'target': fld}, 'description': f'Abrir carpeta de {fld}'}
+
+    m_file = re.search(r'\b(?:abre|abrir|muestra|mostrar)\s+(?:el\s+)?(?:archivo|documento|pdf|informe|reporte|imagen|foto|video|presentacion|hoja\s+de\s+calculo)\s+(?:de\s+|titulado\s+|llamado\s+)?([a-z0-9_\-\. ]{2,80})', clean)
+    if m_file:
+        fname = m_file.group(1).strip()
+        return {'action': 'open_file', 'params': {'target': fname}, 'description': f'Abrir archivo {fname}'}
+
     if re.search(r'\b(abre|abri|abrir|inicia|iniciar|ejecuta|ejecutar|lanza|lanzar)\b', clean):
         app_terms = [
             ('calculadora', 'calculator'),
@@ -234,8 +287,23 @@ def interpret_command(text: str):
             if re.search(r'\b' + re.escape(term) + r'\b', clean):
                 return {'action': 'launch_app', 'params': {'app': app}, 'description': f'Abrir {term}'}
 
-        sites = {'youtube': 'https://www.youtube.com', 'google': 'https://www.google.com',
-                 'baqueano': 'https://baqueanonicaragua.com', 'wikipedia': 'https://www.wikipedia.org'}
+        sites = {
+            'whatsapp web': 'https://web.whatsapp.com',
+            'whatsapp': 'https://web.whatsapp.com',
+            'facebook': 'https://www.facebook.com',
+            'instagram': 'https://www.instagram.com',
+            'tiktok': 'https://www.tiktok.com',
+            'twitter': 'https://x.com',
+            'x': 'https://x.com',
+            'linkedin': 'https://www.linkedin.com',
+            'telegram': 'https://web.telegram.org',
+            'reddit': 'https://www.reddit.com',
+            'pinterest': 'https://www.pinterest.com',
+            'youtube': 'https://www.youtube.com',
+            'google': 'https://www.google.com',
+            'baqueano': 'https://baqueanonicaragua.com',
+            'wikipedia': 'https://www.wikipedia.org'
+        }
         for term, url in sites.items():
             if term in clean:
                 return {'action': 'open_url', 'params': {'url': url}, 'description': f'Abrir {url}'}

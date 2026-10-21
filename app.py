@@ -293,19 +293,28 @@ def render_media_card(datos):
         </div>
         """, unsafe_allow_html=True)
 
-        # Reproducción con st.video garantizada
-        if url and 'watch?v=' in url:
-            st.video(url)
-        elif video_id:
-            st.video(f"https://www.youtube.com/watch?v={video_id}")
-        else:
-            st.video("https://www.youtube.com/watch?v=fJ9rUzIMcZQ")
+        # Reproductor IFrame oficial con strict-origin para cumplimiento de directivas de YouTube
+        import streamlit.components.v1 as components
+        embed_id = video_id or "fJ9rUzIMcZQ"
+        embed_html = f"""
+        <div style="width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid rgba(0, 242, 255, 0.35); box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);">
+            <iframe width="100%" height="420"
+                    src="https://www.youtube-nocookie.com/embed/{embed_id}?autoplay=1&enablejsapi=1&rel=0"
+                    title="{query or 'YouTube Video'}"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                    allowfullscreen>
+            </iframe>
+        </div>
+        """
+        components.html(embed_html, height=435)
 
         col_m1, col_m2 = st.columns([1.2, 1.8])
         with col_m1:
             st.link_button("🖥️ ABRIR EN VENTANA / CHROME", url, type="primary")
         with col_m2:
-            st.caption("🟢 **Ventana abierta en Windows**: Se inició en tu navegador. Si el autor restringe la inserción externa, puedes verlo en la ventana enfocada.")
+            st.caption("🟢 **Ventana activa en Windows**: El video se reproduce según las políticas de YouTube.")
     elif service == 'google':
         st.markdown(f"""
         <div style="background: rgba(5, 14, 30, 0.85); border: 1px solid rgba(0, 168, 255, 0.35);
@@ -317,6 +326,125 @@ def render_media_card(datos):
         st.link_button("🌐 Ver resultados en Google", url, type="primary")
     else:
         st.link_button(f"🌐 Abrir enlace: {url}", url, type="primary")
+
+
+def render_social_card(datos):
+    subaction = datos.get('subaction', 'post')
+    platform = (datos.get('platform') or 'whatsapp').lower()
+    import urllib.parse
+
+    icons = {
+        'whatsapp': '💬',
+        'facebook': '📘',
+        'instagram': '📸',
+        'tiktok': '🎵',
+        'twitter': '🐦',
+        'x': '🐦',
+        'linkedin': '💼',
+        'telegram': '✈️',
+        'general': '📣'
+    }
+    ico = icons.get(platform, '📣')
+
+    st.markdown(f"""
+    <div style="background: rgba(6, 18, 38, 0.92); border: 1px solid rgba(0, 242, 255, 0.4);
+                border-radius: 14px; padding: 16px 20px 10px 20px; margin: 12px 0; box-shadow: 0 0 25px rgba(0, 242, 255, 0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span style="color: #00f2ff; font-family: 'Orbitron', monospace; font-size: 0.95rem; font-weight: 700;">
+                {ico} CENTRO SOCIAL SKY JARVIS · {platform.upper()}
+            </span>
+            <span style="background: rgba(0, 242, 255, 0.15); color: #00f2ff; border: 1px solid #00f2ff; padding: 3px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 600;">
+                MODO INTERACTIVO
+            </span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if subaction == 'post':
+        content = datos.get('content', '') or f"¡Hola comunidad! Comparto una actualización con SKY JARVIS. #Innovacion #{platform.title()}"
+        edit_content = st.text_area("Texto de la publicación (Copywriting + Hashtags)", value=content, height=110, key=f"soc_post_{abs(hash(content)) % 100000}")
+        
+        foto = st.file_uploader("📷 Subir foto para la publicación", type=["jpg", "png", "jpeg", "webp"], key=f"soc_file_{abs(hash(content)) % 100000}")
+        if foto:
+            st.image(foto, caption="Vista previa de imagen a publicar", use_container_width=True)
+
+        col_p1, col_p2 = st.columns(2)
+        encoded_text = urllib.parse.quote_plus(edit_content)
+        with col_p1:
+            if platform in ('twitter', 'x'):
+                st.link_button("🐦 Publicar Tweet en X", f"https://twitter.com/intent/tweet?text={encoded_text}", type="primary")
+            elif platform == 'whatsapp':
+                st.link_button("💬 Compartir en WhatsApp", f"https://api.whatsapp.com/send?text={encoded_text}", type="primary")
+            elif platform == 'facebook':
+                st.link_button("📘 Publicar en Facebook", f"https://www.facebook.com/sharer/sharer.php?quote={encoded_text}", type="primary")
+            elif platform == 'instagram':
+                st.link_button("📸 Abrir Instagram Web", "https://www.instagram.com/", type="primary")
+            elif platform == 'tiktok':
+                st.link_button("🎵 Abrir TikTok Studio", "https://www.tiktok.com/upload", type="primary")
+            elif platform == 'linkedin':
+                st.link_button("💼 Publicar en LinkedIn", "https://www.linkedin.com/feed/", type="primary")
+            else:
+                st.link_button(f"🚀 Abrir {platform.title()}", f"https://www.{platform}.com", type="primary")
+        with col_p2:
+            st.caption("🟢 Puedes editar el texto, adjuntar foto o pulsar el botón para publicar.")
+
+    elif subaction == 'message':
+        recip = datos.get('recipient', '') or 'contacto'
+        msg = datos.get('message', '') or 'Hola, te escribo desde mi asistente personal SKY JARVIS.'
+        edit_msg = st.text_area(f"Mensaje para {recip}", value=msg, height=90, key=f"soc_msg_{abs(hash(msg)) % 100000}")
+        encoded_msg = urllib.parse.quote_plus(edit_msg)
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            st.link_button("💬 Enviar por WhatsApp Web", f"https://web.whatsapp.com/send?text={encoded_msg}", type="primary")
+        with col_m2:
+            st.caption(f"🟢 Pulsa para abrir WhatsApp Web con el mensaje listo para enviar.")
+
+    elif subaction == 'comment':
+        comm = datos.get('comment', '') or 'Excelente publicación, totalmente de acuerdo.'
+        st.text_area("Comentario generado", value=comm, height=80, key=f"soc_comm_{abs(hash(comm)) % 100000}")
+        st.caption("🟢 Comentario listo. Cópialo o ábrelo en tu red social para responder.")
+
+
+def render_archivo_card(datos):
+    path_str = str(datos.get('path', ''))
+    tipo = datos.get('type', 'file')
+    import os
+    basename = os.path.basename(path_str) or path_str
+
+    icons = {
+        '.docx': '📄 Documento Microsoft Word',
+        '.doc': '📄 Documento Microsoft Word',
+        '.xlsx': '📊 Hoja de Cálculo Excel',
+        '.xls': '📊 Hoja de Cálculo Excel',
+        '.pptx': '📽️ Presentación PowerPoint',
+        '.ppt': '📽️ Presentación PowerPoint',
+        '.pdf': '📕 Documento PDF',
+        '.txt': '📝 Archivo de Texto',
+        '.png': '🖼️ Imagen PNG',
+        '.jpg': '🖼️ Imagen JPG',
+        '.jpeg': '🖼️ Imagen JPEG',
+        '.mp4': '🎬 Video MP4',
+        '.mp3': '🎵 Archivo de Audio'
+    }
+    ext = os.path.splitext(path_str)[1].lower()
+    label_tipo = icons.get(ext, '📁 Carpeta de Windows' if tipo == 'folder' else '📄 Archivo del Sistema')
+
+    st.markdown(f"""
+    <div style="background: rgba(8, 22, 45, 0.92); border: 1px solid rgba(0, 242, 255, 0.35);
+                border-radius: 12px; padding: 14px 18px; margin: 10px 0; box-shadow: 0 0 20px rgba(0, 242, 255, 0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="color: #00f2ff; font-weight: 700; font-size: 0.95rem;">
+                {label_tipo}
+            </span>
+            <span style="background: rgba(0, 255, 170, 0.15); color: #00ffaa; border: 1px solid #00ffaa; padding: 2px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 600;">
+                🟢 INICIADO EN WINDOWS
+            </span>
+        </div>
+        <div style="color: #ffffff; font-family: monospace; font-size: 0.9rem; margin: 4px 0;">{basename}</div>
+        <div style="color: #8bb5dc; font-size: 0.8rem;">Ubicación: <code>{path_str}</code></div>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 
 
@@ -605,13 +733,13 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
     st.markdown("**Acciones rápidas:**")
     opciones_rapidas = [
         "Abre YouTube y pon Queen",
-        "Pon música de Michael Jackson",
-        "Abre la calculadora",
-        "Consulta el estado de mi computadora",
-        "Lista las ventanas abiertas",
-        "Cómo van mis finanzas este mes",
-        "Calcula 125 * 8",
-        "Noticias de hoy"
+        "Abre WhatsApp",
+        "Publica en Facebook un saludo a mi comunidad",
+        "Crea un post para Instagram",
+        "Abre mi carpeta de documentos",
+        "Abre Word",
+        "Abre Excel",
+        "Consulta el estado de mi computadora"
     ]
     sugerencia_clic = st.pills("Acciones", opciones_rapidas, label_visibility="collapsed")
 
@@ -620,7 +748,7 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
         st.session_state.chat_jarvis_history = [
             {
                 "role": "assistant",
-                "content": "¡Hola Oscar! Soy **SKY JARVIS**. Todos mis módulos (control de equipo, multimedia, finanzas, documentos Office, diseño 3D y cálculo) operan internamente en segundo plano. ¿Qué necesitas que haga?"
+                "content": "¡Hola Oscar! Soy **SKY JARVIS**. Todos mis módulos (control de equipo, multimedia, redes sociales, documentos Office, diseño 3D y finanzas) operan internamente en segundo plano. ¿Qué necesitas que haga?"
             }
         ]
 
@@ -636,6 +764,10 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                     ]), hide_index=True)
             elif m.get("tipo") == "media" and m.get("datos"):
                 render_media_card(m["datos"])
+            elif m.get("tipo") == "social" and m.get("datos"):
+                render_social_card(m["datos"])
+            elif m.get("tipo") == "archivo" and m.get("datos"):
+                render_archivo_card(m["datos"])
 
     # Captura de entrada
     prompt_usuario = st.chat_input("Escribe una orden a SKY... (ej: 'SKY, abre YouTube y pon Queen', 'abre la calculadora', 'calcula 500*12')", submit_mode="disable")
@@ -748,6 +880,31 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                                 respuesta_texto = f"⚠️ Control multimedia: {err}"
                         else:
                             respuesta_texto = f"Tecla multimedia `{cmd_device['params'].get('key')}` propuesta."
+                    elif cmd_device['action'] == 'open_file':
+                        if ejecucion_dispositivo:
+                            try:
+                                from neural_core.windows_controller import open_local_file_or_folder
+                                target_f = cmd_device['params'].get('target', '')
+                                res_f = open_local_file_or_folder(target_f)
+                                respuesta_texto = f"📂 **SKY JARVIS**: {res_f['message']}"
+                                tipo_extra = "archivo"
+                                datos_extra = res_f
+                            except Exception as err:
+                                respuesta_texto = f"⚠️ {err}"
+                        else:
+                            respuesta_texto = f"Acción propuesta: Abrir archivo o carpeta '{cmd_device['params'].get('target')}'."
+                    elif cmd_device['action'] == 'social_action':
+                        subact = cmd_device['params'].get('subaction', 'post')
+                        plat = cmd_device['params'].get('platform', 'whatsapp')
+                        tipo_extra = "social"
+                        datos_extra = cmd_device['params']
+                        if subact == 'post':
+                            respuesta_texto = f"📣 **SKY JARVIS**: He preparado tu publicación para **{plat.title()}**. Puedes redactar, adjuntar fotos y publicar directamente."
+                        elif subact == 'message':
+                            recip = cmd_device['params'].get('recipient', '')
+                            respuesta_texto = f"💬 **SKY JARVIS**: He preparado tu mensaje para **{recip}** en **WhatsApp**. Puedes enviarlo con un clic."
+                        elif subact == 'comment':
+                            respuesta_texto = f"✍️ **SKY JARVIS**: Generé un comentario optimizado para **{plat.title()}**."
                     elif cmd_device['action'] == 'status':
                         import platform
                         respuesta_texto = f"🖥️ **Estado de tu computadora:**\n- Dispositivo: `{platform.node()}`\n- Sistema: `{platform.system()} {platform.release()}`\n- Plataforma: `{platform.platform()}`\n- Agente local: Conectado y operativo."
@@ -825,6 +982,10 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                 ]), hide_index=True)
             elif tipo_extra == "media" and datos_extra:
                 render_media_card(datos_extra)
+            elif tipo_extra == "social" and datos_extra:
+                render_social_card(datos_extra)
+            elif tipo_extra == "archivo" and datos_extra:
+                render_archivo_card(datos_extra)
 
             msg_salida = {"role": "assistant", "content": respuesta_texto}
             if tipo_extra:

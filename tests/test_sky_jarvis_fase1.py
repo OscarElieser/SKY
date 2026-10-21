@@ -179,3 +179,56 @@ def test_interpretar_busqueda_google():
     assert res['params'].get('service') == 'google'
     assert 'inteligencia artificial' in res['params'].get('query', '')
 
+
+@pytest.mark.parametrize('text,expected_url', [
+    ('SKY, abre WhatsApp', 'web.whatsapp.com'),
+    ('abre Facebook', 'facebook.com'),
+    ('abre Instagram', 'instagram.com'),
+    ('abre TikTok', 'tiktok.com'),
+    ('abre Twitter', 'x.com'),
+    ('abre LinkedIn', 'linkedin.com'),
+])
+def test_interpretar_redes_sociales_open(text, expected_url):
+    res = dispositivos.interpret_command(text)
+    assert res is not None
+    assert res['action'] == 'open_url'
+    assert expected_url in res['params']['url']
+
+
+@pytest.mark.parametrize('text,expected_subaction,expected_plat', [
+    ('publica en facebook un saludo a la comunidad', 'post', 'facebook'),
+    ('crea un post para instagram sobre tecnología', 'post', 'instagram'),
+    ('sube foto a tiktok', 'post', 'tiktok'),
+    ('envia mensaje por whatsapp a Carlos diciendo ya voy', 'message', 'whatsapp'),
+    ('comenta en la publicacion diciendo felicitaciones', 'comment', 'redes'),
+])
+def test_interpretar_social_actions(text, expected_subaction, expected_plat):
+    res = dispositivos.interpret_command(text)
+    assert res is not None
+    assert res['action'] == 'social_action'
+    assert res['params']['subaction'] == expected_subaction
+    assert res['params']['platform'] == expected_plat
+
+
+@pytest.mark.parametrize('text,expected_target', [
+    ('abre mi carpeta de documentos', 'documentos'),
+    ('abre mi carpeta de descargas', 'descargas'),
+    ('abre el archivo balance.xlsx', 'balance.xlsx'),
+    ('abre el documento reporte.docx', 'reporte.docx'),
+    ('abre el pdf manual.pdf', 'manual.pdf'),
+])
+def test_interpretar_open_file(text, expected_target):
+    res = dispositivos.interpret_command(text)
+    assert res is not None
+    assert res['action'] == 'open_file'
+    assert res['params']['target'] == expected_target
+
+
+def test_windows_controller_open_special_folder(monkeypatch):
+    from neural_core import windows_controller
+    monkeypatch.setattr("os.startfile", lambda p: None)
+    res = windows_controller.open_local_file_or_folder("documentos")
+    assert res['ok'] is True
+    assert res['type'] == 'folder'
+
+

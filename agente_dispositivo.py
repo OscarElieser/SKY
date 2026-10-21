@@ -108,6 +108,10 @@ def execute_action(action,params):
             raise ValueError('Sólo se admiten páginas HTTPS normales.')
         opened=webbrowser.open(url,new=2)
         return {'ok':bool(opened),'message':'Se solicitó abrir la página en el navegador.'}
+    if action=='open_file':
+        target = str(params.get('target', ''))
+        from neural_core.windows_controller import open_local_file_or_folder
+        return open_local_file_or_folder(target)
     raise ValueError('Acción no permitida.')
 
 

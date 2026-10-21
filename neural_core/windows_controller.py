@@ -235,6 +235,104 @@ def launch_authorized_app(app_id: str) -> Dict[str, Any]:
         }
 
 
+SAFE_FILE_EXTENSIONS = {
+    '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt',
+    '.pdf', '.txt', '.csv', '.json', '.md',
+    '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp',
+    '.mp4', '.mkv', '.avi', '.mp3', '.wav'
+}
+
+SPECIAL_FOLDERS = {
+    'documentos': 'Documents',
+    'documents': 'Documents',
+    'descargas': 'Downloads',
+    'downloads': 'Downloads',
+    'escritorio': 'Desktop',
+    'desktop': 'Desktop',
+    'imagenes': 'Pictures',
+    'fotos': 'Pictures',
+    'pictures': 'Pictures',
+    'videos': 'Videos',
+    'musica': 'Music'
+}
+
+
+def open_local_file_or_folder(target: str) -> Dict[str, Any]:
+    """Abre un archivo (Word, Excel, PowerPoint, PDF, imagen, video) o carpeta en Windows de forma segura."""
+    clean = target.strip()
+    if not clean:
+        raise ValueError("Debes indicar el archivo o carpeta a abrir.")
+
+    # 1. Carpeta especial del sistema
+    norm_t = clean.lower().replace('mi ', '').replace('carpeta de ', '').replace('carpeta ', '').strip()
+    if norm_t in SPECIAL_FOLDERS:
+        folder_path = Path.home() / SPECIAL_FOLDERS[norm_t]
+        if folder_path.exists():
+            if platform.system().lower() == 'windows':
+                os.startfile(str(folder_path))
+            return {
+                'ok': True,
+                'path': str(folder_path),
+                'type': 'folder',
+                'message': f"Carpeta '{SPECIAL_FOLDERS[norm_t]}' abierta en el Explorador de Windows."
+            }
+
+    # 2. Archivo por ruta directa
+    p = Path(clean)
+    if p.exists() and p.is_file():
+        ext = p.suffix.lower()
+        if ext not in SAFE_FILE_EXTENSIONS:
+            raise ValueError(f"Extensión '{ext}' no autorizada por seguridad.")
+        if platform.system().lower() == 'windows':
+            os.startfile(str(p))
+        return {
+            'ok': True,
+            'path': str(p),
+            'type': 'file',
+            'message': f"Abriendo '{p.name}' con su aplicación predeterminada."
+        }
+
+    # 3. Búsqueda por nombre en carpetas del usuario
+    candidate_dirs = [
+        Path.cwd(),
+        Path.home() / 'Documents',
+        Path.home() / 'Desktop',
+        Path.home() / 'Downloads',
+        Path.home() / 'Pictures',
+        Path.home() / 'Videos',
+    ]
+    for d in candidate_dirs:
+        if not d.exists():
+            continue
+        cand = d / clean
+        if cand.exists() and cand.is_file():
+            ext = cand.suffix.lower()
+            if ext in SAFE_FILE_EXTENSIONS:
+                if platform.system().lower() == 'windows':
+                    os.startfile(str(cand))
+                return {
+                    'ok': True,
+                    'path': str(cand),
+                    'type': 'file',
+                    'message': f"Abriendo '{cand.name}' con su aplicación predeterminada."
+                }
+        try:
+            for item in d.glob(f"*{clean}*"):
+                if item.is_file() and item.suffix.lower() in SAFE_FILE_EXTENSIONS:
+                    if platform.system().lower() == 'windows':
+                        os.startfile(str(item))
+                    return {
+                        'ok': True,
+                        'path': str(item),
+                        'type': 'file',
+                        'message': f"Abriendo '{item.name}' con su aplicación predeterminada."
+                    }
+        except Exception:
+            pass
+
+    raise FileNotFoundError(f"No se encontró el archivo o carpeta '{clean}' en tus documentos, escritorio o descargas.")
+
+
 def _ensure_interactive_desktop() -> None:
     """Asegura que el hilo esté conectado a la estación de ventanas interactiva en Windows."""
     if platform.system().lower() != 'windows':
