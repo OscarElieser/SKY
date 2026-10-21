@@ -573,9 +573,11 @@ def client_bootstrap(request: Request):
     """Inicializa la sesión directa del creador/superadministrador en localhost."""
     client_ip = request.client.host if request.client else '127.0.0.1'
     is_local = client_ip in ('127.0.0.1', '::1', 'localhost', 'testserver')
+    # En despliegues públicos, una conexión interna del proxy no prueba que sea el dueño.
+    reveal_owner_key = is_local and os.getenv('SKY_DEPLOYMENT_MODE', 'local').strip().lower() == 'local'
     return {
         'superadmin': 'oscarelieser.informatica.inatec@gmail.com',
-        'key': api_token() if is_local else '',
+        'key': api_token() if reveal_owner_key else '',
         'local': is_local,
         'ollama_active': True,
         'gemini_active': bool(os.getenv('GEMINI_API_KEY')),
