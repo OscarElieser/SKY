@@ -485,3 +485,33 @@ def restore_user_window(target: Optional[str] = None) -> Dict[str, Any]:
             user32.SetForegroundWindow(first['hwnd'])
             return {'ok': True, 'title': first['title'], 'message': f"Ventana «{first['title']}» restaurada."}
         raise RuntimeError("No hay ventanas disponibles para restaurar.")
+
+
+def close_user_window(target: Optional[str] = None) -> Dict[str, Any]:
+    """Cierra de forma limpia una ventana de usuario mediante WM_CLOSE."""
+    if platform.system().lower() != 'windows':
+        raise RuntimeError("La gestión de ventanas requiere Windows en esta fase.")
+
+    _ensure_interactive_desktop()
+    user32 = ctypes.windll.user32
+    WM_CLOSE = 0x0010
+
+    if target:
+        windows = list_user_windows()
+        target_clean = target.strip().lower()
+        for w in windows:
+            if target_clean in w['title'].lower():
+                user32.PostMessageW(w['hwnd'], WM_CLOSE, 0, 0)
+                return {'ok': True, 'title': w['title'], 'message': f"Ventana «{w['title']}» cerrada."}
+        raise ValueError(f"No se encontró una ventana que coincida con '{target}'.")
+    else:
+        hwnd = user32.GetForegroundWindow()
+        if hwnd:
+            length = user32.GetWindowTextLengthW(hwnd)
+            buff = ctypes.create_unicode_buffer(length + 1)
+            user32.GetWindowTextW(hwnd, buff, length + 1)
+            title = buff.value or "Ventana activa"
+            user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+            return {'ok': True, 'title': title, 'message': f"Ventana «{title}» cerrada."}
+        raise RuntimeError("No se detectó una ventana en primer plano para cerrar.")
+

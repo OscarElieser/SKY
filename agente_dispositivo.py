@@ -95,6 +95,9 @@ def execute_action(action,params):
             return minimize_user_window(params.get('target'))
         if subaction=='restore':
             return restore_user_window(params.get('target'))
+        if subaction=='close':
+            from neural_core.windows_controller import close_user_window
+            return close_user_window(params.get('target'))
     if action in NOTE_ACTIONS:
         return run_note_action(action, params)
     if action=='media_key':
@@ -115,6 +118,24 @@ def execute_action(action,params):
     if action=='player_control':
         sub = str(params.get('subaction', 'mode_normal'))
         return {'ok': True, 'message': f'Modo de reproductor SKY actualizado a {sub}.'}
+    if action=='task_action':
+        subaction = params.get('subaction', 'create_presentation')
+        from neural_core.task_manager import gestor_tareas
+        if subaction == 'create_presentation':
+            topic = params.get('topic', 'tema general')
+            t = gestor_tareas.create_task('presentation', f"Presentación: {topic}", f"Preparando presentación sobre {topic}", params)
+            gestor_tareas.run_presentation_task(t.id, topic)
+            return {'ok': True, 'task_id': t.id, 'message': f"Inicié la preparación de la presentación sobre «{topic}» en segundo plano."}
+        elif subaction == 'append':
+            mod = params.get('modification', '')
+            t = gestor_tareas.append_to_active_task(mod)
+            if t:
+                return {'ok': True, 'task_id': t.id, 'message': f"Modificación registrada en la tarea activa «{t.title}»: agregar {mod}."}
+            return {'ok': True, 'message': f"Registré la nota para el trabajo: {mod}."}
+        elif subaction == 'create_document':
+            topic = params.get('topic', 'documento general')
+            t = gestor_tareas.create_task('document', f"Documento: {topic}", f"Creando documento sobre {topic}", params)
+            return {'ok': True, 'task_id': t.id, 'message': f"Preparando documento sobre «{topic}»."}
     raise ValueError('Acción no permitida.')
 
 

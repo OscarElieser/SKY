@@ -155,3 +155,59 @@ def test_interpret_player_control_modes():
     assert "queen" in m9["params"]["query"].lower()
 
 
+def test_close_window_command():
+    from neural_core.dispositivos import interpret_command
+    c1 = interpret_command("SKY, cerrá Word")
+    assert c1["action"] == "window_action"
+    assert c1["params"]["subaction"] == "close"
+    assert "word" in c1["params"]["target"].lower()
+
+    c2 = interpret_command("SKY, cerrá la ventana")
+    assert c2["action"] == "window_action"
+    assert c2["params"]["subaction"] == "close"
+
+
+def test_task_action_presentation_and_append():
+    from neural_core.dispositivos import interpret_command
+    t1 = interpret_command("SKY, prepará una presentación sobre los volcanes de Nicaragua")
+    assert t1["action"] == "task_action"
+    assert t1["params"]["subaction"] == "create_presentation"
+    assert "volcanes de nicaragua" in t1["params"]["topic"].lower()
+
+    t2 = interpret_command("SKY, agregá fotografías de los volcanes")
+    assert t2["action"] == "task_action"
+    assert t2["params"]["subaction"] == "append"
+    assert "volcanes" in t2["params"]["modification"].lower()
+
+    t3 = interpret_command("SKY, creá un documento sobre fauna silvestre")
+    assert t3["action"] == "task_action"
+    assert t3["params"]["subaction"] == "create_document"
+    assert "fauna silvestre" in t3["params"]["topic"].lower()
+
+    txt = interpret_command("SKY, quiero escribir")
+    assert txt["action"] == "player_control"
+    assert txt["params"]["subaction"] == "text_mode"
+
+
+def test_task_manager_execution():
+    from neural_core.task_manager import TaskManager
+    tm = TaskManager()
+    t = tm.create_task('presentation', "Presentación Volcanes", "Preparando...")
+    assert t.status == 'pending'
+    assert tm.get_active_task().id == t.id
+
+    tm.update_progress(t.id, 50, 'running', "Estructurando diapositivas...")
+    assert tm.get_task(t.id).progress == 50
+    assert tm.get_task(t.id).status == 'running'
+
+    t_mod = tm.append_to_active_task("Agregar fotos del volcán Masaya")
+    assert t_mod is not None
+    assert len(t_mod.params['modifications']) == 1
+    assert "Masaya" in t_mod.params['modifications'][0]['text']
+
+    tm.complete_task(t.id, {'ok': True, 'path': 'test.pptx'})
+    assert tm.get_task(t.id).status == 'completed'
+    assert tm.get_task(t.id).progress == 100
+
+
+

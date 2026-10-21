@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .dispositivos import APP_OPTIONS, MEDIA_KEYS, WINDOW_SUBACTIONS, call_device
 
-SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key", "window_action", "open_file", "player_control"})
+SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key", "window_action", "open_file", "player_control", "task_action"})
 _TOKEN_PATH = Path.home() / ".neuralt" / "device_agent.token"
 
 
@@ -76,5 +76,7 @@ def execute_safe_local(intent: dict) -> str:
     if action == "player_control":
         sub = params.get("subaction", "")
         return f"Comando de reproductor recibido ({sub}). Modo actualizado en el asistente."
+    if action == "task_action":
+        return result.get("message") or "Tarea en segundo plano procesada por SKY-IA."
 
     return "SKY está conectado con tu equipo: " + str(result.get("device", "equipo local")) + "."

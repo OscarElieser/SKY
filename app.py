@@ -41,7 +41,7 @@ from neural_core.sky_evolution import (feedback as sky_feedback, feedback_resume
 from neural_core.sky_agent import SKILLS, execute_skill, interpret_local_command
 from neural_core.sky_live import historial as sky_live_historial, ejecutar_ciclo as sky_live_check
 
-st.set_page_config(page_title="SKY JARVIS · Asistente Universal", page_icon="⚡", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="SKY-IA · Asistente Universal", page_icon="⚡", layout="wide", initial_sidebar_state="collapsed")
 # Si se desea abrir el panel desde otro dispositivo mediante Tailscale, definir
 # SKY_DASHBOARD_PASSWORD de al menos 12 caracteres en .env.
 clave_panel=(os.getenv('SKY_DASHBOARD_PASSWORD') or os.getenv('NEURALT_DASHBOARD_PASSWORD','')).strip()
@@ -123,7 +123,7 @@ SECCIONES_TECNICAS = [
 ]
 
 with st.sidebar:
-    st.markdown("### 🧠 SKY Jarvis")
+    st.markdown("### 🧠 SKY-IA")
     st.caption("Asistente Central · 26 módulos internos")
     
     modo_interfaz = st.radio(
@@ -773,7 +773,7 @@ def render_social_card(datos):
                 border-radius: 14px; padding: 16px 20px 10px 20px; margin: 12px 0; box-shadow: 0 0 25px rgba(0, 242, 255, 0.15);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <span style="color: #00f2ff; font-family: 'Orbitron', monospace; font-size: 0.95rem; font-weight: 700;">
-                {ico} CENTRO SOCIAL SKY JARVIS · {platform.upper()}
+                {ico} CENTRO SOCIAL SKY-IA · {platform.upper()}
             </span>
             <span style="background: rgba(0, 242, 255, 0.15); color: #00f2ff; border: 1px solid #00f2ff; padding: 3px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 600;">
                 MODO INTERACTIVO
@@ -783,7 +783,7 @@ def render_social_card(datos):
     """, unsafe_allow_html=True)
 
     if subaction == 'post':
-        content = datos.get('content', '') or f"¡Hola comunidad! Comparto una actualización con SKY JARVIS. #Innovacion #{platform.title()}"
+        content = datos.get('content', '') or f"¡Hola comunidad! Comparto una actualización con SKY-IA. #Innovacion #{platform.title()}"
         edit_content = st.text_area("Texto de la publicación (Copywriting + Hashtags)", value=content, height=110, key=f"soc_post_{abs(hash(content)) % 100000}")
         
         foto = st.file_uploader("📷 Subir foto para la publicación", type=["jpg", "png", "jpeg", "webp"], key=f"soc_file_{abs(hash(content)) % 100000}")
@@ -812,7 +812,7 @@ def render_social_card(datos):
 
     elif subaction == 'message':
         recip = datos.get('recipient', '') or 'contacto'
-        msg = datos.get('message', '') or 'Hola, te escribo desde mi asistente personal SKY JARVIS.'
+        msg = datos.get('message', '') or 'Hola, te escribo desde mi asistente personal SKY-IA.'
         edit_msg = st.text_area(f"Mensaje para {recip}", value=msg, height=90, key=f"soc_msg_{abs(hash(msg)) % 100000}")
         encoded_msg = urllib.parse.quote_plus(edit_msg)
         col_m1, col_m2 = st.columns(2)
@@ -1462,12 +1462,43 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
     ]
     sugerencia_clic = st.pills("Acciones", opciones_rapidas, label_visibility="collapsed")
 
+    # Estado del servicio de voz y tareas activas en segundo plano
+    import json
+    from pathlib import Path
+    st_file = Path(__file__).resolve().parent / "local_data" / "sky_session_state.json"
+    hands_free_info = {}
+    if st_file.exists():
+        try:
+            hands_free_info = json.loads(st_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    from neural_core.task_manager import gestor_tareas
+    act_task = gestor_tareas.get_active_task()
+
+    col_stat1, col_stat2 = st.columns([1, 1])
+    with col_stat1:
+        if hands_free_info.get("hands_free_listening"):
+            st.markdown(
+                '<div style="background: rgba(0, 255, 170, 0.12); border: 1px solid #00ffaa; border-radius: 8px; padding: 5px 12px; margin-bottom: 8px; font-size: 0.8rem; color: #00ffaa; font-weight: 600;">🟢 MODO MANOS LIBRES: Escucha continua activa (Di "SKY")</div>',
+                unsafe_allow_html=True
+            )
+    with col_stat2:
+        if act_task:
+            st.markdown(
+                f'<div style="background: rgba(0, 242, 255, 0.12); border: 1px solid #00f2ff; border-radius: 8px; padding: 5px 12px; margin-bottom: 8px; font-size: 0.8rem; color: #00f2ff; font-weight: 600;">⚡ TRABAJO ACTIVO: {act_task.title} ({act_task.progress}%)</div>',
+                unsafe_allow_html=True
+            )
+
+    if act_task and act_task.status in ('pending', 'running'):
+        st.progress(act_task.progress / 100.0, text=f"Progreso de {act_task.title}: {act_task.description}")
+
     # Historial de conversación
     if "chat_jarvis_history" not in st.session_state:
         st.session_state.chat_jarvis_history = [
             {
                 "role": "assistant",
-                "content": "¡Hola Oscar! Soy **SKY JARVIS**. Todos mis módulos (control de equipo, multimedia, redes sociales, documentos Office, diseño 3D y finanzas) operan internamente en segundo plano. ¿Qué necesitas que haga?"
+                "content": "¡Hola Oscar! Soy **SKY-IA**. Todos mis módulos (control de equipo, multimedia, redes sociales, documentos Office, diseño 3D y finanzas) operan internamente en segundo plano. ¿Qué necesitas que haga?"
             }
         ]
 
@@ -1526,7 +1557,18 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                             video_id = res_yt.get('video_id', '')
                             candidates = res_yt.get('candidates', [])
                             title = res_yt.get('titulo', query or 'Queen')
-                            cur_mode = st.session_state.get('sky_player_mode', 'normal')
+                            
+                            # Miniventana manejable por defecto salvo que el usuario indique otro tamaño
+                            cur_mode = st.session_state.get('sky_player_mode')
+                            if not cur_mode:
+                                cur_mode = 'mini'
+                                if any(w in texto_limpio for w in ('ampliado', 'pantalla ancha', 'cine', 'grande')):
+                                    cur_mode = 'ampliado'
+                                elif any(w in texto_limpio for w in ('pantalla completa', 'completa')):
+                                    cur_mode = 'ampliado'
+                                elif any(w in texto_limpio for w in ('normal', 'panel normal')):
+                                    cur_mode = 'normal'
+                                st.session_state['sky_player_mode'] = cur_mode
 
                             datos_extra = {
                                 'url': url,
@@ -1550,16 +1592,16 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
 
                             if service == 'youtube':
                                 if query:
-                                    respuesta_texto = f"🎬 **SKY JARVIS**: He cargado **«{title}»** en el reproductor integrado oficial de SKY (con controles, selección de versiones y modos)."
+                                    respuesta_texto = f"🎬 **SKY-IA**: He cargado **«{title}»** en miniventana interactiva (con controles, selección de versiones y modos)."
                                 else:
-                                    respuesta_texto = "🎬 **SKY JARVIS**: He abierto YouTube en el reproductor integrado de SKY."
+                                    respuesta_texto = "🎬 **SKY-IA**: He abierto YouTube en el reproductor integrado de SKY-IA."
                                 tipo_extra = "media"
                             elif service == 'google':
-                                respuesta_texto = f"🔍 **SKY JARVIS**: He abierto la búsqueda de Google para **«{query}»** en tu navegador."
+                                respuesta_texto = f"🔍 **SKY-IA**: He abierto la búsqueda de Google para **«{query}»** en tu navegador."
                                 tipo_extra = "media"
                                 datos_extra = {'url': url, 'query': query, 'service': 'google'}
                             else:
-                                respuesta_texto = f"✅ **SKY JARVIS**: He abierto **{url}** en tu navegador local."
+                                respuesta_texto = f"✅ **SKY-IA**: He abierto **{url}** en tu navegador local."
                                 tipo_extra = "media"
                                 datos_extra = {'url': url, 'query': query, 'service': 'web'}
                         else:
@@ -1580,7 +1622,7 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                             try:
                                 from neural_core.windows_controller import (
                                     list_user_windows, focus_user_window,
-                                    minimize_user_window, restore_user_window
+                                    minimize_user_window, restore_user_window, close_user_window
                                 )
                                 subaction = cmd_device['params'].get('subaction', 'list')
                                 if subaction == 'list':
@@ -1599,6 +1641,9 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                                 elif subaction == 'restore':
                                     res_r = restore_user_window(cmd_device['params'].get('target'))
                                     respuesta_texto = f"✅ {res_r['message']}"
+                                elif subaction == 'close':
+                                    res_c = close_user_window(cmd_device['params'].get('target'))
+                                    respuesta_texto = f"✅ {res_c['message']}"
                             except Exception as err:
                                 respuesta_texto = f"⚠️ Error en ventana: {err}"
                         else:
@@ -1631,30 +1676,30 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                         if subact == 'mode_mini':
                             st.session_state['sky_player_mode'] = 'mini'
                             cur_p['mode'] = 'mini'
-                            respuesta_texto = "🎬 **SKY JARVIS**: He cambiado el reproductor a modo **Mini ventana flotante (PiP)**. Puedes moverlo y continuar navegando."
+                            respuesta_texto = "🎬 **SKY-IA**: He cambiado el reproductor a modo **Mini ventana flotante (PiP)**. Puedes moverlo y continuar navegando."
                             tipo_extra = "media"
                             datos_extra = cur_p
                         elif subact == 'mode_expanded':
                             st.session_state['sky_player_mode'] = 'ampliado'
                             cur_p['mode'] = 'ampliado'
-                            respuesta_texto = "🎬 **SKY JARVIS**: He ampliado el reproductor a **Modo Cine (Pantalla Ancha)**."
+                            respuesta_texto = "🎬 **SKY-IA**: He ampliado el reproductor a **Modo Cine (Pantalla Ancha)**."
                             tipo_extra = "media"
                             datos_extra = cur_p
                         elif subact == 'mode_fullscreen':
                             st.session_state['sky_player_mode'] = 'ampliado'
                             cur_p['mode'] = 'ampliado'
-                            respuesta_texto = "🎬 **SKY JARVIS**: Activando modo **Pantalla Completa**. Puedes utilizar el botón 🔲 en los controles del reproductor."
+                            respuesta_texto = "🎬 **SKY-IA**: Activando modo **Pantalla Completa**. Puedes utilizar el botón 🔲 en los controles del reproductor."
                             tipo_extra = "media"
                             datos_extra = cur_p
                         elif subact == 'mode_normal':
                             st.session_state['sky_player_mode'] = 'normal'
                             cur_p['mode'] = 'normal'
-                            respuesta_texto = "🎬 **SKY JARVIS**: He restaurado el reproductor a **Tamaño Normal**."
+                            respuesta_texto = "🎬 **SKY-IA**: He restaurado el reproductor a **Tamaño Normal**."
                             tipo_extra = "media"
                             datos_extra = cur_p
                         elif subact == 'close':
                             st.session_state['sky_current_player'] = None
-                            respuesta_texto = "🎬 **SKY JARVIS**: He cerrado el reproductor multimedia."
+                            respuesta_texto = "🎬 **SKY-IA**: He cerrado el reproductor multimedia."
                         elif subact == 'next':
                             cands = cur_p.get('candidates', [])
                             if cands:
@@ -1662,7 +1707,7 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                                 cur_p['video_id'] = cur_p['candidates'][0]['id']
                                 cur_p['title'] = cur_p['candidates'][0]['title']
                                 cur_p['url'] = f"https://www.youtube.com/watch?v={cur_p['video_id']}"
-                            respuesta_texto = f"⏭️ **SKY JARVIS**: Saltando al siguiente video: **{cur_p.get('title')}**."
+                            respuesta_texto = f"⏭️ **SKY-IA**: Saltando al siguiente video: **{cur_p.get('title')}**."
                             tipo_extra = "media"
                             datos_extra = cur_p
                         elif subact in ('pause', 'play'):
@@ -1671,18 +1716,51 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                                 send_media_key('play_pause')
                             except Exception:
                                 pass
-                            respuesta_texto = f"⏯️ **SKY JARVIS**: {'Pausando' if subact == 'pause' else 'Reanudando'} reproducción."
+                            respuesta_texto = f"⏯️ **SKY-IA**: {'Pausando' if subact == 'pause' else 'Reanudando'} reproducción."
                             tipo_extra = "media"
                             datos_extra = cur_p
+                        elif subact == 'text_mode':
+                            st.session_state['sky_text_mode_focus'] = True
+                            respuesta_texto = "✍️ **SKY-IA**: Modo de chat escrito activado. Mantengo tu historial, contexto, tareas y música en segundo plano. ¿Qué deseas escribir?"
                         if subact != 'close':
                             st.session_state['sky_current_player'] = cur_p
+                    elif cmd_device['action'] == 'task_action':
+                        subact = cmd_device['params'].get('subaction', 'create_presentation')
+                        from neural_core.task_manager import gestor_tareas
+                        if subact == 'create_presentation':
+                            topic = cmd_device['params'].get('topic', 'tema general')
+                            t = gestor_tareas.create_task('presentation', f"Presentación: {topic}", f"Preparando presentación sobre {topic}", cmd_device['params'])
+                            gestor_tareas.run_presentation_task(t.id, topic)
+                            respuesta_texto = f"📽️ **SKY-IA**: He iniciado la preparación de la presentación sobre **«{topic}»** en segundo plano con Office Studio. Mientras avanza, puedes seguir conversando conmigo o pedirme que agregue fotos y detalles."
+                            tipo_extra = "archivo"
+                            datos_extra = {'path': f"Presentacion_{topic}.pptx", 'type': 'file', 'task_id': t.id}
+                        elif subact == 'append':
+                            mod = cmd_device['params'].get('modification', '')
+                            t = gestor_tareas.append_to_active_task(mod)
+                            if t and t.kind == 'presentation':
+                                mods = [m['text'] for m in t.params.get('modifications', [])]
+                                gestor_tareas.run_presentation_task(t.id, t.params.get('topic', 'trabajo'), mods)
+                                respuesta_texto = f"✨ **SKY-IA**: He incorporado tu solicitud (**«{mod}»**) a la presentación en curso sin interrumpir nuestro diálogo."
+                            else:
+                                respuesta_texto = f"✨ **SKY-IA**: Modificación registrada para el trabajo en curso: **«{mod}»**."
+                        elif subact == 'create_document':
+                            topic = cmd_device['params'].get('topic', 'documento general')
+                            from neural_core.sky_office import create_document
+                            gen_doc = create_document('docx', topic, f"# {topic.title()}\n\nDocumento generado por SKY-IA.\n\nContenido base estructurado y listo para edición.")
+                            docs_dir = Path.home() / "Documents" / "SKY_Office"
+                            docs_dir.mkdir(parents=True, exist_ok=True)
+                            out_p = docs_dir / gen_doc.filename
+                            out_p.write_bytes(gen_doc.data)
+                            respuesta_texto = f"📄 **SKY-IA**: He creado el documento **«{gen_doc.filename}»** en tu carpeta de Documentos."
+                            tipo_extra = "archivo"
+                            datos_extra = {'path': str(out_p), 'type': 'file'}
                     elif cmd_device['action'] == 'open_file':
                         if ejecucion_dispositivo:
                             try:
                                 from neural_core.windows_controller import open_local_file_or_folder
                                 target_f = cmd_device['params'].get('target', '')
                                 res_f = open_local_file_or_folder(target_f)
-                                respuesta_texto = f"📂 **SKY JARVIS**: {res_f['message']}"
+                                respuesta_texto = f"📂 **SKY-IA**: {res_f['message']}"
                                 tipo_extra = "archivo"
                                 datos_extra = res_f
                             except Exception as err:
@@ -1695,12 +1773,12 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                         tipo_extra = "social"
                         datos_extra = cmd_device['params']
                         if subact == 'post':
-                            respuesta_texto = f"📣 **SKY JARVIS**: He preparado tu publicación para **{plat.title()}**. Puedes redactar, adjuntar fotos y publicar directamente."
+                            respuesta_texto = f"📣 **SKY-IA**: He preparado tu publicación para **{plat.title()}**. Puedes redactar, adjuntar fotos y publicar directamente."
                         elif subact == 'message':
                             recip = cmd_device['params'].get('recipient', '')
-                            respuesta_texto = f"💬 **SKY JARVIS**: He preparado tu mensaje para **{recip}** en **WhatsApp**. Puedes enviarlo con un clic."
+                            respuesta_texto = f"💬 **SKY-IA**: He preparado tu mensaje para **{recip}** en **WhatsApp**. Puedes enviarlo con un clic."
                         elif subact == 'comment':
-                            respuesta_texto = f"✍️ **SKY JARVIS**: Generé un comentario optimizado para **{plat.title()}**."
+                            respuesta_texto = f"✍️ **SKY-IA**: Generé un comentario optimizado para **{plat.title()}**."
                     elif cmd_device['action'] == 'status':
                         import platform
                         respuesta_texto = f"🖥️ **Estado de tu computadora:**\n- Dispositivo: `{platform.node()}`\n- Sistema: `{platform.system()} {platform.release()}`\n- Plataforma: `{platform.platform()}`\n- Agente local: Conectado y operativo."

@@ -21,13 +21,14 @@ ACTION_CAPABILITIES = {
     'open_file': 'Abrir documentos o carpetas locales en el equipo (Windows)',
     'social_action': 'Gestionar publicaciones, mensajes y comentarios en redes sociales',
     'player_control': 'Control del reproductor de video (modos, tamaño, pausa, cerrar)',
+    'task_action': 'Gestionar tareas en segundo plano (presentaciones, documentos, modificaciones)',
 }
 APP_OPTIONS = [
     'calculator', 'text_editor', 'file_manager', 'browser',
     'chrome', 'edge', 'firefox',
     'word', 'excel', 'powerpoint', 'vscode'
 ]
-WINDOW_SUBACTIONS = frozenset({'list', 'focus', 'minimize', 'restore'})
+WINDOW_SUBACTIONS = frozenset({'list', 'focus', 'minimize', 'restore', 'close'})
 MEDIA_KEYS = frozenset({'play_pause','next_track','previous_track','volume_up','volume_down','mute'})
 _REGISTRY = Path(__file__).resolve().parent.parent / 'local_data' / 'paired_devices.json'
 
@@ -173,6 +174,38 @@ def interpret_command(text: str):
         target = '' if raw_t in ('ventana', 'la ventana', '') else raw_t
         return {'action': 'window_action', 'params': {'subaction': 'restore', 'target': target},
                 'description': f'Restaurar ventana {target}' if target else 'Restaurar ventana'}
+
+    m_close = re.search(r'\b(?:cierra|cerrar|cerra)\s+(?:la\s+ventana\s*(?:de\s*)?|ventana\s*(?:de\s*)?|la\s+app\s*(?:de\s*)?|la\s+aplicacion\s*(?:de\s*)?)?([a-z0-9_\-\. ]{2,50})?\b', clean)
+    if m_close and not re.search(r'\b(reproductor|video|musica|cancion)\b', clean):
+        raw_t = (m_close.group(1) or '').strip()
+        target = '' if raw_t in ('ventana', 'la ventana', 'app', 'la app', '') else raw_t
+        return {'action': 'window_action', 'params': {'subaction': 'close', 'target': target},
+                'description': f'Cerrar ventana {target}' if target else 'Cerrar ventana activa'}
+
+    # Modo texto inmediato ("SKY, quiero escribir")
+    if re.search(r'\b(?:quiero\s+escribir|abrir?\s+(?:el\s+)?chat|modo\s+texto|escribir\s+por\s+chat|activar?\s+chat)\b', clean):
+        return {'action': 'player_control', 'params': {'subaction': 'text_mode'},
+                'description': 'Activar modo de texto / chat'}
+
+    # Tareas en segundo plano / presentaciones / documentos Office
+    m_pres = re.search(r'\b(?:prepara|preparar|crea|crear|hace|hacer|arma|armar)\s+(?:una\s+)?presentacion\s+(?:sobre|de|acerca\s+de)\s+(.+)', clean)
+    if m_pres:
+        topic = m_pres.group(1).strip()
+        return {'action': 'task_action', 'params': {'subaction': 'create_presentation', 'topic': topic},
+                'description': f'Preparar presentación sobre {topic}'}
+
+    m_add_task = re.search(r'\b(?:agrega|agregar|anade|añade|incluye|incluir)\s+(?:fotografias|fotos|imagenes|datos|informacion|detalles)\s+(?:de\s+|sobre\s+|a\s+la\s+presentacion\s+(?:de\s+|sobre\s+)?|al\s+trabajo\s+(?:de\s+|sobre\s+)?)?(.+)', clean)
+    if m_add_task and not re.search(r'\b(nota|cancion|video)\b', clean):
+        detail = m_add_task.group(1).strip()
+        return {'action': 'task_action', 'params': {'subaction': 'append', 'modification': detail},
+                'description': f'Modificar trabajo en curso: agregar {detail}'}
+
+    m_doc = re.search(r'\b(?:crea|crear|genera|generar|arma|armar)\s+(?:un\s+)?documento\s+(?:nuevo\s+)?(?:sobre|de|llamado|titulado)?\s*(.+)?', clean)
+    if m_doc and not re.search(r'\b(nota|presentacion)\b', clean):
+        topic = (m_doc.group(1) or 'documento general').strip()
+        return {'action': 'task_action', 'params': {'subaction': 'create_document', 'topic': topic},
+                'description': f'Crear documento sobre {topic}'}
+
 
     # YouTube y reproducción de medios / música
     yt_match = re.search(r'\b(?:abre|abrir|abri|pon|pone|poner|reproduce|reproducir|busca|buscar)\s+(?:en\s+)?youtube(?:\s+(?:y\s+)?(?:pon|pone|poner|busca|buscar|con|el\s+video\s+de|la\s+cancion\s+de|de)?\s*(.*))?', clean)

@@ -87,7 +87,7 @@ def main():
     history=[]
     def say(message):
         nonlocal speaking
-        print('SKY:',message)
+        print('SKY-IA:',message)
         if tts:
             speaking=True
             try:
@@ -97,6 +97,25 @@ def main():
                 while not audio.empty():
                     try: audio.get_nowait()
                     except queue.Empty: break
+
+    def sync_state(data):
+        try:
+            st_path = Path(__file__).resolve().parent / 'local_data' / 'sky_session_state.json'
+            st_path.parent.mkdir(parents=True, exist_ok=True)
+            existing = {}
+            if st_path.exists():
+                try: existing = json.loads(st_path.read_text(encoding='utf-8'))
+                except Exception: pass
+            existing.update(data)
+            st_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8')
+        except Exception:
+            pass
+
+    import time
+    SESSION_TIMEOUT = 25.0
+    active_until = 0.0
+    sync_state({'hands_free_listening': True, 'last_seen': time.time(), 'status': 'ready'})
+
     try:
         with stream:
             while True:
@@ -104,18 +123,43 @@ def main():
                 if not recognizer.AcceptWaveform(buffer): continue
                 result=json.loads(recognizer.Result()).get('text','').strip()
                 if not result: continue
-                command=text_after_wake(result)
-                if command is None: continue
+                now = time.time()
+                command = text_after_wake(result)
+
+                if command is not None:
+                    # Palabra clave "SKY" detectada -> Abrir ventana conversacional de 25s
+                    active_until = now + SESSION_TIMEOUT
+                    sync_state({'session_active': True, 'active_until': active_until, 'last_wake': now})
+                elif now < active_until:
+                    # Sesión conversacional continua activa: no requiere repetir "SKY"
+                    command = result.strip(' ,.:;!?¿¡')
+                    active_until = now + SESSION_TIMEOUT
+                else:
+                    sync_state({'session_active': False})
+                    continue
+
                 if not command:
-                    say('Te escucho. Decí SKY seguido de lo que necesitás.');continue
+                    say('Te escucho. Indicame qué necesitás.')
+                    continue
+
+                # Comprobar orden de cierre de sesión de escucha
+                clean_cmd = norm(command)
+                if any(phrase in clean_cmd for phrase in ('deja de escuchar', 'para de escuchar', 'silencio', 'descansa', 'cerrar sesion', 'apagate')):
+                    active_until = 0.0
+                    sync_state({'session_active': False, 'status': 'idle'})
+                    say('Entendido, detengo la escucha continua. Decí SKY cuando me necesites.')
+                    continue
+
                 print('Escuchado:',command)
+                sync_state({'last_command': command, 'timestamp': now})
                 intent=interpret_command(command)
                 if intent:
                     from neural_core.sky_voice_actions import SAFE_ACTIONS
                     if args.execute_safe and intent.get('action') in SAFE_ACTIONS:
                         from neural_core.sky_voice_actions import execute_safe_local
                         try:
-                            say(execute_safe_local(intent))
+                            msg_resp = execute_safe_local(intent)
+                            say(msg_resp)
                         except (ValueError, RuntimeError, OSError) as exc:
                             say('No se pudo ejecutar la orden. Revisá que el agente local esté activo y autorizado.')
                             print('Detalle:',str(exc))
@@ -133,6 +177,7 @@ def main():
                     say('No pude completar esta consulta. Revisá la conexión y la configuración de Gemini u Ollama.')
                     print('Detalle:',str(exc))
     except KeyboardInterrupt:
-        print('Micrófono desactivado. SKY finalizado.')
+        sync_state({'hands_free_listening': False, 'session_active': False, 'status': 'stopped'})
+        print('Micrófono desactivado. SKY-IA finalizado.')
 
 if __name__=='__main__': main()
