@@ -13,8 +13,10 @@ ACTION_CAPABILITIES = {
     'status': 'Consultar estado del dispositivo',
     'open_url': 'Abrir un sitio web en el dispositivo',
     'launch_app': 'Abrir una aplicación permitida en el dispositivo',
+    'media_key': 'Enviar tecla multimedia al reproductor del dispositivo (Windows)',
 }
 APP_OPTIONS = ['calculator', 'text_editor', 'file_manager', 'browser']
+MEDIA_KEYS = frozenset({'play_pause','next_track','previous_track','volume_up','volume_down','mute'})
 _REGISTRY = Path(__file__).resolve().parent.parent / 'local_data' / 'paired_devices.json'
 
 
@@ -92,6 +94,33 @@ def interpret_command(text: str):
     if not clean: return None
     if re.search(r'\b(estado|informacion|informacion del|diagnostico|como esta)\b.*\b(equipo|pc|computadora|ordenador|dispositivo)\b',clean):
         return {'action':'status','params':{},'description':'Consultar estado del equipo'}
+    # Las teclas multimedia NO confirman el estado real del reproductor.
+    # Se priorizan expresiones concretas, antes de interpretar órdenes de abrir.
+    media_phrases = (
+        (r'\\b(siguiente|proxima)\\b.*\\b(cancion|pista|video|tema)\\b', 'next_track'),
+        (r'\\b(anterior|previa)\\b.*\\b(cancion|pista|video|tema)\\b', 'previous_track'),
+        (r'\\b(sube|subir|aumenta)\\b.*\\bvolumen\\b', 'volume_up'),
+        (r'\\b(baja|bajar|reduce)\\b.*\\bvolumen\\b', 'volume_down'),
+        (r'\\b(silencia|silenciar|mutea|mutear)\\b', 'mute'),
+        (r'\\b(pausa|pausar|reanuda|reanudar|continua|continuar)\\b.*\\b(musica|video|reproduccion|cancion)\\b', 'play_pause'),
+        (r'\\b(reproduce|reproducir|pausa|reanuda)\\b\\s*
+        for term,app in [('calculadora','calculator'),('bloc de notas','text_editor'),('editor de texto','text_editor'),('archivos','file_manager'),('explorador de archivos','file_manager')]:
+            if term in clean: return {'action':'launch_app','params':{'app':app},'description':f'Abrir {term}'}
+        sites={'youtube':'https://www.youtube.com','google':'https://www.google.com',
+               'baqueano':'https://baqueanonicaragua.com','wikipedia':'https://www.wikipedia.org'}
+        for term,url in sites.items():
+            if term in clean:
+                return {'action':'open_url','params':{'url':url},'description':f'Abrir {url}'}
+        m=re.search(r'https?://[^\s,;]+',text,re.I)
+        if m:
+            return {'action':'open_url','params':{'url':m.group(0)},'description':'Abrir URL indicada'}
+    return None
+, 'play_pause'),
+    )
+    for pattern, key in media_phrases:
+        if re.search(pattern, clean):
+            return {'action':'media_key','params':{'key':key},
+                    'description':'Enviar tecla multimedia '+key}
     if re.search(r'\b(abre|abri|abrir|inicia|iniciar|ejecuta|ejecutar)\b',clean):
         for term,app in [('calculadora','calculator'),('bloc de notas','text_editor'),('editor de texto','text_editor'),('archivos','file_manager'),('explorador de archivos','file_manager')]:
             if term in clean: return {'action':'launch_app','params':{'app':app},'description':f'Abrir {term}'}
