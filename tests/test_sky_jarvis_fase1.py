@@ -153,3 +153,29 @@ def test_voice_actions_window_list(monkeypatch):
     assert "Ventanas abiertas" in msg
     assert "Documento 1" in msg
     assert "Navegador" in msg
+
+
+@pytest.mark.parametrize('text,expected_query', [
+    ('SKY, abre YouTube y pon Queen Bohemian Rhapsody', 'Queen Bohemian Rhapsody'),
+    ('busca en youtube tutoriales de python', 'tutoriales de python'),
+    ('pon en youtube shakira', 'shakira'),
+    ('pon musica de michael jackson', 'michael jackson'),
+    ('reproduce coldplay', 'coldplay'),
+])
+def test_interpretar_media_youtube(text, expected_query):
+    res = dispositivos.interpret_command(text)
+    assert res is not None, f"No reconoció orden multimedia: {text}"
+    assert res['action'] == 'open_url'
+    assert 'youtube.com' in res['params']['url']
+    assert res['params'].get('service') == 'youtube'
+    assert expected_query.lower() in res['params'].get('query', '').lower()
+
+
+def test_interpretar_busqueda_google():
+    res = dispositivos.interpret_command("busca en google inteligencia artificial")
+    assert res is not None
+    assert res['action'] == 'open_url'
+    assert 'google.com/search' in res['params']['url']
+    assert res['params'].get('service') == 'google'
+    assert 'inteligencia artificial' in res['params'].get('query', '')
+

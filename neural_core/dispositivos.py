@@ -157,6 +157,53 @@ def interpret_command(text: str):
         return {'action': 'window_action', 'params': {'subaction': 'restore', 'target': target},
                 'description': f'Restaurar ventana {target}' if target else 'Restaurar ventana'}
 
+    # YouTube y reproducción de medios / música
+    yt_match = re.search(r'\b(?:abre|abrir|abri|pon|poner|reproduce|reproducir|busca|buscar)\s+(?:en\s+)?youtube(?:\s+(?:y\s+)?(?:pon|poner|busca|buscar|con|el\s+video\s+de|la\s+cancion\s+de|de)?\s*(.*))?', clean)
+    if not yt_match and 'youtube' in clean and any(w in clean for w in ['pon', 'busca', 'reproduce', 'ver']):
+        yt_match = re.search(r'\byoutube\s+(?:pon|busca|reproduce|ver)\s+(.*)', clean)
+    if yt_match:
+        raw_query = (yt_match.group(1) or '').strip()
+        raw_query = re.sub(r'^(?:y\s+pon|y\s+reproduce|pon|reproduce|busca|con|de)\s+', '', raw_query).strip()
+        if raw_query:
+            encoded = urllib.parse.quote_plus(raw_query)
+            url = f"https://www.youtube.com/results?search_query={encoded}"
+            return {
+                'action': 'open_url',
+                'params': {'url': url, 'query': raw_query, 'service': 'youtube', 'media_type': 'video'},
+                'description': f'Abrir YouTube: {raw_query}'
+            }
+        else:
+            return {'action': 'open_url', 'params': {'url': 'https://www.youtube.com'}, 'description': 'Abrir https://www.youtube.com'}
+
+    # Reproducción multimedia directa (música o videos)
+    m_music = re.search(r'\b(?:pon|poner|reproduce|reproducir|toca|tocar)\s+(?:musica|una\s+cancion|cancion|un\s+video|video|el\s+tema|tema)?\s*(?:de|a|el|la)?\s*([a-z0-9_\-\. ]{2,80})$', clean)
+    if m_music and not re.search(r'\b(nota|calculadora|bloc|explorador|ventana|archivo)\b', clean):
+        query = m_music.group(1).strip()
+        query = re.sub(r'^(?:de|a|el|la)\s+', '', query).strip()
+        if query and query not in ('musica', 'video', 'cancion', 'reproduccion'):
+            encoded = urllib.parse.quote_plus(query)
+            url = f"https://www.youtube.com/results?search_query={encoded}"
+            return {
+                'action': 'open_url',
+                'params': {'url': url, 'query': query, 'service': 'youtube', 'media_type': 'video'},
+                'description': f'Reproducir {query} en YouTube'
+            }
+
+    # Búsqueda en Google / Web
+    m_search = re.search(r'\b(?:busca|buscar|investiga|investigar)\s+(?:en\s+google\s+|en\s+internet\s+|en\s+la\s+web\s+)(.+)', clean)
+    if not m_search:
+        m_search = re.search(r'\b(?:abre|abrir)\s+google\s+y\s+(?:busca|investiga)\s+(.+)', clean)
+    if m_search:
+        q = m_search.group(1).strip()
+        if q:
+            encoded = urllib.parse.quote_plus(q)
+            url = f"https://www.google.com/search?q={encoded}"
+            return {
+                'action': 'open_url',
+                'params': {'url': url, 'query': q, 'service': 'google'},
+                'description': f'Buscar "{q}" en Google'
+            }
+
     if re.search(r'\b(abre|abri|abrir|inicia|iniciar|ejecuta|ejecutar|lanza|lanzar)\b', clean):
         app_terms = [
             ('calculadora', 'calculator'),

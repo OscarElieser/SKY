@@ -41,7 +41,7 @@ from neural_core.sky_evolution import (feedback as sky_feedback, feedback_resume
 from neural_core.sky_agent import SKILLS, execute_skill, interpret_local_command
 from neural_core.sky_live import historial as sky_live_historial, ejecutar_ciclo as sky_live_check
 
-st.set_page_config(page_title="SKY Universal v8.0", page_icon="🧠", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="SKY JARVIS · Asistente Universal", page_icon="⚡", layout="wide", initial_sidebar_state="collapsed")
 # Si se desea abrir el panel desde otro dispositivo mediante Tailscale, definir
 # SKY_DASHBOARD_PASSWORD de al menos 12 caracteres en .env.
 clave_panel=(os.getenv('SKY_DASHBOARD_PASSWORD') or os.getenv('NEURALT_DASHBOARD_PASSWORD','')).strip()
@@ -257,36 +257,336 @@ def mostrar_chat(area="General", prompt_inicial=None):
 SECCIONES = SECCIONES_TECNICAS
 
 
+def render_media_card(datos):
+    url = datos.get('url', '')
+    query = datos.get('query', '')
+    service = datos.get('service', 'youtube')
+    video_id = datos.get('video_id', '')
+
+    if service == 'youtube':
+        from neural_core.multimedia import resolve_youtube_video
+        if not video_id and query:
+            res_v = resolve_youtube_video(query)
+            video_id = res_v.get('video_id', '')
+            if res_v.get('url') and 'watch?v=' in res_v['url']:
+                url = res_v['url']
+        elif not url or url == 'https://www.youtube.com':
+            res_v = resolve_youtube_video("musica en vivo")
+            video_id = res_v.get('video_id', 'fJ9rUzIMcZQ')
+            url = res_v.get('url', f"https://www.youtube.com/watch?v={video_id}")
+
+        st.markdown(f"""
+        <div style="background: rgba(5, 14, 30, 0.95); border: 1px solid rgba(0, 242, 255, 0.45);
+                    border-radius: 14px; padding: 14px 18px 8px 18px; margin-top: 12px; margin-bottom: 12px;
+                    box-shadow: 0 0 25px rgba(0, 242, 255, 0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.3rem;">🎬</span>
+                    <span style="color: #00f2ff; font-weight: 700; font-family: 'Orbitron', monospace; font-size: 0.95rem; letter-spacing: 0.5px;">
+                        REPRODUCTOR HOLOGRÁFICO SKY JARVIS · {query.upper() if query else 'YOUTUBE EN VIVO'}
+                    </span>
+                </div>
+                <span style="background: rgba(0, 242, 255, 0.15); color: #00f2ff; border: 1px solid #00f2ff; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                    🟢 EN PANTALLA & VENTANA ACTIVA
+                </span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Reproducción con st.video garantizada
+        if url and 'watch?v=' in url:
+            st.video(url)
+        elif video_id:
+            st.video(f"https://www.youtube.com/watch?v={video_id}")
+        else:
+            st.video("https://www.youtube.com/watch?v=fJ9rUzIMcZQ")
+
+        col_m1, col_m2 = st.columns([1.2, 1.8])
+        with col_m1:
+            st.link_button("🖥️ ABRIR EN VENTANA / CHROME", url, type="primary")
+        with col_m2:
+            st.caption("🟢 **Ventana abierta en Windows**: Se inició en tu navegador. Si el autor restringe la inserción externa, puedes verlo en la ventana enfocada.")
+    elif service == 'google':
+        st.markdown(f"""
+        <div style="background: rgba(5, 14, 30, 0.85); border: 1px solid rgba(0, 168, 255, 0.35);
+                    border-radius: 12px; padding: 14px 18px; margin: 10px 0;">
+            <div style="color: #00f2ff; font-weight: 700; margin-bottom: 6px;">🔍 BÚSQUEDA WEB ACTIVADA</div>
+            <div style="color: #9cb8d9; font-size: 0.95rem;">Término consultado: <strong>«{query}»</strong></div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.link_button("🌐 Ver resultados en Google", url, type="primary")
+    else:
+        st.link_button(f"🌐 Abrir enlace: {url}", url, type="primary")
+
+
+
 def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
+    # Inyección de estilos de estética JARVIS / Iron Man
     st.markdown("""
-    <div style="background: radial-gradient(ellipse at 50% 0%, rgba(23, 63, 98, 0.7) 0%, rgba(10, 23, 41, 0.9) 100%);
-                border: 1px solid rgba(78, 191, 232, 0.35); border-radius: 16px; padding: 24px 28px; margin-bottom: 22px;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);">
-        <h1 style="margin: 0; font-size: 2.3rem; color: #ffffff; letter-spacing: -0.5px;">
-            🧠 SKY Universal
-        </h1>
-        <p style="margin: 8px 0 0 0; color: #9fbad0; font-size: 1.05rem;">
-            Asistente inteligente multimodal. Las 26 herramientas (finanzas, visión, 3D, office, control de equipo y agentes) se ejecutan de forma interna bajo demanda por voz o texto.
-        </p>
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;600&display=swap');
+
+    .stApp {
+        background: radial-gradient(circle at 50% 0%, #07152b 0%, #050b16 50%, #03060d 100%) !important;
+        color: #e2f1ff !important;
+        font-family: 'Rajdhani', 'Segoe UI', sans-serif !important;
+    }
+
+    [data-testid="stSidebar"] {
+        background: rgba(5, 12, 26, 0.96) !important;
+        border-right: 1px solid rgba(0, 242, 255, 0.25) !important;
+        box-shadow: 4px 0 25px rgba(0, 0, 0, 0.5) !important;
+    }
+    [data-testid="stSidebar"] * {
+        color: #d1e5ff !important;
+    }
+
+    .jarvis-hud-container {
+        background: rgba(6, 17, 36, 0.75);
+        border: 1px solid rgba(0, 242, 255, 0.4);
+        box-shadow: 0 0 35px rgba(0, 242, 255, 0.15), inset 0 0 20px rgba(0, 242, 255, 0.05);
+        border-radius: 16px;
+        padding: 20px 28px;
+        margin-bottom: 18px;
+        backdrop-filter: blur(14px);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .jarvis-hud-container::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; height: 2px;
+        background: linear-gradient(90deg, transparent, #00f2ff, #00a8ff, transparent);
+    }
+
+    .arc-reactor-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+    }
+
+    .arc-reactor {
+        position: relative;
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle, rgba(0, 242, 255, 0.3) 0%, rgba(3, 10, 22, 0.8) 70%);
+        box-shadow: 0 0 25px #00f2ff, inset 0 0 15px #00f2ff;
+        flex-shrink: 0;
+    }
+
+    .arc-ring {
+        position: absolute;
+        border-radius: 50%;
+    }
+    .ring-outer {
+        width: 66px; height: 66px;
+        border: 2px dashed rgba(0, 242, 255, 0.8);
+        animation: rotateCW 9s linear infinite;
+    }
+    .ring-middle {
+        width: 50px; height: 50px;
+        border: 2px dotted rgba(0, 168, 255, 0.9);
+        animation: rotateCCW 6s linear infinite;
+    }
+    .ring-inner {
+        width: 34px; height: 34px;
+        border: 2px solid rgba(0, 242, 255, 0.7);
+        animation: rotateCW 4s linear infinite;
+    }
+    .arc-core {
+        width: 20px; height: 20px;
+        background: #ffffff;
+        border-radius: 50%;
+        box-shadow: 0 0 20px #00f2ff, 0 0 40px #00f2ff;
+        animation: pulseCore 2s ease-in-out infinite;
+    }
+
+    @keyframes rotateCW {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    @keyframes rotateCCW {
+        from { transform: rotate(360deg); }
+        to { transform: rotate(0deg); }
+    }
+    @keyframes pulseCore {
+        0%, 100% { transform: scale(0.9); opacity: 0.85; box-shadow: 0 0 15px #00f2ff; }
+        50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 30px #00f2ff, 0 0 45px #00a8ff; }
+    }
+
+    .jarvis-title-block {
+        flex-grow: 1;
+    }
+    .jarvis-system-tag {
+        font-family: 'Orbitron', monospace;
+        font-size: 0.75rem;
+        color: #00f2ff;
+        letter-spacing: 2px;
+        margin-bottom: 2px;
+    }
+    .jarvis-main-title {
+        font-family: 'Orbitron', sans-serif !important;
+        font-size: 2.1rem !important;
+        font-weight: 900 !important;
+        margin: 0 !important;
+        color: #ffffff !important;
+        letter-spacing: 1.5px;
+        text-shadow: 0 0 15px rgba(0, 242, 255, 0.6);
+    }
+    .jarvis-sub-title {
+        font-size: 0.95rem;
+        color: #9cb8d9;
+        letter-spacing: 1px;
+        margin-top: 4px;
+    }
+
+    .jarvis-audio-waves {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        height: 40px;
+        padding-right: 10px;
+    }
+    .jarvis-audio-waves span {
+        width: 4px;
+        background: #00f2ff;
+        border-radius: 3px;
+        box-shadow: 0 0 8px #00f2ff;
+        animation: waveBar 1.2s ease-in-out infinite alternate;
+    }
+    .jarvis-audio-waves span:nth-child(1) { height: 10px; animation-delay: 0.1s; }
+    .jarvis-audio-waves span:nth-child(2) { height: 25px; animation-delay: 0.3s; }
+    .jarvis-audio-waves span:nth-child(3) { height: 35px; animation-delay: 0.2s; }
+    .jarvis-audio-waves span:nth-child(4) { height: 18px; animation-delay: 0.4s; }
+    .jarvis-audio-waves span:nth-child(5) { height: 28px; animation-delay: 0.15s; }
+    .jarvis-audio-waves span:nth-child(6) { height: 38px; animation-delay: 0.35s; }
+    .jarvis-audio-waves span:nth-child(7) { height: 22px; animation-delay: 0.25s; }
+    .jarvis-audio-waves span:nth-child(8) { height: 15px; animation-delay: 0.45s; }
+
+    @keyframes waveBar {
+        0% { transform: scaleY(0.3); opacity: 0.4; }
+        100% { transform: scaleY(1.2); opacity: 1; }
+    }
+
+    .telemetry-deck {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .telemetry-card {
+        background: rgba(10, 24, 48, 0.65);
+        border: 1px solid rgba(0, 242, 255, 0.25);
+        border-radius: 12px;
+        padding: 12px 16px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+        transition: all 0.2s ease;
+    }
+    .telemetry-card:hover {
+        border-color: #00f2ff;
+        box-shadow: 0 0 20px rgba(0, 242, 255, 0.25);
+    }
+    .telemetry-label {
+        font-size: 0.72rem;
+        color: #79a6d2;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .telemetry-value {
+        font-family: 'Orbitron', monospace;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #00f2ff;
+        margin-top: 3px;
+        text-shadow: 0 0 8px rgba(0, 242, 255, 0.4);
+    }
+
+    [data-testid="stChatMessage"] {
+        background: rgba(8, 20, 40, 0.75) !important;
+        border: 1px solid rgba(0, 242, 255, 0.2) !important;
+        border-radius: 14px !important;
+        margin-bottom: 12px !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+    }
+    [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+        border-left: 4px solid #00a8ff !important;
+        background: rgba(10, 25, 52, 0.65) !important;
+    }
+    [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
+        border-left: 4px solid #00f2ff !important;
+        box-shadow: 0 0 15px rgba(0, 242, 255, 0.1) !important;
+    }
+
+    [data-testid="stPills"] button {
+        background: rgba(12, 28, 56, 0.8) !important;
+        border: 1px solid rgba(0, 242, 255, 0.35) !important;
+        color: #e0f2fe !important;
+        font-weight: 600 !important;
+        border-radius: 20px !important;
+        transition: all 0.25s ease !important;
+    }
+    [data-testid="stPills"] button:hover {
+        background: rgba(0, 242, 255, 0.2) !important;
+        border-color: #00f2ff !important;
+        box-shadow: 0 0 14px rgba(0, 242, 255, 0.4) !important;
+        transform: translateY(-1px);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Cabecera Arc Reactor Holográfico
+    st.markdown("""
+    <div class="jarvis-hud-container">
+        <div class="arc-reactor-wrapper">
+            <div class="arc-reactor">
+                <div class="arc-ring ring-outer"></div>
+                <div class="arc-ring ring-middle"></div>
+                <div class="arc-ring ring-inner"></div>
+                <div class="arc-core"></div>
+            </div>
+            <div class="jarvis-title-block">
+                <div class="jarvis-system-tag">SYSTEM ID: SKY-JARVIS // MARK VIII // ASISTENTE UNIFICADO</div>
+                <h1 class="jarvis-main-title">SKY NEURAL CORE</h1>
+                <div class="jarvis-sub-title">CONTROL TOTAL DE WINDOWS · MULTIMEDIA DIRECTA · INTELIGENCIA AUTÓNOMA</div>
+            </div>
+            <div class="jarvis-audio-waves">
+                <span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span>
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Indicadores rápidos de estado
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Herramientas internas", "26 activas", help="Finanzas, 3D, Office, Visión, Dispositivo, etc.")
-    with col2:
-        st.metric("Modalidad", "Voz + Texto")
-    with col3:
-        st.metric("Motor activo", PROVIDERS[proveedor].name)
-    with col4:
-        st.metric("Control PC", "Autorizado" if ejecucion_dispositivo else "Solo lectura")
-
-    st.write("")
+    # Deck de Telemetría HUD
+    st.markdown(f"""
+    <div class="telemetry-deck">
+        <div class="telemetry-card">
+            <div class="telemetry-label">⚡ ARC REACTOR</div>
+            <div class="telemetry-value">100% ONLINE</div>
+        </div>
+        <div class="telemetry-card">
+            <div class="telemetry-label">🧠 CEREBRO MULTI-IA</div>
+            <div class="telemetry-value">{PROVIDERS[proveedor].name.upper()}</div>
+        </div>
+        <div class="telemetry-card">
+            <div class="telemetry-label">🖥️ CONTROL WINDOWS</div>
+            <div class="telemetry-value">{'AUTORIZADO' if ejecucion_dispositivo else 'SOLO LECTURA'}</div>
+        </div>
+        <div class="telemetry-card">
+            <div class="telemetry-label">🎬 MULTIMEDIA HUD</div>
+            <div class="telemetry-value">ACTIVO</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Dictado por voz mediante micrófono
     with st.expander("🎙️ Dictado por voz (Micrófono)", expanded=False):
-        st.caption("Graba una orden de voz (ej: «SKY, abre YouTube» o «SKY, cómo van mis finanzas») y el sistema la transcribirá y ejecutará:")
+        st.caption("Graba una orden de voz (ej: «SKY, abre YouTube y pon Queen» o «SKY, abre la calculadora») y el sistema la transcribirá y ejecutará:")
         audio_clip = st.audio_input("Grabar orden de voz", key="jarvis_mic_input")
         if audio_clip is not None:
             audio_bytes = audio_clip.read()
@@ -304,13 +604,14 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
     # Sugerencias rápidas en píldoras
     st.markdown("**Acciones rápidas:**")
     opciones_rapidas = [
-        "Abre YouTube",
+        "Abre YouTube y pon Queen",
+        "Pon música de Michael Jackson",
         "Abre la calculadora",
         "Consulta el estado de mi computadora",
+        "Lista las ventanas abiertas",
         "Cómo van mis finanzas este mes",
         "Calcula 125 * 8",
-        "Noticias de hoy",
-        "Metas de mejora"
+        "Noticias de hoy"
     ]
     sugerencia_clic = st.pills("Acciones", opciones_rapidas, label_visibility="collapsed")
 
@@ -319,7 +620,7 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
         st.session_state.chat_jarvis_history = [
             {
                 "role": "assistant",
-                "content": "¡Hola Oscar! Soy **SKY**. Todos mis módulos (control de equipo, finanzas, documentos Office, diseño 3D, noticias y cálculo) operan internamente en segundo plano. ¿Qué necesitas que haga?"
+                "content": "¡Hola Oscar! Soy **SKY JARVIS**. Todos mis módulos (control de equipo, multimedia, finanzas, documentos Office, diseño 3D y cálculo) operan internamente en segundo plano. ¿Qué necesitas que haga?"
             }
         ]
 
@@ -333,9 +634,11 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                         {'Moneda': mon, 'Ingresos': vals['ingreso']/100, 'Gastos': vals['gasto']/100, 'Balance': (vals['ingreso']-vals['gasto'])/100}
                         for mon, vals in res['totales'].items()
                     ]), hide_index=True)
+            elif m.get("tipo") == "media" and m.get("datos"):
+                render_media_card(m["datos"])
 
     # Captura de entrada
-    prompt_usuario = st.chat_input("Escribe una orden a SKY... (ej: 'SKY, abre YouTube', 'calcula 500*12', 'resumen financiero')", submit_mode="disable")
+    prompt_usuario = st.chat_input("Escribe una orden a SKY... (ej: 'SKY, abre YouTube y pon Queen', 'abre la calculadora', 'calcula 500*12')", submit_mode="disable")
 
     if not prompt_usuario and st.session_state.get('_audio_pending_prompt'):
         prompt_usuario = st.session_state.pop('_audio_pending_prompt')
@@ -361,10 +664,39 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                     status_box.update(label=f"Ejecutando acción en PC: {cmd_device['description']}", state="running")
                     if cmd_device['action'] == 'open_url':
                         url = cmd_device['params'].get('url')
+                        query = cmd_device['params'].get('query', '')
+                        service = cmd_device['params'].get('service', 'web')
+
+                        if service == 'youtube' and query:
+                            from neural_core.multimedia import resolve_youtube_video
+                            res_yt = resolve_youtube_video(query)
+                            if res_yt.get('url') and 'watch?v=' in res_yt['url']:
+                                url = res_yt['url']
+
                         if ejecucion_dispositivo and url:
                             import webbrowser
-                            webbrowser.open(url)
-                            respuesta_texto = f"✅ He abierto **{url}** en tu navegador."
+                            webbrowser.open(url, new=2)
+                            try:
+                                from neural_core.windows_controller import focus_user_window
+                                focus_user_window("YouTube") or focus_user_window("Chrome") or focus_user_window("Edge")
+                            except Exception:
+                                pass
+
+                            if service == 'youtube':
+                                if query:
+                                    respuesta_texto = f"🎬 **SKY JARVIS**: He abierto YouTube en Windows y cargué el video de **«{query}»** directamente en tu pantalla."
+                                else:
+                                    respuesta_texto = "🎬 **SKY JARVIS**: He abierto YouTube en tu navegador y en el reproductor del sistema."
+                                tipo_extra = "media"
+                                datos_extra = {'url': url, 'query': query, 'service': 'youtube'}
+                            elif service == 'google':
+                                respuesta_texto = f"🔍 **SKY JARVIS**: He abierto la búsqueda de Google para **«{query}»** en tu navegador."
+                                tipo_extra = "media"
+                                datos_extra = {'url': url, 'query': query, 'service': 'google'}
+                            else:
+                                respuesta_texto = f"✅ **SKY JARVIS**: He abierto **{url}** en tu navegador local."
+                                tipo_extra = "media"
+                                datos_extra = {'url': url, 'query': query, 'service': 'web'}
                         else:
                             respuesta_texto = f"Acción disponible: Abrir enlace `{url}`. (Habilita ejecución directa para abrirlo automáticamente)."
                     elif cmd_device['action'] == 'launch_app':
@@ -491,6 +823,8 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                     {'Moneda': mon, 'Ingresos': vals['ingreso']/100, 'Gastos': vals['gasto']/100, 'Balance': (vals['ingreso']-vals['gasto'])/100}
                     for mon, vals in datos_extra['totales'].items()
                 ]), hide_index=True)
+            elif tipo_extra == "media" and datos_extra:
+                render_media_card(datos_extra)
 
             msg_salida = {"role": "assistant", "content": respuesta_texto}
             if tipo_extra:
