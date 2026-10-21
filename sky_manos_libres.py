@@ -84,19 +84,29 @@ def main():
     stream, recognizer = create_stream_and_recognizer()
     print('SKY: micrófono activo; decí “SKY” antes de la pregunta. Ctrl+C para finalizar.')
     print('La voz se reconoce localmente con Vosk; el texto consulta al proveedor SKY que configuraste.')
+    from neural_core.voice_coordinator import coordinador_voz, VoiceState, InteractionMode
+
     history=[]
     def say(message):
         nonlocal speaking
         print('SKY-IA:',message)
+        coordinador_voz.set_speaking(True)
         if tts:
             speaking=True
             try:
+                # Ajustar velocidad si está configurada
+                rate = int(180 * coordinador_voz.get_speech_rate())
+                try: tts.setProperty('rate', rate)
+                except Exception: pass
                 tts.say(message[:1000]); tts.runAndWait()
             finally:
                 speaking=False
+                coordinador_voz.set_speaking(False)
                 while not audio.empty():
                     try: audio.get_nowait()
                     except queue.Empty: break
+        else:
+            coordinador_voz.set_speaking(False)
 
     def sync_state(data):
         try:
@@ -112,9 +122,9 @@ def main():
             pass
 
     import time
-    SESSION_TIMEOUT = 25.0
+    SESSION_TIMEOUT = 35.0
     active_until = 0.0
-    sync_state({'hands_free_listening': True, 'last_seen': time.time(), 'status': 'ready'})
+    sync_state({'hands_free_listening': True, 'last_seen': time.time(), 'status': 'ready', 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
 
     try:
         with stream:
@@ -123,61 +133,89 @@ def main():
                 if not recognizer.AcceptWaveform(buffer): continue
                 result=json.loads(recognizer.Result()).get('text','').strip()
                 if not result: continue
+
+                # Verificar si el usuario está en modo C (texto) y no solicitó reactivar voz
+                current_mode = coordinador_voz.get_mode()
+                clean_raw = norm(result)
+                if current_mode == InteractionMode.MODO_C_TEXTO:
+                    if not any(w in clean_raw for w in ('volve a hablarme', 'activa la conversacion', 'modo voz', 'hablame')):
+                        continue
+                    else:
+                        coordinador_voz.set_mode(InteractionMode.MODO_A_NATURAL)
+
                 now = time.time()
                 command = text_after_wake(result)
 
                 if command is not None:
-                    # Palabra clave "SKY" detectada -> Abrir ventana conversacional de 25s
+                    # Palabra clave "SKY" detectada -> Activar sesión continua
                     active_until = now + SESSION_TIMEOUT
-                    sync_state({'session_active': True, 'active_until': active_until, 'last_wake': now})
-                elif now < active_until:
-                    # Sesión conversacional continua activa: no requiere repetir "SKY"
+                    coordinador_voz.activate_session()
+                    sync_state({'session_active': True, 'active_until': active_until, 'last_wake': now, 'coordinator_state': VoiceState.ESCUCHANDO.value})
+                elif coordinador_voz.is_in_follow_up_window() or (now < active_until):
+                    # Turno conversacional continuo activo: no requiere repetir "SKY"
                     command = result.strip(' ,.:;!?¿¡')
                     active_until = now + SESSION_TIMEOUT
+                    coordinador_voz.activate_session()
                 else:
-                    sync_state({'session_active': False})
+                    sync_state({'session_active': False, 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
                     continue
 
                 if not command:
                     say('Te escucho. Indicame qué necesitás.')
                     continue
 
-                # Comprobar orden de cierre de sesión de escucha
+                # Comprobar orden de cierre o pausa de conversación
                 clean_cmd = norm(command)
-                if any(phrase in clean_cmd for phrase in ('deja de escuchar', 'para de escuchar', 'silencio', 'descansa', 'cerrar sesion', 'apagate')):
-                    active_until = 0.0
-                    sync_state({'session_active': False, 'status': 'idle'})
-                    say('Entendido, detengo la escucha continua. Decí SKY cuando me necesites.')
+                v_ctrl = coordinador_voz.check_voice_control_command(clean_cmd)
+                if v_ctrl:
+                    subact = v_ctrl.get('subaction')
+                    msg = v_ctrl.get('message', 'Comando recibido.')
+                    if subact in ('pause_session', 'end_session'):
+                        active_until = 0.0
+                        sync_state({'session_active': False, 'status': 'paused' if subact == 'pause_session' else 'idle', 'coordinator_state': coordinador_voz.get_state().value})
+                    say(msg)
                     continue
 
                 print('Escuchado:',command)
-                sync_state({'last_command': command, 'timestamp': now})
+                coordinador_voz.set_state(VoiceState.PROCESANDO)
+                sync_state({'last_command': command, 'timestamp': now, 'coordinator_state': VoiceState.PROCESANDO.value})
+                
                 intent=interpret_command(command)
                 if intent:
+                    coordinador_voz.set_state(VoiceState.EJECUTANDO_HERRAMIENTA)
+                    sync_state({'coordinator_state': VoiceState.EJECUTANDO_HERRAMIENTA.value})
                     from neural_core.sky_voice_actions import SAFE_ACTIONS
                     if args.execute_safe and intent.get('action') in SAFE_ACTIONS:
                         from neural_core.sky_voice_actions import execute_safe_local
                         try:
                             msg_resp = execute_safe_local(intent)
+                            coordinador_voz.record_turn(command, msg_resp)
                             say(msg_resp)
                         except (ValueError, RuntimeError, OSError) as exc:
-                            say('No se pudo ejecutar la orden. Revisá que el agente local esté activo y autorizado.')
+                            err_msg = 'No se pudo ejecutar la orden. Revisá que el agente local esté activo y autorizado.'
+                            coordinador_voz.record_turn(command, err_msg)
+                            say(err_msg)
                             print('Detalle:',str(exc))
                     else:
                         add_inbox(command,intent)
-                        say('Preparé la orden. Abrí la sección SKY del panel para confirmarla.')
+                        msg_p = 'Preparé la orden. Abrí la sección SKY del panel para confirmarla.'
+                        coordinador_voz.record_turn(command, msg_p)
+                        say(msg_p)
                     continue
+
                 provider,modelo=choose_provider(os.getenv('SKY_VOICE_PROVIDER','auto'), 'SKY voz')
                 try:
                     answer,_=responder(command,'SKY voz local',history,modelo,proveedor=provider)
                     history.extend([{'role':'user','content':command},{'role':'assistant','content':answer}])
                     history=history[-10:]
+                    coordinador_voz.record_turn(command, answer)
                     say(answer)
                 except Exception as exc:
                     say('No pude completar esta consulta. Revisá la conexión y la configuración de Gemini u Ollama.')
                     print('Detalle:',str(exc))
     except KeyboardInterrupt:
-        sync_state({'hands_free_listening': False, 'session_active': False, 'status': 'stopped'})
+        coordinador_voz.set_state(VoiceState.ESPERANDO_ACTIVACION)
+        sync_state({'hands_free_listening': False, 'session_active': False, 'status': 'stopped', 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
         print('Micrófono desactivado. SKY-IA finalizado.')
 
 if __name__=='__main__': main()

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .dispositivos import APP_OPTIONS, MEDIA_KEYS, WINDOW_SUBACTIONS, call_device
 
-SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key", "window_action", "open_file", "player_control", "task_action"})
+SAFE_ACTIONS = frozenset({"status", "open_url", "launch_app", "media_key", "window_action", "open_file", "player_control", "task_action", "voice_control"})
 _TOKEN_PATH = Path.home() / ".neuralt" / "device_agent.token"
 
 
@@ -52,6 +52,9 @@ def execute_safe_local(intent: dict) -> str:
         parsed = urlsplit(url)
         if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
             raise ValueError("Solo se permiten direcciones HTTPS.")
+    if action == "voice_control":
+        return params.get("message") or "Control conversacional ejecutado."
+
     base, token = local_agent_credentials()
     result = call_device(base, token, action, params)
     if not result.get("ok"):

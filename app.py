@@ -1431,22 +1431,89 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
     </div>
     """, unsafe_allow_html=True)
 
-    # Dictado por voz mediante micrófono
-    with st.expander("🎙️ Dictado por voz (Micrófono)", expanded=False):
-        st.caption("Graba una orden de voz (ej: «SKY, abre YouTube y pon Queen» o «SKY, abre la calculadora») y el sistema la transcribirá y ejecutará:")
-        audio_clip = st.audio_input("Grabar orden de voz", key="jarvis_mic_input")
+    # 3 MODOS DE INTERACCIÓN: A (Conversación Natural), B (Micrófono Manual), C (Chat Escrito)
+    from neural_core.voice_coordinator import coordinador_voz, InteractionMode, VoiceState
+
+    if "sky_interaction_mode" not in st.session_state:
+        st.session_state["sky_interaction_mode"] = "MODO_A"
+
+    col_m1, col_m2, col_m3 = st.columns(3)
+    with col_m1:
+        if st.button("🎙️ Modo A: Conversación Natural",
+                     type="primary" if st.session_state["sky_interaction_mode"] == "MODO_A" else "secondary",
+                     use_container_width=True,
+                     help="Diálogo bidireccional continuo frente a frente con SKY-IA. Responde con voz y escucha el siguiente turno sin repetir 'SKY'."):
+            st.session_state["sky_interaction_mode"] = "MODO_A"
+            coordinador_voz.set_mode(InteractionMode.MODO_A_NATURAL)
+            st.rerun()
+    with col_m2:
+        if st.button("🔘 Modo B: Micrófono Manual",
+                     type="primary" if st.session_state["sky_interaction_mode"] == "MODO_B" else "secondary",
+                     use_container_width=True,
+                     help="Grabación solo cuando pulsas el micrófono (Push-To-Talk). No graba en reposo. Responde con voz."):
+            st.session_state["sky_interaction_mode"] = "MODO_B"
+            coordinador_voz.set_mode(InteractionMode.MODO_B_MANUAL)
+            st.rerun()
+    with col_m3:
+        if st.button("✍️ Modo C: Chat Escrito",
+                     type="primary" if st.session_state["sky_interaction_mode"] == "MODO_C" else "secondary",
+                     use_container_width=True,
+                     help="Modo texto sin micrófono. Conserva todo tu historial, contexto, tareas y música."):
+            st.session_state["sky_interaction_mode"] = "MODO_C"
+            coordinador_voz.set_mode(InteractionMode.MODO_C_TEXTO)
+            st.rerun()
+
+    # Estado activo del coordinador de voz
+    modo_act = st.session_state["sky_interaction_mode"]
+    if modo_act == "MODO_A":
+        st.markdown("""
+        <div style="background: rgba(0, 242, 255, 0.08); border: 1px solid #00f2ff; border-radius: 10px; padding: 8px 14px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #00f2ff; font-weight: 700; font-size: 0.88rem;">🟢 MODO A: CONVERSACIÓN NATURAL BIDIRECCIONAL</span>
+            <span style="color: #a0d8ef; font-size: 0.78rem;">Decí "SKY" o grabá tu orden · Luego continuá dialogando libremente</span>
+        </div>
+        """, unsafe_allow_html=True)
+        audio_clip = st.audio_input("Habla con SKY-IA (Detección de voz activa)", key="sky_mode_a_mic")
         if audio_clip is not None:
             audio_bytes = audio_clip.read()
             audio_hash = hashlib.md5(audio_bytes).hexdigest()
             if st.session_state.get('_last_audio_hash') != audio_hash:
                 st.session_state['_last_audio_hash'] = audio_hash
-                with st.spinner("Transcribiendo orden de voz..."):
+                with st.spinner("Escuchando y procesando tu intervención..."):
+                    try:
+                        coordinador_voz.set_state(VoiceState.ESCUCHANDO)
+                        transcrito = transcribir_audio(audio_bytes, mime='audio/wav')
+                        st.session_state['_audio_pending_prompt'] = transcrito
+                        coordinador_voz.set_state(VoiceState.PROCESANDO)
+                        st.success(f"Voz capturada: «{transcrito}»")
+                    except Exception as err:
+                        st.warning(f"Audio no detectado: {err}. Puedes escribir abajo.")
+    elif modo_act == "MODO_B":
+        st.markdown("""
+        <div style="background: rgba(0, 255, 170, 0.08); border: 1px solid #00ffaa; border-radius: 10px; padding: 8px 14px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #00ffaa; font-weight: 700; font-size: 0.88rem;">🔘 MODO B: MICRÓFONO MANUAL (PUSH-TO-TALK)</span>
+            <span style="color: #9cb8d9; font-size: 0.78rem;">Grabación bajo demanda · Sin grabaciones ambientales</span>
+        </div>
+        """, unsafe_allow_html=True)
+        audio_clip = st.audio_input("Presiona para hablar (Modo Manual)", key="sky_mode_b_mic")
+        if audio_clip is not None:
+            audio_bytes = audio_clip.read()
+            audio_hash = hashlib.md5(audio_bytes).hexdigest()
+            if st.session_state.get('_last_audio_hash') != audio_hash:
+                st.session_state['_last_audio_hash'] = audio_hash
+                with st.spinner("Procesando audio manual..."):
                     try:
                         transcrito = transcribir_audio(audio_bytes, mime='audio/wav')
                         st.session_state['_audio_pending_prompt'] = transcrito
-                        st.success(f"Voz reconocida: «{transcrito}»")
+                        st.success(f"Intervención manual: «{transcrito}»")
                     except Exception as err:
-                        st.warning(f"No se pudo transcribir audio: {err}. Puedes escribir la orden abajo.")
+                        st.warning(f"Error al transcribir: {err}")
+    else:
+        st.markdown("""
+        <div style="background: rgba(140, 90, 255, 0.08); border: 1px solid #8c5aff; border-radius: 10px; padding: 8px 14px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #c49eff; font-weight: 700; font-size: 0.88rem;">✍️ MODO C: CHAT ESCRITO Y MINIVENTANA</span>
+            <span style="color: #9cb8d9; font-size: 0.78rem;">Escribe tus órdenes abajo · Conservo todo tu contexto y música</span>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Sugerencias rápidas en píldoras
     st.markdown("**Acciones rápidas:**")
@@ -1866,6 +1933,24 @@ def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
                 msg_salida["tipo"] = tipo_extra
                 msg_salida["datos"] = datos_extra
             st.session_state.chat_jarvis_history.append(msg_salida)
+
+            # Síntesis de voz hablada en el navegador si estamos en Modo A o Modo B
+            interact_mode = st.session_state.get("sky_interaction_mode", "MODO_A")
+            if interact_mode in ("MODO_A", "MODO_B") and respuesta_texto:
+                try:
+                    from neural_core.voz import hablar_texto
+                    audio_mp3 = hablar_texto(respuesta_texto)
+                    if audio_mp3:
+                        st.caption("🔊 *SKY-IA respondiendo con voz:*")
+                        st.audio(audio_mp3, format="audio/mp3", autoplay=True)
+                except Exception:
+                    pass
+
+            # Registrar turno en coordinador_voz
+            try:
+                coordinador_voz.record_turn(prompt_usuario, respuesta_texto)
+            except Exception:
+                pass
 
 
 if seccion == "🎙️ Asistente Central":

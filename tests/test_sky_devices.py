@@ -210,4 +210,102 @@ def test_task_manager_execution():
     assert tm.get_task(t.id).progress == 100
 
 
+def test_voice_coordinator_state_machine_and_modes():
+    from neural_core.voice_coordinator import VoiceCoordinator, VoiceState, InteractionMode
+    vc = VoiceCoordinator()
+    assert vc.get_state() in (VoiceState.ESPERANDO_ACTIVACION, VoiceState.ESPERANDO_SIGUIENTE_INTERVENCION)
+
+    # Modo A: Natural
+    vc.set_mode(InteractionMode.MODO_A_NATURAL)
+    assert vc.get_mode() == InteractionMode.MODO_A_NATURAL
+
+    vc.start_listening()
+    assert vc.get_state() == VoiceState.ESCUCHANDO
+
+    vc.set_speaking(True)
+    assert vc.get_state() == VoiceState.RESPONDIENDO
+
+    vc.set_speaking(False)
+    assert vc.get_state() in (VoiceState.ESPERANDO_SIGUIENTE_INTERVENCION, VoiceState.ESPERANDO_ACTIVACION)
+
+    # Modo B: Manual
+    vc.set_mode(InteractionMode.MODO_B_MANUAL)
+    assert vc.get_mode() == InteractionMode.MODO_B_MANUAL
+
+    # Modo C: Texto
+    vc.set_mode(InteractionMode.MODO_C_TEXTO)
+    assert vc.get_mode() == InteractionMode.MODO_C_TEXTO
+
+
+def test_voice_coordinator_barge_in_and_interruption():
+    from neural_core.voice_coordinator import VoiceCoordinator, VoiceState
+    vc = VoiceCoordinator()
+    vc.set_speaking(True)
+    assert vc.get_state() == VoiceState.RESPONDIENDO
+    assert not vc.is_interrupted()
+
+    # Usuario interrumpe a SKY
+    vc.interrupt()
+    assert vc.is_interrupted()
+    assert vc.get_state() == VoiceState.ESCUCHANDO
+
+
+def test_voice_control_commands_interpretation():
+    from neural_core.dispositivos import interpret_command
+    c1 = interpret_command("SKY, dejá de hablar")
+    assert c1["action"] == "voice_control"
+    assert c1["subaction"] == "stop_speech"
+
+    c2 = interpret_command("SKY, hablá más despacio")
+    assert c2["action"] == "voice_control"
+    assert c2["subaction"] == "slower"
+
+    c3 = interpret_command("SKY, repetí lo último")
+    assert c3["action"] == "voice_control"
+    assert c3["subaction"] == "repeat_last"
+
+    c4 = interpret_command("SKY, pausá la conversación")
+    assert c4["action"] == "voice_control"
+    assert c4["subaction"] == "pause_session"
+
+    c5 = interpret_command("SKY, volvé a escuchar")
+    assert c5["action"] == "voice_control"
+    assert c5["subaction"] == "resume_session"
+
+    c6 = interpret_command("SKY, terminamos por ahora")
+    assert c6["action"] == "voice_control"
+    assert c6["subaction"] == "end_session"
+
+
+def test_contextual_commands_queen_word_volume():
+    from neural_core.dispositivos import interpret_command
+    # "¿Me escuchás?"
+    g = interpret_command("SKY, ¿me escuchás?")
+    assert g["action"] == "status"
+    assert g["params"].get("greeting") is True
+
+    # "Ponelo más pequeño"
+    p1 = interpret_command("Ponelo más pequeño")
+    assert p1["action"] == "player_control"
+    assert p1["params"]["subaction"] == "mode_mini"
+
+    # "Subí un poco el volumen"
+    v = interpret_command("Subí un poco el volumen")
+    assert v["action"] == "media_key"
+    assert v["params"]["key"] == "volume_up"
+
+    # "Ahora abrí Word"
+    w = interpret_command("Ahora abrí Word")
+    assert w["action"] == "launch_app"
+    assert w["params"]["app"] == "word"
+
+
+def test_hablar_texto_clean_synthesis():
+    from neural_core.voz import hablar_texto
+    # Debe limpiar markdown sin fallar
+    res = hablar_texto("¡Hola! Soy **SKY-IA**.")
+    assert res is None or isinstance(res, bytes)
+
+
+
 

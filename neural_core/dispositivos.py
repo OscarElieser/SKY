@@ -22,6 +22,7 @@ ACTION_CAPABILITIES = {
     'social_action': 'Gestionar publicaciones, mensajes y comentarios en redes sociales',
     'player_control': 'Control del reproductor de video (modos, tamaño, pausa, cerrar)',
     'task_action': 'Gestionar tareas en segundo plano (presentaciones, documentos, modificaciones)',
+    'voice_control': 'Control del flujo conversacional de voz (pausa, ritmo, interrupción, repetición)',
 }
 APP_OPTIONS = [
     'calculator', 'text_editor', 'file_manager', 'browser',
@@ -106,13 +107,25 @@ def interpret_command(text: str):
     clean = norm(text.strip())
     if not clean:
         return None
+
+    # Comandos de control conversacional directo (voz, ritmo, pausa, finalización)
+    from neural_core.voice_coordinator import coordinador_voz
+    vc = coordinador_voz.check_voice_control_command(clean)
+    if vc:
+        return vc
+
+    # Saludos y confirmación de escucha ("SKY, ¿me escuchás?")
+    if re.search(r'\b(?:me\s+escuchas|me\s+ois|estas\s+ahi|estas\s+conectado)\b', clean):
+        return {'action': 'status', 'params': {'greeting': True, 'message': 'Sí, te escucho. ¿Qué necesitás?'},
+                'description': 'Comprobar escucha activa'}
+
     if re.search(r'\b(estado|informacion|informacion del|diagnostico|como esta)\b.*\b(equipo|pc|computadora|ordenador|dispositivo)\b', clean):
         return {'action': 'status', 'params': {}, 'description': 'Consultar estado del equipo'}
 
     # Modos del reproductor SKY (Mini, Ampliado, Pantalla Completa, Normal, Cerrar)
-    if re.search(r'\b(?:muestra|mostrar|pon|poner|cambia|cambiar|ver)?\s*(?:el\s+video\s+)?en\s+mini\b|\bmodo\s+mini\b|\bmini\s+ventana\b|\bminiventana\b', clean):
+    if re.search(r'\b(?:muestra|mostrar|mostra|pon|pone|poner|cambia|cambiar|ver|hace|hacer|ponelo|hacelo)?\s*(?:el\s+video\s+|el\s+reproductor\s+)?(?:en\s+)?(?:mini|miniventana|pequeno|mas\s+pequeno|chico|mas\s+chico)\b|\bmodo\s+mini\b|\bmini\s+ventana\b|\bminiventana\b', clean):
         return {'action': 'player_control', 'params': {'subaction': 'mode_mini'}, 'description': 'Mostrar reproductor en mini ventana flotante'}
-    if re.search(r'\b(?:amplia|ampliar|agranda|agrandar)\s+(?:la\s+)?ventana\b|\bmodo\s+ampliado\b|\bventana\s+ampliada\b|\bver\s+ampliado\b', clean):
+    if re.search(r'\b(?:amplia|ampliar|agranda|agrandar)\s+(?:la\s+)?ventana\b|\bmodo\s+ampliado\b|\bventana\s+ampliada\b|\bver\s+ampliado\b|\bmas\s+grande\b|\bponelo\s+grande\b', clean):
         return {'action': 'player_control', 'params': {'subaction': 'mode_expanded'}, 'description': 'Ampliar reproductor a vista completa'}
     if re.search(r'\b(?:pantalla\s+completa|fullscreen|ponelo\s+en\s+pantalla\s+completa|pon\s+pantalla\s+completa)\b', clean):
         return {'action': 'player_control', 'params': {'subaction': 'mode_fullscreen'}, 'description': 'Activar pantalla completa en el reproductor'}

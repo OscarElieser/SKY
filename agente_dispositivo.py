@@ -136,6 +136,8 @@ def execute_action(action,params):
             topic = params.get('topic', 'documento general')
             t = gestor_tareas.create_task('document', f"Documento: {topic}", f"Creando documento sobre {topic}", params)
             return {'ok': True, 'task_id': t.id, 'message': f"Preparando documento sobre «{topic}»."}
+    if action=='voice_control':
+        return {'ok': True, 'message': params.get('message', 'Comando conversacional procesado')}
     raise ValueError('Acción no permitida.')
 
 
