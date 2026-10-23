@@ -252,6 +252,7 @@ def mensaje_stream(body: Mensaje, request: Request):
                 yield final(_completar(resultado, body.dispositivo, request))
                 return
             elif evento == 'fin':
+                asis._necesidad(original)
                 yield final({'tipo': 'respuesta', 'mensaje': valor, 'proveedor': 'ollama', 'transmitido': True})
                 return
             elif evento == 'error':

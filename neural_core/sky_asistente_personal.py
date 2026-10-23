@@ -282,7 +282,8 @@ def reglas(texto: str) -> dict | None:
         return resolver_especial({'tipo': 'rutina', 'rutina': rutina})
     from . import sky_skills, sky_perfil
     try:
-        r = sky_perfil.interpretar(_norm(texto)) or sky_skills.interpretar(texto)
+        from . import sky_habilidades
+        r = sky_perfil.interpretar(_norm(texto)) or sky_skills.interpretar(texto) or sky_habilidades.interpretar(texto)
     except Exception as exc:
         r = {'tipo': 'error', 'mensaje': 'No pude completar eso: ' + str(exc)[:140]}
     if r:
@@ -378,6 +379,14 @@ def _reglas_hud(t: str) -> dict | None:
     return None
 
 
+def _necesidad(texto: str) -> None:
+    try:
+        from .sky_skill_builder import registrar_necesidad
+        registrar_necesidad(texto)
+    except Exception:
+        pass
+
+
 def marcar_cerebro(resultado: dict, frase: str) -> dict:
     """Marca una acción elegida por el cerebro para que SKY la aprenda si sale bien."""
     if isinstance(resultado, dict):
@@ -428,8 +437,12 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
             d = sky_cerebro.decidir(texto, turnos, modo)
             if d['tipo'] == 'herramienta':
                 return marcar_cerebro(resolver_especial(d['resultado']), original)
+            if d['tipo'] == 'texto':
+                _necesidad(original)            # el cerebro no encontró herramienta: quizá falta una habilidad
             if d['tipo'] == 'texto' and d['mensaje'] and modo == 'voz':
                 return {'tipo': 'respuesta', 'mensaje': d['mensaje'], 'proveedor': 'ollama'}
+        else:
+            _necesidad(original)
     except Exception:
         pass
     try:

@@ -29,7 +29,7 @@ from neural_core import dispositivos
 from neural_core.sky_asistente_personal import token_agente_local, url_agente_local
 
 router = APIRouter(prefix='/api/hud', dependencies=[Depends(require_key)])
-VERSION_SKY = '12.3.0'
+VERSION_SKY = '12.4.0'
 
 
 def _credenciales() -> tuple[str, str]:
@@ -425,3 +425,124 @@ def whatsapp_prueba():
     except Exception as exc:
         raise HTTPException(502, 'Meta rechazó el envío: ' + str(exc)[:160])
     return {'ok': True}
+
+
+# ------------------------------------------------------------------ v12.4: habilidades, Skill Builder, integraciones, creaciones
+
+@router.get('/habilidades')
+def habilidades():
+    from neural_core import sky_habilidades
+    return sky_habilidades.catalogo()
+
+
+class Interruptor(BaseModel):
+    activa: bool
+
+
+@router.patch('/habilidades/{hid}')
+def habilidades_cambiar(hid: str, body: Interruptor):
+    from neural_core import sky_habilidades
+    if not sky_habilidades.cambiar(hid, body.activa):
+        raise HTTPException(400, 'Habilidad desconocida o protegida.')
+    return {'id': hid, 'activa': sky_habilidades.activa(hid)}
+
+
+@router.get('/integraciones')
+def integraciones():
+    from neural_core import sky_integraciones
+    return {'integraciones': sky_integraciones.listar()}
+
+
+class Pedido(BaseModel):
+    pedido: str = Field(min_length=6, max_length=500)
+
+
+@router.post('/builder/proponer')
+def builder_proponer(body: Pedido):
+    """La IA diseña la habilidad, se revisa y se prueba aislada. NO la instala."""
+    from neural_core import sky_skill_builder
+    try:
+        return sky_skill_builder.proponer(body.pedido)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:300])
+    except Exception as exc:
+        raise HTTPException(503, 'No pude diseñarla (¿hay un modelo de IA disponible?): ' + str(exc)[:200])
+
+
+class Version(BaseModel):
+    manifiesto: dict
+    codigo: str = Field(min_length=10, max_length=20000)
+
+
+@router.post('/builder/version')
+def builder_version(body: Version):
+    """Una versión escrita o corregida por el dueño: se revisa y se prueba igual que la de la IA."""
+    from neural_core import sky_skill_builder
+    try:
+        return sky_skill_builder.guardar_propuesta(body.manifiesto, body.codigo, 'versión del dueño')
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:300])
+
+
+@router.get('/builder/{sid}')
+def builder_ver(sid: str, version: int | None = None):
+    from neural_core import sky_skill_builder
+    try:
+        m, codigo, reporte = sky_skill_builder.cargar(sid, version)
+    except (KeyError, OSError, ValueError):
+        raise HTTPException(404, 'Habilidad no encontrada.')
+    return {'manifiesto': m, 'codigo': codigo, 'reporte': reporte}
+
+
+class Aprobacion(BaseModel):
+    version: int = Field(ge=1, le=10000)
+    permisos: list[str] = Field(default_factory=list, max_length=10)
+
+
+@router.post('/builder/{sid}/aprobar')
+def builder_aprobar(sid: str, body: Aprobacion):
+    """Este clic del dueño ES la aprobación (nivel 3): instala esa versión con esos permisos."""
+    from neural_core import sky_skill_builder
+    try:
+        return sky_skill_builder.aprobar(sid, body.version, body.permisos)
+    except KeyError:
+        raise HTTPException(404, 'Habilidad o versión no encontrada.')
+    except (ValueError, OSError) as exc:
+        raise HTTPException(400, str(exc)[:300])
+
+
+@router.post('/builder/{sid}/desactivar')
+def builder_desactivar(sid: str):
+    from neural_core import sky_skill_builder
+    return {'ok': sky_skill_builder.desactivar(sid)}
+
+
+@router.delete('/builder/{sid}')
+def builder_eliminar(sid: str):
+    from neural_core import sky_skill_builder
+    if not re.fullmatch(r'[a-z0-9-]{1,40}', sid):
+        raise HTTPException(400, 'Identificador inválido.')
+    return {'ok': sky_skill_builder.eliminar(sid)}
+
+
+@router.get('/creaciones/{tipo}')
+def creaciones(tipo: str):
+    from neural_core import sky_creativo
+    try:
+        return {'archivos': sky_creativo.listar(tipo)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.get('/creaciones/{tipo}/{nombre}')
+def creacion_archivo(tipo: str, nombre: str):
+    from fastapi.responses import FileResponse
+    from neural_core import sky_creativo
+    try:
+        ruta = sky_creativo.ruta_creacion(tipo, nombre)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except FileNotFoundError:
+        raise HTTPException(404, 'No existe.')
+    tipos = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.md': 'text/markdown; charset=utf-8'}
+    return FileResponse(ruta, media_type=tipos[ruta.suffix.lower()], headers={'Cache-Control': 'private, no-store'})

@@ -17,7 +17,7 @@ jobs:
           python-version: '3.11'
       - name: Install test dependencies
         run: |
-          sudo apt-get -o Acquire::Retries=3 update -qq && sudo apt-get -o Acquire::Retries=3 install -y ffmpeg
+          timeout 300 sh -c "sudo apt-get -o Acquire::Retries=3 update -qq && sudo apt-get -o Acquire::Retries=3 install -y ffmpeg" || { echo "apt no respondio a tiempo; uso ffmpeg estatico"; python -m pip install static-ffmpeg; }
           python -m pip install -r requirements_studio.txt -r requirements_production.txt pytest PyYAML
       - name: Validate isolated operator controls
         run: PYTHONPATH=. pytest -q tests/test_sky_v10_7_public.py tests/test_sky_v10_8_operations.py

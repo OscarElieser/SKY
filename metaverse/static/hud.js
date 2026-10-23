@@ -517,6 +517,8 @@
       if (data.recordatorio || data.proveedor === 'sky-agenda') refrescarAgenda();
       if (data.modulo === 'kpi') abrirKPI(data.kpi);
       if (data.modulo === 'perfil') abrirPerfil();
+      if (data.modulo === 'habilidades') abrirHabilidades(); else if (ventanas.has('habilidades')) HAB.cargar();
+      if (data.imagen) mostrarImagen(data.imagen);
       if (data.modulo === 'auto') abrirAuto();
       else if (ventanas.has('auto')) AUTO.cargar();
       if (data.parada) { if (!data.parada.reanudar) { callar(); if (S.pending) S.pending.cancel(); } tarjetaParada(); setState('error', 'Parada de emergencia'); }
@@ -729,6 +731,7 @@
     { id: 'kpi', t: 'Rendimiento', d: 'KPIs reales, fallos y aprendizaje', accion: () => abrirKPI() },
     { id: 'auto', t: 'Automatización', d: 'Tareas programadas, skills, borradores y WhatsApp', accion: () => abrirAuto() },
     { id: 'perfil', t: 'Perfil', d: 'Quién sos: SKY lo lee en cada respuesta', accion: () => abrirPerfil() },
+    { id: 'habilidades', t: 'Habilidades', d: 'Catálogo, Skill Builder e integraciones', accion: () => abrirHabilidades() },
     { id: 'streamlit', t: 'Panel completo', d: 'Deportes, finanzas, visión… (pestaña aparte)', externo: 'http://127.0.0.1:8501' },
   ];
   function pintarModulos() {
@@ -942,6 +945,113 @@
       pr.addEventListener('click', async () => { try { await api('/api/hud/whatsapp/prueba', { method: 'POST' }); pr.textContent = 'Enviado'; } catch (e) { pr.textContent = e.message; } });
       s4.appendChild(pr);
     }
+  };
+
+  /* ------------------------------------------------------------------ imágenes creadas por SKY */
+  async function mostrarImagen(nombre) {
+    try {
+      const r = await fetch('/api/hud/creaciones/imagenes/' + encodeURIComponent(nombre), { headers: headers({}, false) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const url = URL.createObjectURL(await r.blob());
+      const card = addCard('▸ Imagen creada por SKY', nombre);
+      const img = el('img', 'sky-img'); img.src = url; img.alt = 'Imagen generada: ' + nombre;
+      card.appendChild(img); scroll();
+    } catch (e) { addMsg('sky', 'No pude mostrar la imagen: ' + e.message, 'err'); }
+  }
+
+  /* ------------------------------------------------------------------ habilidades y SKY Skill Builder */
+  const HAB = { raiz: null };
+  function abrirHabilidades() {
+    if (!HAB.raiz || !ventanas.has('habilidades')) HAB.raiz = el('div', 'kpi');
+    abrirVentana('habilidades', 'Habilidades de SKY', HAB.raiz, { w: 980, h: 680 });
+    HAB.cargar();
+  }
+  HAB.cargar = async function () {
+    if (!HAB.raiz) return;
+    const c = HAB.raiz; let d;
+    try { d = await api('/api/hud/habilidades'); } catch (e) { c.textContent = ''; c.appendChild(el('div', 'note', 'No pude leer las habilidades: ' + e.message)); return; }
+    c.textContent = '';
+    // Skill Builder
+    const sb = seccion(c, 'SKY Skill Builder');
+    sb.appendChild(el('div', 's', 'SKY diseña la habilidad, la revisa y la prueba aislada (sin red, sin archivos, sin instalar nada externo). Sólo se instala cuando vos la aprobás aquí.'));
+    const fila = el('div', 'kpi-bar');
+    const inp = el('input', 'hab-in'); inp.type = 'text'; inp.maxLength = 500; inp.placeholder = '¿Qué habilidad necesitás? Ej.: convertir monedas con el tipo de cambio del día';
+    const go = el('button', 'btn primary', 'Proponer'); go.type = 'button';
+    const est = el('span', 'kpi-gen', '');
+    go.addEventListener('click', async () => {
+      if (inp.value.trim().length < 6) { est.textContent = 'Contame un poco más.'; return; }
+      go.disabled = true; est.textContent = 'Diseñando y probando…';
+      try { const r = await api('/api/hud/builder/proponer', { method: 'POST', body: JSON.stringify({ pedido: inp.value.trim() }) }); est.textContent = r.reporte.aprobada ? 'Lista para revisar' : 'No pasó las pruebas'; inp.value = ''; }
+      catch (e) { est.textContent = e.message; }
+      go.disabled = false; HAB.cargar();
+    });
+    fila.append(inp, go, est); sb.appendChild(fila);
+    if (d.necesidades.length) {
+      sb.appendChild(el('div', 's', 'Pedidos que todavía no sé resolver:'));
+      d.necesidades.forEach(n => {
+        const f = el('div', 'kpi-atajo'); f.appendChild(el('span', '', '«' + n.frase + '» · ' + n.veces + ' veces'));
+        const b = el('button', 'btn', 'Proponer habilidad'); b.type = 'button';
+        b.addEventListener('click', () => { inp.value = n.frase; go.click(); });
+        f.appendChild(b); sb.appendChild(f);
+      });
+    }
+    d.builder.forEach(b => {
+      const box = el('div', 'kpi-prob ' + (b.estado === 'instalada' ? '' : b.estado_ultima === 'probada' ? 'warn' : 'bad'));
+      const m = b.manifiesto, rep = b.reporte;
+      box.appendChild(el('b', '', m.nombre + ' · ' + (b.estado === 'instalada' ? 'instalada v' + b.version_instalada : b.estado) + ' · última v' + b.ultima + ' (' + b.estado_ultima + ')'));
+      box.appendChild(el('div', '', (m.descripcion || '') + ' · Se usa diciendo: ' + m.disparadores.map(x => '«' + x + ' …»').join(', ')));
+      if (rep.estatica && rep.estatica.length) box.appendChild(el('div', 'res bad', 'Revisión: ' + rep.estatica.join(' · ')));
+      if (rep.error) box.appendChild(el('div', 'res bad', rep.error));
+      (rep.pruebas || []).forEach(p => box.appendChild(el('div', p.ok ? 'res' : 'res bad', (p.ok ? '✓ ' : '✗ ') + p.entrada + ' → ' + (p.decir || p.error || '').slice(0, 160))));
+      const det = el('details'); det.appendChild(el('summary', '', 'Ver código (v' + b.ultima + ')'));
+      det.appendChild(el('pre', '', 'skill.json\n' + JSON.stringify(m, null, 2) + '\n\nskill.py\n' + (b.codigo_resumen || '')));
+      box.appendChild(det);
+      det.addEventListener('toggle', async () => {
+        if (!det.open || det.dataset.cargado) return;
+        try { const v = await api('/api/hud/builder/' + b.id); det.querySelector('pre').textContent = 'skill.json\n' + JSON.stringify(v.manifiesto, null, 2) + '\n\nskill.py\n' + v.codigo; det.dataset.cargado = '1'; } catch (e) { /* queda el resumen */ }
+      });
+      const perms = el('div', 'hab-perm');
+      (m.permisos || []).forEach(pm => {
+        const l = el('label', ''); const ck = el('input'); ck.type = 'checkbox'; ck.value = pm; ck.checked = (b.permisos_aprobados || []).includes(pm);
+        l.append(ck, document.createTextNode(' ' + pm)); perms.appendChild(l);
+      });
+      if ((m.permisos || []).length) { box.appendChild(el('div', 's', 'Permisos que pide (marcá los que concedés):')); box.appendChild(perms); }
+      const bx = el('div', 'btns');
+      if (b.estado_ultima === 'probada' && !(b.estado === 'instalada' && b.version_instalada === b.ultima)) {
+        const ap = el('button', 'btn primary', 'Aprobar e instalar v' + b.ultima); ap.type = 'button';
+        ap.addEventListener('click', async () => {
+          const permisos = [...perms.querySelectorAll('input:checked')].map(x => x.value);
+          ap.disabled = true;
+          try { await api('/api/hud/builder/' + b.id + '/aprobar', { method: 'POST', body: JSON.stringify({ version: b.ultima, permisos }) }); HAB.cargar(); }
+          catch (e) { ap.disabled = false; box.appendChild(el('div', 'res bad', e.message)); }
+        });
+        bx.appendChild(ap);
+      }
+      if (b.estado === 'instalada') {
+        const de = el('button', 'btn', 'Desactivar'); de.type = 'button';
+        de.addEventListener('click', async () => { await api('/api/hud/builder/' + b.id + '/desactivar', { method: 'POST' }).catch(() => {}); HAB.cargar(); });
+        bx.appendChild(de);
+      }
+      const el2 = el('button', 'btn', 'Eliminar'); el2.type = 'button';
+      el2.addEventListener('click', async () => { await api('/api/hud/builder/' + b.id, { method: 'DELETE' }).catch(() => {}); HAB.cargar(); });
+      bx.appendChild(el2); box.appendChild(bx); sb.appendChild(box);
+    });
+    // Nativas
+    const sn = seccion(c, 'Habilidades de SKY');
+    d.nativas.forEach(h => {
+      const f = el('div', 'kpi-atajo');
+      f.appendChild(el('span', '', h.nombre + ' — ' + h.descripcion + (h.integraciones_listas ? '' : ' (falta configurar su integración)') + ' · Ej.: «' + h.ejemplos[0] + '»'));
+      if (h.protegida) f.appendChild(el('span', 's', 'siempre activa'));
+      else {
+        const tg = el('button', 'btn' + (h.activa ? ' primary' : ''), h.activa ? 'Activa' : 'Inactiva'); tg.type = 'button'; tg.setAttribute('aria-pressed', String(h.activa));
+        tg.addEventListener('click', async () => { await api('/api/hud/habilidades/' + h.id, { method: 'PATCH', body: JSON.stringify({ activa: !h.activa }) }).catch(() => {}); HAB.cargar(); });
+        f.appendChild(tg);
+      }
+      sn.appendChild(f);
+    });
+    // Integraciones
+    const si = seccion(c, 'Integraciones (tener una cuenta no es tener su API)');
+    si.appendChild(tabla(['Plataforma', 'Vía', 'Estado', 'Para qué', 'Nota'], d.integraciones.map(i => [i.nombre, i.via, i.estado, i.uso, i.nota])));
   };
 
   /* ------------------------------------------------------------------ reproductor */

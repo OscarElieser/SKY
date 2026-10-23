@@ -42,5 +42,5 @@ jobs:
           tests/test_sky_v10_5_global.py
           tests/test_sky_devices.py tests/test_sky_jarvis_local.py
           tests/test_sky_public_secrets.py tests/test_sky_notes_local.py
-          tests/test_sky_v12_unificado.py tests/test_sky_v12_1_mejoras.py tests/test_sky_v12_2_aprendizaje_kpi.py tests/test_sky_v12_3_jarvis_completo.py tests/test_sky_v11_1_asistente.py
+          tests/test_sky_v12_unificado.py tests/test_sky_v12_1_mejoras.py tests/test_sky_v12_2_aprendizaje_kpi.py tests/test_sky_v12_3_jarvis_completo.py tests/test_sky_v12_4_habilidades.py tests/test_sky_v11_1_asistente.py
           tests/test_windows_desktop_control.py tests/test_sky_jarvis_fase1.py
