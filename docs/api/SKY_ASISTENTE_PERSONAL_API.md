@@ -1,4 +1,4 @@
-# SKY v12.1 — API del Asistente Personal y del HUD
+# SKY v12.2 — API del Asistente Personal y del HUD
 
 Todas las rutas `/api/*` requieren `X-SKY-KEY` (llave del dueño) y, si el 2FA del creador está activo, `X-SKY-SESSION`.
 
@@ -30,16 +30,19 @@ Voz manos libres ──┘   /api/hud/*             │   ledger verificable (/a
 |---|---|---|
 | POST | `/api/asistente/mensaje` | `{texto, historial?, proveedor?, dispositivo?, modo: "chat"\|"voz"}` |
 | POST | `/api/asistente/stream` | Igual que `/mensaje`, en NDJSON: `{"delta": "…"}` mientras el modelo habla y `{"final": {...}}` al terminar |
-| POST | `/api/asistente/ejecutar` | `{action, params, dispositivo?}`: confirmación del dueño |
+| POST | `/api/asistente/ejecutar` | `{action, params, dispositivo?, frase?}`: confirmación del dueño (con `frase`, SKY aprende el atajo si sale bien) |
 | POST | `/api/asistente/correo` | `{para, asunto, cuerpo, en_respuesta_a?}`: envío confirmado por el dueño |
-| POST | `/api/asistente/casa` | `{service, entity_ids, data?}`: confirmación para Home Assistant |
+| POST | `/api/asistente/casa` | `{service, entity_ids, data?, frase?}`: confirmación para Home Assistant |
+| GET / POST / DELETE | `/api/asistente/emergencia` | Estado, activar o levantar la parada de emergencia (levantarla requiere la llave del dueño) |
 | GET | `/api/asistente/dispositivo` | Estado y capacidades del agente |
 | GET | `/api/asistente/ayuda` | Ejemplos, capacidades, perfiles y dispositivos |
 | GET / DELETE | `/api/asistente/voz[/{id}]` | Pendientes de la voz manos libres |
 
 Respuestas de `/mensaje`: `respuesta` (puede traer `recordatorio`, `correos` o `acciones` de una rutina), `local`, `error`, `accion` (con `requiere_confirmacion`, `ejecucion`, `aviso` o `interfaz`), `casa` (con `requiere_confirmacion` y `ejecucion`) y `correo` (con `borrador`, siempre requiere confirmación).
 
-Orden de decisión: reglas rápidas (agenda, rutinas, WhatsApp, correo, equipo, casa) → cerebro con herramientas (Ollama, `neural_core/sky_cerebro.py`) → respuesta de la IA.
+Orden de decisión: parada de emergencia → reglas rápidas (agenda, rutinas, WhatsApp, correo, aprendizaje, KPIs, interfaz, equipo, casa) → atajos aprendidos → cerebro con herramientas (Ollama, `neural_core/sky_cerebro.py`) → respuesta de la IA.
+
+Campos v12.2 en las respuestas: `ms` (tiempo real del turno), `nivel_riesgo` (1 bajo, 2 moderado, 3 alto: siempre requiere confirmación), `aprender` (frase a enviar en `/ejecutar` al confirmar), `aprendido` (resuelto por un atajo), `aprendido_ahora`, `modulo: "kpi"` + `kpi` (abre el panel de rendimiento) y `parada`.
 
 ## HUD
 
@@ -56,6 +59,10 @@ Orden de decisión: reglas rápidas (agenda, rutinas, WhatsApp, correo, equipo, 
 | GET | `/api/hud/agenda` · DELETE `/api/hud/agenda/{id}` | Recordatorios pendientes y rutinas |
 | POST | `/api/hud/rutinas` | `{nombre, frases, hora?, dias?, pasos}`; pasos: `saludo`, `recordatorios_hoy`, `correo_resumen`, `decir`, `accion` |
 | GET | `/api/hud/diagnostico` | Qué funciona, qué falta y cómo arreglarlo |
+| GET | `/api/hud/kpi?periodo=hoy\|semana` | KPIs reales: acciones, automatización, asistente, modelo, API (p50/p95/p99, disponibilidad), agente, voz, seguridad, servicio, serie por hora, problemas detectados, SLO, sistema y `texto` |
+| POST | `/api/hud/kpi/evento` | `{tipo: voz\|tarea, nombre: primera_voz\|interrupcion\|error_microfono\|error_reproduccion\|cancelada, ms?, ok?}` (mediciones del navegador) |
+| GET | `/api/hud/aprendizaje` · DELETE `/api/hud/aprendizaje/atajos/{frase}` | Lo aprendido y olvidar un atajo |
+| GET | `/api/hud/memoria` · DELETE `/api/hud/memoria/{id}` | Exportar todo lo que SKY sabe del dueño (clasificado) y borrar un dato |
 | POST | `/api/global-media/stt/transcribe` | Transcripción local con faster-whisper (usada por el HUD) |
 
 ## Acciones del agente v6

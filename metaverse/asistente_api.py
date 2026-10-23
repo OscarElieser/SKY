@@ -15,6 +15,7 @@ del dueño: esta API no puede activar capacidades ni saltarse esa política.
 from __future__ import annotations
 
 import json
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -23,6 +24,7 @@ from .api import require_key
 from neural_core import dispositivos, voz_inbox
 from neural_core import sky_capacidades as caps
 from neural_core.sky_asistente_personal import AYUDA, atender, token_agente_local, url_agente_local
+from neural_core.sky_capacidades import DESCRIPCION_ACCIONES as DESCRIPCIONES
 
 router = APIRouter(prefix='/api/asistente', dependencies=[Depends(require_key)])
 
@@ -46,12 +48,14 @@ class OrdenCasa(BaseModel):
     service: str = Field(min_length=3, max_length=60)
     entity_ids: list[str] = Field(min_length=1, max_length=20)
     data: dict = Field(default_factory=dict)
+    frase: str = Field(default='', max_length=120)
 
 
 class Ejecucion(BaseModel):
     action: str = Field(min_length=2, max_length=40)
     params: dict = Field(default_factory=dict)
     dispositivo: str = Field(default=LOCAL, max_length=80)
+    frase: str = Field(default='', max_length=120)   # v12.2: si viene del cerebro, SKY la aprende al salir bien
 
 
 _url_local = url_agente_local
@@ -86,6 +90,53 @@ def _llamar(nombre: str, request: Request, action: str, params: dict):
         raise HTTPException(502, str(exc)[:250])
 
 
+def _casa(service: str, entity_ids: list[str], data: dict) -> dict:
+    """Ejecuta en Home Assistant y lo registra en los KPIs."""
+    from neural_core import sky_home_assistant as casa, sky_metricas
+    if caps.parada_activa():
+        raise RuntimeError('SKY está en parada de emergencia.')
+    inicio = time.perf_counter()
+    try:
+        res = casa.ejecutar(service, entity_ids, data)
+    except (RuntimeError, ValueError) as exc:
+        sky_metricas.registrar('casa', service, False, (time.perf_counter() - inicio) * 1000, detalle=str(exc))
+        raise
+    sky_metricas.registrar('casa', service, res.get('ok', True) is not False, (time.perf_counter() - inicio) * 1000)
+    return res
+
+
+def _aprender(frase: str, resultado: dict, ejecucion) -> None:
+    """SKY aprende la frase como atajo sólo si la acción elegida por el cerebro salió bien."""
+    if not frase:
+        return
+    from neural_core import sky_aprendizaje, sky_metricas
+    ok, _ = sky_metricas.resultado_ok(ejecucion)
+    if ok:
+        try:
+            if sky_aprendizaje.aprender_orden(frase, resultado):
+                resultado['aprendido_ahora'] = True
+        except Exception:
+            pass
+
+
+def _origen(resultado: dict) -> str:
+    if resultado.get('aprendido'):
+        return 'aprendido'
+    if resultado.get('via') == 'cerebro' or resultado.get('aprender') or resultado.get('proveedor') == 'ollama':
+        return 'cerebro'
+    if resultado.get('tipo') == 'respuesta' and resultado.get('proveedor', '').split('-')[0] not in ('sky',):
+        return 'ia'
+    return 'reglas'
+
+
+def _medir_turno(resultado: dict, inicio: float) -> dict:
+    from neural_core import sky_metricas
+    resultado['ms'] = int((time.perf_counter() - inicio) * 1000)
+    sky_metricas.registrar('turno', resultado.get('tipo', '?'), resultado.get('tipo') != 'error', resultado['ms'],
+                           origen=_origen(resultado), detalle=resultado.get('mensaje', '') if resultado.get('tipo') == 'error' else '')
+    return resultado
+
+
 @router.get('/ayuda')
 def ayuda():
     return {
@@ -108,21 +159,35 @@ def _completar(resultado: dict, dispositivo: str, request: Request) -> dict:
     if resultado['tipo'] == 'casa':
         orden = resultado['propuesta']
         resultado['requiere_confirmacion'] = orden['requiere_confirmacion']
-        if not orden['requiere_confirmacion']:
-            from neural_core import sky_home_assistant as casa
+        resultado['nivel_riesgo'] = 3 if any(str(e).split('.')[0] in ('lock', 'cover', 'alarm_control_panel')
+                                             for e in orden.get('entity_ids', [])) else (2 if orden['requiere_confirmacion'] else 1)
+        if caps.parada_activa():
+            resultado['requiere_confirmacion'] = True
+            resultado['aviso'] = 'Parada de emergencia activa.'
+        elif not orden['requiere_confirmacion']:
             try:
-                resultado['ejecucion'] = casa.ejecutar(orden['service'], orden['entity_ids'], orden['data'])
+                resultado['ejecucion'] = _casa(orden['service'], orden['entity_ids'], orden['data'])
             except (RuntimeError, ValueError) as exc:
                 resultado['ejecucion'] = {'ok': False, 'error': str(exc)[:200]}
+            _aprender(resultado.pop('aprender', ''), resultado, resultado['ejecucion'])
         return resultado
+    if resultado['tipo'] == 'correo':
+        resultado['nivel_riesgo'] = 3
     if resultado['tipo'] != 'accion':
         return resultado
     propuesta = resultado['propuesta']
     resultado['requiere_confirmacion'] = True
+    resultado['nivel_riesgo'] = caps.nivel_riesgo(propuesta['action'], propuesta.get('params'))
     if propuesta['action'] in caps.ACCIONES_INTERFAZ:
         # Reproductor interno, ventanas holográficas y flujo de voz: los aplica la interfaz.
         resultado['requiere_confirmacion'] = False
         resultado['interfaz'] = True
+        from neural_core import sky_metricas
+        sky_metricas.registrar('interfaz', propuesta['action'], True)
+        _aprender(resultado.pop('aprender', ''), resultado, None)
+        return resultado
+    if caps.parada_activa():
+        resultado['aviso'] = 'SKY está en parada de emergencia: no ejecuto acciones hasta que la levantes (Reanudar).'
         return resultado
     # ¿El dueño autorizó esta capacidad sin confirmación? Lo dice el propio agente.
     try:
@@ -136,19 +201,24 @@ def _completar(resultado: dict, dispositivo: str, request: Request) -> dict:
         resultado['aviso'] = (f'La capacidad "{cap}" está desactivada en tu equipo. Activala con: '
                               f'python agente_dispositivo.py --activar {cap}')
         return resultado
-    if not caps.requiere_confirmacion(propuesta['action'], propuesta['params'], politica):
+    if caps.requiere_confirmacion(propuesta['action'], propuesta['params'], politica):
+        from neural_core import sky_metricas
+        sky_metricas.registrar('tarea', 'propuesta', True, detalle=propuesta['action'])
+    else:
         resultado['requiere_confirmacion'] = False
         try:
             resultado['ejecucion'] = _llamar(dispositivo, request, propuesta['action'], propuesta['params'])
         except HTTPException as exc:
             resultado['ejecucion'] = {'ok': False, 'error': str(exc.detail)[:200]}
+        _aprender(resultado.pop('aprender', ''), resultado, resultado['ejecucion'])
     return resultado
 
 
 @router.post('/mensaje')
 def mensaje(body: Mensaje, request: Request):
+    inicio = time.perf_counter()
     resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
-    return _completar(resultado, body.dispositivo, request)
+    return _medir_turno(_completar(resultado, body.dispositivo, request), inicio)
 
 
 @router.post('/stream')
@@ -159,13 +229,17 @@ def mensaje_stream(body: Mensaje, request: Request):
     from neural_core import sky_asistente_personal as asis
 
     def eventos():
+        inicio = time.perf_counter()
         historial = [t.model_dump() for t in body.historial]
         def linea(obj):
             return json.dumps(obj, ensure_ascii=False) + '\n'
-        texto = body.texto.strip()
+        def final(resultado):
+            return linea({'final': _medir_turno(resultado, inicio)})
+        original = body.texto.strip()
+        texto = asis.preparar(original) if original else original
         r = asis.reglas(texto) if texto else None
         if r or not texto or not asis.usar_cerebro(body.proveedor):
-            yield linea({'final': _completar(r or asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request)})
+            yield final(_completar(r or asis.atender(original, historial, body.proveedor, body.modo), body.dispositivo, request))
             return
         from neural_core import sky_cerebro
         completo = ''
@@ -174,16 +248,17 @@ def mensaje_stream(body: Mensaje, request: Request):
                 completo += valor
                 yield linea({'delta': valor})
             elif evento == 'herramienta':
-                yield linea({'final': _completar(asis.resolver_especial(valor), body.dispositivo, request)})
+                resultado = asis.marcar_cerebro(asis.resolver_especial(valor), original)
+                yield final(_completar(resultado, body.dispositivo, request))
                 return
             elif evento == 'fin':
-                yield linea({'final': {'tipo': 'respuesta', 'mensaje': valor, 'proveedor': 'ollama', 'transmitido': True}})
+                yield final({'tipo': 'respuesta', 'mensaje': valor, 'proveedor': 'ollama', 'transmitido': True})
                 return
             elif evento == 'error':
                 if completo:
-                    yield linea({'final': {'tipo': 'respuesta', 'mensaje': completo, 'proveedor': 'ollama', 'transmitido': True}})
+                    yield final({'tipo': 'respuesta', 'mensaje': completo, 'proveedor': 'ollama', 'transmitido': True})
                 else:
-                    yield linea({'final': _completar(asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request)})
+                    yield final(_completar(asis.atender(original, historial, body.proveedor, body.modo), body.dispositivo, request))
                 return
     return StreamingResponse(eventos(), media_type='application/x-ndjson', headers={'Cache-Control': 'no-store'})
 
@@ -199,6 +274,8 @@ class Correo(BaseModel):
 def enviar_correo(body: Correo):
     """Envío confirmado por el dueño (un correo enviado no se puede deshacer)."""
     from neural_core import sky_correo
+    if caps.parada_activa():
+        raise HTTPException(409, 'SKY está en parada de emergencia: levantala antes de enviar.')
     try:
         return sky_correo.enviar(body.para, body.asunto, body.cuerpo, body.en_respuesta_a)
     except ValueError as exc:
@@ -213,15 +290,49 @@ def ejecutar(body: Ejecucion, request: Request):
     params = dict(body.params)
     if body.action in ('note_create', 'note_append', 'note_trash'):
         params['confirmed'] = True   # este clic ES la confirmación individual que exigen las notas
-    return _llamar(body.dispositivo, request, body.action, params)
+    from neural_core import sky_metricas
+    sky_metricas.registrar('tarea', 'confirmada', True, detalle=body.action)
+    res = _llamar(body.dispositivo, request, body.action, params)
+    if body.frase:
+        info = {'tipo': 'accion', 'propuesta': {'action': body.action, 'params': dict(body.params),
+                                                'description': DESCRIPCIONES.get(body.action, body.action)}}
+        _aprender(body.frase, info, res)
+        if info.get('aprendido_ahora') and isinstance(res, dict):
+            res = {**res, 'aprendido_ahora': True}
+    return res
+
+
+@router.get('/emergencia')
+def emergencia_estado():
+    return {'parada': caps.parada_activa()}
+
+
+@router.post('/emergencia')
+def emergencia_activar():
+    """Detiene toda ejecución en este equipo (el agente la respeta en cada acción)."""
+    from neural_core import sky_metricas
+    sky_metricas.registrar('servicio', 'parada', True, detalle='activada desde el HUD')
+    return {'parada': caps.activar_parada('Botón del HUD')}
+
+
+@router.delete('/emergencia')
+def emergencia_levantar():
+    """Sólo el dueño, con su llave: vuelve a permitir acciones según su política."""
+    from neural_core import sky_metricas
+    sky_metricas.registrar('servicio', 'reanudar', True, detalle='parada levantada por el dueño')
+    return {'levantada': caps.levantar_parada()}
 
 
 @router.post('/casa')
 def ejecutar_casa(body: OrdenCasa):
     """Confirmación del dueño para Home Assistant (luces, escenas, clima, cortinas, cerraduras)."""
-    from neural_core import sky_home_assistant as casa
     try:
-        return casa.ejecutar(body.service, body.entity_ids, body.data)
+        res = _casa(body.service, body.entity_ids, body.data)
+        if body.frase:
+            _aprender(body.frase, {'tipo': 'casa', 'propuesta': {'service': body.service, 'entity_ids': body.entity_ids,
+                                   'data': body.data, 'description': body.frase,
+                                   'requiere_confirmacion': True}}, res)
+        return res
     except ValueError as exc:
         raise HTTPException(400, str(exc)[:200])
     except RuntimeError as exc:

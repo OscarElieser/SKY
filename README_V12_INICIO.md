@@ -1,4 +1,4 @@
-# SKY IA v12.1 — Inicio
+# SKY IA v12.2 — Inicio
 
 ## 1. Instalar (una sola vez)
 
@@ -34,6 +34,9 @@ Ejemplos:
 - **Notas y tareas:** "crea una nota agenda que diga reunión el lunes" · "prepara una presentación sobre energía solar"
 - **Mensajes:** "lee mis correos" · "responde al último correo diciendo gracias, lo reviso hoy" · "mándale un whatsapp a mamá que llego tarde"
 - **Casa:** "enciende la luz de la sala" · "activa la escena cine"
+- **Aprender:** "aprende sobre energía solar" · "sigue el tema Real Madrid" · "recuerda que mi equipo es el Real Madrid" · "qué sabes de mí" · "cuando diga modo cine, pon el video en pantalla completa" · "no, eso no era"
+- **Rendimiento:** "mostrame tu rendimiento de hoy, cuántas tareas completaste y cuáles fallaron" · "analizá tu rendimiento y decime qué está fallando" · "cerrá el panel"
+- **Emergencia:** "SKY, para todo" detiene toda acción al instante; para reanudar tocá **Reanudar** en la tarjeta.
 
 ## 4. Permisos
 
@@ -82,6 +85,14 @@ Con Tailscale en la PC y el celular:
 
 No uses Funnel ni abras puertos públicos.
 
-## 11. Recomendación de equipo
+## 11. Aprendizaje y KPIs
 
-Para que el cerebro local sea rápido: tarjeta NVIDIA de 8 GB o más y 16 GB de RAM, con `qwen2.5:7b`. Sin tarjeta gráfica también funciona, pero más lento; con poca memoria el instalador elige `qwen2.5:3b`.
+- SKY aprende sola: cuando entiende una frase nueva con el cerebro y la acción sale bien, la próxima vez la hace al instante. Lo que aprendió se ve (y se puede olvidar) en **Módulos → Rendimiento**.
+- Con internet, "aprende sobre…" lee Wikipedia y noticias y lo guarda en tu PC con la fuente. `SKY_INTERNET=0` en `.env` lo apaga.
+- Todo lo que sabe de vos se exporta con `GET /api/hud/memoria`. Nunca guarda contraseñas ni datos de tarjetas.
+- Los KPIs son mediciones reales guardadas en `~/.neuralt/sky_metricas.sqlite3`. Los objetivos (`SKY_SLO_*`) se cambian en `.env`. SKY te avisa una vez por día si detecta un problema.
+- Qué funciona de verdad y qué falta: `docs/ESTADO_REAL_SKY.md`.
+
+## 12. Recomendación de equipo
+
+Para que el cerebro local sea rápido: tarjeta NVIDIA de 8 GB o más y 16 GB de RAM, con `qwen2.5:7b`. Con 30 GB de RAM o más el instalador elige `qwen2.5:14b` (más inteligente). Sin tarjeta gráfica también funciona, pero más lento; con poca memoria elige `qwen2.5:3b`.

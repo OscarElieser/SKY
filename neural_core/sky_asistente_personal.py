@@ -242,11 +242,33 @@ def resolver_especial(r: dict) -> dict:
         return {'tipo': 'accion', 'propuesta': p, 'mensaje': p['description'] + ' — ' + DESCRIPCION_ACCIONES.get(p['action'], '')}
     if tipo == 'casa':
         return {'tipo': 'casa', 'propuesta': r['propuesta'], 'mensaje': r['propuesta']['description']}
+    if tipo == 'kpi':
+        from . import sky_metricas
+        datos = sky_metricas.resumen(r.get('periodo', 'hoy'))
+        texto_kpi = sky_metricas.diagnosticar(datos) if r.get('diagnostico') else sky_metricas.describir(datos)
+        return {'tipo': 'respuesta', 'mensaje': texto_kpi, 'proveedor': 'sky-metricas',
+                'modulo': 'kpi', 'kpi': datos}
+    if tipo == 'aprendizaje':
+        from . import sky_aprendizaje
+        return sky_aprendizaje.interpretar(r['texto']) or {'tipo': 'error', 'mensaje': 'No entendí qué aprender.'}
     return r
+
+
+def preparar(texto: str) -> str:
+    """Si el dueño le enseñó a SKY esa frase («cuando diga modo cine, …»), devuelve la orden enseñada."""
+    try:
+        from . import sky_aprendizaje
+        return sky_aprendizaje.alias_para(texto) or texto
+    except Exception:
+        return texto
 
 
 def reglas(texto: str) -> dict | None:
     """Todas las reglas rápidas, en orden. None si ninguna entiende la orden."""
+    from .sky_aprendizaje import _norm
+    stop = parada(_norm(texto))   # la parada de emergencia va antes que todo
+    if stop:
+        return stop
     try:
         from .sky_agent import interpret_local_command
         local = interpret_local_command(texto)
@@ -265,6 +287,20 @@ def reglas(texto: str) -> dict | None:
             r = None
         if r:
             return resolver_especial(r)
+    from . import sky_aprendizaje
+    try:
+        r = sky_aprendizaje.interpretar(texto)
+    except Exception as exc:
+        r = {'tipo': 'error', 'mensaje': 'No pude aprender eso: ' + str(exc)[:120]}
+    if r:
+        return r
+    hud = _reglas_hud(sky_aprendizaje._norm(texto))
+    if hud:
+        return {'tipo': 'accion', 'propuesta': hud, 'mensaje': hud['description']}
+    from . import sky_metricas
+    kpi = sky_metricas.interpretar(sky_aprendizaje._norm(texto))
+    if kpi:
+        return resolver_especial(kpi)
     propuesta = interpretar(texto)
     if propuesta:
         return {'tipo': 'accion', 'propuesta': propuesta,
@@ -276,7 +312,72 @@ def reglas(texto: str) -> dict | None:
             return {'tipo': 'casa', 'propuesta': orden_casa, 'mensaje': orden_casa['description']}
     except Exception:
         pass
+    # Atajos que SKY aprendió del cerebro: la misma frase ya no necesita al modelo.
+    try:
+        aprendido = sky_aprendizaje.orden_aprendida(texto)
+    except Exception:
+        aprendido = None
+    if aprendido:
+        if aprendido['tipo'] == 'casa':
+            # Los permisos de la casa se vuelven a calcular hoy (SKY_HA_AUTO puede haber cambiado).
+            from . import sky_home_assistant as casa
+            p = aprendido['propuesta']
+            p['requiere_confirmacion'] = any(casa.requiere_confirmacion(str(e).split('.')[0]) for e in p.get('entity_ids') or ['?.x'])
+        r = resolver_especial(aprendido)
+        r['aprendido'] = True
+        return r
     return None
+
+
+_PANEL = r'(?:el |la |los |las )?(?:panel|paneles|ventana|kpis?|metricas|indicadores|rendimiento|estadisticas)(?: de (?:kpis?|rendimiento|metricas|indicadores|sky))?'
+
+
+_PARAR = re.compile(r'^(?:sky )?(?:para todo|para todas las acciones|deten(?:te)?(?: todo| todas las acciones| todas las tareas)?|'
+                    r'parada de emergencia|emergencia|modo emergencia|cancela todo|cancela todas las acciones|alto total|frena todo)$')
+_REANUDAR = re.compile(r'^(?:quita|levanta|desactiva|termina) (?:la )?(?:parada|emergencia|parada de emergencia)$|'
+                       r'^(?:reanuda|retoma) (?:las acciones|el control|todo)$|^ya (?:puedes|podes) (?:seguir|continuar)$')
+
+
+def parada(t: str) -> dict | None:
+    """Parada de emergencia: detener es inmediato; reanudar siempre requiere un clic del dueño."""
+    from . import sky_capacidades as caps
+    if _PARAR.match(t):
+        caps.activar_parada('Orden por voz o texto')
+        try:
+            from . import sky_metricas
+            sky_metricas.registrar('servicio', 'parada', True, detalle='activada por el dueño')
+        except Exception:
+            pass
+        return {'tipo': 'respuesta', 'proveedor': 'sky-seguridad', 'parada': {'activa': True},
+                'mensaje': 'Me detuve. No voy a ejecutar ninguna acción en tus equipos hasta que me lo autorices con un clic.'}
+    if _REANUDAR.match(t):
+        activa = caps.parada_activa()
+        if not activa:
+            return {'tipo': 'respuesta', 'proveedor': 'sky-seguridad', 'mensaje': 'No hay ninguna parada activa.'}
+        return {'tipo': 'respuesta', 'proveedor': 'sky-seguridad', 'parada': {'activa': True, 'reanudar': True},
+                'mensaje': 'Para reanudar necesito tu confirmación: tocá «Reanudar» en la tarjeta.'}
+    return None
+
+
+def _reglas_hud(t: str) -> dict | None:
+    """Órdenes sobre la propia interfaz holográfica de SKY (no sobre las ventanas del escritorio)."""
+    m = re.match(r'^(?:cierra|cerra|oculta|ocultá|quita|saca)(?: me)? ' + _PANEL + r'$', t)
+    if m:
+        cual = 'close_kpi' if re.search(r'kpi|metric|indicador|rendimiento|estadistic', t) else 'close_panel'
+        return {'action': 'holographic_window', 'params': {'subaction': cual},
+                'description': 'Cerrar el panel de rendimiento' if cual == 'close_kpi' else 'Cerrar el panel'}
+    if re.match(r'^(?:muestra|mostra|ensena|abre|abri|ver)(?:me)? (?:los|mis) archivos$', t):
+        return {'action': 'open_file', 'params': {'target': 'documentos'}, 'description': 'Abrir tus documentos'}
+    return None
+
+
+def marcar_cerebro(resultado: dict, frase: str) -> dict:
+    """Marca una acción elegida por el cerebro para que SKY la aprenda si sale bien."""
+    if isinstance(resultado, dict):
+        resultado['via'] = 'cerebro'
+        if resultado.get('tipo') in ('accion', 'casa'):
+            resultado['aprender'] = frase[:120]
+    return resultado
 
 
 def _turnos(historial: list[dict] | None) -> list[dict]:
@@ -303,6 +404,8 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
         return {'tipo': 'error', 'mensaje': 'Decime qué necesitás.'}
     if len(texto) > 4000:
         return {'tipo': 'error', 'mensaje': 'El mensaje es demasiado largo (máx. 4000 caracteres).'}
+    original = texto
+    texto = preparar(texto)
     r = reglas(texto)
     if r:
         return r
@@ -312,7 +415,7 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
             from . import sky_cerebro
             d = sky_cerebro.decidir(texto, turnos, modo)
             if d['tipo'] == 'herramienta':
-                return resolver_especial(d['resultado'])
+                return marcar_cerebro(resolver_especial(d['resultado']), original)
             if d['tipo'] == 'texto' and d['mensaje'] and modo == 'voz':
                 return {'tipo': 'respuesta', 'mensaje': d['mensaje'], 'proveedor': 'ollama'}
     except Exception:
@@ -345,6 +448,8 @@ AYUDA = [
     ('Archivos', ['abre mis documentos', 'qué hay en mis descargas']),
     ('Equipo', ['toma una captura', 'bloquea la pantalla', 'copia hola mundo al portapapeles', 'avísame que tengo reunión']),
     ('Agenda', ['recuérdame en 10 minutos sacar la ropa', 'pon una alarma a las 6:30', 'qué recordatorios tengo', 'buenos días']),
+    ('Aprendizaje', ['aprende sobre energía solar', 'recuerda que mi equipo es el Real Madrid', 'qué sabes de mí',
+                     'sigue el tema inteligencia artificial', 'cuando diga modo cine, pon el video en pantalla completa', 'no, eso no era']),
     ('Mensajes', ['lee mis correos', 'responde al último correo diciendo gracias, lo reviso hoy', 'mandale un whatsapp a mamá que llego tarde']),
 ]
 
@@ -371,6 +476,8 @@ def ejecutar_local_si_autorizado(propuesta: dict) -> dict | None:
     Devuelve el resultado del agente, o None si hace falta confirmar en el panel."""
     from . import sky_capacidades as caps
     from .dispositivos import call_device
+    if caps.parada_activa():
+        return None   # parada de emergencia: nada automático
     politica = caps.cargar_politica()
     accion, params = propuesta['action'], propuesta.get('params', {})
     if not caps.accion_habilitada(accion, politica, params) or caps.requiere_confirmacion(accion, params, politica):

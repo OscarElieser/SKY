@@ -200,6 +200,10 @@
     return fetch('/api/hud/tts', { method: 'POST', headers: headers(), body: JSON.stringify({ texto: texto.slice(0, 680) }) })
       .then(r => r.ok ? r.blob() : Promise.reject(new Error('tts'))).catch(() => null);
   }
+  function pedirMic() {
+    return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+      .catch((e) => { kpiEvento('voz', 'error_microfono', null, false); throw e; });
+  }
   function encolar(texto) {
     if (!S.voz || !texto) return;
     const item = { texto, audio: S.ttsLocal ? prepararPiper(texto) : null };
@@ -212,7 +216,8 @@
       const a = new Audio(url); audioActual = a;
       try { const ac = salidaAudio(); ac.createMediaElementSource(a).connect(S.outAn); } catch { /* sin visual */ }
       const fin = () => { URL.revokeObjectURL(url); audioActual = null; resolve(); };
-      a.onended = fin; a.onerror = fin; a.play().catch(fin);
+      const falla = () => { kpiEvento('voz', 'error_reproduccion', null, false); fin(); };
+      a.onended = fin; a.onerror = falla; a.play().catch(falla);
     });
   }
   function hablarSistema(texto) {
@@ -232,6 +237,7 @@
       const item = cola.shift();
       const blob = item.audio ? await item.audio : null;
       if (!hablando) break;
+      if (S.tEnvio) { kpiEvento('voz', 'primera_voz', performance.now() - S.tEnvio); S.tEnvio = null; }
       if (blob) await reproducirBlob(blob); else await hablarSistema(item.texto);
     }
     hablando = false; S.speaking = false;
@@ -243,6 +249,8 @@
     return new Promise((resolve) => { if (!hablando) resolve(); else esperas.push(resolve); });
   }
   function callar() {
+    if (hablando) kpiEvento('voz', 'interrupcion');
+    S.tEnvio = null;
     cola.length = 0; hablando = false; S.speaking = false;
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     if (audioActual) { audioActual.pause(); audioActual = null; }
@@ -251,7 +259,7 @@
 
   /* ------------------------------------------------------------------ voz: escuchar */
   async function micAnalyser() {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    const stream = await pedirMic();
     const ac = new (window.AudioContext || window.webkitAudioContext)();
     const src = ac.createMediaStreamSource(stream);
     const an = ac.createAnalyser(); an.fftSize = 256; src.connect(an);
@@ -358,7 +366,7 @@
     Object.assign(W, { stream: null, ac: null, an: null, rec: null, sr: null, ocupado: false });
   }
   async function vigilarLocal() {
-    W.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    W.stream = await pedirMic();
     W.ac = new (window.AudioContext || window.webkitAudioContext)();
     W.an = W.ac.createAnalyser(); W.an.fftSize = 512; W.ac.createMediaStreamSource(W.stream).connect(W.an);
     W.buf = new Uint8Array(W.an.fftSize);
@@ -431,6 +439,7 @@
     texto = String(texto || '').trim();
     if (!texto) return;
     addMsg('user', texto); $('chat-input').value = '';
+    S.tEnvio = performance.now();
     setState('thinking', modo === 'voz' ? 'Pensando…' : 'Procesando…');
     if (modo === 'voz' && window.ReadableStream) { await enviarStream(texto); return; }
     try {
@@ -506,6 +515,9 @@
         c.appendChild(el('pre', '', data.correos.map(m => '▸ ' + m.de + ' — ' + m.asunto + '\n   ' + (m.resumen || '').slice(0, 140)).join('\n')));
       }
       if (data.recordatorio || data.proveedor === 'sky-agenda') refrescarAgenda();
+      if (data.modulo === 'kpi') abrirKPI(data.kpi);
+      if (data.parada) { if (!data.parada.reanudar) { callar(); if (S.pending) S.pending.cancel(); } tarjetaParada(); setState('error', 'Parada de emergencia'); }
+      if (data.aprendizaje && ventanas.has('kpi')) KPI.cargar();
       await decir(data.mensaje || ''); return;
     }
     if (data.tipo === 'error') { setState('error', 'Revisá el motor de IA'); addMsg('sky', data.mensaje || 'Error.', 'err'); await speak('Tengo un problema: ' + (data.mensaje || '').split('.')[0]); return; }
@@ -520,16 +532,29 @@
     if (p.action === 'play_media' && (p.params.service || 'youtube') === 'youtube' && S.ytApi && !p.params.path) {
       await reproductor(p.params.query); return;
     }
-    const card = addCard('▸ ' + p.description, 'acción · ' + p.action);
+    const card = addCard('▸ ' + p.description, 'acción · ' + p.action + (data.nivel_riesgo ? ' · nivel ' + data.nivel_riesgo + ' ' + ['', '(bajo)', '(moderado)', '(alto: confirmación obligatoria)'][data.nivel_riesgo] : ''));
     if (data.ejecucion) {
       renderResult(card, data.ejecucion); setState('idle', 'Listo.');
       await speak(resultText(data.ejecucion)); refrescarLog(); seguirConversacion(); return;
     }
     if (data.aviso) { card.appendChild(el('div', 'note', data.aviso)); setState('idle', 'Permiso desactivado');
       await speak('Esa función está desactivada en tu equipo. Te dejé cómo activarla.'); seguirConversacion(); return; }
-    confirmar(card, p.description, () => ejecutar(p, card));
+    confirmar(card, p.description, () => ejecutar(p, card, data.aprender));
     setState('idle', 'Esperando tu confirmación');
     if (modo === 'voz') { await speak('¿Lo hago? ' + p.description + '.'); if (S.conv || modo === 'voz') escuchar(); }
+  }
+  function tarjetaParada() {
+    const card = addCard('⏹ Parada de emergencia activa', 'Ninguna acción se ejecuta en tus equipos ni en tu casa hasta que la levantes.');
+    const btns = el('div', 'btns');
+    const b = el('button', 'btn primary', 'Reanudar'); b.type = 'button';
+    b.addEventListener('click', async () => {
+      try { await api('/api/asistente/emergencia', { method: 'DELETE' }); btns.remove(); card.appendChild(el('div', 'res', 'Reanudado. Vuelvo a actuar según tus permisos.')); setState('idle', 'Listo.'); S.paradaVista = false; refrescarEstado(); }
+      catch (e) { card.appendChild(el('div', 'res bad', 'No pude reanudar: ' + e.message)); }
+    });
+    btns.appendChild(b); card.appendChild(btns); scroll();
+  }
+  function kpiEvento(tipo, nombre, ms, ok = true) {
+    api('/api/hud/kpi/evento', { method: 'POST', body: JSON.stringify({ tipo, nombre, ms: ms == null ? null : Math.round(ms), ok }) }).catch(() => {});
   }
   function confirmar(card, desc, run) {
     const btns = el('div', 'btns');
@@ -538,26 +563,30 @@
     btns.append(si, no); card.appendChild(btns); scroll();
     const pend = {
       run: () => { btns.remove(); S.pending = null; run(); },
-      cancel: () => { btns.remove(); S.pending = null; card.appendChild(el('div', 's', 'Cancelado.')); setState('idle', 'Listo.'); },
+      cancel: () => { btns.remove(); S.pending = null; card.appendChild(el('div', 's', 'Cancelado.')); setState('idle', 'Listo.'); kpiEvento('tarea', 'cancelada'); },
     };
     si.addEventListener('click', pend.run); no.addEventListener('click', pend.cancel);
     S.pending = pend;
   }
-  async function ejecutar(p, card) {
+  async function ejecutar(p, card, frase) {
     setState('executing', p.description);
     try {
-      const res = await api('/api/asistente/ejecutar', { method: 'POST', body: JSON.stringify({ action: p.action, params: p.params, dispositivo: 'local' }) });
-      renderResult(card, res); setState('idle', 'Listo.'); await speak(resultText(res));
+      const cuerpo = { action: p.action, params: p.params, dispositivo: 'local' };
+      if (frase) cuerpo.frase = String(frase).slice(0, 120);
+      const res = await api('/api/asistente/ejecutar', { method: 'POST', body: JSON.stringify(cuerpo) });
+      renderResult(card, res); setState('idle', 'Listo.');
+      if (res && res.aprendido_ahora) card.appendChild(el('div', 's', 'Aprendido: la próxima vez lo hago al instante.'));
+      await speak(resultText(res));
     } catch (e) { renderResult(card, { ok: false, error: e.message }); setState('error', 'No se completó'); await speak('No se pudo: ' + e.message); }
     refrescarLog(); refrescarTareas(); refrescarNotas(); seguirConversacion();
   }
   async function casaOrden(data, modo) {
     const p = data.propuesta;
-    const card = addCard('▸ ' + p.description, 'casa · ' + p.service);
+    const card = addCard('▸ ' + p.description, 'casa · ' + p.service + (data.nivel_riesgo ? ' · nivel ' + data.nivel_riesgo : ''));
     const correr = async () => {
       setState('executing', p.description);
       try {
-        const r = await api('/api/asistente/casa', { method: 'POST', body: JSON.stringify({ service: p.service, entity_ids: p.entity_ids, data: p.data || {} }) });
+        const r = await api('/api/asistente/casa', { method: 'POST', body: JSON.stringify({ service: p.service, entity_ids: p.entity_ids, data: p.data || {}, frase: (data.aprender || '').slice(0, 120) }) });
         renderResult(card, r); setState('idle', 'Listo.'); await speak('Listo.');
       } catch (e) { renderResult(card, { ok: false, error: e.message }); setState('error', 'Casa'); }
       refrescarCasa(); seguirConversacion();
@@ -670,6 +699,11 @@
     if (sub === 'minimize_all' || sub === 'leave_only_core') ventanas.forEach(w => w.el.classList.add('hidden'));
     else if (sub === 'restore_all') ventanas.forEach(w => w.el.classList.remove('hidden'));
     else if (sub === 'close_multimedia') cerrarVentana('player');
+    else if (sub === 'close_panel') {   // la ventana visible que está más arriba
+      let top = null, z = -1;
+      ventanas.forEach((w, id) => { const zi = +w.el.style.zIndex || 0; if (!w.el.classList.contains('hidden') && zi > z) { z = zi; top = id; } });
+      if (top) cerrarVentana(top);
+    }
     else if (sub.startsWith('close_')) {
       const grupo = { close_docs: ['office'], close_modules: [...ventanas.keys()], close_projects: ['flows'], close_chat: ['clasico'] }[sub]
         || [sub.slice(6)];
@@ -689,6 +723,7 @@
     { id: 'community', t: 'Comunidad', d: 'Espacios compartidos', url: '/community' },
     { id: 'negocio', t: 'BAQUEANO', d: 'Panel de negocio del dueño', url: '/owner/baqueano' },
     { id: 'player', t: 'Reproductor', d: 'YouTube dentro de SKY', accion: () => preguntarReproducir() },
+    { id: 'kpi', t: 'Rendimiento', d: 'KPIs reales, fallos y aprendizaje', accion: () => abrirKPI() },
     { id: 'streamlit', t: 'Panel completo', d: 'Deportes, finanzas, visión… (pestaña aparte)', externo: 'http://127.0.0.1:8501' },
   ];
   function pintarModulos() {
@@ -704,6 +739,106 @@
       });
       box.appendChild(b);
     });
+  }
+
+  /* ------------------------------------------------------------------ módulo de rendimiento (KPIs reales) */
+  const KPI = { abierto: false, periodo: 'hoy', raiz: null, timer: null };
+  function fmtMs(ms) { return ms == null ? '—' : (ms < 1000 ? ms + ' ms' : (ms / 1000).toFixed(1).replace('.', ',') + ' s'); }
+  const ORIGEN = { reglas: 'Reglas', aprendido: 'Atajos aprendidos', cerebro: 'Cerebro local', ia: 'IA conversacional' };
+  function abrirKPI(datos) {
+    if (!KPI.raiz) {
+      const raiz = el('div', 'kpi');
+      const barra = el('div', 'kpi-bar');
+      ['hoy', 'semana'].forEach(p => {
+        const b = el('button', 'btn' + (p === KPI.periodo ? ' primary' : ''), p === 'hoy' ? 'Hoy' : '7 días'); b.type = 'button'; b.dataset.p = p;
+        b.addEventListener('click', () => { KPI.periodo = p; barra.querySelectorAll('button[data-p]').forEach(x => x.classList.toggle('primary', x.dataset.p === p)); KPI.cargar(); });
+        barra.appendChild(b);
+      });
+      const r = el('button', 'btn', 'Actualizar'); r.type = 'button'; r.addEventListener('click', () => KPI.cargar());
+      barra.appendChild(r); barra.appendChild(el('span', 'kpi-gen', ''));
+      raiz.appendChild(barra); raiz.appendChild(el('div', 'kpi-cuerpo'));
+      KPI.raiz = raiz;
+    }
+    const w = abrirVentana('kpi', 'Rendimiento de SKY', KPI.raiz, { w: 980, h: 640 });
+    KPI.abierto = true;
+    const cerrar = w.el.querySelector('header button[title="Cerrar"]');
+    if (cerrar && !cerrar.dataset.kpi) { cerrar.dataset.kpi = '1'; cerrar.addEventListener('click', () => { KPI.abierto = false; KPI.raiz = null; clearInterval(KPI.timer); }); }
+    if (datos && datos.periodo === KPI.periodo) pintarKPI(datos); else KPI.cargar();
+    clearInterval(KPI.timer);
+    KPI.timer = setInterval(() => { if (ventanas.has('kpi') && document.visibilityState === 'visible') KPI.cargar(); else if (!ventanas.has('kpi')) clearInterval(KPI.timer); }, 20000);
+  }
+  KPI.cargar = async function () {
+    if (!KPI.raiz) return;
+    try {
+      const [d, a] = await Promise.all([api('/api/hud/kpi?periodo=' + KPI.periodo), api('/api/hud/aprendizaje').catch(() => null)]);
+      pintarKPI(d, a);
+    } catch (e) { const c = KPI.raiz.querySelector('.kpi-cuerpo'); c.textContent = ''; c.appendChild(el('div', 'note', 'No pude leer los KPIs: ' + e.message)); }
+  };
+  function tarjeta(titulo, valor, sub, clase) {
+    const t = el('div', 'kpi-tile' + (clase ? ' ' + clase : ''));
+    t.appendChild(el('small', '', titulo)); t.appendChild(el('b', '', valor)); if (sub) t.appendChild(el('span', '', sub));
+    return t;
+  }
+  function seccion(cuerpo, titulo) { const s = el('section', 'kpi-sec'); s.appendChild(el('h4', '', titulo)); cuerpo.appendChild(s); return s; }
+  function tabla(cols, filas) {
+    const t = el('table', 'kpi-tab'); const h = el('tr'); cols.forEach(c => h.appendChild(el('th', '', c))); t.appendChild(h);
+    filas.forEach(f => { const tr = el('tr'); f.forEach(v => tr.appendChild(el('td', '', String(v)))); t.appendChild(tr); });
+    return t;
+  }
+  function pintarKPI(d, aprend) {
+    if (!KPI.raiz) return;
+    KPI.raiz.querySelector('.kpi-gen').textContent = 'Medido ' + (d.generado || '').replace('T', ' ') + ' · ' + d.eventos + ' eventos';
+    const c = KPI.raiz.querySelector('.kpi-cuerpo'); c.textContent = '';
+    const a = d.acciones, t = d.asistente, ap = d.api, ag = d.agente;
+    const tiles = el('div', 'kpi-tiles');
+    tiles.appendChild(tarjeta('Tareas completadas', a.completadas + ' / ' + a.total, a.tasa_exito == null ? 'sin tareas' : a.tasa_exito + ' % de éxito', a.fallidas ? '' : 'ok'));
+    tiles.appendChild(tarjeta('Tareas fallidas', String(a.fallidas), a.total ? 'de ' + a.total + ' · mediana ' + fmtMs(a.p50_ms) : '', a.fallidas ? 'bad' : 'ok'));
+    tiles.appendChild(tarjeta('Mensajes atendidos', String(t.turnos), t.errores ? t.errores + ' con error' : 'sin errores', t.errores ? 'warn' : ''));
+    tiles.appendChild(tarjeta('API · p95', fmtMs(ap.p95_ms), ap.peticiones + ' peticiones · ' + ap.errores_5xx + ' errores 5xx', ap.errores_5xx ? 'warn' : ''));
+    tiles.appendChild(tarjeta('Agente del equipo', ag.disponibilidad == null ? '—' : ag.disponibilidad + ' %', ag.sin_respuesta ? ag.sin_respuesta + ' sin respuesta' : 'disponible', ag.sin_respuesta ? 'warn' : ''));
+    if (d.sistema && d.sistema.cpu_equipo != null) tiles.appendChild(tarjeta('Equipo', 'CPU ' + Math.round(d.sistema.cpu_equipo) + ' %', 'RAM ' + Math.round(d.sistema.memoria_equipo) + ' % · SKY ' + d.sistema.memoria_sky_mb + ' MB'));
+    c.appendChild(tiles);
+
+    const sp = seccion(c, 'Problemas detectados');
+    if (!d.problemas.length) sp.appendChild(el('div', 'kpi-ok', 'Sin problemas de rendimiento (comparado con los 7 días anteriores).'));
+    d.problemas.forEach(p => {
+      const b = el('div', 'kpi-prob ' + (p.severidad === 'alta' ? 'bad' : 'warn'));
+      b.appendChild(el('b', '', p.titulo)); b.appendChild(el('div', '', p.detalle)); b.appendChild(el('small', '', '→ ' + p.sugerencia));
+      sp.appendChild(b);
+    });
+
+    if (d.serie.length) {
+      const ss = seccion(c, d.periodo === 'hoy' ? 'Tareas por hora' : 'Tareas por hora (7 días)');
+      const max = Math.max(1, ...d.serie.map(x => x.completadas + x.fallidas));
+      const g = el('div', 'kpi-serie');
+      d.serie.slice(-24).forEach(x => {
+        const col = el('div', 'kpi-col'); col.title = x.hora + ': ' + x.completadas + ' completadas, ' + x.fallidas + ' fallidas';
+        const pila = el('div', 'kpi-pila');
+        const f = el('i', 'f'); f.style.height = (x.fallidas / max * 100) + '%';
+        const o = el('i', 'o'); o.style.height = (x.completadas / max * 100) + '%';
+        pila.append(f, o); col.appendChild(pila); col.appendChild(el('small', '', x.hora.slice(-5, -3)));
+        g.appendChild(col);
+      });
+      ss.appendChild(g);
+    }
+    if (a.ultimas_fallidas.length) seccion(c, 'Tareas que fallaron').appendChild(tabla(['Hora', 'Tarea', 'Motivo'], a.ultimas_fallidas.map(f => [f.hora, f.nombre, f.motivo || '—'])));
+    if (a.por_accion.length) seccion(c, 'Por tipo de tarea').appendChild(tabla(['Tarea', 'Completadas', 'Fallidas', 'Mediana'], a.por_accion.map(x => [x.nombre, x.completadas, x.fallidas, fmtMs(x.p50_ms)])));
+    const orig = Object.entries(t.por_origen || {});
+    if (orig.length) seccion(c, 'Cómo resolví tus mensajes').appendChild(tabla(['Vía', 'Mensajes', 'Mediana', 'p95'], orig.sort((x, y) => y[1].n - x[1].n).map(([k, v]) => [ORIGEN[k] || k, v.n, fmtMs(v.p50_ms), fmtMs(v.p95_ms)])));
+    if (ap.rutas_lentas.length) seccion(c, 'Rutas más lentas de la API').appendChild(tabla(['Ruta', 'Peticiones', 'Mediana', 'p95'], ap.rutas_lentas.map(x => [x.ruta, x.n, fmtMs(x.p50_ms), fmtMs(x.p95_ms)])));
+    if (aprend) {
+      const sa = seccion(c, 'Aprendizaje');
+      sa.appendChild(el('div', 's', aprend.atajos + ' atajos · ' + aprend.ordenes_ensenadas + ' órdenes enseñadas · ' + aprend.temas + ' temas de internet · ' + aprend.memorias + ' datos sobre vos' + (aprend.internet ? '' : ' · internet desactivado')));
+      if (aprend.intereses.length) sa.appendChild(el('div', 's', 'Sigo: ' + aprend.intereses.join(', ')));
+      if (aprend.temas_recientes.length) sa.appendChild(el('div', 's', 'Aprendí sobre: ' + aprend.temas_recientes.join(', ')));
+      (aprend.lista_atajos || []).concat(aprend.lista_ensenadas || []).forEach(x => {
+        const fila = el('div', 'kpi-atajo');
+        fila.appendChild(el('span', '', '«' + x.frase + '» → ' + x.hace + (x.veces ? ' · ' + x.veces + ' usos' : '')));
+        const b = el('button', 'btn', 'Olvidar'); b.type = 'button';
+        b.addEventListener('click', async () => { try { await api('/api/hud/aprendizaje/atajos/' + encodeURIComponent(x.frase), { method: 'DELETE' }); fila.remove(); } catch (e) { b.textContent = 'Error'; } });
+        fila.appendChild(b); sa.appendChild(fila);
+      });
+    }
   }
 
   /* ------------------------------------------------------------------ reproductor */
@@ -786,7 +921,10 @@
       const c = $('caps-list'); c.textContent = ''; c.appendChild(el('span', 'muted', a.error || 'Iniciá SKY completo (opción 0 del menú).'));
       ['cpu', 'ram', 'bat'].forEach(k => meter(k, null)); return;
     }
-    pill('pill-agent', 'AGENTE · ' + String(a.profile || '').toUpperCase(), 'ok');
+    if (a.parada_emergencia) {
+      pill('pill-agent', 'AGENTE · PARADA', 'bad');
+      if (!S.paradaVista) { S.paradaVista = true; tarjetaParada(); }
+    } else { S.paradaVista = false; pill('pill-agent', 'AGENTE · ' + String(a.profile || '').toUpperCase(), 'ok'); }
     $('sys-device').textContent = a.device + ' · ' + a.platform;
     $('sys-profile').textContent = a.profile + ' · v' + (a.version || '');
     const s = a.system || {};

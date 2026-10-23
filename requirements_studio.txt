@@ -17,3 +17,6 @@ scipy>=1.13,<2
 
 # v11.0 CI: Office PDF regression tests require pypdf (also used in main requirements.txt)
 pypdf>=5,<7
+
+# SKY v12.2: matemática simbólica (derivadas, integrales, ecuaciones, verificación de cálculos)
+sympy>=1.13,<2

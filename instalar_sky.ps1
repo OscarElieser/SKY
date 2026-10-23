@@ -91,7 +91,7 @@ if (-not $SinOllama) {
     if ($ollama) {
         if (-not $Modelo) {
             $gb = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-            $Modelo = if ($gb -ge 14) { "qwen2.5:7b" } else { "qwen2.5:3b" }
+            $Modelo = if ($gb -ge 30) { "qwen2.5:14b" } elseif ($gb -ge 14) { "qwen2.5:7b" } else { "qwen2.5:3b" }
             Ok "Memoria: $gb GB -> modelo $Modelo"
         }
         try { Invoke-WebRequest -Uri "http://127.0.0.1:11434/api/tags" -UseBasicParsing -TimeoutSec 2 | Out-Null }

@@ -74,10 +74,33 @@ async def _agenda_pump():
             res=sky_rutinas.ejecutar_rutina(rutina)
             if res['mensaje']:
                 sky_rutinas.avisar(res['mensaje'],'rutina')
+        _vigilancia()
     while True:
         try:await asyncio.to_thread(ciclo)
         except Exception:pass
         await asyncio.sleep(20)
+
+_VIGILANCIA={'kpi':0.0,'intereses':0.0,'avisados':set(),'dia':''}
+
+def _vigilancia():
+    # SKY v12.2: cada 5 min revisa sus KPIs y avisa UNA vez por día cada problema nuevo;
+    # cada hora actualiza los temas que sigue (si SKY_INTERNET no es 0).
+    import time as _t
+    from datetime import date
+    from neural_core import sky_rutinas, sky_metricas, sky_aprendizaje
+    ahora=_t.time();hoy=date.today().isoformat()
+    if _VIGILANCIA['dia']!=hoy:
+        _VIGILANCIA.update(dia=hoy,avisados=set())
+    if ahora-_VIGILANCIA['kpi']>=300:
+        _VIGILANCIA['kpi']=ahora
+        for p in sky_metricas.detectar():
+            if p['id'] not in _VIGILANCIA['avisados']:
+                _VIGILANCIA['avisados'].add(p['id'])
+                sky_rutinas.avisar('Detecté un problema: '+p['titulo']+'. '+p['sugerencia'],'kpi')
+    if ahora-_VIGILANCIA['intereses']>=3600:
+        _VIGILANCIA['intereses']=ahora
+        for linea in sky_aprendizaje.actualizar_intereses():
+            sky_rutinas.avisar('Novedad: '+linea,'aprendizaje')
 
 def _avisar_fuera(texto:str):
     try:
@@ -110,6 +133,10 @@ async def lifespan(app):
     creative_pump=asyncio.create_task(_creative_pump()) if os.getenv('SKY_CREATIVE_WORKER','1')=='1' else None
     if os.getenv('SKY_WORKFLOWS_ENABLED','1')=='1':
         pump=asyncio.create_task(_workflow_pump())
+    try:
+        from neural_core import sky_metricas
+        sky_metricas.registrar('servicio','inicio',True,detalle='API iniciada')
+    except Exception:pass
     agenda_pump=asyncio.create_task(_agenda_pump()) if os.getenv('SKY_AGENDA_ENABLED','1')=='1' else None
     try:
         yield
@@ -559,11 +586,23 @@ async def sky_real_activity(request:Request,call_next):
     start=time.perf_counter()
     try:
         response=await call_next(request)
-        record(request.url.path,(time.perf_counter()-start)*1000,response.status_code)
+        ms=(time.perf_counter()-start)*1000
+        record(request.url.path,ms,response.status_code)
+        _kpi_api(request,ms,response.status_code)
         return response
     except Exception:
-        record(request.url.path,(time.perf_counter()-start)*1000,500)
+        ms=(time.perf_counter()-start)*1000
+        record(request.url.path,ms,500)
+        _kpi_api(request,ms,500)
         raise
+
+def _kpi_api(request:Request,ms:float,status:int):
+    # SKY v12.2: KPIs reales por ruta (plantilla sin IDs), código y milisegundos.
+    path=request.url.path
+    if not path.startswith('/api/'):return
+    from neural_core import sky_metricas
+    ruta=getattr(request.scope.get('route'),'path',None) or sky_metricas.ruta_plantilla(path)
+    sky_metricas.registrar('api',f'{request.method} {ruta}',status<500,ms,codigo=status)
 
 # v9.3: flujos autónomos locales, privilegios exclusivos del creador.
 from .workflow_api import router as workflow_router

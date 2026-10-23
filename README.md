@@ -1,4 +1,4 @@
-# 🌌 SKY IA — Universal v12.1 | HUD · Asistente Personal
+# 🌌 SKY IA — Universal v12.2 | HUD · Asistente Personal
 
 **Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
 
@@ -27,7 +27,12 @@ Desde este panel podrás elegir fácilmente:
 
 ---
 
-## 🛰️ SKY v12.1 — HUD y Asistente Personal
+## 🛰️ SKY v12.2 — HUD y Asistente Personal
+
+- **Aprende sola:** las frases nuevas que salen bien se vuelven atajos instantáneos; le podés enseñar órdenes, contarle datos tuyos y corregirla. Todo se puede revisar, exportar y borrar.
+- **Se alimenta de internet:** "aprende sobre…" (Wikipedia y noticias, con fuentes) y "sigue el tema…" con novedades diarias. `SKY_INTERNET=0` lo apaga.
+- **KPIs reales:** mide cada petición, mensaje y acción; detecta problemas sola y responde "¿qué está fallando?" con evidencia. Panel de rendimiento a pedido. Novedades: [CHANGELOG_V12_2.md](CHANGELOG_V12_2.md) · Estado real: [docs/ESTADO_REAL_SKY.md](docs/ESTADO_REAL_SKY.md)
+- **Parada de emergencia** ("SKY, para todo") y niveles de riesgo 1–3 en cada acción.
 
 - **Entiende a la primera:** las órdenes conocidas se resuelven al instante, y las demás las interpreta un **cerebro local con herramientas** (Ollama), que también entiende referencias como "más fuerte" o "cerralo".
 - **Voz fluida:** empieza a hablar con la primera frase, con voz natural **Piper** local y escucha continua **"SKY…"** transcrita en tu PC.

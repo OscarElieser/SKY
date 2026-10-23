@@ -29,7 +29,7 @@ from neural_core import dispositivos
 from neural_core.sky_asistente_personal import token_agente_local, url_agente_local
 
 router = APIRouter(prefix='/api/hud', dependencies=[Depends(require_key)])
-VERSION_SKY = '12.1.0'
+VERSION_SKY = '12.2.0'
 
 
 def _credenciales() -> tuple[str, str]:
@@ -209,3 +209,56 @@ def diagnostico():
     from neural_core import sky_diagnostico
     items = sky_diagnostico.revisar()
     return {'items': items, 'resumen': sky_diagnostico.resumen(items)}
+
+
+@router.get('/kpi')
+def kpi(periodo: str = 'hoy'):
+    """KPIs reales (API, asistente, acciones) y problemas detectados. periodo: hoy | semana."""
+    from neural_core import sky_metricas
+    if periodo not in ('hoy', 'semana'):
+        raise HTTPException(400, 'periodo debe ser hoy o semana')
+    datos = sky_metricas.resumen(periodo)
+    return {**datos, 'texto': sky_metricas.describir(datos)}
+
+
+@router.get('/aprendizaje')
+def aprendizaje():
+    """Lo que SKY aprendió: atajos, órdenes enseñadas, temas de internet, datos y temas que sigue."""
+    from neural_core import sky_aprendizaje
+    return sky_aprendizaje.estadisticas()
+
+
+@router.delete('/aprendizaje/atajos/{frase}')
+def olvidar_atajo(frase: str):
+    from neural_core import sky_aprendizaje
+    if len(frase) > 120:
+        raise HTTPException(400, 'Frase demasiado larga.')
+    return {'ok': sky_aprendizaje.olvidar_orden(frase)}
+
+
+class EventoKPI(BaseModel):
+    tipo: str = Field(pattern='^(voz|tarea)$')
+    nombre: str = Field(pattern='^(primera_voz|interrupcion|error_microfono|error_reproduccion|cancelada)$')
+    ms: int | None = Field(default=None, ge=0, le=600_000)
+    ok: bool = True
+
+
+@router.post('/kpi/evento')
+def kpi_evento(body: EventoKPI):
+    """Mediciones que sólo el navegador conoce (voz y cancelaciones). Lista cerrada de nombres."""
+    from neural_core import sky_metricas
+    sky_metricas.registrar(body.tipo, body.nombre, body.ok, body.ms)
+    return {'ok': True}
+
+
+@router.get('/memoria')
+def memoria_exportar():
+    """Exporta todo lo que SKY recuerda y aprendió (para revisarlo o guardarlo)."""
+    from neural_core import sky_aprendizaje
+    return sky_aprendizaje.exportar()
+
+
+@router.delete('/memoria/{memoria_id}')
+def memoria_borrar(memoria_id: int):
+    from neural_core import sky_aprendizaje
+    return {'ok': sky_aprendizaje.borrar_memoria(memoria_id)}

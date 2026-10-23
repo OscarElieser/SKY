@@ -43,3 +43,6 @@ pyyaml>=6.0,<7
 
 # SKY v11.1 Asistente Personal: batería/CPU/RAM en el estado del equipo (opcional)
 psutil>=5.9,<8
+
+# SKY v12.2: matemática simbólica (derivadas, integrales, ecuaciones, verificación de cálculos)
+sympy>=1.13,<2
