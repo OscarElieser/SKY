@@ -1,4 +1,4 @@
-# SKY: estado real de cada capacidad (v12.3)
+# SKY: estado real de cada capacidad (v12.4)
 
 Formato del prompt maestro §20. Cada capacidad tiene uno de estos estados:
 
@@ -34,6 +34,12 @@ Ninguna capacidad marcada «sin validación completa» debe presentarse como fun
 | Núcleo | Planificación de varias acciones encadenadas | Parcial: las skills encadenan pasos que vos definís (también por voz); el cerebro todavía elige **una** herramienta por mensaje |
 | Perfil | `USER.md`: quién sos, herramientas, suscripciones; lo leen todos los cerebros | Implementada y probada |
 | Skills | Carpeta de skills, 4 integradas, creación y ejecución por voz | Implementada y probada |
+| Habilidades | Catálogo nativo: viajes, proyectos, casa, automonitoreo, seguridad, música, creación | Implementada y probada (APIs externas simuladas) |
+| Skill Builder | Detección de necesidades, propuesta con IA, revisión estática, pruebas aisladas, aprobación con permisos, versiones | Implementada y probada (aislamiento por proceso; sin contenedor del SO) |
+| Integraciones | Centro con vía, requisitos y estado real de 20 plataformas | Implementada y probada |
+| Creación | Imágenes (OpenAI, Adobe Firefly), presentaciones (Gamma), letras de canciones | Implementada sin validación completa (APIs simuladas; requiere tus claves) |
+| Creación | Canciones con audio (Suno) | **Bloqueada**: Suno no tiene API pública |
+| Creación | Diseños en Canva | Pendiente (OAuth de Canva Connect) |
 | Aprendizaje | Atajos aprendidos de acciones exitosas, corrección y caducidad | Implementada y probada |
 | Aprendizaje | Órdenes enseñadas («cuando diga…») | Implementada y probada |
 | Memoria | Datos personales: recordar, corregir, olvidar, exportar y borrar; se rechazan secretos | Implementada y probada |
@@ -62,7 +68,7 @@ Ninguna capacidad marcada «sin validación completa» debe presentarse como fun
 | Seguridad | Control de velocidad (rate limit) por ruta | Pendiente |
 | Multidispositivo | Agentes remotos emparejados vía Tailscale con token por dispositivo | Implementada sin validación completa |
 | Multidispositivo | App móvil nativa y sincronización de memoria | Pendiente |
-| Evolución | Proponer mejoras técnicas, probarlas en un entorno aislado y revertirlas (§4) | Pendiente; hoy SKY **no** modifica su propio código |
+| Evolución | Proponer habilidades nuevas, probarlas aisladas y versionarlas (§4) | Implementada y probada con el Skill Builder; SKY **no** modifica su núcleo ni sus controles |
 
 ## Próximas fases recomendadas
 

@@ -246,17 +246,17 @@ def interpretar(texto: str) -> dict | None:
     if not t:
         return None
     from . import sky_rutinas
-    if re.fullmatch(r'(?:que|cuales) (?:skills|habilidades) (?:tienes|tenes|hay|sabes)', t):
+    if re.fullmatch(r'(?:que|cuales) skills (?:tienes|tenes|hay|sabes)', t):
         return _resp('Mis skills: ' + '; '.join(f"{s['nombre']} ({s['descripcion'] or 'sin descripción'})" for s in listar()) + '.',
                      modulo='auto')
     if re.fullmatch(r'(?:que|cuales) (?:tareas programadas|tareas automaticas|automatizaciones) (?:tengo|hay|tienes)|'
                     r'(?:muestra(?:me)?|mostra(?:me)?|abre|ver) (?:mis |las )?(?:tareas programadas|automatizaciones|skills)', t):
         return _resp(describir_programadas(), modulo='auto')
-    m = re.fullmatch(r'(?:ejecuta|corre|usa|activa|haz) (?:la |el )?(?:skill|habilidad) (.{2,60})', t)
+    m = re.fullmatch(r'(?:ejecuta|corre|usa|haz) (?:la |el )?(?:skill|habilidad) (.{2,60})', t)
     if m:
         sk = buscar(m.group(1))
         if not sk:
-            return _resp(f'No tengo una skill llamada «{m.group(1)}».')
+            return None   # puede ser una habilidad del catálogo o del Skill Builder
         res = ejecutar(sk)
         return _resp(f"{sk['nombre']}. " + (res['mensaje'] or 'Listo.'), acciones=res['acciones'], skill=sk['id'])
     m = re.fullmatch(r'(?:crea|creame|nueva|agrega) (?:una )?(?:skill|habilidad) (?:llamada |que se llame )?(.{2,60}?) '
@@ -265,7 +265,8 @@ def interpretar(texto: str) -> dict | None:
         from .sky_aprendizaje import _recuperar
         pasos, malas = pasos_desde_texto(_recuperar(texto, m.group(2)))
         if malas:
-            return _resp('No entendí estas partes: «' + '», «'.join(malas) + '». Decilas como órdenes, por ejemplo «abra Word».')
+            return _resp('No entendí estas partes: «' + '», «'.join(malas) + '». Decilas como órdenes, por ejemplo «abra Word». '
+                         'Si necesitás algo nuevo que SKY todavía no sabe hacer, decí «diseña una habilidad para …».')
         try:
             sk = guardar({'nombre': _recuperar(texto, m.group(1)), 'frases': [m.group(1)], 'pasos': pasos})
         except ValueError as exc:

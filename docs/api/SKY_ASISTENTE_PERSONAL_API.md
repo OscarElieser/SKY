@@ -1,4 +1,4 @@
-# SKY v12.3 — API del Asistente Personal y del HUD
+# SKY v12.4 — API del Asistente Personal y del HUD
 
 Todas las rutas `/api/*` requieren `X-SKY-KEY` (llave del dueño) y, si el 2FA del creador está activo, `X-SKY-SESSION`.
 
@@ -68,6 +68,16 @@ Campos v12.2 en las respuestas: `ms` (tiempo real del turno), `nivel_riesgo` (1 
 | GET | `/api/hud/programadas` · PATCH `/{id}` `{activa}` · DELETE `/{id}` | Tareas programadas |
 | GET | `/api/hud/borradores` · POST `/preparar` · PATCH `/{id}` `{cuerpo}` · POST `/{id}/enviar` · DELETE `/{id}` | Borradores de correo; `enviar` es la confirmación del dueño |
 | GET | `/api/hud/whatsapp` · POST `/api/hud/whatsapp/prueba` | Estado del canal de WhatsApp y mensaje de prueba |
+| GET | `/api/hud/habilidades` · PATCH `/api/hud/habilidades/{id}` `{activa}` | Catálogo completo (nativas, Builder, skills, integraciones, necesidades) |
+| GET | `/api/hud/integraciones` | Vía, requisitos y estado de cada plataforma |
+| POST | `/api/hud/builder/proponer` `{pedido}` | La IA diseña, revisa y prueba una habilidad (no la instala) |
+| POST | `/api/hud/builder/version` `{manifiesto, codigo}` | Versión escrita por el dueño (se revisa y prueba igual) |
+| GET | `/api/hud/builder/{id}?version=` | Manifiesto, código y reporte de pruebas |
+| POST | `/api/hud/builder/{id}/aprobar` `{version, permisos}` | Aprobación del dueño: instala esa versión con esos permisos (vuelve a probar) |
+| POST | `/api/hud/builder/{id}/desactivar` · DELETE `/api/hud/builder/{id}` | Quitar permisos / eliminar con todas sus versiones |
+| GET | `/api/hud/creaciones/{imagenes\|musica\|presentaciones}[/{archivo}]` | Lo que creó SKY (nombre validado, sólo con la llave) |
+
+Manifiesto del Skill Builder: `{nombre, descripcion, disparadores[], permisos[acciones, internet:<dominio>], fuentes[{nombre, url https}], pruebas[{entrada, contexto, espera[]}]}`; código: `def ejecutar(entrada, contexto) -> {"decir": str, "acciones": [{"orden": str}] (≤5)}`.
 
 Pasos de rutinas y skills: `saludo`, `recordatorios_hoy`, `correo_resumen`, `correo_borradores`, `borradores_pendientes`, `decir{texto}`, `orden{texto}`, `skill{id}`, `noticias{tema}`, `aprender{tema}`, `intereses`, `kpi{diagnostico}`, `accion{action, params}`. Las rutinas aceptan `activa`.
 
