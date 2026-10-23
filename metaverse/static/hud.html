@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SKY · Interfaz</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2212%22 fill=%22none%22 stroke=%22%2300e5ff%22 stroke-width=%224%22/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/hud.css?v=12.0">
+</head>
+<body data-state="idle">
+<div class="grid-bg" aria-hidden="true"></div>
+<div class="scan" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="brand"><span class="mark" aria-hidden="true"></span><span class="word">S K Y</span><span class="ver" id="ver">v12</span></div>
+  <div class="pills">
+    <span class="pill" id="pill-agent" title="Agente del equipo">AGENTE · …</span>
+    <span class="pill" id="pill-ia" title="Motor de inteligencia">IA · …</span>
+    <span class="pill" id="pill-voz" title="Reconocimiento de voz">VOZ · …</span>
+    <span class="pill" id="pill-casa" title="Home Assistant">CASA · …</span>
+  </div>
+  <div class="clock"><span id="clock-time">--:--</span><span id="clock-date"></span></div>
+</header>
+
+<main class="hud">
+  <aside class="col left" id="col-left">
+    <section class="panel" id="p-sistema">
+      <h2>Sistema</h2>
+      <div class="kv"><span>Equipo</span><b id="sys-device">—</b></div>
+      <div class="kv"><span>Perfil</span><b id="sys-profile">—</b></div>
+      <div class="meter"><span>CPU</span><i><u id="m-cpu"></u></i><b id="v-cpu">—</b></div>
+      <div class="meter"><span>RAM</span><i><u id="m-ram"></u></i><b id="v-ram">—</b></div>
+      <div class="meter"><span>BAT</span><i><u id="m-bat"></u></i><b id="v-bat">—</b></div>
+    </section>
+    <section class="panel" id="p-ia">
+      <h2>Motor de IA</h2>
+      <div class="kv"><span>Proveedor</span><b id="ia-prov">—</b></div>
+      <div class="kv"><span>Privacidad</span><b id="ia-priv">—</b></div>
+      <div class="kv"><span>Ollama</span><b id="ia-ollama">—</b></div>
+    </section>
+    <section class="panel" id="p-casa">
+      <h2>Casa</h2>
+      <div class="chips" id="casa-list"><span class="muted">Configurá SKY_HA_URL y SKY_HA_TOKEN para controlar tu casa.</span></div>
+    </section>
+    <section class="panel" id="p-caps">
+      <h2>Permisos activos</h2>
+      <div class="chips" id="caps-list"><span class="muted">Iniciá el agente del equipo.</span></div>
+    </section>
+  </aside>
+
+  <section class="center">
+    <div class="core-wrap">
+      <canvas id="core" aria-label="Núcleo de SKY: tocá para hablar" role="button" tabindex="0"></canvas>
+      <div class="core-state"><span id="state-label">EN ESPERA</span><span id="state-sub">Tocá el núcleo o decí lo que necesitás</span></div>
+      <div class="transcript" id="transcript" aria-live="polite"></div>
+    </div>
+    <div class="feed" id="feed" aria-live="polite"></div>
+    <form class="composer" id="chat-form" autocomplete="off">
+      <button type="button" class="ctl" id="btn-mic" title="Hablar con SKY" aria-label="Hablar con SKY">MIC</button>
+      <input id="chat-input" maxlength="4000" placeholder="Escribí una orden o pregunta para SKY…" aria-label="Mensaje para SKY">
+      <button type="button" class="ctl toggle" id="btn-conv" title="Conversación continua: SKY vuelve a escucharte después de responder" aria-pressed="false">CONV</button>
+      <button type="button" class="ctl toggle on" id="btn-tts" title="SKY responde en voz alta" aria-pressed="true">VOZ</button>
+      <button type="submit" class="send">ENVIAR</button>
+    </form>
+  </section>
+
+  <aside class="col right" id="col-right">
+    <section class="panel" id="p-mod">
+      <h2>Módulos</h2>
+      <div class="tiles" id="tiles"></div>
+    </section>
+    <section class="panel" id="p-tareas">
+      <h2>Tareas</h2>
+      <ul class="list" id="tareas-list"><li class="muted">Sin tareas en curso.</li></ul>
+    </section>
+    <section class="panel" id="p-voz">
+      <h2>Pendientes</h2>
+      <ul class="list" id="voz-list"><li class="muted">Nada pendiente.</li></ul>
+    </section>
+    <section class="panel" id="p-notas">
+      <h2>Notas</h2>
+      <ul class="list" id="notas-list"><li class="muted">Sin notas.</li></ul>
+    </section>
+    <section class="panel" id="p-log">
+      <h2>Registro verificado</h2>
+      <ul class="list log" id="log-list"><li class="muted">Sin acciones todavía.</li></ul>
+    </section>
+  </aside>
+</main>
+
+<nav class="mobile-tabs" id="mobile-tabs" aria-label="Paneles">
+  <button type="button" data-panel="col-left">Sistema</button>
+  <button type="button" data-panel="core">Núcleo</button>
+  <button type="button" data-panel="col-right">Módulos</button>
+</nav>
+
+<div class="windows" id="windows"></div>
+<div class="dock" id="dock" aria-label="Ventanas abiertas"></div>
+
+<script src="/static/sky-security-ui.js" defer></script>
+<script src="/static/hud.js?v=12.0" defer></script>
+</body>
+</html>

@@ -80,14 +80,21 @@ def install(app):
             with _LOCK:_ATTEMPTS[key].append(time.monotonic())
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['Referrer-Policy']='no-referrer'
-        response.headers['X-Frame-Options']='DENY'
+        # SKY v12: un módulo de SKY puede mostrarse DENTRO del HUD de SKY (mismo origen).
+        # Sec-Fetch-* los fija el navegador y una página ajena no puede falsificarlos;
+        # cualquier otro caso sigue con DENY / frame-ancestors 'none'.
+        embebido_en_sky=(request.headers.get('sec-fetch-dest')=='iframe'
+                         and request.headers.get('sec-fetch-site')=='same-origin')
+        response.headers['X-Frame-Options']='SAMEORIGIN' if embebido_en_sky else 'DENY'
         response.headers['Cross-Origin-Resource-Policy']='same-origin'
         response.headers['Permissions-Policy']='camera=(self), microphone=(self), geolocation=(), payment=()'
+        es_hud=path in ('/','/hud')
         response.headers['Content-Security-Policy']=("default-src 'self'; base-uri 'none'; object-src 'none'; "
             "script-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' blob: data:; media-src 'self' blob:; "
+            "img-src 'self' blob: data:"+(" https://i.ytimg.com" if es_hud else "")+"; media-src 'self' blob:; "
             "font-src 'self' data:; connect-src 'self' ws: wss:; "
-            "form-action 'self'; frame-ancestors 'none'")
+            +("frame-src 'self' https://www.youtube-nocookie.com; " if es_hud else "")+
+            "form-action 'self'; frame-ancestors "+("'self'" if embebido_en_sky else "'none'"))
         if path.startswith(('/api/','/v1/','/owner/')):
             response.headers['Cache-Control']='private, no-store'
         if request.url.scheme=='https':

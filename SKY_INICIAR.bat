@@ -25,6 +25,7 @@ echo  [6] Permisos de SKY (basico / multimedia / completo)
 echo  [7] Diagnostico de servicios, puertos y modulos
 echo  [8] Iniciar SKY automaticamente con Windows
 echo  [9] Ejecutar pruebas (pytest)
+echo  [I] SKY Interprete: codigo en tu PC con Open Interpreter (confirma cada paso)
 echo  [X] Salir
 echo.
 echo ==============================================================
@@ -41,6 +42,7 @@ if "%opt%"=="6" goto opt_permisos
 if "%opt%"=="7" goto opt_status
 if "%opt%"=="8" goto opt_startup
 if "%opt%"=="9" goto opt_tests
+if /i "%opt%"=="i" goto opt_interprete
 if /i "%opt%"=="x" goto opt_salir
 goto menu
 
@@ -114,6 +116,12 @@ goto menu
 
 :opt_tests
 ".venv\Scripts\python.exe" -m pytest tests
+pause
+goto menu
+
+:opt_interprete
+".venv\Scripts\python.exe" -c "import interpreter" 2>nul || ".venv\Scripts\python.exe" -m pip install open-interpreter
+".venv\Scripts\python.exe" sky_interprete.py
 pause
 goto menu
 

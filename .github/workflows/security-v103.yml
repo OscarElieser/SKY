@@ -28,6 +28,7 @@ jobs:
         run: |
           node --check metaverse/static/sky-global-i18n.js
           node --check metaverse/static/creative.js
+          node --check metaverse/static/hud.js
       - name: Test security, deployment and recovery controls
         run: >-
           PYTHONPATH=. pytest -q
@@ -38,3 +39,5 @@ jobs:
           tests/test_sky_v10_5_global.py
           tests/test_sky_devices.py tests/test_sky_jarvis_local.py
           tests/test_sky_public_secrets.py tests/test_sky_notes_local.py
+          tests/test_sky_v12_unificado.py tests/test_sky_v11_1_asistente.py
+          tests/test_windows_desktop_control.py tests/test_sky_jarvis_fase1.py

@@ -339,6 +339,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {'ok': True, 'record': rec.to_dict()})
         if split.path == '/actions_history':
             return self.reply(200, {'ok': True, 'actions': verificador_acciones.get_recent_actions(limit=30)})
+        if split.path == '/tasks':
+            from neural_core.task_manager import gestor_tareas
+            return self.reply(200, {'ok': True, 'tasks': gestor_tareas.list_tasks(limit=12)})
         return self.reply(404, {'ok': False, 'error': 'Ruta desconocida'})
 
     def do_POST(self):

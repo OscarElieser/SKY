@@ -1,8 +1,8 @@
-# 🌌 SKY IA — Universal v11.1 | Asistente Personal
+# 🌌 SKY IA — Universal v12 | HUD · Asistente Personal
 
 **Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
 
-Plataforma tecnológica personal que integra un **asistente personal que controla tu equipo con tu autorización** (música, volumen, apps, archivos, capturas, voz), asistencia multi-IA privada, metaverso 3D, flujos de trabajo autónomos, estudio creativo de video/animación, generación de documentos de oficina (Word, Excel, PowerPoint, PDF) y agente de dispositivos locales.
+Plataforma tecnológica personal con una **interfaz HUD** y un **asistente personal que controla tu equipo, tu casa y tus apps con tu autorización** (voz local, Ollama 100 % local, Home Assistant, ventanas, música, documentos), asistencia multi-IA privada, metaverso 3D, flujos de trabajo autónomos, estudio creativo de video/animación, generación de documentos de oficina (Word, Excel, PowerPoint, PDF) y agente de dispositivos locales.
 
 ---
 
@@ -13,29 +13,32 @@ Para iniciar cualquier componente de SKY, ejecuta el menú interactivo unificado
 SKY_INICIAR.bat
 ```
 Desde este panel podrás elegir fácilmente:
-0. **🆕 Asistente Personal SKY:** [http://127.0.0.1:8765/asistente](http://127.0.0.1:8765/asistente) — agente + API + panel con voz en un clic. Guía: [README_V11_1_INICIO.md](README_V11_1_INICIO.md)
-1. **Metaverso y API:** [http://127.0.0.1:8765/sky](http://127.0.0.1:8765/sky)
+0. **🆕 SKY completo (HUD):** [http://127.0.0.1:8765/](http://127.0.0.1:8765/) — agente + API + voz + interfaz en un clic. Guía: [README_V12_INICIO.md](README_V12_INICIO.md)
+1. **Interfaz clásica y API:** [http://127.0.0.1:8765/sky](http://127.0.0.1:8765/sky)
 2. **Panel General Streamlit:** [http://127.0.0.1:8501](http://127.0.0.1:8501)
 3. **Estudio Creativo de Video:** [http://127.0.0.1:8765/creative](http://127.0.0.1:8765/creative)
 4. **Office Studio (Documentos):** [http://127.0.0.1:8765/office](http://127.0.0.1:8765/office)
-5. **Agente de Dispositivo Local:** `agente_dispositivo.py` (puerto 8766; permisos con `--perfil basico|multimedia|completo`, u opción 9 del menú)
+5. **Agente del equipo:** `agente_dispositivo.py` (puerto 8766; permisos con `--perfil basico|multimedia|completo`, u opción 6 del menú)
+   · **Intérprete de código:** opción I (`sky_interprete.py`, Open Interpreter con confirmación de cada paso)
 6. **Diagnóstico del Motor:** `sky_preflight.py`
 7. **Suite de Pruebas Automatizadas:** 199 tests en `pytest`
 
 ---
 
-## 🗣️ Asistente Personal (v11.1)
+## 🛰️ SKY v12 — HUD y Asistente Personal
 
-Decile a SKY, por texto o voz: *"reproduce Bad Bunny en Spotify"*, *"sube el volumen"*, *"pausa la música"*, *"abre WhatsApp"*, *"abre mis documentos"*, *"toma una captura"*, *"bloquea la pantalla"*. Todo lo demás lo responde la IA que configures.
+Hablale o escribile a SKY desde el **núcleo holográfico**: *"reproduce Bad Bunny en Spotify"*, *"pon el video en pantalla completa"*, *"organiza las ventanas"*, *"abre mis documentos"*, *"crea una nota agenda que diga…"*, *"prepara una presentación sobre…"*, *"enciende la luz de la sala"*, *"toma una captura"*. Todo lo demás lo responde la IA (100 % local con Ollama y `SKY_LOCAL_ONLY=1`).
 
-Vos decidís qué puede hacer en tu PC (la política vive sólo ahí):
+Todos los módulos (clásico, Creative, Office, Flujos, Metaverso, Studio 3D, Comunidad, reproductor) se abren **dentro** del HUD como ventanas holográficas.
+
+Vos decidís qué controla SKY en tu PC (la política vive sólo ahí):
 
 ```bash
 python agente_dispositivo.py --perfil completo --carpeta ~/Música --carpeta ~/Documentos
 python agente_dispositivo.py --ver-politica
 ```
 
-SKY nunca ejecuta comandos de shell, nunca abre programas o scripts, no sale de tus carpetas autorizadas, no instala nada ni paga. Detalles: [CHANGELOG_V11_1.md](CHANGELOG_V11_1.md) · API: [docs/api/SKY_ASISTENTE_PERSONAL_API.md](docs/api/SKY_ASISTENTE_PERSONAL_API.md)
+SKY no ejecuta comandos de shell desde la voz ni el HUD, no abre programas o scripts como archivos, no sale de tus carpetas, no instala nada ni paga. Para automatizar con código está el **Intérprete** (opción I), que muestra cada paso antes de ejecutarlo. Detalles: [CHANGELOG_V12_0.md](CHANGELOG_V12_0.md) · API: [docs/api/SKY_ASISTENTE_PERSONAL_API.md](docs/api/SKY_ASISTENTE_PERSONAL_API.md)
 
 ---
 

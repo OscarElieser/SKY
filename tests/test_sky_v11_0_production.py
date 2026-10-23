@@ -158,8 +158,8 @@ def test_https_load_rejects_too_many_requests(tmp_path):
 
 
 def test_v11_version_and_isolated_drill_are_retained():
-    # v11.1+ conserva todo lo verificado en v11.0 (misma serie 11.x).
-    assert (ROOT/'VERSION.txt').read_text().strip().startswith('11.')
+    # v11.1+ y v12 conservan todo lo verificado en v11.0.
+    assert tuple(int(x) for x in (ROOT/'VERSION.txt').read_text().strip().split('.')[:2]) >= (11, 0)
     script=(ROOT/'scripts/ci_cross_container_v109.sh').read_text()
     assert '--network none' in script and '--read-only' in script
     assert '--expected-sha256' in script

@@ -67,9 +67,24 @@ def interpretar(texto: str) -> dict | None:
         jarvis = _interpretar_basico(_limpiar_wake(str(texto or ''))[:2000])
     except Exception:
         jarvis = None
+    jarvis = _normalizar(jarvis)
     if jarvis and jarvis.get('action') in _PRIORIDAD_JARVIS:
         return jarvis
     return propio or jarvis
+
+
+def _normalizar(orden: dict | None) -> dict | None:
+    """Algunas órdenes JARVIS (control de voz) llegan sin 'params' ni 'description'."""
+    if not isinstance(orden, dict) or not orden.get('action'):
+        return None
+    params = orden.get('params')
+    if not isinstance(params, dict):
+        params = {k: v for k, v in orden.items() if k not in ('action', 'description', 'target_device')}
+    descripcion = str(orden.get('description') or params.get('message') or orden['action'])[:200]
+    salida = {'action': orden['action'], 'params': params, 'description': descripcion}
+    if orden.get('target_device'):
+        salida['target_device'] = orden['target_device']
+    return salida
 
 
 def _interpretar_propio(texto: str) -> dict | None:
@@ -180,16 +195,20 @@ def _recortar_original(original: str, fragmento_norm: str) -> str | None:
 
 
 SISTEMA_ASISTENTE = (
-    'Sos SKY, el asistente personal de Oscar Elieser Chamorro Guzmán. Respondé en el idioma del usuario, '
-    'de forma clara, útil y breve (máximo 6 líneas salvo que pida detalle). Si pide controlar su equipo y la '
+    'Sos SKY, el asistente personal de Oscar Elieser Chamorro Guzmán. Estás hablando en voz alta: respondé en el '
+    'idioma del usuario con frases naturales y cortas (2 a 4 oraciones), sin listas, emojis, markdown ni fórmulas, '
+    'salvo que pida detalle. Si pide controlar su equipo y la '
     'orden no se entendió, sugerí cómo decirla: "abre Spotify", "reproduce Bad Bunny en Spotify", '
     '"sube el volumen", "pausa la música", "toma una captura", "abre mis documentos", "bloquea la pantalla". '
     'Nunca afirmes haber ejecutado acciones en el dispositivo: eso sólo lo hace el agente tras la confirmación.'
 )
 
 
-def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'auto') -> dict:
+def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'auto', modo: str = 'chat') -> dict:
     """Punto de entrada único del asistente.
+
+    modo='voz'  → respuesta breve y conversacional (para hablarla sin esperas).
+    modo='chat' → el cerebro completo de SKY (documentos, memorias, evidencias).
 
     Devuelve uno de:
       {'tipo':'accion','propuesta':{...},'mensaje':str}
@@ -213,21 +232,31 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
     if propuesta:
         return {'tipo': 'accion', 'propuesta': propuesta,
                 'mensaje': propuesta['description'] + ' — ' + DESCRIPCION_ACCIONES.get(propuesta['action'], '')}
-    mensajes = [{'role': 'system', 'content': SISTEMA_ASISTENTE}]
-    for h in (historial or [])[-12:]:
-        if isinstance(h, dict) and h.get('role') in ('user', 'assistant') and h.get('content'):
-            mensajes.append({'role': h['role'], 'content': str(h['content'])[:4000]})
-    mensajes.append({'role': 'user', 'content': texto})
     try:
-        from .providers import reply, choose_provider, ProviderError
+        from . import sky_home_assistant as casa
+        orden_casa = casa.interpretar(texto)
+        if orden_casa:
+            return {'tipo': 'casa', 'propuesta': orden_casa, 'mensaje': orden_casa['description']}
+    except Exception:
+        pass
+    turnos = [{'role': h['role'], 'content': str(h['content'])[:4000]} for h in (historial or [])[-12:]
+              if isinstance(h, dict) and h.get('role') in ('user', 'assistant') and h.get('content')]
+    try:
+        from .providers import ProviderError
     except Exception as exc:  # dependencias opcionales ausentes
         return {'tipo': 'error', 'mensaje': 'El motor de IA no está disponible: ' + str(exc)[:160]}
     try:
-        nombre, _ = choose_provider(proveedor or 'auto')
-        return {'tipo': 'respuesta', 'mensaje': reply(mensajes, nombre), 'proveedor': nombre}
+        if modo == 'voz':
+            from .providers import reply, choose_provider
+            nombre, _ = choose_provider(proveedor or 'auto')
+            mensajes = [{'role': 'system', 'content': SISTEMA_ASISTENTE}, *turnos, {'role': 'user', 'content': texto}]
+            return {'tipo': 'respuesta', 'mensaje': reply(mensajes, nombre, max_output_tokens=600), 'proveedor': nombre}
+        from .assistant import responder
+        respuesta, _ = responder(texto, 'Asistente SKY personal', turnos, proveedor=proveedor or 'auto')
+        return {'tipo': 'respuesta', 'mensaje': respuesta, 'proveedor': proveedor or 'auto'}
     except ProviderError as exc:
-        return {'tipo': 'error', 'mensaje': 'Configurá un proveedor de IA en .env (GEMINI_API_KEY, ANTHROPIC_API_KEY…) '
-                                             'o iniciá Ollama. Detalle: ' + str(exc)[:160]}
+        return {'tipo': 'error', 'mensaje': 'Configurá un proveedor de IA: Ollama para 100 % local (ollama serve), '
+                                             'o una clave en .env (GEMINI_API_KEY, ANTHROPIC_API_KEY…). Detalle: ' + str(exc)[:160]}
     except Exception as exc:
         return {'tipo': 'error', 'mensaje': 'No pude consultar la IA: ' + str(exc)[:160]}
 

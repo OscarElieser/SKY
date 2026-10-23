@@ -2798,7 +2798,7 @@ elif seccion=="🎙️ SKY y dispositivos":
         if st.session_state.get('sky_audio_salida'):
             st.audio(st.session_state['sky_audio_salida'],format='audio/mp3',autoplay=True)
         st.caption('Ejemplos: «Reproducí Bad Bunny en Spotify», «Subí el volumen», «Pausá la música», «Abrí WhatsApp», «Abrí mis documentos», «Tomá una captura», «Estado de mi computadora», «Explicame qué es Gemini».')
-        st.info('Nuevo en v11.1: panel del **Asistente Personal** con voz en http://127.0.0.1:8765/asistente')
+        st.info('SKY v12: interfaz HUD con voz, módulos y control del equipo en http://127.0.0.1:8765/')
     pendiente=st.session_state.get('sky_pending')
     if pendiente:
         st.divider()

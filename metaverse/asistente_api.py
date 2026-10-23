@@ -1,4 +1,4 @@
-"""SKY v11.1 — API del Asistente Personal (sólo el dueño, con su llave y 2FA si está activo).
+"""SKY v12 — API del Asistente Personal (sólo el dueño, con su llave y 2FA si está activo).
 
     POST /api/asistente/mensaje    texto → respuesta de IA o propuesta de acción
                                    (si el dueño activó auto_confirm para esa capacidad
@@ -37,6 +37,13 @@ class Mensaje(BaseModel):
     historial: list[Turno] = Field(default_factory=list, max_length=24)
     proveedor: str = Field(default='auto', max_length=20)
     dispositivo: str = Field(default=LOCAL, max_length=80)
+    modo: str = Field(default='chat', pattern='^(chat|voz)$')
+
+
+class OrdenCasa(BaseModel):
+    service: str = Field(min_length=3, max_length=60)
+    entity_ids: list[str] = Field(min_length=1, max_length=20)
+    data: dict = Field(default_factory=dict)
 
 
 class Ejecucion(BaseModel):
@@ -96,11 +103,26 @@ def estado_dispositivo(request: Request, dispositivo: str = LOCAL):
 
 @router.post('/mensaje')
 def mensaje(body: Mensaje, request: Request):
-    resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor)
+    resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
+    if resultado['tipo'] == 'casa':
+        orden = resultado['propuesta']
+        resultado['requiere_confirmacion'] = orden['requiere_confirmacion']
+        if not orden['requiere_confirmacion']:
+            from neural_core import sky_home_assistant as casa
+            try:
+                resultado['ejecucion'] = casa.ejecutar(orden['service'], orden['entity_ids'], orden['data'])
+            except (RuntimeError, ValueError) as exc:
+                resultado['ejecucion'] = {'ok': False, 'error': str(exc)[:200]}
+        return resultado
     if resultado['tipo'] != 'accion':
         return resultado
     propuesta = resultado['propuesta']
     resultado['requiere_confirmacion'] = True
+    if propuesta['action'] in caps.ACCIONES_INTERFAZ:
+        # Reproductor interno, ventanas holográficas y flujo de voz: los aplica la interfaz.
+        resultado['requiere_confirmacion'] = False
+        resultado['interfaz'] = True
+        return resultado
     # ¿El dueño autorizó esta capacidad sin confirmación? Lo dice el propio agente.
     try:
         estado = _llamar(body.dispositivo, request, 'status', {})
@@ -122,7 +144,22 @@ def mensaje(body: Mensaje, request: Request):
 @router.post('/ejecutar')
 def ejecutar(body: Ejecucion, request: Request):
     """Confirmación explícita del dueño desde el panel."""
-    return _llamar(body.dispositivo, request, body.action, body.params)
+    params = dict(body.params)
+    if body.action in ('note_create', 'note_append', 'note_trash'):
+        params['confirmed'] = True   # este clic ES la confirmación individual que exigen las notas
+    return _llamar(body.dispositivo, request, body.action, params)
+
+
+@router.post('/casa')
+def ejecutar_casa(body: OrdenCasa):
+    """Confirmación del dueño para Home Assistant (luces, escenas, clima, cortinas, cerraduras)."""
+    from neural_core import sky_home_assistant as casa
+    try:
+        return casa.ejecutar(body.service, body.entity_ids, body.data)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200])
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200])
 
 
 @router.get('/voz')

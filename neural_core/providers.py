@@ -56,7 +56,15 @@ def provider_summary() -> list[dict]:
                  modelo=os.getenv(v.model_env,v.model_default), nube=v.cloud)
             for k,v in PROVIDERS.items()]
 
+def local_only() -> bool:
+    """SKY_LOCAL_ONLY=1: ningún texto sale del equipo; sólo Ollama local."""
+    return os.getenv('SKY_LOCAL_ONLY', '0').strip().lower() in ('1', 'true', 'si', 'sí', 'yes')
+
 def choose_provider(name: str='auto', area: str='General') -> tuple[str,str]:
+    if local_only():
+        if name not in ('auto', 'sky', 'ollama'):
+            raise ProviderError('Modo 100 % local activo (SKY_LOCAL_ONLY=1): SKY sólo usa Ollama en este equipo.')
+        name = 'ollama'
     if name in ('auto', 'sky'):
         a=area.casefold()
         preferred=next((pref for token,pref in DOMAIN_PREF.items() if token in a),AUTO_ORDER)

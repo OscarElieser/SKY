@@ -188,7 +188,8 @@ class PositionMessage(BaseModel):
 
 @app.get('/')
 def index():
-    resp = FileResponse(STATIC/'sky.html')
+    # SKY v12: la interfaz principal es el HUD; la clásica sigue en /sky (también dentro del HUD).
+    resp = FileResponse(STATIC/'hud.html')
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
@@ -568,15 +569,24 @@ app.include_router(sky_stt_v105_router)
 from .telemetria_api import router as sky_telemetria_router
 app.include_router(sky_telemetria_router)
 
-# SKY v11.1: Asistente Personal — órdenes en lenguaje natural sobre tus dispositivos.
+# SKY v11.1/v12: Asistente Personal — órdenes en lenguaje natural sobre tus dispositivos.
 from .asistente_api import router as sky_asistente_router
 app.include_router(sky_asistente_router)
 
-@app.get('/asistente')
-def asistente_page():
-    resp=FileResponse(STATIC/'asistente.html')
+from .hud_api import router as sky_hud_router
+app.include_router(sky_hud_router)
+
+@app.get('/hud')
+def hud_page():
+    resp=FileResponse(STATIC/'hud.html')
     resp.headers['Cache-Control']='no-cache, no-store, must-revalidate'
     return resp
+
+@app.get('/asistente')
+def asistente_page():
+    # v12: el Asistente Personal vive dentro del HUD.
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse('/', status_code=307)
 
 @app.get('/api/client/bootstrap')
 def client_bootstrap(request: Request):
