@@ -51,7 +51,7 @@ jobs:
           tests/test_multiia.py tests/test_sky_devices.py tests/test_sky_v11_1_asistente.py tests/test_sky_v5.py
           tests/test_sky_v6_metaverse.py tests/test_sky_v7_social.py
           tests/test_sky_v8_office.py
-          tests/test_sky_v12_unificado.py tests/test_sky_v12_1_mejoras.py tests/test_sky_v12_2_aprendizaje_kpi.py tests/test_windows_desktop_control.py
+          tests/test_sky_v12_unificado.py tests/test_sky_v12_1_mejoras.py tests/test_sky_v12_2_aprendizaje_kpi.py tests/test_sky_v12_3_jarvis_completo.py tests/test_windows_desktop_control.py
           tests/test_sky_jarvis_fase1.py tests/test_sky_jarvis_local.py tests/test_sky_notes_local.py
           tests/test_multi_device_and_launcher.py tests/test_holographic_windows.py
           tests/test_math_and_dev_engine.py tests/test_sky_v12_universal.py tests/test_academic_core.py tests/test_developer_core.py

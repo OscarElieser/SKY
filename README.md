@@ -1,4 +1,4 @@
-# 🌌 SKY IA — Universal v12.2 | HUD · Asistente Personal
+# 🌌 SKY IA — Universal v12.3 | HUD · Asistente Personal
 
 **Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
 
@@ -27,7 +27,11 @@ Desde este panel podrás elegir fácilmente:
 
 ---
 
-## 🛰️ SKY v12.2 — HUD y Asistente Personal
+## 🛰️ SKY v12.3 — HUD y Asistente Personal
+
+- **WhatsApp:** hablale a SKY desde tu celular (API oficial de Meta), con texto o notas de voz; confirma lo sensible con un código. Guía: [docs/guias/SKY_WHATSAPP.md](docs/guias/SKY_WHATSAPP.md)
+- **Skills y tareas programadas por voz:** "todos los días a las 8 prepara las respuestas de los correos". **Perfil USER.md** que SKY lee en cada respuesta.
+- **Cerebro con herramientas también con Claude, GPT o Gemini**, y **SKY 24/7** con reinicio automático. Novedades: [CHANGELOG_V12_3.md](CHANGELOG_V12_3.md)
 
 - **Aprende sola:** las frases nuevas que salen bien se vuelven atajos instantáneos; le podés enseñar órdenes, contarle datos tuyos y corregirla. Todo se puede revisar, exportar y borrar.
 - **Se alimenta de internet:** "aprende sobre…" (Wikipedia y noticias, con fuentes) y "sigue el tema…" con novedades diarias. `SKY_INTERNET=0` lo apaga.

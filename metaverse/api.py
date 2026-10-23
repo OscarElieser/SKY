@@ -74,6 +74,7 @@ async def _agenda_pump():
             res=sky_rutinas.ejecutar_rutina(rutina)
             if res['mensaje']:
                 sky_rutinas.avisar(res['mensaje'],'rutina')
+                _whatsapp(rutina.get('nombre','Tarea')+': '+res['mensaje'])
         _vigilancia()
     while True:
         try:await asyncio.to_thread(ciclo)
@@ -97,12 +98,21 @@ def _vigilancia():
             if p['id'] not in _VIGILANCIA['avisados']:
                 _VIGILANCIA['avisados'].add(p['id'])
                 sky_rutinas.avisar('Detecté un problema: '+p['titulo']+'. '+p['sugerencia'],'kpi')
+                _whatsapp('⚠️ Detecté un problema: '+p['titulo']+'. '+p['sugerencia'])
     if ahora-_VIGILANCIA['intereses']>=3600:
         _VIGILANCIA['intereses']=ahora
         for linea in sky_aprendizaje.actualizar_intereses():
             sky_rutinas.avisar('Novedad: '+linea,'aprendizaje')
 
+def _whatsapp(texto:str):
+    # v12.3: avisos al WhatsApp del dueño (dentro de la ventana de 24 h, o con su plantilla aprobada).
+    try:
+        from neural_core import sky_whatsapp
+        sky_whatsapp.enviar_aviso(texto)
+    except Exception:pass
+
 def _avisar_fuera(texto:str):
+    _whatsapp('🔔 '+texto)
     try:
         from neural_core.sky_asistente_personal import ejecutar_local_si_autorizado
         ejecutar_local_si_autorizado({'action':'notify','params':{'title':'SKY','message':texto},'description':'Recordatorio'})

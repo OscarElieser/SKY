@@ -25,6 +25,7 @@ echo  [7] Diagnostico de servicios, puertos y modulos
 echo  [8] Iniciar SKY automaticamente con Windows
 echo  [9] Ejecutar pruebas (pytest)
 echo  [I] SKY Interprete: codigo en tu PC con Open Interpreter (confirma cada paso)
+echo  [W] WhatsApp: puente para hablarle a SKY desde tu celular (ver docs\guias\SKY_WHATSAPP.md)
 echo  [X] Salir
 echo.
 echo ==============================================================
@@ -43,6 +44,7 @@ if /i "%opt%"=="d" goto opt_status
 if "%opt%"=="8" goto opt_startup
 if "%opt%"=="9" goto opt_tests
 if /i "%opt%"=="i" goto opt_interprete
+if /i "%opt%"=="w" goto opt_whatsapp
 if /i "%opt%"=="x" goto opt_salir
 goto menu
 
@@ -122,6 +124,12 @@ goto menu
 :opt_interprete
 ".venv\Scripts\python.exe" -c "import interpreter" 2>nul || ".venv\Scripts\python.exe" -m pip install open-interpreter
 ".venv\Scripts\python.exe" sky_interprete.py
+pause
+goto menu
+
+:opt_whatsapp
+echo [SKY] Puente de WhatsApp en 127.0.0.1:8770. En otra ventana publicalo con:  tailscale funnel --bg 8770
+".venv\Scripts\python.exe" sky_whatsapp_puente.py
 pause
 goto menu
 

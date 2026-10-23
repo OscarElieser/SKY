@@ -268,6 +268,7 @@ class Correo(BaseModel):
     asunto: str = Field(default='', max_length=200)
     cuerpo: str = Field(min_length=1, max_length=20000)
     en_respuesta_a: str = Field(default='', max_length=300)
+    borrador_id: str = Field(default='', max_length=20)
 
 
 @router.post('/correo')
@@ -277,7 +278,11 @@ def enviar_correo(body: Correo):
     if caps.parada_activa():
         raise HTTPException(409, 'SKY está en parada de emergencia: levantala antes de enviar.')
     try:
-        return sky_correo.enviar(body.para, body.asunto, body.cuerpo, body.en_respuesta_a)
+        res = sky_correo.enviar(body.para, body.asunto, body.cuerpo, body.en_respuesta_a)
+        if body.borrador_id:
+            from neural_core import sky_borradores
+            sky_borradores.descartar(body.borrador_id)
+        return res
     except ValueError as exc:
         raise HTTPException(400, str(exc)[:200])
     except RuntimeError as exc:
