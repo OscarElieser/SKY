@@ -415,11 +415,12 @@ def launch_authorized_app(app_id: str, create_blank: bool = True) -> Dict[str, A
     else:
         # Plataformas no Windows (Linux, macOS: una .app se abre con `open`)
         cmd = ['open', exe_path] if current_os == 'darwin' else [exe_path]
-        subprocess.Popen(cmd, shell=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         result = {
             'ok': True,
-            'status': 'VERIFIED',
+            'status': 'RUNNING',
             'command_id': rec.command_id,
+            'pid': getattr(proc, 'pid', None),
             'app': app_id,
             'description': app_desc,
             'executable': exe_path,

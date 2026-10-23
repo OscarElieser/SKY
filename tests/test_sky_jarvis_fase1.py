@@ -17,6 +17,21 @@ from neural_core.windows_controller import (
 import agente_dispositivo as agent
 
 
+@pytest.fixture(autouse=True)
+def _hogar_y_permisos_v12(tmp_path, monkeypatch):
+    """v12: perfil de usuario simulado (también en CI Linux) y capacidades
+    autorizadas por el dueño, como exige ahora el agente."""
+    home = tmp_path / 'home'
+    for d in ('Documents', 'Desktop', 'Downloads', 'Pictures', 'Videos', 'Music'):
+        (home / d).mkdir(parents=True)
+    monkeypatch.setenv('HOME', str(home))
+    monkeypatch.setenv('USERPROFILE', str(home))
+    monkeypatch.setenv('SKY_ALL_CAPABILITIES', '1')
+    from neural_core import windows_controller
+    monkeypatch.setattr(windows_controller, '_open_with_system', lambda path: None)
+
+
+
 @pytest.mark.parametrize('text,expected_app', [
     ('SKY, abre Word', 'word'),
     ('SKY abrí Microsoft Word', 'word'),
@@ -226,7 +241,7 @@ def test_interpretar_open_file(text, expected_target):
 
 def test_windows_controller_open_special_folder(monkeypatch):
     from neural_core import windows_controller
-    monkeypatch.setattr("os.startfile", lambda p: None)
+    monkeypatch.setattr("os.startfile", lambda p: None, raising=False)
     res = windows_controller.open_local_file_or_folder("documentos")
     assert res['ok'] is True
     assert res['type'] == 'folder'

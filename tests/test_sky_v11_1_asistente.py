@@ -1,4 +1,4 @@
-"""SKY v11.1 — Asistente Personal: intérprete, política del dueño, agente v5 y API."""
+"""SKY v12 — Asistente Personal: intérprete combinado, política del dueño, agente v6 y API."""
 import json
 import os
 import threading
@@ -42,7 +42,7 @@ def _politica(tmp_path, **kw):
     ('abre la calculadora', 'launch_app', {'app': 'calculator'}),
     ('abre YouTube', 'open_url', {'url': 'https://www.youtube.com'}),
     ('busca recetas de gallo pinto en Google', 'open_url', {'url': 'https://www.google.com/search?q=recetas+de+gallo+pinto'}),
-    ('abre mis documentos', 'open_path', {'path': '~/Documents'}),
+    ('abre mis documentos', 'open_file', {'target': 'documentos'}),   # carpetas reales/OneDrive (JARVIS)
     ('qué hay en mis descargas', 'list_path', {'path': '~/Downloads'}),
     ('toma una captura de pantalla', 'screenshot', {}),
     ('bloquea la pantalla', 'lock_screen', {}),
@@ -84,10 +84,26 @@ def test_volumen_fuera_de_rango_no_es_accion_set():
 
 # ------------------------------------------------------------------ política
 
-def test_politica_por_defecto_es_minima(tmp_path):
+def test_politica_por_defecto_solo_bajo_riesgo(tmp_path, monkeypatch):
+    for var in ('SKY_WINDOW_ACTIONS', 'SKY_ALL_CAPABILITIES', 'SKY_NOTES_ENABLED'):
+        monkeypatch.delenv(var, raising=False)
     pol = caps.cargar_politica(tmp_path / 'no-existe.json')
-    assert caps.acciones_habilitadas(pol) == ['status', 'open_url', 'launch_app']
-    assert pol['auto_confirm'] == [] and pol['allowed_folders'] == []
+    assert set(pol['enabled']) == {'status', 'open_url', 'launch_app', 'apps_extra', 'media', 'volume',
+                                   'play_media', 'notify', 'tasks'}
+    assert not {'files', 'windows', 'type_text', 'notes', 'clipboard', 'screenshot', 'lock'} & set(pol['enabled'])
+    assert pol['auto_confirm'] == ['status', 'media', 'volume'] and pol['allowed_folders'] == []
+
+
+def test_variables_de_entorno_jarvis_autorizan(tmp_path, monkeypatch):
+    monkeypatch.setenv('SKY_WINDOW_ACTIONS', '1')
+    monkeypatch.setenv('SKY_NOTES_ENABLED', '1')
+    pol = caps.cargar_politica(tmp_path / 'no-existe.json')
+    assert {'windows', 'notes'} <= set(pol['enabled']) and 'type_text' not in pol['enabled']
+    monkeypatch.setenv('SKY_ALL_CAPABILITIES', '1')
+    assert {'files', 'windows', 'type_text'} <= set(caps.cargar_politica(tmp_path / 'x.json')['enabled'])
+    # la variable autoriza, pero nunca se escribe en el archivo de política
+    caps.guardar_politica(caps.cargar_politica_guardada(tmp_path / 'p.json'), tmp_path / 'p.json')
+    assert 'type_text' not in (tmp_path / 'p.json').read_text(encoding='utf-8')
 
 
 def test_politica_corrupta_o_desconocida(tmp_path):
@@ -108,10 +124,16 @@ def test_perfiles(tmp_path):
     assert {'media', 'volume', 'play_media', 'apps_extra'} <= set(pol['enabled'])
     assert 'clipboard' not in pol['enabled']
     assert not caps.requiere_confirmacion('volume', {'command': 'up'}, pol)
-    assert caps.requiere_confirmacion('open_url', {'url': 'https://x.org'}, pol)
+    assert not caps.requiere_confirmacion('media_key', {'key': 'mute'}, pol)
+    assert caps.capacidad_para('media_key', {'key': 'mute'}) == 'volume'
+    assert caps.capacidad_para('media_key', {'key': 'next_track'}) == 'media'
+    assert not caps.accion_habilitada('window_action', pol, {'subaction': 'close'})
     pol = caps.aplicar_perfil('completo', [str(tmp_path)], path)
     assert set(pol['enabled']) == set(caps.CAPACIDADES)
-    assert 'clipboard' not in pol['auto_confirm'] and 'files' not in pol['auto_confirm']
+    for sensible in ('files', 'windows', 'type_text', 'notes', 'clipboard', 'screenshot'):
+        assert sensible not in pol['auto_confirm']
+    assert caps.requiere_confirmacion('window_action', {'subaction': 'close'}, pol)
+    assert caps.requiere_confirmacion('type_text', {'text': 'hola'}, pol)
     with pytest.raises(ValueError):
         caps.aplicar_perfil('sin_limites', [], path)
 
@@ -159,7 +181,7 @@ def test_agente_ejecuta_lo_autorizado(tmp_path, monkeypatch):
 def test_status_refleja_politica(tmp_path, monkeypatch):
     monkeypatch.setattr(caps, 'POLICY_PATH', _politica(tmp_path, enabled=['status', 'media'], auto_confirm=['media']))
     st = agent.status()
-    assert st['capabilities'] == ['status', 'media_control']
+    assert st['capabilities'] == ['status', 'media_control', 'media_key']
     assert st['auto_confirm'] == ['media'] and st['agent_version'] == agent.VERSION
 
 

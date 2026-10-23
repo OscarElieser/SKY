@@ -52,7 +52,10 @@ def test_servidor_autorizacion_aislado():
         with pytest.raises(RuntimeError): dispositivos.call_device(url,'z'*48,'status')
         response=dispositivos.call_device(url,server.secret,'status')
         assert response['ok'] and 'device' in response
-        assert set(response['capabilities']) == {'status','open_url','launch_app','media_key'}
+        # v12: por defecto sólo capacidades de bajo riesgo; nada de ventanas, archivos ni texto.
+        assert set(response['capabilities']) == {'status','open_url','launch_app','media_key','media_control',
+                                                 'volume','play_media','notify','task_action'}
+        assert not {'window_action','type_text','open_file','clipboard_get','note_create'} & set(response['capabilities'])
     finally:
         server.shutdown();server.server_close();thread.join(2)
 
