@@ -15,18 +15,21 @@ echo ==============================================================
 echo                 SKY IA UNIVERSAL - PANEL DE CONTROL           
 echo ==============================================================
 echo.
+echo  [0] ASISTENTE PERSONAL SKY (agente + API + panel con voz)
 echo  [1] Iniciar Metaverso y API (Puerto 8765)
 echo  [2] Iniciar Panel de Control Streamlit (Puerto 8501)
 echo  [3] Iniciar Estudio Creativo de Video (Puerto 8765)
 echo  [4] Iniciar Estudio Office de Documentos (Puerto 8765)
-echo  [5] Iniciar Agente de Dispositivo Local
+echo  [5] Iniciar Agente de Dispositivo Local (Puerto 8766)
 echo  [6] Ejecutar Diagnostico de Modulos (Preflight)
 echo  [7] Ejecutar Suite de Pruebas (Pytest)
 echo  [8] Salir
+echo  [9] Permisos del asistente (perfil basico / multimedia / completo)
 echo.
 echo ==============================================================
-set /p opt="Selecciona una opcion (1-8): "
+set /p opt="Selecciona una opcion (0-9): "
 
+if "%opt%"=="0" goto opt_asistente
 if "%opt%"=="1" goto opt_metaverso
 if "%opt%"=="2" goto opt_streamlit
 if "%opt%"=="3" goto opt_creative
@@ -35,6 +38,24 @@ if "%opt%"=="5" goto opt_agente
 if "%opt%"=="6" goto opt_preflight
 if "%opt%"=="7" goto opt_tests
 if "%opt%"=="8" goto opt_salir
+if "%opt%"=="9" goto opt_permisos
+goto menu
+
+:opt_asistente
+call "%~dp0INICIAR_SKY_ASISTENTE_WINDOWS.bat"
+goto menu
+
+:opt_permisos
+".venv\Scripts\python.exe" agente_dispositivo.py --ver-politica
+echo.
+echo  [b] basico   - estado, webs y 4 apps (confirmando cada accion)
+echo  [m] multimedia - + musica, volumen, Spotify/YouTube, apps y avisos (automaticos)
+echo  [c] completo - + archivos, capturas, portapapeles y bloqueo
+set /p perf="Perfil (b/m/c, Enter para volver): "
+if /i "%perf%"=="b" ".venv\Scripts\python.exe" agente_dispositivo.py --perfil basico --solo-config
+if /i "%perf%"=="m" ".venv\Scripts\python.exe" agente_dispositivo.py --perfil multimedia --solo-config
+if /i "%perf%"=="c" ".venv\Scripts\python.exe" agente_dispositivo.py --perfil completo --solo-config
+pause
 goto menu
 
 :opt_metaverso

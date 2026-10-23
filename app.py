@@ -33,6 +33,7 @@ from neural_core.dispositivos import (paired_devices, save_device, remove_device
     interpret_command, APP_OPTIONS)
 from neural_core.voz import transcribir_audio, hablar_texto
 from neural_core.voz_inbox import read_inbox, dismiss_inbox
+from neural_core.sky_asistente_personal import interpretar as interpretar_asistente
 from sensores_app import mostrar_sensores
 from neural_core.sky_3d import leer_imagen, caja_relativa, segmentar_parte, png_bytes, ensamblar_glb, crear_paquete, importar_paquete
 from neural_core.sky_vision import analizar as vision_analizar
@@ -635,7 +636,7 @@ elif seccion=="🎙️ SKY y dispositivos":
             enviar=st.form_submit_button('Enviar a SKY',type='primary')
         if enviar and frase.strip():
             st.session_state['sky_entrada']=''
-            orden=interpret_command(frase)
+            orden=interpretar_asistente(frase)
             if orden:
                 ds=paired_devices()
                 elegido=st.session_state.get('sky_dispositivo')
@@ -663,7 +664,8 @@ elif seccion=="🎙️ SKY y dispositivos":
         if respuesta: st.markdown('**SKY:** '+respuesta)
         if st.session_state.get('sky_audio_salida'):
             st.audio(st.session_state['sky_audio_salida'],format='audio/mp3',autoplay=True)
-        st.caption('Ejemplos: «Abrí YouTube», «Abrí calculadora», «Estado de mi computadora», «Explicame qué es Gemini», «Ayudame con una campaña para BAQUEANO».')
+        st.caption('Ejemplos: «Reproducí Bad Bunny en Spotify», «Subí el volumen», «Pausá la música», «Abrí WhatsApp», «Abrí mis documentos», «Tomá una captura», «Estado de mi computadora», «Explicame qué es Gemini».')
+        st.info('Nuevo en v11.1: panel del **Asistente Personal** con voz en http://127.0.0.1:8765/asistente')
     pendiente=st.session_state.get('sky_pending')
     if pendiente:
         st.divider()
@@ -693,14 +695,22 @@ python agente_dispositivo.py
 Guardá el token que muestra esa computadora. Para acceso desde tu móvil u otra PC, instalá Tailscale en ambos dispositivos y, en la computadora con el agente, activá:
 
 ```bash
-tailscale serve 8765
+tailscale serve 8766
 ```
 
 Copiá la dirección HTTPS del agente desde Tailscale y emparejala en este panel. Para acceder al panel SKY desde el celular también necesitás Tailscale, **contraseña del panel**, HTTPS y servir su puerto 8501. No usés Tailscale Funnel para exponerlo públicamente.
 
-**Lo que funciona en esta versión:** voz pulsar-para-hablar, respuestas de Gemini/Ollama, lectura de estado, apertura de páginas HTTPS y cuatro aplicaciones permitidas en computadoras con agente. La ejecución se confirma manualmente.
+**Vos decidís qué controla SKY (v11.1):** en la computadora con el agente elegí un perfil:
 
-**Modo manos libres opcional:** instalá `vosk sounddevice pyttsx3`, descargá un modelo de voz español de Vosk e iniciá `python sky_manos_libres.py --model ruta/al/modelo`. Se activa al escuchar «SKY», se detiene con Ctrl+C y envía órdenes de equipo a una cola para confirmación. **No incluido todavía:** control nativo de Android/iOS, manejo completo del escritorio, automatización de otras apps sin API, encendido remoto de equipos apagados, movimiento de dinero y comandos de shell arbitrarios. La presencia de la herramienta no permite saltar contraseñas ni restricciones del sistema operativo.""")
+```bash
+python agente_dispositivo.py --perfil multimedia      # música, volumen, apps, avisos
+python agente_dispositivo.py --perfil completo --carpeta ~/Música --carpeta ~/Documentos
+python agente_dispositivo.py --ver-politica
+```
+
+**Lo que funciona:** estado del equipo, páginas HTTPS, apps (Spotify, VLC, Chrome, Word, Excel, WhatsApp, Telegram…), control multimedia, volumen, reproducir en YouTube/Spotify o archivos locales, notificaciones, archivos en carpetas autorizadas, capturas, portapapeles y bloqueo de pantalla. Cada acción se confirma, salvo las capacidades que marcaste como automáticas (`--auto media,volume`).
+
+**Modo manos libres opcional:** instalá `vosk sounddevice pyttsx3`, descargá un modelo de voz español de Vosk e iniciá `python sky_manos_libres.py --model ruta/al/modelo`. Se activa al escuchar «SKY», se detiene con Ctrl+C ejecuta al instante sólo las capacidades automáticas y deja el resto en cola para confirmación. **No incluido todavía:** control nativo de Android/iOS, manejo completo del escritorio, automatización de otras apps sin API, encendido remoto de equipos apagados, movimiento de dinero y comandos de shell arbitrarios. La presencia de la herramienta no permite saltar contraseñas ni restricciones del sistema operativo.""")
 
 elif seccion=="💰 Finanzas personales":
     st.title("💰 Gestión de dinero")

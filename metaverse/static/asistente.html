@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SKY · Asistente Personal</title>
+  <link rel="stylesheet" href="/static/asistente.css?v=11.1">
+</head>
+<body>
+<div class="layout">
+  <header class="top">
+    <div class="brand">
+      <span class="orb" aria-hidden="true"></span>
+      <div>
+        <h1>SKY</h1>
+        <p>Asistente personal · tu equipo, con tu autorización</p>
+      </div>
+    </div>
+    <div class="device">
+      <label for="device-select">Dispositivo</label>
+      <select id="device-select" title="Dispositivo a controlar"><option value="local">Este equipo</option></select>
+      <span id="device-state" class="pill">conectando…</span>
+    </div>
+  </header>
+
+  <main class="chat" id="chat" aria-live="polite">
+    <div class="welcome" id="welcome">
+      <h2>¿Qué hacemos, Oscar?</h2>
+      <p>Escribí o hablá. Las acciones en tu equipo se confirman con un clic, salvo las que autorizaste en automático.</p>
+      <div class="chips" id="chips"></div>
+    </div>
+  </main>
+
+  <aside class="side" id="side">
+    <section>
+      <h3>Capacidades del equipo</h3>
+      <ul id="caps" class="caps"><li class="muted">Iniciá el agente para verlas.</li></ul>
+      <p class="hint">Se cambian sólo en tu PC:<br><code>python agente_dispositivo.py --perfil completo</code></p>
+    </section>
+    <section>
+      <h3>Pendientes de voz</h3>
+      <ul id="voice" class="voice"><li class="muted">Sin pendientes.</li></ul>
+    </section>
+  </aside>
+
+  <form class="composer" id="composer" autocomplete="off">
+    <button type="button" id="mic" class="icon" title="Hablar (decí tu orden)" aria-label="Hablar">🎙️</button>
+    <input id="input" maxlength="4000" placeholder="Ej.: reproduce Bad Bunny en Spotify · sube el volumen · abre mis documentos" aria-label="Mensaje para SKY">
+    <label class="speak" title="SKY lee las respuestas en voz alta"><input type="checkbox" id="tts"> voz</label>
+    <button type="submit" class="send">Enviar</button>
+  </form>
+</div>
+<script src="/static/sky-security-ui.js" defer></script>
+<script src="/static/asistente.js?v=11.1" defer></script>
+</body>
+</html>

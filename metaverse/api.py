@@ -568,6 +568,16 @@ app.include_router(sky_stt_v105_router)
 from .telemetria_api import router as sky_telemetria_router
 app.include_router(sky_telemetria_router)
 
+# SKY v11.1: Asistente Personal — órdenes en lenguaje natural sobre tus dispositivos.
+from .asistente_api import router as sky_asistente_router
+app.include_router(sky_asistente_router)
+
+@app.get('/asistente')
+def asistente_page():
+    resp=FileResponse(STATIC/'asistente.html')
+    resp.headers['Cache-Control']='no-cache, no-store, must-revalidate'
+    return resp
+
 @app.get('/api/client/bootstrap')
 def client_bootstrap(request: Request):
     """Inicializa la sesión directa del creador/superadministrador en localhost."""

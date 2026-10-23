@@ -40,3 +40,6 @@ cryptography>=44,<51
 # Hardware & Industrial IoT (Sensores físicos RS485 / COM / Arduino / ESP32)
 pyserial>=3.5,<4
 pyyaml>=6.0,<7
+
+# SKY v11.1 Asistente Personal: batería/CPU/RAM en el estado del equipo (opcional)
+psutil>=5.9,<8

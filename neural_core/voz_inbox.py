@@ -15,10 +15,11 @@ def read_inbox():
 
 
 def add_inbox(text,command):
-    if not isinstance(command,dict) or command.get('action') not in ('status','open_url','launch_app'):
+    from .sky_capacidades import ACCION_A_CAPACIDAD
+    if not isinstance(command,dict) or command.get('action') not in ACCION_A_CAPACIDAD:
         raise ValueError('Propuesta de acción no admitida')
     entry={'id':str(uuid4()),'timestamp':datetime.now(timezone.utc).isoformat(),
-           'text':str(text)[:500], 'action':command['action'],'params':command.get('params',{}),
+           'text':str(text)[:500], 'action':command['action'],'params':command.get('params',{}) if isinstance(command.get('params',{}),dict) else {},
            'description':str(command.get('description',''))[:180]}
     INBOX.parent.mkdir(parents=True,exist_ok=True)
     INBOX.write_text(json.dumps((read_inbox()+[entry])[-40:],ensure_ascii=False,indent=2),encoding='utf-8')

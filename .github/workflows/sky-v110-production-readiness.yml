@@ -48,7 +48,7 @@ jobs:
         run: >-
           PYTHONPATH=. pytest -q
           tests/test_gemini_baqueano.py tests/test_local.py
-          tests/test_multiia.py tests/test_sky_devices.py tests/test_sky_v5.py
+          tests/test_multiia.py tests/test_sky_devices.py tests/test_sky_v11_1_asistente.py tests/test_sky_v5.py
           tests/test_sky_v6_metaverse.py tests/test_sky_v7_social.py
           tests/test_sky_v8_office.py
       - name: Static deployment audit

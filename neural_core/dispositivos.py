@@ -9,11 +9,10 @@ import urllib.error
 from datetime import datetime, timezone
 import unicodedata
 
-ACTION_CAPABILITIES = {
-    'status': 'Consultar estado del dispositivo',
-    'open_url': 'Abrir un sitio web en el dispositivo',
-    'launch_app': 'Abrir una aplicación permitida en el dispositivo',
-}
+from .sky_capacidades import DESCRIPCION_ACCIONES
+
+# v11.1: todas las acciones del registro; el agente sólo ejecuta las que su dueño activó.
+ACTION_CAPABILITIES = dict(DESCRIPCION_ACCIONES)
 APP_OPTIONS = ['calculator', 'text_editor', 'file_manager', 'browser']
 _REGISTRY = Path(__file__).resolve().parent.parent / 'local_data' / 'paired_devices.json'
 
@@ -47,9 +46,14 @@ def call_device(url: str, token: str, action: str='status', params: dict | None=
             data=payload, headers={'Authorization':'Bearer '+token.strip(), 'Content-Type':'application/json'})
     try:
         with urllib.request.urlopen(req,timeout=timeout) as resp:
-            data=resp.read(16_384)
+            data=resp.read(131_072)
             return json.loads(data)
     except urllib.error.HTTPError as exc:
+        detalle=''
+        try: detalle=json.loads(exc.read(4096)).get('error','')
+        except Exception: pass
+        if exc.code in (400,403) and detalle:
+            raise RuntimeError(str(detalle)[:250]) from exc
         raise RuntimeError(f'El agente respondió HTTP {exc.code}: verificá el token y los permisos.') from exc
     except (urllib.error.URLError,TimeoutError,OSError) as exc:
         raise RuntimeError('No se pudo conectar. Verificá que el agente y Tailscale estén activos.') from exc

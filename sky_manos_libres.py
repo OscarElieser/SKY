@@ -4,14 +4,16 @@ Requisitos opcionales: pip install vosk sounddevice pyttsx3
 Descargar modelo Vosk ES, extraerlo y arrancar:
 python sky_manos_libres.py --model ./modelos/vosk-model-es
 
-La voz no ejecuta nunca acciones remotas sin consentimiento desde el panel.
+La voz sólo ejecuta al instante las capacidades que el dueño marcó como automáticas
+(agente_dispositivo.py --auto ...); el resto queda pendiente de confirmación en /asistente.
 """
 from __future__ import annotations
 import argparse, json, os, queue, sys, re
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent/'.env')
-from neural_core.dispositivos import interpret_command, norm
+from neural_core.dispositivos import norm
+from neural_core.sky_asistente_personal import interpretar as interpret_command, ejecutar_local_si_autorizado
 from neural_core.voz_inbox import add_inbox
 from neural_core.assistant import responder
 from neural_core.providers import choose_provider
@@ -81,8 +83,14 @@ def main():
                 print('Escuchado:',command)
                 intent=interpret_command(command)
                 if intent:
+                    try:
+                        hecho=ejecutar_local_si_autorizado(intent)
+                    except Exception as exc:
+                        hecho={'ok':False,'error':str(exc)}
+                    if hecho and hecho.get('ok',True):
+                        say(hecho.get('message') or 'Listo.'); continue
                     add_inbox(command,intent)
-                    say('Preparé la orden. Abrí la sección SKY del panel para confirmarla.')
+                    say('Preparé la orden: '+intent['description']+'. Confirmala en el panel del asistente.')
                     continue
                 provider,modelo=choose_provider(os.getenv('SKY_VOICE_PROVIDER','auto'), 'SKY voz')
                 try:
