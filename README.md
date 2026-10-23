@@ -1,4 +1,4 @@
-# 🌌 SKY IA — Universal v12 | HUD · Asistente Personal
+# 🌌 SKY IA — Universal v12.1 | HUD · Asistente Personal
 
 **Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
 
@@ -7,6 +7,8 @@ Plataforma tecnológica personal con una **interfaz HUD** y un **asistente perso
 ---
 
 ## ⚡ Inicio Rápido (Windows)
+
+**Primera vez:** doble clic en `INSTALAR_SKY_WINDOWS.bat` (instala Python, librerías, Ollama y su modelo, la voz natural Piper y la escucha local). Guía completa: [README_V12_INICIO.md](README_V12_INICIO.md).
 
 Para iniciar cualquier componente de SKY, ejecuta el menú interactivo unificado:
 ```cmd
@@ -21,11 +23,17 @@ Desde este panel podrás elegir fácilmente:
 5. **Agente del equipo:** `agente_dispositivo.py` (puerto 8766; permisos con `--perfil basico|multimedia|completo`, u opción 6 del menú)
    · **Intérprete de código:** opción I (`sky_interprete.py`, Open Interpreter con confirmación de cada paso)
 6. **Diagnóstico del Motor:** `sky_preflight.py`
-7. **Suite de Pruebas Automatizadas:** 199 tests en `pytest`
+7. **Diagnóstico y pruebas:** `python sky_diagnostico.py` · más de 600 tests en `pytest`
 
 ---
 
-## 🛰️ SKY v12 — HUD y Asistente Personal
+## 🛰️ SKY v12.1 — HUD y Asistente Personal
+
+- **Entiende a la primera:** las órdenes conocidas se resuelven al instante, y las demás las interpreta un **cerebro local con herramientas** (Ollama), que también entiende referencias como "más fuerte" o "cerralo".
+- **Voz fluida:** empieza a hablar con la primera frase, con voz natural **Piper** local y escucha continua **"SKY…"** transcrita en tu PC.
+- **Agenda:** recordatorios, alarmas y rutinas ("buenos días"); avisos en el HUD, en el escritorio y en el celular.
+- **Mensajes:** leer y responder correo con tu confirmación, WhatsApp con el mensaje ya escrito, y contactos.
+- **Instalador único** y **diagnóstico** (botón DIAG) que dice cómo arreglar lo que falte. Novedades: [CHANGELOG_V12_1.md](CHANGELOG_V12_1.md)
 
 Hablale o escribile a SKY desde el **núcleo holográfico**: *"reproduce Bad Bunny en Spotify"*, *"pon el video en pantalla completa"*, *"organiza las ventanas"*, *"abre mis documentos"*, *"crea una nota agenda que diga…"*, *"prepara una presentación sobre…"*, *"enciende la luz de la sala"*, *"toma una captura"*. Todo lo demás lo responde la IA (100 % local con Ollama y `SKY_LOCAL_ONLY=1`).
 

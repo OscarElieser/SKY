@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>SKY · Interfaz</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2212%22 fill=%22none%22 stroke=%22%2300e5ff%22 stroke-width=%224%22/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/hud.css?v=12.0">
+  <link rel="stylesheet" href="/static/hud.css?v=12.1">
 </head>
 <body data-state="idle">
 <div class="grid-bg" aria-hidden="true"></div>
@@ -18,6 +18,7 @@
     <span class="pill" id="pill-ia" title="Motor de inteligencia">IA · …</span>
     <span class="pill" id="pill-voz" title="Reconocimiento de voz">VOZ · …</span>
     <span class="pill" id="pill-casa" title="Home Assistant">CASA · …</span>
+    <button type="button" class="pill diag" id="btn-diag" title="Revisar qué funciona y qué falta">DIAG</button>
   </div>
   <div class="clock"><span id="clock-time">--:--</span><span id="clock-date"></span></div>
 </header>
@@ -37,6 +38,8 @@
       <div class="kv"><span>Proveedor</span><b id="ia-prov">—</b></div>
       <div class="kv"><span>Privacidad</span><b id="ia-priv">—</b></div>
       <div class="kv"><span>Ollama</span><b id="ia-ollama">—</b></div>
+      <div class="kv"><span>Cerebro</span><b id="ia-cerebro">—</b></div>
+      <div class="kv"><span>Voz</span><b id="ia-voz">—</b></div>
     </section>
     <section class="panel" id="p-casa">
       <h2>Casa</h2>
@@ -58,6 +61,7 @@
     <form class="composer" id="chat-form" autocomplete="off">
       <button type="button" class="ctl" id="btn-mic" title="Hablar con SKY" aria-label="Hablar con SKY">MIC</button>
       <input id="chat-input" maxlength="4000" placeholder="Escribí una orden o pregunta para SKY…" aria-label="Mensaje para SKY">
+      <button type="button" class="ctl toggle" id="btn-wake" title="Escucha continua: decí “SKY…” sin tocar nada" aria-pressed="false">SKY</button>
       <button type="button" class="ctl toggle" id="btn-conv" title="Conversación continua: SKY vuelve a escucharte después de responder" aria-pressed="false">CONV</button>
       <button type="button" class="ctl toggle on" id="btn-tts" title="SKY responde en voz alta" aria-pressed="true">VOZ</button>
       <button type="submit" class="send">ENVIAR</button>
@@ -68,6 +72,10 @@
     <section class="panel" id="p-mod">
       <h2>Módulos</h2>
       <div class="tiles" id="tiles"></div>
+    </section>
+    <section class="panel" id="p-agenda">
+      <h2>Agenda</h2>
+      <ul class="list" id="agenda-list"><li class="muted">Decí: “recuérdame en 10 minutos…”.</li></ul>
     </section>
     <section class="panel" id="p-tareas">
       <h2>Tareas</h2>
@@ -98,6 +106,6 @@
 <div class="dock" id="dock" aria-label="Ventanas abiertas"></div>
 
 <script src="/static/sky-security-ui.js" defer></script>
-<script src="/static/hud.js?v=12.0" defer></script>
+<script src="/static/hud.js?v=12.1" defer></script>
 </body>
 </html>

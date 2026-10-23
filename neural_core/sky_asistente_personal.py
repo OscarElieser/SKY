@@ -204,23 +204,49 @@ SISTEMA_ASISTENTE = (
 )
 
 
-def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'auto', modo: str = 'chat') -> dict:
-    """Punto de entrada único del asistente.
+def resolver_especial(r: dict) -> dict:
+    """Convierte resultados de agenda/correo/rutinas/avisos en la respuesta estándar,
+    ejecutando lo que es inmediato y seguro (crear un recordatorio, leer correo)."""
+    tipo = r.get('tipo')
+    if tipo == 'recordatorio':
+        from . import sky_rutinas
+        try:
+            item = sky_rutinas.crear(r['texto'], r['cuando'], r.get('clase', 'recordatorio'))
+        except (ValueError, KeyError) as exc:
+            return {'tipo': 'error', 'mensaje': 'No pude crear el recordatorio: ' + str(exc)[:120]}
+        return {'tipo': 'respuesta', 'mensaje': 'Listo. ' + r['description'] + '.', 'proveedor': 'sky-agenda', 'recordatorio': item}
+    if tipo == 'agenda':
+        from . import sky_rutinas
+        return {'tipo': 'respuesta', 'mensaje': sky_rutinas.describir_agenda(), 'proveedor': 'sky-agenda'}
+    if tipo == 'rutina':
+        from . import sky_rutinas
+        res = sky_rutinas.ejecutar_rutina(r['rutina'])
+        return {'tipo': 'respuesta', 'mensaje': res['mensaje'] or 'Rutina ejecutada.', 'proveedor': 'sky-rutina', 'acciones': res['acciones']}
+    if tipo == 'correo_leer':
+        from . import sky_correo
+        try:
+            correos = sky_correo.no_leidos(6)
+        except RuntimeError as exc:
+            return {'tipo': 'error', 'mensaje': str(exc)}
+        if not correos:
+            return {'tipo': 'respuesta', 'mensaje': 'No tenés correos nuevos.', 'proveedor': 'sky-correo'}
+        partes = [f"de {c['de']}: {c['asunto']}" for c in correos]
+        return {'tipo': 'respuesta', 'proveedor': 'sky-correo', 'correos': correos,
+                'mensaje': f'Tenés {len(correos)} correos nuevos. ' + '; '.join(partes) + '.'}
+    if tipo == 'correo_enviar':
+        return {'tipo': 'correo', 'borrador': r['borrador'], 'mensaje': r['description'], 'requiere_confirmacion': True}
+    if tipo in ('correo_aviso', 'aviso'):
+        return {'tipo': 'respuesta', 'mensaje': r['description'], 'proveedor': 'sky'}
+    if tipo == 'accion':
+        p = r['propuesta']
+        return {'tipo': 'accion', 'propuesta': p, 'mensaje': p['description'] + ' — ' + DESCRIPCION_ACCIONES.get(p['action'], '')}
+    if tipo == 'casa':
+        return {'tipo': 'casa', 'propuesta': r['propuesta'], 'mensaje': r['propuesta']['description']}
+    return r
 
-    modo='voz'  → respuesta breve y conversacional (para hablarla sin esperas).
-    modo='chat' → el cerebro completo de SKY (documentos, memorias, evidencias).
 
-    Devuelve uno de:
-      {'tipo':'accion','propuesta':{...},'mensaje':str}
-      {'tipo':'local','mensaje':str}            (calculadora, hora… de sky_agent)
-      {'tipo':'respuesta','mensaje':str,'proveedor':str}
-      {'tipo':'error','mensaje':str}
-    """
-    texto = str(texto or '').strip()
-    if not texto:
-        return {'tipo': 'error', 'mensaje': 'Decime qué necesitás.'}
-    if len(texto) > 4000:
-        return {'tipo': 'error', 'mensaje': 'El mensaje es demasiado largo (máx. 4000 caracteres).'}
+def reglas(texto: str) -> dict | None:
+    """Todas las reglas rápidas, en orden. None si ninguna entiende la orden."""
     try:
         from .sky_agent import interpret_local_command
         local = interpret_local_command(texto)
@@ -228,6 +254,17 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
             return {'tipo': 'local', 'mensaje': local}
     except Exception:
         pass
+    from . import sky_rutinas, sky_correo, sky_contactos
+    rutina = sky_rutinas.rutina_por_frase(texto)
+    if rutina:
+        return resolver_especial({'tipo': 'rutina', 'rutina': rutina})
+    for modulo in (sky_rutinas, sky_contactos, sky_correo):
+        try:
+            r = modulo.interpretar(texto)
+        except Exception:
+            r = None
+        if r:
+            return resolver_especial(r)
     propuesta = interpretar(texto)
     if propuesta:
         return {'tipo': 'accion', 'propuesta': propuesta,
@@ -239,8 +276,47 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
             return {'tipo': 'casa', 'propuesta': orden_casa, 'mensaje': orden_casa['description']}
     except Exception:
         pass
-    turnos = [{'role': h['role'], 'content': str(h['content'])[:4000]} for h in (historial or [])[-12:]
-              if isinstance(h, dict) and h.get('role') in ('user', 'assistant') and h.get('content')]
+    return None
+
+
+def _turnos(historial: list[dict] | None) -> list[dict]:
+    return [{'role': h['role'], 'content': str(h['content'])[:4000]} for h in (historial or [])[-12:]
+            if isinstance(h, dict) and h.get('role') in ('user', 'assistant') and h.get('content')]
+
+
+def usar_cerebro(proveedor: str) -> bool:
+    from . import sky_cerebro
+    return (proveedor or 'auto') in ('auto', 'sky', 'ollama') and sky_cerebro.disponible()
+
+
+def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'auto', modo: str = 'chat') -> dict:
+    """Punto de entrada único del asistente.
+
+    1. Reglas rápidas (agenda, rutinas, correo, WhatsApp, equipo, casa): instantáneas.
+    2. Cerebro con herramientas (Ollama local): entiende frases libres y referencias.
+    3. Respuesta: modo='voz' breve; modo='chat' el cerebro completo de SKY (documentos, memorias).
+
+    Devuelve: accion | casa | correo | local | respuesta | error (ver docs/api).
+    """
+    texto = str(texto or '').strip()
+    if not texto:
+        return {'tipo': 'error', 'mensaje': 'Decime qué necesitás.'}
+    if len(texto) > 4000:
+        return {'tipo': 'error', 'mensaje': 'El mensaje es demasiado largo (máx. 4000 caracteres).'}
+    r = reglas(texto)
+    if r:
+        return r
+    turnos = _turnos(historial)
+    try:
+        if usar_cerebro(proveedor):
+            from . import sky_cerebro
+            d = sky_cerebro.decidir(texto, turnos, modo)
+            if d['tipo'] == 'herramienta':
+                return resolver_especial(d['resultado'])
+            if d['tipo'] == 'texto' and d['mensaje'] and modo == 'voz':
+                return {'tipo': 'respuesta', 'mensaje': d['mensaje'], 'proveedor': 'ollama'}
+    except Exception:
+        pass
     try:
         from .providers import ProviderError
     except Exception as exc:  # dependencias opcionales ausentes
@@ -268,6 +344,8 @@ AYUDA = [
     ('Web', ['busca recetas de gallo pinto en Google', 'abre YouTube', 'busca en mapas León Nicaragua']),
     ('Archivos', ['abre mis documentos', 'qué hay en mis descargas']),
     ('Equipo', ['toma una captura', 'bloquea la pantalla', 'copia hola mundo al portapapeles', 'avísame que tengo reunión']),
+    ('Agenda', ['recuérdame en 10 minutos sacar la ropa', 'pon una alarma a las 6:30', 'qué recordatorios tengo', 'buenos días']),
+    ('Mensajes', ['lee mis correos', 'responde al último correo diciendo gracias, lo reviso hoy', 'mandale un whatsapp a mamá que llego tarde']),
 ]
 
 

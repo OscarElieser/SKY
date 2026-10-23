@@ -61,6 +61,34 @@ async def _workflow_pump():
             pass
         await asyncio.sleep(2)
 
+async def _agenda_pump():
+    # SKY v12.1: recordatorios, alarmas y rutinas programadas. Avisa al HUD, al escritorio
+    # (si la capacidad notify es automática) y al celular (SKY_HA_NOTIFY), sin red externa.
+    from neural_core import sky_rutinas
+    def ciclo():
+        for r in sky_rutinas.vencidos():
+            texto=('⏰ ' if r.get('clase')=='alarma' else '🔔 ')+r.get('texto','Recordatorio')
+            sky_rutinas.avisar(texto,'recordatorio')
+            _avisar_fuera(r.get('texto','Recordatorio'))
+        for rutina in sky_rutinas.rutinas_programadas():
+            res=sky_rutinas.ejecutar_rutina(rutina)
+            if res['mensaje']:
+                sky_rutinas.avisar(res['mensaje'],'rutina')
+    while True:
+        try:await asyncio.to_thread(ciclo)
+        except Exception:pass
+        await asyncio.sleep(20)
+
+def _avisar_fuera(texto:str):
+    try:
+        from neural_core.sky_asistente_personal import ejecutar_local_si_autorizado
+        ejecutar_local_si_autorizado({'action':'notify','params':{'title':'SKY','message':texto},'description':'Recordatorio'})
+    except Exception:pass
+    try:
+        from neural_core import sky_home_assistant
+        sky_home_assistant.notificar_celular(texto)
+    except Exception:pass
+
 async def _creative_pump():
     from neural_core.sky_creative import run_next_job
     while True:
@@ -82,9 +110,14 @@ async def lifespan(app):
     creative_pump=asyncio.create_task(_creative_pump()) if os.getenv('SKY_CREATIVE_WORKER','1')=='1' else None
     if os.getenv('SKY_WORKFLOWS_ENABLED','1')=='1':
         pump=asyncio.create_task(_workflow_pump())
+    agenda_pump=asyncio.create_task(_agenda_pump()) if os.getenv('SKY_AGENDA_ENABLED','1')=='1' else None
     try:
         yield
     finally:
+        if agenda_pump:
+            agenda_pump.cancel()
+            try:await agenda_pump
+            except asyncio.CancelledError:pass
         if creative_pump:
             creative_pump.cancel()
             try:await creative_pump

@@ -226,3 +226,20 @@ def resumen() -> dict:
                 'auto': sorted(d for d in SERVICIOS_PERMITIDOS if not requiere_confirmacion(d))}
     except RuntimeError as exc:
         return {'configurado': True, 'ok': False, 'error': str(exc)}
+
+
+def servicio_celular() -> str | None:
+    """SKY_HA_NOTIFY=notify.mobile_app_mi_telefono (app Home Assistant del celular)."""
+    s = os.getenv('SKY_HA_NOTIFY', '').strip()
+    return s if re.fullmatch(r'notify\.[a-z0-9_]{1,80}', s) else None
+
+
+def notificar_celular(texto: str, titulo: str = 'SKY') -> bool:
+    """Envía un aviso push al celular vía la app de Home Assistant. False si no está configurado."""
+    servicio = servicio_celular()
+    if not servicio or not configurado():
+        return False
+    _, nombre = servicio.split('.', 1)
+    _peticion('POST', f'/api/services/notify/{nombre}',
+              {'title': str(titulo)[:60], 'message': ' '.join(str(texto).split())[:500]})
+    return True

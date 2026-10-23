@@ -4,9 +4,8 @@ cd /d "%~dp0"
 title SKY IA - Centro de Control
 
 if not exist ".venv\Scripts\python.exe" (
-    echo [SKY] Creando entorno virtual e instalando librerias...
-    py -3 -m venv .venv || python -m venv .venv
-    ".venv\Scripts\python.exe" -m pip install -r requirements.txt
+    echo [SKY] Primera vez: ejecutando el instalador completo de SKY...
+    call "%~dp0INSTALAR_SKY_WINDOWS.bat"
 )
 
 :menu
@@ -40,6 +39,7 @@ if "%opt%"=="4" goto opt_office
 if "%opt%"=="5" goto opt_agente
 if "%opt%"=="6" goto opt_permisos
 if "%opt%"=="7" goto opt_status
+if /i "%opt%"=="d" goto opt_status
 if "%opt%"=="8" goto opt_startup
 if "%opt%"=="9" goto opt_tests
 if /i "%opt%"=="i" goto opt_interprete
@@ -103,9 +103,9 @@ pause
 goto menu
 
 :opt_status
-".venv\Scripts\python.exe" iniciar_sky_autonomo.py --status
+".venv\Scripts\python.exe" sky_diagnostico.py
 echo.
-".venv\Scripts\python.exe" sky_preflight.py
+".venv\Scripts\python.exe" iniciar_sky_autonomo.py --status
 pause
 goto menu
 

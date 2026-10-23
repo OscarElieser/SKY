@@ -6,6 +6,10 @@
     GET  /api/hud/notas       nombres de tus notas locales (sólo lectura)
     GET  /api/hud/casa        entidades de Home Assistant (sin token)
     GET  /api/hud/youtube?q=  video incrustable vía YouTube Data API oficial (si hay YOUTUBE_API_KEY)
+    POST /api/hud/tts         voz natural local con Piper (WAV)
+    GET  /api/hud/avisos      recordatorios y rutinas que el HUD debe decir (se marcan como vistos)
+    GET  /api/hud/agenda      recordatorios pendientes y rutinas · DELETE /api/hud/agenda/{id}
+    GET  /api/hud/diagnostico qué funciona, qué falta y cómo arreglarlo
 """
 from __future__ import annotations
 
@@ -17,13 +21,15 @@ import urllib.request
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
 from .api import require_key
 from neural_core import dispositivos
 from neural_core.sky_asistente_personal import token_agente_local, url_agente_local
 
 router = APIRouter(prefix='/api/hud', dependencies=[Depends(require_key)])
-VERSION_SKY = '12.0.0'
+VERSION_SKY = '12.1.0'
 
 
 def _credenciales() -> tuple[str, str]:
@@ -73,7 +79,10 @@ def estado():
         stt = {'disponible': bool(stt_caps().get('available'))}
     except Exception:
         stt = {'disponible': False}
+    from neural_core import sky_tts, sky_correo, sky_cerebro
+    ia['cerebro'] = sky_cerebro.disponible()
     return {'version': VERSION_SKY, 'agente': agente, 'ia': ia, 'stt_local': stt,
+            'tts_local': sky_tts.disponible(), 'correo': sky_correo.configurado(),
             'casa': {'configurado': casa.configurado()},
             'youtube_api': bool(os.getenv('YOUTUBE_API_KEY') or os.getenv('GOOGLE_API_KEY'))}
 
@@ -138,3 +147,65 @@ def youtube(q: str):
         return {'embebible': False, 'busqueda': busqueda, 'motivo': 'Sin resultados incrustables.'}
     return {'embebible': True, 'busqueda': busqueda,
             'videos': [{'id': c['id'], 'titulo': str(c.get('title', ''))[:140]} for c in candidatos[:6]]}
+
+
+class TextoVoz(BaseModel):
+    texto: str = Field(min_length=1, max_length=700)
+
+
+@router.post('/tts')
+def tts(body: TextoVoz):
+    from neural_core import sky_tts
+    try:
+        return Response(sky_tts.sintetizar(body.texto), media_type='audio/wav', headers={'Cache-Control': 'no-store'})
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except (RuntimeError, OSError) as exc:
+        raise HTTPException(503, str(exc)[:200])
+
+
+@router.get('/avisos')
+def avisos():
+    from neural_core import sky_rutinas
+    return {'avisos': sky_rutinas.avisos_nuevos()}
+
+
+@router.get('/agenda')
+def agenda():
+    from neural_core import sky_rutinas
+    data = sky_rutinas.agenda()
+    return {'recordatorios': sky_rutinas.pendientes()[:30],
+            'rutinas': [{'id': r.get('id'), 'nombre': r.get('nombre'), 'hora': r.get('hora'), 'frases': r.get('frases', [])}
+                        for r in data['rutinas']]}
+
+
+@router.delete('/agenda/{item_id}')
+def borrar_recordatorio(item_id: str):
+    from neural_core import sky_rutinas
+    if not re.fullmatch(r'[a-f0-9]{6,32}', item_id):
+        raise HTTPException(400, 'Identificador inválido')
+    return {'ok': sky_rutinas.borrar(item_id)}
+
+
+class Rutina(BaseModel):
+    nombre: str = Field(min_length=1, max_length=60)
+    frases: list[str] = Field(default_factory=list, max_length=6)
+    hora: str | None = Field(default=None, max_length=5)
+    dias: list[int] = Field(default_factory=list, max_length=7)
+    pasos: list[dict] = Field(min_length=1, max_length=12)
+
+
+@router.post('/rutinas')
+def guardar_rutina(body: Rutina):
+    from neural_core import sky_rutinas
+    try:
+        return sky_rutinas.guardar_rutina(body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.get('/diagnostico')
+def diagnostico():
+    from neural_core import sky_diagnostico
+    items = sky_diagnostico.revisar()
+    return {'items': items, 'resumen': sky_diagnostico.resumen(items)}

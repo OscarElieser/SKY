@@ -155,3 +155,19 @@ button.chip.on{color:var(--amber);border-color:rgba(255,176,32,.6)}
   .dock{bottom:60px;max-width:100%;overflow-x:auto}
 }
 @media (prefers-reduced-motion:reduce){.meter u{transition:none}}
+
+/* v12.1 */
+.pill.diag{cursor:pointer;color:var(--cyan2)}
+.pill.diag:hover{border-color:var(--cyan);color:var(--white)}
+.msg.aviso{border-color:rgba(255,176,32,.55);background:rgba(255,176,32,.08)}
+.msg.aviso::before{content:"AVISO";color:var(--amber)}
+.msg.live::after{content:"▍";animation:blink 1s steps(1) infinite;color:var(--cyan)}
+@keyframes blink{50%{opacity:0}}
+#btn-wake[aria-pressed="true"]{color:#012030;background:var(--green);border-color:var(--green)}
+.diag-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:13px}
+.diag-list li{padding:8px 10px;border-left:3px solid var(--line2);background:rgba(0,229,255,.04)}
+.diag-list li.ok{border-left-color:var(--green)}.diag-list li.bad{border-left-color:var(--red)}.diag-list li.opt{border-left-color:var(--muted)}
+.diag-list b{display:block}.diag-list small{display:block;color:var(--muted);margin-top:2px}
+.diag-list .fix{color:var(--amber);font-size:12px;margin-top:4px}
+.list .x{float:right;border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1}
+.list .x:hover{color:var(--red)}

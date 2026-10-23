@@ -1,60 +1,87 @@
-# SKY IA v12 — Inicio
+# SKY IA v12.1 — Inicio
 
-## 1. Arrancar
+## 1. Instalar (una sola vez)
 
-**Windows:** doble clic en `SKY_INICIAR.bat` → **0 · SKY COMPLETO**. Se inician el agente del equipo, la API, la voz manos libres (si tenés el modelo Vosk) y se abre la interfaz: **http://127.0.0.1:8765/**
+Doble clic en **`INSTALAR_SKY_WINDOWS.bat`**. Deja todo listo: Python, librerías, **Ollama** con el modelo del cerebro, la **voz natural Piper** en español, la **escucha local** (faster-whisper), el modelo **Vosk** para manos libres, los permisos y `.env`. Si algo falla, volvé a ejecutarlo: salta lo que ya está instalado.
 
-**Linux / macOS:** `./iniciar_sky_asistente_linux_mac.sh`
+- `INSTALAR_SKY_WINDOWS.bat -Local` → modo 100 % local (nada sale del equipo).
+- `INSTALAR_SKY_WINDOWS.bat -Modelo qwen2.5:7b` → elegir el modelo.
 
-La primera vez se activa el perfil **multimedia**. Cambialo con la opción **6** del menú.
+## 2. Arrancar
 
-## 2. Hablar con SKY
+`SKY_INICIAR.bat` → **0 · SKY COMPLETO**. Se abre la interfaz en **http://127.0.0.1:8765/**.
 
-- Tocá el **núcleo**, el botón **MIC**, la **barra espaciadora** o **F2** y hablá.
-- **CONV**: conversación continua (SKY te vuelve a escuchar después de responder).
-- **VOZ**: SKY responde en voz alta.
-- Si SKY pregunta "¿Lo hago?", respondé "sí" o "no".
-- Esc corta la voz o la escucha.
+¿Algo no anda? Botón **DIAG** del HUD, opción **7** del menú o `python sky_diagnostico.py`: te dice qué falta y el comando para arreglarlo.
 
-Ejemplos: "reproduce Bad Bunny en Spotify" · "pon el video en pantalla completa" · "sube el volumen" · "abre Word" · "organiza las ventanas" · "abre mis documentos" · "crea una nota agenda que diga reunión el lunes" · "prepara una presentación sobre energía solar" · "enciende la luz de la sala" · "toma una captura" · "bloquea la pantalla" · y cualquier pregunta.
+## 3. Hablar con SKY
 
-## 3. 100 % local
+| Botón | Qué hace |
+|---|---|
+| Núcleo / **MIC** / barra espaciadora / F2 | Hablar una vez |
+| **SKY** | Escucha continua: decí "SKY, …" cuando quieras, sin tocar nada |
+| **CONV** | Después de responder, SKY te vuelve a escuchar |
+| **VOZ** | SKY responde en voz alta (Piper si está instalado) |
+| Esc | Cortar la voz o la escucha |
 
-1. Instalá Ollama y descargá un modelo: `ollama pull llama3.1`
-2. En `.env`: `SKY_LOCAL_ONLY=1` y `OLLAMA_MODEL=llama3.1`
-3. Voz local: `pip install faster-whisper`, descargá un modelo de faster-whisper a una carpeta y poné `SKY_STT_MODEL_DIR=esa\carpeta`.
+SKY empieza a hablar con la primera frase de la respuesta. Si te pregunta "¿Lo hago?", respondé "sí" o "no".
 
-El HUD muestra **IA · LOCAL** y **VOZ · LOCAL** cuando está todo en tu equipo.
+**Podés hablarle con naturalidad.** Las órdenes conocidas se resuelven al instante, y las demás las interpreta el cerebro local: "está muy fuerte esto", "me aburrí de esta canción", "quiero algo relajante de fondo", "cerralo".
+
+Ejemplos:
+- **Música y video:** "reproduce Bad Bunny en Spotify" · "pon el video en pantalla completa" · "siguiente"
+- **Equipo:** "abre Word" · "organiza las ventanas" · "abre mis documentos" · "toma una captura" · "bloquea la pantalla"
+- **Agenda:** "recuérdame en 10 minutos sacar la ropa" · "pon una alarma a las 6:30" · "qué recordatorios tengo" · "buenos días"
+- **Notas y tareas:** "crea una nota agenda que diga reunión el lunes" · "prepara una presentación sobre energía solar"
+- **Mensajes:** "lee mis correos" · "responde al último correo diciendo gracias, lo reviso hoy" · "mándale un whatsapp a mamá que llego tarde"
+- **Casa:** "enciende la luz de la sala" · "activa la escena cine"
 
 ## 4. Permisos
 
 | Perfil | Qué hace | Sin pedir clic |
 |---|---|---|
 | `basico` | apps, música, volumen, webs, avisos, tareas | estado, música, volumen |
-| `multimedia` | lo mismo | todo lo anterior + abrir apps/webs, reproducir, avisos, tareas |
+| `multimedia` | lo mismo | todo lo anterior |
 | `completo` | + ventanas, carpetas y documentos, notas, escribir texto, capturas, portapapeles, bloqueo | lo de multimedia + bloquear |
 
-Ventanas, archivos, notas, escritura y portapapeles **siempre** piden confirmación. Detalle: `python agente_dispositivo.py --help`.
+Ventanas, archivos, notas, escritura, portapapeles, correos y cerraduras **siempre** piden confirmación. Para cambiar el perfil: opción **6** del menú.
 
-## 5. Casa (Home Assistant)
+## 5. Correo, WhatsApp y contactos
+
+- **Correo:** en `.env` poné `SKY_MAIL_USER` y `SKY_MAIL_APP_PASSWORD`. Es una *contraseña de aplicación*, no tu contraseña real; en Gmail se crea en myaccount.google.com/apppasswords con la verificación en dos pasos activada. SKY lee sin marcar como leído y **nunca envía sin tu confirmación**.
+- **Contactos:** copiá `docs/ejemplos/contactos.json` a `C:\Users\TU_USUARIO\.neuralt\contactos.json` y completalo.
+- **WhatsApp:** SKY abre WhatsApp con el mensaje escrito; vos tocás Enviar.
+
+## 6. Casa y celular (Home Assistant)
 
 En Home Assistant: Perfil → Seguridad → **Tokens de acceso de larga duración**. En `.env`:
 
 ```
 SKY_HA_URL=http://homeassistant.local:8123
 SKY_HA_TOKEN=el_token
+SKY_HA_NOTIFY=notify.mobile_app_tu_telefono   # avisos de SKY en tu celular
 ```
 
-Reiniciá SKY. El panel **Casa** muestra tus luces, enchufes y escenas.
+## 7. Rutinas
 
-## 6. Reproductor de YouTube dentro de SKY
+"Buenos días" ya viene configurada (saludo, recordatorios del día y correos nuevos). Para crear las tuyas, con hora y días, usá `POST /api/hud/rutinas` (ver `docs/api/SKY_ASISTENTE_PERSONAL_API.md`).
 
-Creá una clave de **YouTube Data API v3** en Google Cloud y poné `YOUTUBE_API_KEY=` en `.env`. Sin clave, SKY abre la búsqueda en tu navegador.
+## 8. Reproductor de YouTube dentro de SKY
 
-## 7. Intérprete de código
+Poné `YOUTUBE_API_KEY=` (YouTube Data API v3) en `.env`. Sin clave, SKY abre la búsqueda en tu navegador.
 
-`SKY_INICIAR.bat` → **I**, o `python sky_interprete.py`. SKY escribe código para lo que le pidas y **te muestra cada bloque antes de ejecutarlo** (respondé `y` o `n`).
+## 9. Intérprete de código
 
-## 8. Desde el celular
+`SKY_INICIAR.bat` → **I**. SKY escribe código para lo que le pidas y **muestra cada bloque antes de ejecutarlo**; respondé `y` para ejecutarlo o `n` para saltarlo.
 
-Con Tailscale en la PC y el celular: `tailscale serve 8765` en la PC, agregá ese nombre (por ejemplo `mi-pc.mi-red.ts.net`) a `SKY_TRUSTED_HOSTS` en `.env` y abrí la dirección HTTPS en el celular. Si te pide la llave del dueño, está en `local_data/sky_api_token.txt`. No uses Funnel ni abras puertos públicos.
+## 10. Desde el celular
+
+Con Tailscale en la PC y el celular:
+1. En la PC: `tailscale serve 8765`.
+2. Agregá ese nombre (por ejemplo `mi-pc.mi-red.ts.net`) a `SKY_TRUSTED_HOSTS` en `.env`.
+3. Abrí la dirección HTTPS en el celular. Si te pide la llave del dueño, está en `local_data/sky_api_token.txt`.
+
+No uses Funnel ni abras puertos públicos.
+
+## 11. Recomendación de equipo
+
+Para que el cerebro local sea rápido: tarjeta NVIDIA de 8 GB o más y 16 GB de RAM, con `qwen2.5:7b`. Sin tarjeta gráfica también funciona, pero más lento; con poca memoria el instalador elige `qwen2.5:3b`.

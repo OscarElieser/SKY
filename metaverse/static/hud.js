@@ -67,12 +67,14 @@
     const target = COLOR[estado] || COLOR.idle;
     for (let i = 0; i < 3; i++) rgb[i] += (target[i] - rgb[i]) * 0.08;
     let raw = 0;
-    if (S.analyser) {
-      S.analyser.getByteFrequencyData(S.freq);
+    const an = (S.speaking && S.outAn) ? S.outAn : S.analyser;
+    if (!S.freq) S.freq = new Uint8Array(128);
+    if (an) {
+      an.getByteFrequencyData(S.freq);
       let sum = 0; for (let i = 0; i < S.freq.length; i++) sum += S.freq[i];
       raw = Math.min(1, sum / S.freq.length / 90);
     }
-    if (S.speaking) { S.pulse *= 0.9; raw = Math.max(raw, 0.25 + 0.2 * Math.abs(Math.sin(t / 110)) + S.pulse * 0.4); }
+    if (S.speaking && !(S.outAn && audioActual)) { S.pulse *= 0.9; raw = Math.max(raw, 0.25 + 0.2 * Math.abs(Math.sin(t / 110)) + S.pulse * 0.4); }
     S.level += (raw - S.level) * 0.2;
     const speed = { idle: 0.25, listening: 0.6, thinking: 1.6, speaking: 0.8, executing: 1.4, error: 0.3 }[estado] || 0.3;
     const k = reduce ? 0 : t / 1000 * speed;
@@ -88,7 +90,7 @@
     const bars = 72;
     for (let i = 0; i < bars; i++) {
       const a = i / bars * Math.PI * 2 + k * 0.15;
-      let v = S.freq && S.analyser ? S.freq[(i * 3) % S.freq.length] / 255 : 0;
+      let v = an ? S.freq[(i * 3) % S.freq.length] / 255 : 0;
       if (S.speaking) v = Math.max(v, S.level * (0.4 + 0.6 * Math.abs(Math.sin(i * 1.7 + t / 140))));
       const r0 = R * 0.8, r1 = r0 + R * (0.015 + v * 0.14);
       ctx.beginPath(); ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1);
@@ -162,7 +164,7 @@
     scroll();
   }
 
-  /* ------------------------------------------------------------------ voz: hablar */
+  /* ------------------------------------------------------------------ voz: hablar (cola por frases) */
   let voces = [];
   function cargarVoces() { voces = ('speechSynthesis' in window) ? speechSynthesis.getVoices() : []; }
   if ('speechSynthesis' in window) { cargarVoces(); speechSynthesis.onvoiceschanged = cargarVoces; }
@@ -175,23 +177,77 @@
   function limpiarParaVoz(t) {
     return String(t || '').replace(/```[\s\S]*?```/g, ' (código en pantalla) ').replace(/\$\$?[^$]*\$\$?/g, ' ')
       .replace(/[#*_`>|~]/g, ' ').replace(/https?:\/\/\S+/g, ' enlace ')
-      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 900);
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ').replace(/\s+/g, ' ').trim();
   }
-  function speak(text) {
+  function frases(t) {
+    const limpio = limpiarParaVoz(t);
+    const partes = limpio.match(/[^.!?…;:]+[.!?…;:]*/g) || [];
+    const out = []; let buf = '';
+    for (const p of partes) { buf += p; if (buf.length > 40 || /[.!?…]$/.test(buf.trim())) { out.push(buf.trim()); buf = ''; } }
+    if (buf.trim()) out.push(buf.trim());
+    return out.filter(Boolean);
+  }
+  const cola = []; let hablando = false, esperas = [], audioActual = null;
+  function salidaAudio() {
+    if (!S.acOut) {
+      S.acOut = new (window.AudioContext || window.webkitAudioContext)();
+      S.outAn = S.acOut.createAnalyser(); S.outAn.fftSize = 256; S.outAn.connect(S.acOut.destination);
+    }
+    if (S.acOut.state === 'suspended') S.acOut.resume().catch(() => {});
+    return S.acOut;
+  }
+  function prepararPiper(texto) {
+    return fetch('/api/hud/tts', { method: 'POST', headers: headers(), body: JSON.stringify({ texto: texto.slice(0, 680) }) })
+      .then(r => r.ok ? r.blob() : Promise.reject(new Error('tts'))).catch(() => null);
+  }
+  function encolar(texto) {
+    if (!S.voz || !texto) return;
+    const item = { texto, audio: S.ttsLocal ? prepararPiper(texto) : null };
+    cola.push(item);
+    if (!hablando) procesarCola();
+  }
+  function reproducirBlob(blob) {
     return new Promise((resolve) => {
-      if (!S.voz || !('speechSynthesis' in window) || !text) { resolve(); return; }
-      speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(limpiarParaVoz(text));
+      const url = URL.createObjectURL(blob);
+      const a = new Audio(url); audioActual = a;
+      try { const ac = salidaAudio(); ac.createMediaElementSource(a).connect(S.outAn); } catch { /* sin visual */ }
+      const fin = () => { URL.revokeObjectURL(url); audioActual = null; resolve(); };
+      a.onended = fin; a.onerror = fin; a.play().catch(fin);
+    });
+  }
+  function hablarSistema(texto) {
+    return new Promise((resolve) => {
+      if (!('speechSynthesis' in window)) { resolve(); return; }
+      const u = new SpeechSynthesisUtterance(texto);
       const v = vozLocal(); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'es-419';
-      u.rate = S.rate;
-      u.onboundary = () => { S.pulse = 1; };
-      const fin = () => { S.speaking = false; if (estado === 'speaking') setState('idle', 'Listo.'); resolve(); };
-      u.onend = fin; u.onerror = fin;
-      S.speaking = true; setState('speaking', v && v.localService ? 'Voz local' : 'Voz del sistema');
+      u.rate = S.rate; u.onboundary = () => { S.pulse = 1; };
+      u.onend = resolve; u.onerror = resolve;
       speechSynthesis.speak(u);
     });
   }
-  function callar() { if ('speechSynthesis' in window) speechSynthesis.cancel(); S.speaking = false; }
+  async function procesarCola() {
+    hablando = true; S.speaking = true;
+    setState('speaking', S.ttsLocal ? 'Voz local (Piper)' : (vozLocal() && vozLocal().localService ? 'Voz local' : 'Voz del sistema'));
+    while (cola.length) {
+      const item = cola.shift();
+      const blob = item.audio ? await item.audio : null;
+      if (!hablando) break;
+      if (blob) await reproducirBlob(blob); else await hablarSistema(item.texto);
+    }
+    hablando = false; S.speaking = false;
+    if (estado === 'speaking') setState('idle', 'Listo.');
+    const w = esperas; esperas = []; w.forEach(f => f());
+  }
+  function speak(text) {
+    frases(text).forEach(encolar);
+    return new Promise((resolve) => { if (!hablando) resolve(); else esperas.push(resolve); });
+  }
+  function callar() {
+    cola.length = 0; hablando = false; S.speaking = false;
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    if (audioActual) { audioActual.pause(); audioActual = null; }
+    const w = esperas; esperas = []; w.forEach(f => f());
+  }
 
   /* ------------------------------------------------------------------ voz: escuchar */
   async function micAnalyser() {
@@ -210,10 +266,12 @@
   function finEscucha() {
     S.listening = false; $('btn-mic').classList.remove('rec'); soltarMic();
     if (estado === 'listening') setState('idle', 'Listo.');
+    if (W.on && W.sr) setTimeout(() => { try { W.sr.start(); } catch { /* ya activo */ } }, 500);
   }
   async function escuchar() {
     if (S.listening) { detenerEscucha(); return; }
     callar();
+    if (W.sr) { try { W.sr.stop(); } catch { /* se reanuda en onend */ } }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       addMsg('sky', 'Este navegador no permite usar el micrófono aquí.', 'err'); return;
     }
@@ -279,6 +337,85 @@
     rec.start();
   }
 
+  /* ------------------------------------------------------------------ escucha continua "SKY…" */
+  const WAKE = /^\s*(?:oye\s+|hey\s+|ok\s+|okay\s+)?(?:sky|skye|skai|esky|eskai|esquai|es\s?kai|escai|scai)\b[\s,.:;!¡¿?]*(.*)$/i;
+  const W = { on: false, stream: null, ac: null, an: null, buf: null, rec: null, timer: null, sr: null, ocupado: false };
+  function ordenDespertador(texto) { const m = String(texto || '').match(WAKE); return m ? m[1].trim() : null; }
+  async function activarEscucha(on) {
+    W.on = on; const b = $('btn-wake'); b.setAttribute('aria-pressed', String(on)); store.lset('sky-wake', on ? '1' : '0');
+    if (!on) { apagarEscucha(); setState('idle', 'Escucha continua apagada.'); return; }
+    try {
+      if (S.sttLocal && window.MediaRecorder) await vigilarLocal(); else vigilarNavegador();
+      setState('idle', 'Decí “SKY…” cuando quieras' + (S.sttLocal ? ' (100 % local)' : ' (dictado del navegador)'));
+    } catch (e) { W.on = false; b.setAttribute('aria-pressed', 'false'); setState('error', 'Micrófono: ' + e.message); }
+  }
+  function apagarEscucha() {
+    clearInterval(W.timer); W.timer = null;
+    if (W.rec && W.rec.state === 'recording') { W.rec.onstop = null; W.rec.stop(); }
+    if (W.stream) W.stream.getTracks().forEach(t => t.stop());
+    if (W.ac) W.ac.close().catch(() => {});
+    if (W.sr) { W.sr.onend = null; try { W.sr.stop(); } catch { /* */ } }
+    Object.assign(W, { stream: null, ac: null, an: null, rec: null, sr: null, ocupado: false });
+  }
+  async function vigilarLocal() {
+    W.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    W.ac = new (window.AudioContext || window.webkitAudioContext)();
+    W.an = W.ac.createAnalyser(); W.an.fftSize = 512; W.ac.createMediaStreamSource(W.stream).connect(W.an);
+    W.buf = new Uint8Array(W.an.fftSize);
+    const tipo = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+    let partes = [], voz = 0, silencio = 0, inicio = 0;
+    W.timer = setInterval(() => {
+      if (!W.on || W.ocupado || S.listening || S.speaking || hablando) return;
+      W.an.getByteTimeDomainData(W.buf);
+      let sum = 0; for (const v of W.buf) sum += (v - 128) * (v - 128);
+      const rms = Math.sqrt(sum / W.buf.length) / 128, ahora = performance.now();
+      if (!W.rec || W.rec.state !== 'recording') {
+        voz = rms > 0.045 ? voz + 1 : 0;
+        if (voz >= 2) {
+          partes = []; inicio = ahora; silencio = ahora;
+          W.rec = new MediaRecorder(W.stream, tipo ? { mimeType: tipo } : undefined);
+          W.rec.ondataavailable = (e) => { if (e.data.size) partes.push(e.data); };
+          W.rec.onstop = () => transcribirDespertador(partes, W.rec ? W.rec.mimeType : tipo);
+          W.rec.start(200);
+        }
+        return;
+      }
+      if (rms > 0.035) silencio = ahora;
+      if (ahora - silencio > 850 || ahora - inicio > 9000) W.rec.stop();
+    }, 90);
+  }
+  async function transcribirDespertador(partes, mime) {
+    if (!partes.length || !W.on) return;
+    W.ocupado = true;
+    try {
+      const fd = new FormData(); fd.append('file', new Blob(partes, { type: mime }), (mime || '').includes('mp4') ? 'w.m4a' : 'w.webm');
+      fd.append('language', 'es');
+      const r = await api('/api/global-media/stt/transcribe', { method: 'POST', body: fd });
+      const orden = ordenDespertador(r.text);
+      if (orden !== null) {
+        $('transcript').textContent = '“' + (r.text || '').trim() + '”';
+        if (orden) recibir(orden, 'voz'); else { await speak('¿Sí?'); escuchar(); }
+      }
+    } catch { /* ruido o audio corto */ }
+    W.ocupado = false;
+  }
+  function vigilarNavegador() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) throw new Error('el navegador no tiene reconocimiento de voz; instalá faster-whisper');
+    const sr = new SR(); W.sr = sr; sr.lang = 'es-419'; sr.continuous = true; sr.interimResults = false;
+    sr.onresult = (ev) => {
+      if (S.speaking || hablando || S.listening) return;
+      const txt = ev.results[ev.results.length - 1][0].transcript;
+      const orden = ordenDespertador(txt);
+      if (orden === null) return;
+      $('transcript').textContent = '“' + txt.trim() + '”';
+      if (orden) recibir(orden, 'voz'); else speak('¿Sí?').then(() => { try { sr.stop(); } catch { /* */ } escuchar(); });
+    };
+    sr.onend = () => { if (W.on && W.sr === sr && !S.listening) setTimeout(() => { try { sr.start(); } catch { /* */ } }, 400); };
+    sr.onerror = () => { /* se reinicia en onend */ };
+    sr.start();
+  }
+
   /* ------------------------------------------------------------------ conversación */
   const SI = /^(si|sí|dale|hacelo|hazlo|confirmo|confirmar|adelante|ok|okay|de acuerdo|claro|ejecuta|ejecutalo)\b/i;
   const NO = /^(no|cancela|cancelar|dejalo|déjalo|olvidalo|olvídalo|mejor no)\b/i;
@@ -295,6 +432,7 @@
     if (!texto) return;
     addMsg('user', texto); $('chat-input').value = '';
     setState('thinking', modo === 'voz' ? 'Pensando…' : 'Procesando…');
+    if (modo === 'voz' && window.ReadableStream) { await enviarStream(texto); return; }
     try {
       const data = await api('/api/asistente/mensaje', { method: 'POST', body: JSON.stringify({
         texto, historial: S.historial.slice(-12), modo, dispositivo: 'local' }) });
@@ -303,6 +441,53 @@
     } catch (e) {
       addMsg('sky', 'No pude contactar a SKY: ' + e.message, 'err'); setState('error', 'Sin conexión con SKY');
     }
+  }
+  async function enviarStream(texto) {
+    let r;
+    try {
+      r = await fetch('/api/asistente/stream', { method: 'POST', headers: headers(), body: JSON.stringify({
+        texto, historial: S.historial.slice(-12), modo: 'voz', dispositivo: 'local' }) });
+      if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
+    } catch (e) { addMsg('sky', 'No pude contactar a SKY: ' + e.message, 'err'); setState('error', 'Sin conexión'); return; }
+    S.historial.push({ role: 'user', content: texto });
+    const lector = r.body.getReader(), dec = new TextDecoder();
+    let resto = '', acumulado = '', pendiente = '', vivo = null;
+    const soltarFrases = (forzar) => {
+      const m = pendiente.match(/^[\s\S]*[.!?…:;](?=\s|$)/);
+      if (m && m[0].trim().length > 2) { encolar(limpiarParaVoz(m[0])); pendiente = pendiente.slice(m[0].length); }
+      if (forzar && pendiente.trim()) { encolar(limpiarParaVoz(pendiente)); pendiente = ''; }
+    };
+    for (;;) {
+      const { value, done } = await lector.read();
+      if (done) break;
+      resto += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = resto.indexOf('\n')) >= 0) {
+        const linea = resto.slice(0, nl).trim(); resto = resto.slice(nl + 1);
+        if (!linea) continue;
+        let ev; try { ev = JSON.parse(linea); } catch { continue; }
+        if (ev.delta) {
+          if (!vivo) { vivo = addMsg('sky', '', 'live'); }
+          acumulado += ev.delta; pendiente += ev.delta; vivo.textContent = acumulado; scroll();
+          soltarFrases(false);
+        }
+        if (ev.final) {
+          if (vivo) vivo.classList.remove('live');
+          if (ev.final.transmitido) {
+            soltarFrases(true);
+            const msg = ev.final.mensaje || acumulado;
+            if (vivo) vivo.textContent = msg; else addMsg('sky', msg);
+            S.lastSky = msg; S.historial.push({ role: 'assistant', content: msg.slice(0, 4000) });
+            await speak(''); seguirConversacion();
+          } else {
+            if (vivo && !acumulado.trim()) vivo.remove();
+            await responder(ev.final, 'voz');
+          }
+          return;
+        }
+      }
+    }
+    if (vivo) vivo.classList.remove('live');
   }
   async function decir(texto, extra) {
     addMsg('sky', texto, extra);
@@ -315,10 +500,18 @@
     if (S.conv && !S.listening && !S.pending) setTimeout(() => { if (S.conv && !S.speaking && !S.listening) escuchar(); }, 350);
   }
   async function responder(data, modo) {
-    if (data.tipo === 'respuesta' || data.tipo === 'local') { await decir(data.mensaje || ''); return; }
+    if (data.tipo === 'respuesta' || data.tipo === 'local') {
+      if (Array.isArray(data.correos) && data.correos.length) {
+        const c = addCard('Correos nuevos (' + data.correos.length + ')', 'sin marcar como leídos');
+        c.appendChild(el('pre', '', data.correos.map(m => '▸ ' + m.de + ' — ' + m.asunto + '\n   ' + (m.resumen || '').slice(0, 140)).join('\n')));
+      }
+      if (data.recordatorio || data.proveedor === 'sky-agenda') refrescarAgenda();
+      await decir(data.mensaje || ''); return;
+    }
     if (data.tipo === 'error') { setState('error', 'Revisá el motor de IA'); addMsg('sky', data.mensaje || 'Error.', 'err'); await speak('Tengo un problema: ' + (data.mensaje || '').split('.')[0]); return; }
     if (data.tipo === 'accion') { await accion(data, modo); return; }
     if (data.tipo === 'casa') { await casaOrden(data, modo); return; }
+    if (data.tipo === 'correo') { await correoOrden(data, modo); return; }
     await decir(data.mensaje || 'Listo.');
   }
   async function accion(data, modo) {
@@ -372,6 +565,22 @@
     if (data.ejecucion) { renderResult(card, data.ejecucion); setState('idle', 'Listo.'); await speak(data.ejecucion.ok === false ? 'No pude.' : 'Listo.'); seguirConversacion(); return; }
     confirmar(card, p.description, correr);
     if (modo === 'voz') { await speak('¿Confirmás? ' + p.description + '.'); escuchar(); }
+  }
+
+  async function correoOrden(data, modo) {
+    const b = data.borrador;
+    const card = addCard('▸ ' + data.mensaje, 'correo · para ' + b.para);
+    card.appendChild(el('pre', '', 'Asunto: ' + b.asunto + '\n\n' + b.cuerpo));
+    confirmar(card, data.mensaje, async () => {
+      setState('executing', 'Enviando correo');
+      try {
+        const r = await api('/api/asistente/correo', { method: 'POST', body: JSON.stringify(b) });
+        renderResult(card, r); setState('idle', 'Listo.'); await speak(r.message || 'Enviado.');
+      } catch (e) { renderResult(card, { ok: false, error: e.message }); setState('error', 'Correo'); }
+      seguirConversacion();
+    });
+    setState('idle', 'Revisá el correo antes de enviarlo');
+    if (modo === 'voz') { await speak('Te dejé el borrador. ¿Lo envío?'); escuchar(); }
   }
 
   /* ------------------------------------------------------------------ acciones de interfaz */
@@ -556,7 +765,10 @@
     let e;
     try { e = await api('/api/hud/estado'); } catch (err) { pill('pill-agent', 'SKY · SIN ACCESO', 'bad'); return; }
     $('ver').textContent = 'v' + e.version;
-    S.sttLocal = !!(e.stt_local && e.stt_local.disponible); S.ytApi = !!e.youtube_api;
+    S.sttLocal = !!(e.stt_local && e.stt_local.disponible); S.ytApi = !!e.youtube_api; S.ttsLocal = !!e.tts_local;
+    $('ia-cerebro').textContent = (e.ia && e.ia.cerebro) ? 'herramientas (entiende frases libres)' : 'sólo reglas · iniciá Ollama';
+    $('ia-cerebro').title = $('ia-cerebro').textContent; $('ia-ollama').title = $('ia-ollama').textContent;
+    $('ia-voz').textContent = (S.ttsLocal ? 'Piper local' : 'voz del sistema') + ' · ' + (S.sttLocal ? 'escucha local' : 'dictado navegador');
     pill('pill-voz', S.sttLocal ? 'VOZ · LOCAL' : 'VOZ · NAVEGADOR', S.sttLocal ? 'ok' : 'warn');
     const ia = e.ia || {};
     const ollamaOff = ia.proveedor === 'ollama' && !(ia.ollama && ia.ollama.activo);
@@ -648,6 +860,50 @@
     });
   }
 
+  async function refrescarAvisos() {
+    try {
+      const r = await api('/api/hud/avisos');
+      for (const a of r.avisos || []) {
+        addMsg('sky', a.texto, 'aviso'); S.lastSky = a.texto;
+        await speak(a.texto);
+      }
+      if ((r.avisos || []).length) refrescarAgenda();
+    } catch { /* sin acceso */ }
+  }
+  async function refrescarAgenda() {
+    try {
+      const r = await api('/api/hud/agenda'); const ul = $('agenda-list'); ul.textContent = '';
+      if (!r.recordatorios.length) { ul.appendChild(el('li', 'muted', 'Sin recordatorios. Decí: “recuérdame en 10 minutos…”.')); return; }
+      r.recordatorios.slice(0, 10).forEach(x => {
+        const d = new Date(x.cuando), hoy = new Date();
+        const cuando = (d.toDateString() === hoy.toDateString() ? 'hoy ' : d.toLocaleDateString('es', { weekday: 'short', day: 'numeric' }) + ' ')
+          + d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+        const li = el('li', '', (x.clase === 'alarma' ? '⏰ ' : '🔔 ') + cuando + ' · ' + x.texto);
+        const b = el('button', 'x', '×'); b.type = 'button'; b.title = 'Borrar';
+        b.addEventListener('click', async () => { await api('/api/hud/agenda/' + encodeURIComponent(x.id), { method: 'DELETE' }).catch(() => {}); refrescarAgenda(); });
+        li.prepend(b); ul.appendChild(li);
+      });
+    } catch { /* sin acceso */ }
+  }
+  async function abrirDiagnostico() {
+    const cont = el('div');
+    cont.appendChild(el('p', 'muted', 'Revisando…'));
+    abrirVentana('diag', 'Diagnóstico de SKY', cont, { w: 620, h: 560 });
+    try {
+      const r = await api('/api/hud/diagnostico'); cont.textContent = '';
+      cont.appendChild(el('p', '', r.resumen));
+      const ul = el('ul', 'diag-list');
+      r.items.forEach(i => {
+        const li = el('li', i.ok ? 'ok' : (i.importante ? 'bad' : 'opt'));
+        li.appendChild(el('b', '', (i.ok ? '✔ ' : i.importante ? '✖ ' : '· ') + i.nombre));
+        li.appendChild(el('small', '', i.detalle));
+        if (i.solucion) li.appendChild(el('div', 'fix', '→ ' + i.solucion));
+        ul.appendChild(li);
+      });
+      cont.appendChild(ul);
+    } catch (e) { cont.textContent = 'No se pudo revisar: ' + e.message; }
+  }
+
   /* ------------------------------------------------------------------ controles */
   function setConv(v) { S.conv = v; const b = $('btn-conv'); b.setAttribute('aria-pressed', String(v)); b.classList.toggle('on', v); store.lset('sky-conv', v ? '1' : '0'); }
   function setVoz(v) { S.voz = v; const b = $('btn-tts'); b.setAttribute('aria-pressed', String(v)); b.classList.toggle('on', v); store.lset('sky-voz', v ? '1' : '0'); if (!v) callar(); }
@@ -656,6 +912,9 @@
   canvas.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); escuchar(); } });
   $('btn-conv').addEventListener('click', () => setConv(!S.conv));
   $('btn-tts').addEventListener('click', () => setVoz(!S.voz));
+  $('btn-wake').addEventListener('click', () => { salidaAudio(); activarEscucha(!W.on); });
+  $('btn-diag').addEventListener('click', abrirDiagnostico);
+  document.addEventListener('pointerdown', () => { try { salidaAudio(); } catch { /* */ } }, { once: true });
   $('chat-form').addEventListener('submit', (e) => { e.preventDefault(); recibir($('chat-input').value, 'texto'); });
   document.addEventListener('keydown', (e) => {
     const enCampo = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement && document.activeElement.tagName);
@@ -695,6 +954,8 @@
     refrescarLog(); refrescarTareas(); refrescarNotas(); refrescarVoz(); refrescarCasa();
     setInterval(refrescarEstado, 10000); setInterval(refrescarLog, 8000); setInterval(refrescarTareas, 8000);
     setInterval(refrescarVoz, 15000); setInterval(refrescarNotas, 30000); setInterval(refrescarCasa, 20000);
+    refrescarAgenda(); setInterval(refrescarAgenda, 30000); setInterval(refrescarAvisos, 8000);
+    if (store.lget('sky-wake', '0') === '1') activarEscucha(true);
   }
   iniciar();
 })();

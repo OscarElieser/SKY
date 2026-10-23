@@ -14,6 +14,8 @@ del dueño: esta API no puede activar capacidades ni saltarse esa política.
 """
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
@@ -101,9 +103,8 @@ def estado_dispositivo(request: Request, dispositivo: str = LOCAL):
     return _llamar(dispositivo, request, 'status', {})
 
 
-@router.post('/mensaje')
-def mensaje(body: Mensaje, request: Request):
-    resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
+def _completar(resultado: dict, dispositivo: str, request: Request) -> dict:
+    """Ejecuta lo automático (según la política del agente o SKY_HA_AUTO) y marca lo que pide confirmación."""
     if resultado['tipo'] == 'casa':
         orden = resultado['propuesta']
         resultado['requiere_confirmacion'] = orden['requiere_confirmacion']
@@ -125,20 +126,85 @@ def mensaje(body: Mensaje, request: Request):
         return resultado
     # ¿El dueño autorizó esta capacidad sin confirmación? Lo dice el propio agente.
     try:
-        estado = _llamar(body.dispositivo, request, 'status', {})
+        estado = _llamar(dispositivo, request, 'status', {})
     except HTTPException as exc:
         resultado['aviso'] = str(exc.detail)
         return resultado
     politica = {'enabled': estado.get('enabled', []), 'auto_confirm': estado.get('auto_confirm', [])}
     if not caps.accion_habilitada(propuesta['action'], politica, propuesta['params']):
-        cap = 'apps_extra' if propuesta['action'] == 'launch_app' else caps.capacidad_de(propuesta['action'])
+        cap = caps.capacidad_para(propuesta['action'], propuesta['params'])
         resultado['aviso'] = (f'La capacidad "{cap}" está desactivada en tu equipo. Activala con: '
                               f'python agente_dispositivo.py --activar {cap}')
         return resultado
     if not caps.requiere_confirmacion(propuesta['action'], propuesta['params'], politica):
         resultado['requiere_confirmacion'] = False
-        resultado['ejecucion'] = _llamar(body.dispositivo, request, propuesta['action'], propuesta['params'])
+        try:
+            resultado['ejecucion'] = _llamar(dispositivo, request, propuesta['action'], propuesta['params'])
+        except HTTPException as exc:
+            resultado['ejecucion'] = {'ok': False, 'error': str(exc.detail)[:200]}
     return resultado
+
+
+@router.post('/mensaje')
+def mensaje(body: Mensaje, request: Request):
+    resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
+    return _completar(resultado, body.dispositivo, request)
+
+
+@router.post('/stream')
+def mensaje_stream(body: Mensaje, request: Request):
+    """Igual que /mensaje, pero cuando responde el modelo local envía el texto a medida que
+    se genera (NDJSON: {"delta": "..."} … {"final": {...}}), para que SKY hable sin esperar."""
+    from fastapi.responses import StreamingResponse
+    from neural_core import sky_asistente_personal as asis
+
+    def eventos():
+        historial = [t.model_dump() for t in body.historial]
+        def linea(obj):
+            return json.dumps(obj, ensure_ascii=False) + '\n'
+        texto = body.texto.strip()
+        r = asis.reglas(texto) if texto else None
+        if r or not texto or not asis.usar_cerebro(body.proveedor):
+            yield linea({'final': _completar(r or asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request)})
+            return
+        from neural_core import sky_cerebro
+        completo = ''
+        for evento, valor in sky_cerebro.decidir_eventos(texto, asis._turnos(historial), body.modo):
+            if evento == 'delta':
+                completo += valor
+                yield linea({'delta': valor})
+            elif evento == 'herramienta':
+                yield linea({'final': _completar(asis.resolver_especial(valor), body.dispositivo, request)})
+                return
+            elif evento == 'fin':
+                yield linea({'final': {'tipo': 'respuesta', 'mensaje': valor, 'proveedor': 'ollama', 'transmitido': True}})
+                return
+            elif evento == 'error':
+                if completo:
+                    yield linea({'final': {'tipo': 'respuesta', 'mensaje': completo, 'proveedor': 'ollama', 'transmitido': True}})
+                else:
+                    yield linea({'final': _completar(asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request)})
+                return
+    return StreamingResponse(eventos(), media_type='application/x-ndjson', headers={'Cache-Control': 'no-store'})
+
+
+class Correo(BaseModel):
+    para: str = Field(min_length=6, max_length=254)
+    asunto: str = Field(default='', max_length=200)
+    cuerpo: str = Field(min_length=1, max_length=20000)
+    en_respuesta_a: str = Field(default='', max_length=300)
+
+
+@router.post('/correo')
+def enviar_correo(body: Correo):
+    """Envío confirmado por el dueño (un correo enviado no se puede deshacer)."""
+    from neural_core import sky_correo
+    try:
+        return sky_correo.enviar(body.para, body.asunto, body.cuerpo, body.en_respuesta_a)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200])
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200])
 
 
 @router.post('/ejecutar')

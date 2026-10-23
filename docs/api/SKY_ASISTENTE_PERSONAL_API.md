@@ -1,4 +1,4 @@
-# SKY v12 — API del Asistente Personal y del HUD
+# SKY v12.1 — API del Asistente Personal y del HUD
 
 Todas las rutas `/api/*` requieren `X-SKY-KEY` (llave del dueño) y, si el 2FA del creador está activo, `X-SKY-SESSION`.
 
@@ -29,13 +29,17 @@ Voz manos libres ──┘   /api/hud/*             │   ledger verificable (/a
 | Método | Ruta | Descripción |
 |---|---|---|
 | POST | `/api/asistente/mensaje` | `{texto, historial?, proveedor?, dispositivo?, modo: "chat"\|"voz"}` |
+| POST | `/api/asistente/stream` | Igual que `/mensaje`, en NDJSON: `{"delta": "…"}` mientras el modelo habla y `{"final": {...}}` al terminar |
 | POST | `/api/asistente/ejecutar` | `{action, params, dispositivo?}`: confirmación del dueño |
+| POST | `/api/asistente/correo` | `{para, asunto, cuerpo, en_respuesta_a?}`: envío confirmado por el dueño |
 | POST | `/api/asistente/casa` | `{service, entity_ids, data?}`: confirmación para Home Assistant |
 | GET | `/api/asistente/dispositivo` | Estado y capacidades del agente |
 | GET | `/api/asistente/ayuda` | Ejemplos, capacidades, perfiles y dispositivos |
 | GET / DELETE | `/api/asistente/voz[/{id}]` | Pendientes de la voz manos libres |
 
-Respuestas de `/mensaje`: `respuesta`, `local`, `error`, `accion` (con `requiere_confirmacion`, `ejecucion`, `aviso` o `interfaz`) y `casa` (con `requiere_confirmacion` y `ejecucion`).
+Respuestas de `/mensaje`: `respuesta` (puede traer `recordatorio`, `correos` o `acciones` de una rutina), `local`, `error`, `accion` (con `requiere_confirmacion`, `ejecucion`, `aviso` o `interfaz`), `casa` (con `requiere_confirmacion` y `ejecucion`) y `correo` (con `borrador`, siempre requiere confirmación).
+
+Orden de decisión: reglas rápidas (agenda, rutinas, WhatsApp, correo, equipo, casa) → cerebro con herramientas (Ollama, `neural_core/sky_cerebro.py`) → respuesta de la IA.
 
 ## HUD
 
@@ -47,6 +51,11 @@ Respuestas de `/mensaje`: `respuesta`, `local`, `error`, `accion` (con `requiere
 | GET | `/api/hud/notas` | Nombres de las notas locales |
 | GET | `/api/hud/casa` | Entidades de Home Assistant (sin token) |
 | GET | `/api/hud/youtube?q=` | Videos incrustables vía YouTube Data API (`YOUTUBE_API_KEY`) |
+| POST | `/api/hud/tts` | `{texto}` → WAV con Piper (voz local) |
+| GET | `/api/hud/avisos` | Recordatorios y rutinas a decir en voz alta (se marcan como vistos) |
+| GET | `/api/hud/agenda` · DELETE `/api/hud/agenda/{id}` | Recordatorios pendientes y rutinas |
+| POST | `/api/hud/rutinas` | `{nombre, frases, hora?, dias?, pasos}`; pasos: `saludo`, `recordatorios_hoy`, `correo_resumen`, `decir`, `accion` |
+| GET | `/api/hud/diagnostico` | Qué funciona, qué falta y cómo arreglarlo |
 | POST | `/api/global-media/stt/transcribe` | Transcripción local con faster-whisper (usada por el HUD) |
 
 ## Acciones del agente v6
