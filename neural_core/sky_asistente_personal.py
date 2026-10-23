@@ -280,6 +280,13 @@ def reglas(texto: str) -> dict | None:
     rutina = sky_rutinas.rutina_por_frase(texto)
     if rutina:
         return resolver_especial({'tipo': 'rutina', 'rutina': rutina})
+    from . import sky_skills, sky_perfil
+    try:
+        r = sky_perfil.interpretar(_norm(texto)) or sky_skills.interpretar(texto)
+    except Exception as exc:
+        r = {'tipo': 'error', 'mensaje': 'No pude completar eso: ' + str(exc)[:140]}
+    if r:
+        return r
     for modulo in (sky_rutinas, sky_contactos, sky_correo):
         try:
             r = modulo.interpretar(texto)
@@ -386,8 +393,13 @@ def _turnos(historial: list[dict] | None) -> list[dict]:
 
 
 def usar_cerebro(proveedor: str) -> bool:
+    """Cerebro con herramientas: Ollama local, o el proveedor de la nube que el dueño eligió (v12.3)."""
     from . import sky_cerebro
-    return (proveedor or 'auto') in ('auto', 'sky', 'ollama') and sky_cerebro.disponible()
+    proveedor = proveedor or 'auto'
+    if proveedor not in ('auto', 'sky', 'ollama') + sky_cerebro.NUBE:
+        return False
+    sky_cerebro.preferir(proveedor)
+    return sky_cerebro.disponible()
 
 
 def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'auto', modo: str = 'chat') -> dict:
@@ -428,7 +440,10 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
         if modo == 'voz':
             from .providers import reply, choose_provider
             nombre, _ = choose_provider(proveedor or 'auto')
-            mensajes = [{'role': 'system', 'content': SISTEMA_ASISTENTE}, *turnos, {'role': 'user', 'content': texto}]
+            from .sky_cerebro import contexto_aprendido
+            extra = contexto_aprendido(texto)
+            mensajes = [{'role': 'system', 'content': SISTEMA_ASISTENTE + ('\n\n' + extra if extra else '')}, *turnos,
+                        {'role': 'user', 'content': texto}]
             return {'tipo': 'respuesta', 'mensaje': reply(mensajes, nombre, max_output_tokens=600), 'proveedor': nombre}
         from .assistant import responder
         respuesta, _ = responder(texto, 'Asistente SKY personal', turnos, proveedor=proveedor or 'auto')
@@ -450,6 +465,8 @@ AYUDA = [
     ('Agenda', ['recuérdame en 10 minutos sacar la ropa', 'pon una alarma a las 6:30', 'qué recordatorios tengo', 'buenos días']),
     ('Aprendizaje', ['aprende sobre energía solar', 'recuerda que mi equipo es el Real Madrid', 'qué sabes de mí',
                      'sigue el tema inteligencia artificial', 'cuando diga modo cine, pon el video en pantalla completa', 'no, eso no era']),
+    ('Automatización', ['todos los días a las 8 prepara las respuestas de los correos', 'qué tareas programadas tengo',
+                        'crea una skill modo trabajo que abra Word y ponga lofi para estudiar', 'qué borradores tengo', 'muéstrame mi perfil']),
     ('Mensajes', ['lee mis correos', 'responde al último correo diciendo gracias, lo reviso hoy', 'mandale un whatsapp a mamá que llego tarde']),
 ]
 

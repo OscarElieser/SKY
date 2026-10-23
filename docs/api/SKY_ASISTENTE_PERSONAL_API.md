@@ -1,4 +1,4 @@
-# SKY v12.2 — API del Asistente Personal y del HUD
+# SKY v12.3 — API del Asistente Personal y del HUD
 
 Todas las rutas `/api/*` requieren `X-SKY-KEY` (llave del dueño) y, si el 2FA del creador está activo, `X-SKY-SESSION`.
 
@@ -63,6 +63,21 @@ Campos v12.2 en las respuestas: `ms` (tiempo real del turno), `nivel_riesgo` (1 
 | POST | `/api/hud/kpi/evento` | `{tipo: voz\|tarea, nombre: primera_voz\|interrupcion\|error_microfono\|error_reproduccion\|cancelada, ms?, ok?}` (mediciones del navegador) |
 | GET | `/api/hud/aprendizaje` · DELETE `/api/hud/aprendizaje/atajos/{frase}` | Lo aprendido y olvidar un atajo |
 | GET | `/api/hud/memoria` · DELETE `/api/hud/memoria/{id}` | Exportar todo lo que SKY sabe del dueño (clasificado) y borrar un dato |
+| GET / PUT | `/api/hud/perfil` | Perfil `USER.md` (`{texto}`, máx. 8000, sin contraseñas) |
+| GET / POST | `/api/hud/skills` · DELETE `/api/hud/skills/{id}` · POST `/api/hud/skills/{id}/ejecutar` | Skills integradas y propias (`{nombre, descripcion?, frases?, pasos}`) |
+| GET | `/api/hud/programadas` · PATCH `/{id}` `{activa}` · DELETE `/{id}` | Tareas programadas |
+| GET | `/api/hud/borradores` · POST `/preparar` · PATCH `/{id}` `{cuerpo}` · POST `/{id}/enviar` · DELETE `/{id}` | Borradores de correo; `enviar` es la confirmación del dueño |
+| GET | `/api/hud/whatsapp` · POST `/api/hud/whatsapp/prueba` | Estado del canal de WhatsApp y mensaje de prueba |
+
+Pasos de rutinas y skills: `saludo`, `recordatorios_hoy`, `correo_resumen`, `correo_borradores`, `borradores_pendientes`, `decir{texto}`, `orden{texto}`, `skill{id}`, `noticias{tema}`, `aprender{tema}`, `intereses`, `kpi{diagnostico}`, `accion{action, params}`. Las rutinas aceptan `activa`.
+
+### Puente de WhatsApp (`sky_whatsapp_puente.py`, 127.0.0.1:8770, sin llave de SKY)
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/whatsapp/webhook` | Verificación de Meta (`hub.mode`, `hub.verify_token`, `hub.challenge`) |
+| POST | `/whatsapp/webhook` | Mensajes; exige `X-Hub-Signature-256` válida (401 si no), cuerpo ≤ 1 MB |
+| GET | `/salud` | `{"ok": true}` |
 | POST | `/api/global-media/stt/transcribe` | Transcripción local con faster-whisper (usada por el HUD) |
 
 ## Acciones del agente v6

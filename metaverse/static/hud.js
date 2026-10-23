@@ -516,6 +516,9 @@
       }
       if (data.recordatorio || data.proveedor === 'sky-agenda') refrescarAgenda();
       if (data.modulo === 'kpi') abrirKPI(data.kpi);
+      if (data.modulo === 'perfil') abrirPerfil();
+      if (data.modulo === 'auto') abrirAuto();
+      else if (ventanas.has('auto')) AUTO.cargar();
       if (data.parada) { if (!data.parada.reanudar) { callar(); if (S.pending) S.pending.cancel(); } tarjetaParada(); setState('error', 'Parada de emergencia'); }
       if (data.aprendizaje && ventanas.has('kpi')) KPI.cargar();
       await decir(data.mensaje || ''); return;
@@ -603,7 +606,7 @@
     confirmar(card, data.mensaje, async () => {
       setState('executing', 'Enviando correo');
       try {
-        const r = await api('/api/asistente/correo', { method: 'POST', body: JSON.stringify(b) });
+        const r = await api('/api/asistente/correo', { method: 'POST', body: JSON.stringify(data.borrador_id ? { ...b, borrador_id: data.borrador_id } : b) });
         renderResult(card, r); setState('idle', 'Listo.'); await speak(r.message || 'Enviado.');
       } catch (e) { renderResult(card, { ok: false, error: e.message }); setState('error', 'Correo'); }
       seguirConversacion();
@@ -724,6 +727,8 @@
     { id: 'negocio', t: 'BAQUEANO', d: 'Panel de negocio del dueño', url: '/owner/baqueano' },
     { id: 'player', t: 'Reproductor', d: 'YouTube dentro de SKY', accion: () => preguntarReproducir() },
     { id: 'kpi', t: 'Rendimiento', d: 'KPIs reales, fallos y aprendizaje', accion: () => abrirKPI() },
+    { id: 'auto', t: 'Automatización', d: 'Tareas programadas, skills, borradores y WhatsApp', accion: () => abrirAuto() },
+    { id: 'perfil', t: 'Perfil', d: 'Quién sos: SKY lo lee en cada respuesta', accion: () => abrirPerfil() },
     { id: 'streamlit', t: 'Panel completo', d: 'Deportes, finanzas, visión… (pestaña aparte)', externo: 'http://127.0.0.1:8501' },
   ];
   function pintarModulos() {
@@ -840,6 +845,104 @@
       });
     }
   }
+
+  /* ------------------------------------------------------------------ perfil (USER.md) */
+  async function abrirPerfil() {
+    const raiz = el('div', 'kpi');
+    raiz.appendChild(el('div', 's', 'Escribí quién sos, tus herramientas, suscripciones, horarios y objetivos. SKY lo tiene en cuenta en cada respuesta. No pongas contraseñas.'));
+    const ta = el('textarea', 'perfil-txt'); ta.maxLength = 8000; ta.spellcheck = true; ta.setAttribute('aria-label', 'Tu perfil');
+    raiz.appendChild(ta);
+    const bar = el('div', 'kpi-bar');
+    const g = el('button', 'btn primary', 'Guardar'); g.type = 'button';
+    const est = el('span', 'kpi-gen', '');
+    bar.append(g, est); raiz.appendChild(bar);
+    abrirVentana('perfil', 'Tu perfil', raiz, { w: 760, h: 620 });
+    try { const r = await api('/api/hud/perfil'); ta.value = r.texto || ''; est.textContent = r.ruta || ''; } catch (e) { est.textContent = 'No pude leerlo: ' + e.message; }
+    g.addEventListener('click', async () => {
+      try { const r = await api('/api/hud/perfil', { method: 'PUT', body: JSON.stringify({ texto: ta.value }) }); est.textContent = 'Guardado · ' + r.caracteres + ' caracteres'; }
+      catch (e) { est.textContent = 'No se guardó: ' + e.message; }
+    });
+  }
+
+  /* ------------------------------------------------------------------ automatización: tareas, skills, borradores, WhatsApp */
+  const AUTO = { raiz: null };
+  const DIAS_TXT = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
+  function abrirAuto() {
+    if (!AUTO.raiz || !ventanas.has('auto')) { AUTO.raiz = el('div', 'kpi'); }
+    abrirVentana('auto', 'Automatización', AUTO.raiz, { w: 900, h: 640 });
+    AUTO.cargar();
+  }
+  AUTO.cargar = async function () {
+    if (!AUTO.raiz) return;
+    const c = AUTO.raiz; let d;
+    try {
+      const [t, sk, b, wa] = await Promise.all([api('/api/hud/programadas'), api('/api/hud/skills'), api('/api/hud/borradores'), api('/api/hud/whatsapp').catch(() => ({}))]);
+      d = { t, sk, b, wa };
+    } catch (e) { c.textContent = ''; c.appendChild(el('div', 'note', 'No pude leer la automatización: ' + e.message)); return; }
+    c.textContent = '';
+    const s1 = seccion(c, 'Tareas programadas');
+    if (!d.t.tareas.length) s1.appendChild(el('div', 's', 'Ninguna. Decí por ejemplo: «todos los días a las 8 prepara las respuestas de los correos».'));
+    d.t.tareas.forEach(r => {
+      const fila = el('div', 'kpi-atajo');
+      const dias = (r.dias && r.dias.length && r.dias.length < 7) ? r.dias.map(x => DIAS_TXT[x]).join(' ') : 'todos los días';
+      fila.appendChild(el('span', '', r.hora + ' · ' + r.nombre + ' · ' + dias + (r.ultima ? ' · última: ' + r.ultima : '')));
+      const bx = el('div', 'btns');
+      const tg = el('button', 'btn' + (r.activa === false ? '' : ' primary'), r.activa === false ? 'Pausada' : 'Activa'); tg.type = 'button';
+      tg.setAttribute('aria-pressed', String(r.activa !== false));
+      tg.addEventListener('click', async () => { try { await api('/api/hud/programadas/' + r.id, { method: 'PATCH', body: JSON.stringify({ activa: r.activa === false }) }); AUTO.cargar(); } catch (e) { tg.textContent = 'Error'; } });
+      const del = el('button', 'btn', 'Borrar'); del.type = 'button';
+      del.addEventListener('click', async () => { try { await api('/api/hud/programadas/' + r.id, { method: 'DELETE' }); AUTO.cargar(); } catch (e) { del.textContent = 'Error'; } });
+      bx.append(tg, del); fila.appendChild(bx); s1.appendChild(fila);
+    });
+    const s2 = seccion(c, 'Skills');
+    s2.appendChild(el('div', 's', 'Carpeta: ' + d.sk.carpeta + ' · Creá una diciendo «crea una skill modo trabajo que abra Word y ponga lofi para estudiar».'));
+    d.sk.skills.forEach(k => {
+      const fila = el('div', 'kpi-atajo');
+      fila.appendChild(el('span', '', k.nombre + (k.integrada ? ' (integrada)' : '') + ' — ' + (k.descripcion || k.pasos.length + ' pasos')));
+      const bx = el('div', 'btns');
+      const run = el('button', 'btn primary', 'Ejecutar'); run.type = 'button';
+      run.addEventListener('click', async () => {
+        run.disabled = true;
+        try { const r = await api('/api/hud/skills/' + k.id + '/ejecutar', { method: 'POST' }); const card = addCard('▸ ' + k.nombre, 'skill'); card.appendChild(el('div', '', r.mensaje || 'Listo.')); await decir(r.mensaje || 'Listo.'); }
+        catch (e) { run.textContent = 'Error'; }
+        run.disabled = false; AUTO.cargar();
+      });
+      bx.appendChild(run);
+      if (!k.integrada) { const del = el('button', 'btn', 'Borrar'); del.type = 'button'; del.addEventListener('click', async () => { await api('/api/hud/skills/' + k.id, { method: 'DELETE' }).catch(() => {}); AUTO.cargar(); }); bx.appendChild(del); }
+      fila.appendChild(bx); s2.appendChild(fila);
+    });
+    const s3 = seccion(c, 'Borradores de correo (esperan tu aprobación)');
+    const prep = el('button', 'btn', 'Preparar ahora'); prep.type = 'button';
+    prep.addEventListener('click', async () => { prep.disabled = true; prep.textContent = 'Redactando…'; try { const r = await api('/api/hud/borradores/preparar', { method: 'POST' }); prep.textContent = r.nuevos.length + ' nuevos' + (r.error ? ' · ' + r.error : ''); } catch (e) { prep.textContent = e.message; } AUTO.cargar(); });
+    s3.appendChild(prep);
+    if (!d.b.borradores.length) s3.appendChild(el('div', 's', 'No hay borradores.'));
+    d.b.borradores.forEach(b => {
+      const box = el('div', 'kpi-prob');
+      box.appendChild(el('b', '', 'Para ' + (b.de || b.para) + ' · ' + b.asunto));
+      const ta = el('textarea', 'perfil-txt corto'); ta.value = b.cuerpo; ta.maxLength = 20000; box.appendChild(ta);
+      const bx = el('div', 'btns');
+      const env = el('button', 'btn primary', 'Enviar'); env.type = 'button';
+      env.addEventListener('click', async () => {
+        env.disabled = true;
+        try {
+          if (ta.value !== b.cuerpo) await api('/api/hud/borradores/' + b.id, { method: 'PATCH', body: JSON.stringify({ cuerpo: ta.value }) });
+          await api('/api/hud/borradores/' + b.id + '/enviar', { method: 'POST' }); AUTO.cargar();
+        } catch (e) { env.disabled = false; box.appendChild(el('div', 'res bad', 'No se envió: ' + e.message)); }
+      });
+      const des = el('button', 'btn', 'Descartar'); des.type = 'button';
+      des.addEventListener('click', async () => { await api('/api/hud/borradores/' + b.id, { method: 'DELETE' }).catch(() => {}); AUTO.cargar(); });
+      bx.append(env, des); box.appendChild(bx); s3.appendChild(box);
+    });
+    const s4 = seccion(c, 'WhatsApp');
+    const wa = d.wa || {};
+    if (!wa.configurado) s4.appendChild(el('div', 's', 'Sin configurar. Guía paso a paso: docs/guias/SKY_WHATSAPP.md' + (wa.faltan && wa.faltan.length ? ' · Falta: ' + wa.faltan.join(', ') : '')));
+    else {
+      s4.appendChild(el('div', 's', 'Conectado al número ' + wa.dueno + ' · último mensaje: ' + (wa.ultimo_mensaje || 'nunca') + ' · ' + (wa.ventana_abierta ? 'puedo escribirte ahora' : 'escribime primero para abrir la ventana de 24 h') + (wa.plantilla_avisos ? ' · avisos con plantilla' : '')));
+      const pr = el('button', 'btn', 'Enviar mensaje de prueba'); pr.type = 'button';
+      pr.addEventListener('click', async () => { try { await api('/api/hud/whatsapp/prueba', { method: 'POST' }); pr.textContent = 'Enviado'; } catch (e) { pr.textContent = e.message; } });
+      s4.appendChild(pr);
+    }
+  };
 
   /* ------------------------------------------------------------------ reproductor */
   const YT = 'https://www.youtube-nocookie.com';

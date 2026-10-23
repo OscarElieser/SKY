@@ -236,6 +236,31 @@ def detectar(ahora: datetime | None = None, filas: list | None = None, base: lis
         agregar('agente_caido', 'alta', 'El agente del equipo no responde',
                 agente[-1]['detalle'] or 'Sin conexión con el agente.', 'Inicialo: python agente_dispositivo.py (opción 0 del menú).')
 
+    # 4b) Servicios que se reinician solos
+    reinicios = [f for f in hoy if f['tipo'] == 'servicio' and f['nombre'] == 'reinicio']
+    if len(reinicios) >= 3:
+        agregar('reinicios', 'alta', 'Un servicio de SKY se está reiniciando seguido',
+                f'{len(reinicios)} reinicios hoy. Último: {reinicios[-1]["detalle"]}.',
+                'Ejecutá python sky_diagnostico.py y mirá la consola del servicio.')
+
+    # 4c) WhatsApp cerca del límite gratis del mes
+    if any(f['tipo'] == 'servicio' and f['nombre'] == 'whatsapp_enviado' for f in hoy):
+        mes = whatsapp_del_mes(ahora)
+        if mes >= LIMITE_GRATIS_WHATSAPP * 0.9:
+            agregar('whatsapp_cupo', 'media', 'Cerca del límite de mensajes gratis de WhatsApp',
+                    f'{mes} respuestas enviadas este mes; Meta cobra desde la número {LIMITE_GRATIS_WHATSAPP + 1}.',
+                    'Usá el HUD para consultas largas o configurá un presupuesto en Meta.')
+
+    # 4d) Presupuesto de IA en la nube (si definiste precio y presupuesto)
+    presupuesto = os.getenv('SKY_PRESUPUESTO_USD_MES', '').strip()
+    if re.fullmatch(r'\d+(?:\.\d+)?', presupuesto) and float(presupuesto) > 0 and any(f['tipo'] == 'modelo' for f in hoy):
+        inicio_mes = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0).timestamp()
+        costo = resumen_modelo(_filas(inicio_mes, ahora.timestamp() + 1, 'modelo'))['costo_estimado_usd']
+        if costo is not None and costo >= 0.8 * float(presupuesto):
+            agregar('presupuesto_ia', 'alta' if costo >= float(presupuesto) else 'media', 'Consumo de IA cerca del presupuesto',
+                    f'Llevás USD {costo:.2f} este mes de un presupuesto de USD {float(presupuesto):.2f}.',
+                    'Usá Ollama local (SKY_CEREBRO=auto) o subí el presupuesto en .env.')
+
     # 5) Cerebro lento o fallando
     turnos = [f for f in hoy if f['tipo'] == 'turno']
     cerebro = [f['ms'] for f in turnos if f['origen'] == 'cerebro' and f['ms'] is not None]
@@ -314,10 +339,7 @@ def resumen(periodo: str = 'hoy', ahora: datetime | None = None) -> dict:
                            'interfaz': sum(1 for f in filas if f['tipo'] == 'interfaz')},
         'asistente': {'turnos': len(turnos), 'errores': sum(1 for f in turnos if not f['ok']),
                       'por_origen': {o: _estad(ms) for o, ms in origenes.items()}},
-        'modelo': {'llamadas': len(modelo), 'errores': sum(1 for f in modelo if not f['ok']),
-                   'tokens': sum(f['tokens'] or 0 for f in modelo), **_estad([f['ms'] for f in modelo]),
-                   'costo_estimado_usd': 0.0 if modelo else None,
-                   'nota': 'Cerebro local (Ollama): sin costo por token. Los proveedores en la nube todavía no informan tokens a SKY.'},
+        'modelo': resumen_modelo(modelo),
         'api': {'peticiones': len(api), 'errores_5xx': errores_5xx,
                 'rechazos_4xx': sum(1 for f in api if 400 <= (f['codigo'] or 0) < 500),
                 'disponibilidad': round((len(api) - errores_5xx) / len(api) * 100, 2) if api else None,
@@ -334,6 +356,11 @@ def resumen(periodo: str = 'hoy', ahora: datetime | None = None) -> dict:
                       'prohibidos': sum(1 for f in api if f['codigo'] == 403),
                       'confirmaciones_pendientes': pendientes_confirmacion()},
         'servicio': {'arranques': len(arranques),
+                     'reinicios': sum(1 for f in filas if f['tipo'] == 'servicio' and f['nombre'] == 'reinicio'),
+                     'whatsapp_enviados': sum(1 for f in filas if f['tipo'] == 'servicio' and f['nombre'] == 'whatsapp_enviado'),
+                     'whatsapp_plantillas': sum(1 for f in filas if f['tipo'] == 'servicio' and f['nombre'] == 'whatsapp_plantilla'),
+                     'whatsapp_enviados_mes': whatsapp_del_mes(ahora),
+                     'whatsapp_rechazados': sum(1 for f in filas if f['tipo'] == 'servicio' and f['nombre'] in ('whatsapp_rechazado', 'whatsapp_firma')),
                      'ultimo_arranque': datetime.fromtimestamp(arranques[-1]['ts']).isoformat(timespec='seconds') if arranques else None},
         'serie': [{'hora': h, **v} for h, v in sorted(horas.items())],
         'problemas': detectar(ahora, hoy_filas, base),
@@ -341,6 +368,45 @@ def resumen(periodo: str = 'hoy', ahora: datetime | None = None) -> dict:
     }
     r['slo'] = evaluar_slo(r)
     return r
+
+
+def resumen_modelo(filas: list) -> dict:
+    """Llamadas al cerebro por proveedor: tokens reales informados por cada API. Costo sólo si definís el precio."""
+    por = {}
+    for f in filas:
+        prov = f['nombre'].split(':', 1)[0]
+        d = por.setdefault(prov, {'llamadas': 0, 'tokens': 0, 'errores': 0})
+        d['llamadas'] += 1
+        d['tokens'] += f['tokens'] or 0
+        d['errores'] += 0 if f['ok'] else 1
+    costo, sin_precio = 0.0, []
+    for prov, d in por.items():
+        if prov == 'ollama':
+            d['costo_usd'] = 0.0
+            continue
+        try:
+            precio = float(os.getenv(f'SKY_COSTO_{prov.upper()}_USD_1K', ''))
+            d['costo_usd'] = round(d['tokens'] / 1000 * precio, 4)
+            costo += d['costo_usd']
+        except ValueError:
+            d['costo_usd'] = None
+            sin_precio.append(prov)
+    presupuesto = os.getenv('SKY_PRESUPUESTO_USD_MES', '').strip()
+    return {'llamadas': len(filas), 'errores': sum(1 for f in filas if not f['ok']),
+            'tokens': sum(f['tokens'] or 0 for f in filas), **_estad([f['ms'] for f in filas]),
+            'por_proveedor': por,
+            'costo_estimado_usd': None if (sin_precio or not filas) else round(costo, 4),
+            'presupuesto_usd_mes': float(presupuesto) if re.fullmatch(r'\d+(?:\.\d+)?', presupuesto) else None,
+            'nota': ('Ollama local no tiene costo por token.' +
+                     (f" Sin precio configurado para {', '.join(sin_precio)} (SKY_COSTO_<PROVEEDOR>_USD_1K)." if sin_precio else ''))}
+
+
+LIMITE_GRATIS_WHATSAPP = 1000   # mensajes de servicio gratis por mes y número (Meta, desde el 1/10/2026)
+
+
+def whatsapp_del_mes(ahora: datetime) -> int:
+    inicio = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0).timestamp()
+    return sum(1 for f in _filas(inicio, ahora.timestamp() + 1, 'servicio') if f['nombre'] == 'whatsapp_enviado')
 
 
 def pendientes_confirmacion() -> int | None:

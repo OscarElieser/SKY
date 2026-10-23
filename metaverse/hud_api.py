@@ -29,7 +29,7 @@ from neural_core import dispositivos
 from neural_core.sky_asistente_personal import token_agente_local, url_agente_local
 
 router = APIRouter(prefix='/api/hud', dependencies=[Depends(require_key)])
-VERSION_SKY = '12.2.0'
+VERSION_SKY = '12.3.0'
 
 
 def _credenciales() -> tuple[str, str]:
@@ -193,6 +193,7 @@ class Rutina(BaseModel):
     hora: str | None = Field(default=None, max_length=5)
     dias: list[int] = Field(default_factory=list, max_length=7)
     pasos: list[dict] = Field(min_length=1, max_length=12)
+    activa: bool = True
 
 
 @router.post('/rutinas')
@@ -262,3 +263,165 @@ def memoria_exportar():
 def memoria_borrar(memoria_id: int):
     from neural_core import sky_aprendizaje
     return {'ok': sky_aprendizaje.borrar_memoria(memoria_id)}
+
+
+# ------------------------------------------------------------------ v12.3: perfil, skills, tareas, borradores, WhatsApp
+
+class Perfil(BaseModel):
+    texto: str = Field(max_length=8000)
+
+
+@router.get('/perfil')
+def perfil_ver():
+    from neural_core import sky_perfil
+    return {'texto': sky_perfil.leer(), 'ruta': str(sky_perfil.ruta())}
+
+
+@router.put('/perfil')
+def perfil_guardar(body: Perfil):
+    from neural_core import sky_perfil
+    try:
+        return sky_perfil.guardar(body.texto)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+class Skill(BaseModel):
+    nombre: str = Field(min_length=2, max_length=60)
+    descripcion: str = Field(default='', max_length=300)
+    frases: list[str] = Field(default_factory=list, max_length=6)
+    pasos: list[dict] = Field(min_length=1, max_length=12)
+
+
+@router.get('/skills')
+def skills_listar():
+    from neural_core import sky_skills
+    return {'skills': sky_skills.listar(), 'carpeta': str(sky_skills.carpeta())}
+
+
+@router.post('/skills')
+def skills_guardar(body: Skill):
+    from neural_core import sky_skills
+    try:
+        return sky_skills.guardar(body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.delete('/skills/{skill_id}')
+def skills_borrar(skill_id: str):
+    from neural_core import sky_skills
+    if not re.fullmatch(r'[a-z0-9-]{1,40}', skill_id):
+        raise HTTPException(400, 'Identificador inválido.')
+    return {'ok': sky_skills.borrar(skill_id)}
+
+
+@router.post('/skills/{skill_id}/ejecutar')
+def skills_ejecutar(skill_id: str):
+    from neural_core import sky_skills
+    sk = sky_skills.obtener(skill_id)
+    if not sk:
+        raise HTTPException(404, 'Skill no encontrada.')
+    return sky_skills.ejecutar(sk)
+
+
+@router.get('/programadas')
+def programadas():
+    from neural_core import sky_skills
+    return {'tareas': sky_skills.programadas(), 'texto': sky_skills.describir_programadas()}
+
+
+class Activar(BaseModel):
+    activa: bool
+
+
+@router.patch('/programadas/{rutina_id}')
+def programadas_activar(rutina_id: str, body: Activar):
+    from neural_core import sky_rutinas
+    if not re.fullmatch(r'[a-z0-9-]{1,40}', rutina_id):
+        raise HTTPException(400, 'Identificador inválido.')
+    r = sky_rutinas.activar_rutina(rutina_id, body.activa)
+    if not r:
+        raise HTTPException(404, 'Tarea no encontrada.')
+    return r
+
+
+@router.delete('/programadas/{rutina_id}')
+def programadas_borrar(rutina_id: str):
+    from neural_core import sky_rutinas
+    if not re.fullmatch(r'[a-z0-9-]{1,40}', rutina_id):
+        raise HTTPException(400, 'Identificador inválido.')
+    return {'ok': sky_rutinas.borrar_rutina(rutina_id)}
+
+
+@router.get('/borradores')
+def borradores():
+    from neural_core import sky_borradores
+    return {'borradores': sky_borradores.listar()}
+
+
+@router.post('/borradores/preparar')
+def borradores_preparar():
+    from neural_core import sky_borradores
+    try:
+        return sky_borradores.preparar()
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)[:200])
+
+
+class Cuerpo(BaseModel):
+    cuerpo: str = Field(min_length=1, max_length=20000)
+
+
+@router.patch('/borradores/{item_id}')
+def borradores_editar(item_id: str, body: Cuerpo):
+    from neural_core import sky_borradores
+    try:
+        return sky_borradores.editar(item_id, body.cuerpo)
+    except KeyError:
+        raise HTTPException(404, 'Borrador no encontrado.')
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.post('/borradores/{item_id}/enviar')
+def borradores_enviar(item_id: str):
+    """Este clic ES la confirmación del dueño (nivel 3)."""
+    from neural_core import sky_borradores, sky_metricas
+    try:
+        res = sky_borradores.enviar(item_id)
+    except KeyError:
+        raise HTTPException(404, 'Borrador no encontrado.')
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200])
+    except RuntimeError as exc:
+        raise HTTPException(409 if 'parada' in str(exc) else 502, str(exc)[:200])
+    sky_metricas.registrar('accion', 'enviar_correo', True, detalle='borrador aprobado')
+    return res
+
+
+@router.delete('/borradores/{item_id}')
+def borradores_descartar(item_id: str):
+    from neural_core import sky_borradores
+    return {'ok': sky_borradores.descartar(item_id)}
+
+
+@router.get('/whatsapp')
+def whatsapp_estado():
+    from neural_core import sky_whatsapp
+    return sky_whatsapp.estado()
+
+
+@router.post('/whatsapp/prueba')
+def whatsapp_prueba():
+    """Manda «SKY conectada» al WhatsApp del dueño (sólo funciona dentro de la ventana de 24 h)."""
+    from neural_core import sky_whatsapp
+    if not sky_whatsapp.configurado():
+        raise HTTPException(409, 'WhatsApp no está configurado. Guía: docs/guias/SKY_WHATSAPP.md')
+    if not sky_whatsapp.ventana_abierta():
+        raise HTTPException(409, 'Escribile primero a SKY por WhatsApp: Meta sólo permite responder dentro de las 24 h.')
+    try:
+        sky_whatsapp.enviar_texto('✅ SKY conectada a tu WhatsApp.')
+    except Exception as exc:
+        raise HTTPException(502, 'Meta rechazó el envío: ' + str(exc)[:160])
+    return {'ok': True}
