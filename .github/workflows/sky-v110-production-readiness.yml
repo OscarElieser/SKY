@@ -34,7 +34,7 @@ jobs:
           tests/test_sky_v10_7_public.py tests/test_sky_v10_6_global.py
           tests/test_sky_v10_5_global.py tests/test_sky_v10_4_secure_global.py
           tests/test_sky_v10_3_global.py tests/test_sky_v10_2_global.py
-          tests/test_sky_v10_1_security_languages.py
+          tests/test_sky_v10_1_security_languages.py tests/test_sky_public_secrets.py
       - name: Tests creative, project and integration modules
         run: >-
           PYTHONPATH=. pytest -q

@@ -1,6 +1,8 @@
 """Conservative public deployment guardrails. Does not certify readiness."""
 from __future__ import annotations
 import os
+import hmac
+from .secrets_v107 import get_secret
 
 
 def validate_environment():
@@ -11,14 +13,15 @@ def validate_environment():
     if not hosts or hosts.issubset({'localhost','127.0.0.1','testserver'}):
         raise RuntimeError('Modo público necesita SKY_TRUSTED_HOSTS con dominio propio')
     if '*' in hosts:raise RuntimeError('El modo público prohíbe hosts universales')
-    api_key=os.getenv('SKY_API_KEY','').strip()
+    api_key=get_secret('SKY_API_KEY')
     if len(api_key)<32:
         raise RuntimeError('El modo público requiere SKY_API_KEY explícita de 32 caracteres o más')
-    if not os.getenv('SKY_OWNER_MFA_SECRET'):
+    mfa_secret=get_secret('SKY_OWNER_MFA_SECRET')
+    if not mfa_secret:
         raise RuntimeError('El modo público requiere MFA TOTP para el creador')
     from .owner_mfa import validate_configuration
     validate_configuration()
-    if api_key==os.getenv('SKY_OWNER_MFA_SECRET','').strip():
+    if hmac.compare_digest(api_key,mfa_secret):
         raise RuntimeError('SKY_API_KEY y SKY_OWNER_MFA_SECRET deben ser secretos distintos')
     if not os.getenv('SKY_REDIS_URL'):
         raise RuntimeError('El modo público requiere Redis para limitación distribuida')

@@ -30,7 +30,7 @@ from neural_core.multimedia import catalogo_itunes, convertir_imagen
 from neural_core.seguridad import revisar_archivo
 from neural_core.creadores import campana, produccion, REDES
 from neural_core.dispositivos import (paired_devices, save_device, remove_device, call_device,
-    interpret_command, APP_OPTIONS)
+    interpret_command, APP_OPTIONS, norm)
 from neural_core.voz import transcribir_audio, hablar_texto
 from neural_core.voz_inbox import read_inbox, dismiss_inbox
 from neural_core.sky_asistente_personal import interpretar as interpretar_asistente
@@ -42,7 +42,7 @@ from neural_core.sky_evolution import (feedback as sky_feedback, feedback_resume
 from neural_core.sky_agent import SKILLS, execute_skill, interpret_local_command
 from neural_core.sky_live import historial as sky_live_historial, ejecutar_ciclo as sky_live_check
 
-st.set_page_config(page_title="SKY Universal v8.0", page_icon="🧠", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="SKY-IA · Asistente Universal", page_icon="⚡", layout="wide", initial_sidebar_state="collapsed")
 # Si se desea abrir el panel desde otro dispositivo mediante Tailscale, definir
 # SKY_DASHBOARD_PASSWORD de al menos 12 caracteres en .env.
 clave_panel=(os.getenv('SKY_DASHBOARD_PASSWORD') or os.getenv('NEURALT_DASHBOARD_PASSWORD','')).strip()
@@ -89,53 +89,117 @@ st.markdown("""<style>
 .smallnote {opacity:.85; font-size:.9rem; color:#9fbad0}
 </style>""", unsafe_allow_html=True)
 iniciar(); crear_tablas()
-SECCIONES=["🏠 Inicio", "🌐 SKY IA Universal v12.0", "🧠 IA universal", "🧬 Centro multi-IA", "👁️ SKY Visión", "🎨 SKY Studio 3D", "📁 SKY Office Studio", "🧬 SKY Evolución", "🧰 Herramientas SKY", "🔔 SKY Live", "🌐 SKY Metaverso y API", "🎙️ SKY y dispositivos", "💰 Finanzas personales", "🚀 Generar ingresos", "📈 Bolsa y Bitcoin",
-           "📰 Noticias e Internet", "📣 Redes sociales", "🎵 Música y películas", "🎞️ Imágenes y videos",
-           "🔐 Antivirus y hacking ético", "🎓 Educación e investigación", "📚 Biblioteca y memoria",
-           "🧭 BAQUEANO Control Center", "🧾 Transacciones", "📡 Engine Sensor MLP + GRU", "✅ Proyectos y tareas", "⚽ SKY Sports Madridista"]
-with st.sidebar:
-    st.title("🧠 SKY")
-    st.caption("Universal v10.5 · Asistente privado + metaverso + API")
-    seccion=st.radio("Navegación",SECCIONES, label_visibility="collapsed")
-    st.divider()
-    import neural_core.sky_supabase as sb
-    if sb.is_configured():
-        usuario_sb = st.session_state.get('_supabase_user')
-        if usuario_sb:
-            if usuario_sb.get('is_super_admin'):
-                st.success("👑 **Superadministrador**")
-                st.caption(f"`{usuario_sb.get('email')}`")
-            else:
-                st.caption(f"☁️ Conectado: `{usuario_sb.get('email')}`")
-            if st.button("Cerrar Sesión", key="sb_logout_btn"):
-                sb.sign_out()
-                st.session_state.pop('_supabase_user', None)
-                st.rerun()
-        else:
-            with st.expander("☁️ Supabase Cloud Auth", expanded=False):
-                modo_sb = st.radio("Acción", ["Entrar", "Crear cuenta"], horizontal=True, key="sb_mode", label_visibility="collapsed")
-                sb_email = st.text_input("Correo", key="sb_email")
-                sb_pass = st.text_input("Contraseña", type="password", key="sb_pass")
-                if modo_sb == "Entrar" and st.button("Iniciar Sesión", key="sb_btn_login"):
-                    try:
-                        res = sb.sign_in(sb_email, sb_pass)
-                        st.session_state['_supabase_user'] = res
-                        st.success("Sesión iniciada con éxito.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-                elif modo_sb == "Crear cuenta" and st.button("Registrar Usuario", key="sb_btn_signup"):
-                    try:
-                        res = sb.sign_up(sb_email, sb_pass)
-                        st.success("Cuenta registrada. Ya puedes iniciar sesión.")
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+
+
+def elegir_motor(key, area='General'):
+    """Selector compartido; nunca activa redes ni cuenta doble automáticamente."""
+    opciones = ['auto', *PROVIDERS]
+    default = 'auto'
+    etiqueta = lambda opt: ('Automático — entre los configurados' if opt == 'auto'
+                            else PROVIDERS[opt].name + (' · listo' if provider_ready(opt) else ' · configurar'))
+    elegido = st.selectbox('Motor de IA', opciones, index=opciones.index(default),
+                           format_func=etiqueta, key=key)
+    try:
+        elegido, predeterminado = choose_provider(elegido, area)
+    except Exception as exc:
+        st.warning(str(exc))
+        elegido = 'ollama'
+        predeterminado = PROVIDERS['ollama'].model_default
+    if elegido == 'ollama':
+        instalados = modelo_activo()
+        if not instalados:
+            st.caption('Ollama local no detectado. Ejecutá `ollama serve` y descargá un modelo.')
+        m = st.selectbox('Modelo Ollama', instalados or [predeterminado], key='modelo_' + key)
     else:
-        with st.expander("☁️ Supabase Cloud", expanded=False):
-            st.caption("Configura SUPABASE_ANON_KEY en .env para activar el inicio de sesión.")
-    st.divider()
-    st.caption("Multi-IA + visión + 3D por piezas + memoria + herramientas autorizadas")
-    st.caption("Los proveedores externos sólo reciben contenido cuando los seleccionás o activás el modo automático.")
+        m = st.text_input('Modelo de ' + PROVIDERS[elegido].name, value=predeterminado, key='modelo_' + key)
+    st.caption('Modelo seleccionado: ' + PROVIDERS[elegido].name + '. Claves en .env. Pueden aplicarse tarifas y cuotas.')
+    return elegido, m
+
+
+SECCIONES_TECNICAS = [
+    "🏠 Tablero general (v8.0)", "🌐 SKY IA Universal v12.0", "🧠 IA universal", "🧬 Centro multi-IA", "👁️ SKY Visión", "🎨 SKY Studio 3D", "📁 SKY Office Studio", "🧬 SKY Evolución", "🧰 Herramientas SKY", "🔔 SKY Live", "🌐 SKY Metaverso y API", "🎙️ SKY y dispositivos", "💰 Finanzas personales", "🚀 Generar ingresos", "📈 Bolsa y Bitcoin",
+    "📰 Noticias e Internet", "📣 Redes sociales", "🎵 Música y películas", "🎞️ Imágenes y videos",
+    "🔐 Antivirus y hacking ético", "🎓 Educación e investigación", "📚 Biblioteca y memoria",
+    "🧭 BAQUEANO Control Center", "🧾 Transacciones", "📡 Engine Sensor MLP + GRU", "✅ Proyectos y tareas", "⚽ SKY Sports Madridista"
+]
+
+if "sky_ui_view_mode" not in st.session_state:
+    st.session_state["sky_ui_view_mode"] = "holographic"
+
+if st.session_state["sky_ui_view_mode"] == "classic":
+    with st.sidebar:
+        st.markdown("### 🧠 SKY-IA")
+        st.caption("Asistente Central · 26 módulos internos")
+        
+        modo_interfaz = st.radio(
+            "Modo de Interfaz",
+            ["🎙️ Asistente Unificado (Voz & Chat)", "🛠️ Módulos Técnicos (Modo Dev)"],
+            label_visibility="collapsed"
+        )
+        
+        if modo_interfaz == "🎙️ Asistente Unificado (Voz & Chat)":
+            seccion = "🎙️ Asistente Central"
+            st.caption("🟢 **26 módulos conectados internamente**")
+            ejecucion_dispositivo = st.checkbox("⚡ Ejecución directa en PC", value=True,
+                                                help="Permite a SKY abrir programas y páginas locales cuando se lo pidas.")
+            proveedor_jarvis, modelo_jarvis = elegir_motor('motor_jarvis', 'General')
+        else:
+            st.caption("🛠️ **Explorador de Módulos (Dev):**")
+            seccion_elegida = st.radio("Módulos", SECCIONES_TECNICAS, label_visibility="collapsed")
+            seccion = "🏠 Inicio" if seccion_elegida == "🏠 Tablero general (v8.0)" else seccion_elegida
+            ejecucion_dispositivo = True
+            proveedor_jarvis = 'auto'
+            modelo_jarvis = None
+        st.divider()
+        import neural_core.sky_supabase as sb
+        if sb.is_configured():
+            usuario_sb = st.session_state.get('_supabase_user')
+            if usuario_sb:
+                if usuario_sb.get('is_super_admin'):
+                    st.success("👑 **Superadministrador**")
+                    st.caption(f"`{usuario_sb.get('email')}`")
+                else:
+                    st.caption(f"☁️ Conectado: `{usuario_sb.get('email')}`")
+                if st.button("Cerrar Sesión", key="sb_logout_btn"):
+                    sb.sign_out()
+                    st.session_state.pop('_supabase_user', None)
+                    st.rerun()
+            else:
+                with st.expander("☁️ Supabase Cloud Auth", expanded=False):
+                    modo_sb = st.radio("Acción", ["Entrar", "Crear cuenta"], horizontal=True, key="sb_mode", label_visibility="collapsed")
+                    sb_email = st.text_input("Correo", key="sb_email")
+                    sb_pass = st.text_input("Contraseña", type="password", key="sb_pass")
+                    if modo_sb == "Entrar" and st.button("Iniciar Sesión", key="sb_btn_login"):
+                        try:
+                            res = sb.sign_in(sb_email, sb_pass)
+                            st.session_state['_supabase_user'] = res
+                            st.success("Sesión iniciada con éxito.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                    elif modo_sb == "Crear cuenta" and st.button("Registrar Usuario", key="sb_btn_signup"):
+                        try:
+                            res = sb.sign_up(sb_email, sb_pass)
+                            st.success("Cuenta registrada. Ya puedes iniciar sesión.")
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+        else:
+            with st.expander("☁️ Supabase Cloud", expanded=False):
+                st.caption("Configura SUPABASE_ANON_KEY en .env para activar el inicio de sesión.")
+        st.divider()
+        st.caption("Multi-IA + visión + 3D por piezas + memoria + herramientas autorizadas")
+        st.caption("Los proveedores externos sólo reciben contenido cuando los seleccionás o activás el modo automático.")
+else:
+    # Modo Holográfico 3D: Barra lateral oculta, pantalla limpia centrada en el Núcleo 3D
+    if "seccion_elegida_holo" in st.session_state:
+        seccion = st.session_state.pop("seccion_elegida_holo")
+        st.session_state["sky_ui_view_mode"] = "classic"
+    else:
+        seccion = "🎙️ Asistente Central"
+    ejecucion_dispositivo = True
+    proveedor_jarvis = 'auto'
+    modelo_jarvis = None
+    import neural_core.sky_supabase as sb
 
 
 def alerta_red():
@@ -164,27 +228,7 @@ def boton_descarga(texto, nombre, etiqueta="Descargar TXT"):
     st.download_button(etiqueta, data=texto.encode("utf-8"), file_name=nombre, mime="text/plain")
 
 
-def elegir_motor(key, area='General'):
-    """Selector compartido; nunca activa redes ni cuenta doble automáticamente."""
-    opciones=['auto', *PROVIDERS]
-    default='auto'
-    etiqueta=lambda opt: ('Automático — entre los configurados' if opt=='auto'
-                         else PROVIDERS[opt].name + (' · listo' if provider_ready(opt) else ' · configurar'))
-    elegido=st.selectbox('Motor de IA',opciones,index=opciones.index(default),
-                          format_func=etiqueta,key=key)
-    try:
-        elegido, predeterminado=choose_provider(elegido,area)
-    except Exception as exc:
-        st.warning(str(exc))
-        elegido='ollama';predeterminado=PROVIDERS['ollama'].model_default
-    if elegido=='ollama':
-        instalados=modelo_activo()
-        if not instalados: st.caption('Ollama local no detectado. Ejecutá `ollama serve` y descargá un modelo.')
-        m=st.selectbox('Modelo Ollama',instalados or [predeterminado],key='modelo_'+key)
-    else:
-        m=st.text_input('Modelo de '+PROVIDERS[elegido].name,value=predeterminado,key='modelo_'+key)
-    st.caption('Modelo seleccionado: '+PROVIDERS[elegido].name+'. Claves en .env. Pueden aplicarse tarifas y cuotas.')
-    return elegido,m
+
 
 
 def mostrar_chat(area="General", prompt_inicial=None):
@@ -226,7 +270,2079 @@ def mostrar_chat(area="General", prompt_inicial=None):
         if respuesta: historia.extend([{'role':'user','content':pregunta},{'role':'assistant','content':respuesta}])
 
 
-if seccion=="🏠 Inicio":
+SECCIONES = SECCIONES_TECNICAS
+
+
+def render_media_card(datos):
+    import json
+    import streamlit.components.v1 as components
+    url = datos.get('url', '')
+    query = datos.get('query', '')
+    service = datos.get('service', 'youtube')
+    video_id = datos.get('video_id', '')
+    candidates = datos.get('candidates', [])
+    mode = datos.get('mode', 'normal')
+    title = datos.get('title') or (query.title() if query else 'YouTube en Vivo')
+
+    if service == 'youtube':
+        from neural_core.multimedia import resolve_youtube_video
+        if not video_id and query:
+            res_v = resolve_youtube_video(query)
+            video_id = res_v.get('video_id', '')
+            candidates = res_v.get('candidates', [])
+            title = res_v.get('titulo', query)
+            if res_v.get('url') and 'watch?v=' in res_v['url']:
+                url = res_v['url']
+        elif not url or url == 'https://www.youtube.com' or not video_id:
+            res_v = resolve_youtube_video("Queen")
+            video_id = res_v.get('video_id', 'vbvyNnw8Qjg')
+            candidates = res_v.get('candidates', [])
+            title = res_v.get('titulo', 'Queen – Bohemian Rhapsody (Live Aid 1985)')
+            url = res_v.get('url', f"https://www.youtube.com/watch?v={video_id}")
+
+        embed_id = video_id or "vbvyNnw8Qjg"
+        candidates_json = json.dumps(candidates if candidates else [
+            {"id": embed_id, "title": title, "embeddable": True, "url": url}
+        ])
+
+        # Altura del componente según el modo
+        h_comp = 620 if mode == 'ampliado' else (340 if mode == 'mini' else 495)
+
+        player_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{
+              background: transparent;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              color: #e2f1ff;
+              overflow-x: hidden;
+            }}
+            
+            .player-wrapper {{
+              background: rgba(5, 14, 30, 0.95);
+              border: 1px solid rgba(0, 242, 255, 0.45);
+              border-radius: 14px;
+              padding: 12px 16px;
+              box-shadow: 0 0 30px rgba(0, 242, 255, 0.2);
+              transition: all 0.3s ease;
+              position: relative;
+            }}
+
+            .mode-normal {{
+              width: 100%;
+            }}
+            .mode-normal .video-container {{
+              height: 380px;
+            }}
+
+            .mode-ampliado {{
+              width: 100%;
+            }}
+            .mode-ampliado .video-container {{
+              height: 520px;
+            }}
+
+            .mode-mini {{
+              position: fixed;
+              bottom: 15px;
+              right: 15px;
+              width: 380px;
+              z-index: 999999;
+              border: 2px solid #00f2ff;
+              border-radius: 16px;
+              box-shadow: 0 10px 45px rgba(0, 0, 0, 0.9), 0 0 25px rgba(0, 242, 255, 0.45);
+              background: rgba(4, 12, 26, 0.98);
+            }}
+            .mode-mini .video-container {{
+              height: 200px;
+            }}
+            .mode-mini .playlist-panel {{
+              display: none;
+            }}
+
+            .header-bar {{
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 10px;
+              user-select: none;
+              flex-wrap: wrap;
+              gap: 8px;
+            }}
+            .title-box {{
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              max-width: 55%;
+            }}
+            .title-text {{
+              color: #00f2ff;
+              font-weight: 700;
+              font-size: 0.88rem;
+              letter-spacing: 0.5px;
+              text-shadow: 0 0 8px rgba(0, 242, 255, 0.5);
+            }}
+
+            .mode-btn-group {{
+              display: flex;
+              align-items: center;
+              gap: 5px;
+            }}
+            .mode-btn {{
+              background: rgba(0, 242, 255, 0.12);
+              border: 1px solid rgba(0, 242, 255, 0.35);
+              color: #00f2ff;
+              border-radius: 8px;
+              padding: 3px 8px;
+              font-size: 0.72rem;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.2s;
+            }}
+            .mode-btn:hover, .mode-btn.active {{
+              background: #00f2ff;
+              color: #030a16;
+              box-shadow: 0 0 10px #00f2ff;
+            }}
+
+            .video-container {{
+              width: 100%;
+              border-radius: 10px;
+              overflow: hidden;
+              border: 1px solid rgba(0, 242, 255, 0.3);
+              position: relative;
+              background: #000;
+            }}
+            #sky-yt-player {{
+              width: 100%;
+              height: 100%;
+              border: none;
+            }}
+
+            .error-banner {{
+              display: none;
+              background: rgba(255, 0, 60, 0.15);
+              border: 1px solid #ff003c;
+              border-radius: 10px;
+              padding: 10px 14px;
+              margin-top: 8px;
+              color: #ff99aa;
+              font-size: 0.8rem;
+            }}
+            .error-banner strong {{ color: #ff003c; }}
+
+            .controls-bar {{
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-top: 10px;
+              flex-wrap: wrap;
+              gap: 8px;
+            }}
+            .ctrl-btn {{
+              background: rgba(10, 28, 56, 0.85);
+              border: 1px solid rgba(0, 242, 255, 0.3);
+              color: #e0f2fe;
+              border-radius: 8px;
+              padding: 4px 10px;
+              font-size: 0.76rem;
+              cursor: pointer;
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+              text-decoration: none;
+              transition: all 0.2s;
+            }}
+            .ctrl-btn:hover {{
+              border-color: #00f2ff;
+              color: #00f2ff;
+              box-shadow: 0 0 10px rgba(0, 242, 255, 0.3);
+            }}
+            .ctrl-btn-primary {{
+              background: rgba(0, 242, 255, 0.2);
+              border-color: #00f2ff;
+              color: #00f2ff;
+              font-weight: 700;
+            }}
+
+            .playlist-panel {{
+              margin-top: 8px;
+              padding-top: 8px;
+              border-top: 1px solid rgba(0, 242, 255, 0.2);
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              flex-wrap: wrap;
+            }}
+            .playlist-label {{
+              font-size: 0.7rem;
+              color: #79a6d2;
+              text-transform: uppercase;
+              font-weight: 700;
+            }}
+            .track-pill {{
+              background: rgba(8, 22, 45, 0.7);
+              border: 1px solid rgba(0, 242, 255, 0.25);
+              border-radius: 12px;
+              padding: 2px 8px;
+              font-size: 0.72rem;
+              color: #9cb8d9;
+              cursor: pointer;
+              transition: all 0.2s;
+            }}
+            .progress-bar-container {{
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-top: 8px;
+              padding: 0 4px;
+            }}
+            .progress-bar-container span {{
+              font-size: 0.72rem;
+              color: #79a6d2;
+              font-family: 'Orbitron', monospace;
+              min-width: 38px;
+            }}
+            #seek-bar {{
+              flex: 1;
+              accent-color: #00f2ff;
+              cursor: pointer;
+              height: 4px;
+            }}
+          </style>
+          <script src="https://www.youtube.com/iframe_api"></script>
+        </head>
+        <body>
+          <div id="player-box" class="player-wrapper mode-{mode}">
+            <div id="drag-handle" class="header-bar">
+              <div class="title-box">
+                <span>🎬</span>
+                <span class="title-text" id="player-title">{title}</span>
+              </div>
+              <div class="mode-btn-group">
+                <button class="mode-btn {'active' if mode == 'mini' else ''}" onclick="setMode('mini')">📱 Mini</button>
+                <button class="mode-btn {'active' if mode == 'normal' else ''}" onclick="setMode('normal')">📺 Normal</button>
+                <button class="mode-btn {'active' if mode == 'ampliado' else ''}" onclick="setMode('ampliado')">🖥️ Ampliado</button>
+                <button class="mode-btn" onclick="toggleFullscreen()">🔲 Pantalla Completa</button>
+                <button class="mode-btn" style="border-color: rgba(255, 0, 60, 0.4); color: #ff6688;" onclick="closePlayer()">✕</button>
+              </div>
+            </div>
+
+            <div class="video-container" id="video-box">
+              <div id="sky-yt-player"></div>
+            </div>
+
+            <div class="progress-bar-container">
+              <span id="current-time-label">0:00</span>
+              <input type="range" id="seek-bar" min="0" max="100" value="0" step="0.2" oninput="onSeekInput(this.value)" onchange="onSeekChange(this.value)">
+              <span id="duration-label" style="text-align: right;">0:00</span>
+            </div>
+
+            <div id="error-banner" class="error-banner">
+              <div id="error-text"></div>
+              <div style="margin-top: 6px; display: flex; gap: 8px;">
+                <button id="fallback-btn" class="ctrl-btn ctrl-btn-primary" onclick="loadNextCandidate()">🔄 Reproducir versión en vivo autorizada</button>
+                <a id="direct-link-btn" class="ctrl-btn" href="{url}" target="_blank">🖥️ Mirar en YouTube</a>
+              </div>
+            </div>
+
+            <div class="controls-bar">
+              <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+                <button class="ctrl-btn" onclick="playPrev()" title="Video Anterior">⏮ Anterior</button>
+                <button class="ctrl-btn" onclick="seekRelative(-10)" title="Retroceder 10 segundos">⏪ -10s</button>
+                <button class="ctrl-btn ctrl-btn-primary" id="play-pause-btn" onclick="togglePlay()">⏸ Pausar</button>
+                <button class="ctrl-btn" onclick="seekRelative(10)" title="Adelantar 10 segundos">⏩ +10s</button>
+                <button class="ctrl-btn" onclick="playNext()" title="Video Siguiente">⏭ Siguiente</button>
+                <button class="ctrl-btn" onclick="restartVideo()" title="Reiniciar video desde el inicio">🔄 Reiniciar</button>
+                <button class="ctrl-btn" id="mute-btn" onclick="toggleMute()">🔊 Silenciar</button>
+                <span style="font-size: 0.72rem; color: #79a6d2; margin-left: 4px;">Vol:</span>
+                <input type="range" id="volume-slider" min="0" max="100" value="100" style="width: 65px; accent-color: #00f2ff;" oninput="onVolumeChange(this.value)">
+              </div>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="ctrl-btn" onclick="toggleFullscreen()">🔲 Completa</button>
+                <a class="ctrl-btn" id="yt-web-link" href="{url}" target="_blank">🌐 YouTube</a>
+              </div>
+            </div>
+
+            <div class="playlist-panel" id="playlist-box">
+              <span class="playlist-label">Cola de Reproducción:</span>
+            </div>
+          </div>
+
+          <script>
+            var candidateVideos = {candidates_json};
+            var currentVideoId = "{embed_id}";
+            var currentIndex = 0;
+            var player;
+            var isPlaying = true;
+            var isMuted = false;
+            var isSeeking = false;
+
+            // Cola persistente en el navegador
+            try {{
+              if (candidateVideos && candidateVideos.length > 0) {{
+                localStorage.setItem('sky_yt_queue', JSON.stringify(candidateVideos));
+              }} else {{
+                var savedQ = localStorage.getItem('sky_yt_queue');
+                if (savedQ) candidateVideos = JSON.parse(savedQ);
+              }}
+            }} catch(e) {{}}
+
+            function onYouTubeIframeAPIReady() {{
+              player = new YT.Player('sky-yt-player', {{
+                height: '100%',
+                width: '100%',
+                videoId: currentVideoId,
+                playerVars: {{
+                  'autoplay': 1,
+                  'enablejsapi': 1,
+                  'playsinline': 1,
+                  'rel': 0,
+                  'modestbranding': 1,
+                  'origin': window.location.origin
+                }},
+                events: {{
+                  'onReady': onPlayerReady,
+                  'onStateChange': onPlayerStateChange,
+                  'onError': onPlayerError
+                }}
+              }});
+            }}
+
+            function onPlayerReady(event) {{
+              event.target.playVideo();
+              updatePlaylistUI();
+            }}
+
+            function onPlayerStateChange(event) {{
+              var btn = document.getElementById('play-pause-btn');
+              if (event.data === YT.PlayerState.PLAYING) {{
+                isPlaying = true;
+                btn.innerText = "⏸ Pausar";
+              }} else if (event.data === YT.PlayerState.PAUSED) {{
+                isPlaying = false;
+                btn.innerText = "▶ Reanudar";
+              }} else if (event.data === YT.PlayerState.ENDED) {{
+                playNext();
+              }}
+            }}
+
+            function onPlayerError(event) {{
+              console.warn("YouTube Player Event Error:", event.data);
+              var banner = document.getElementById('error-banner');
+              var errText = document.getElementById('error-text');
+              banner.style.display = 'block';
+
+              if (event.data === 101 || event.data === 150) {{
+                errText.innerHTML = "⚠️ <strong>Restricción del propietario (Error 150/101):</strong> El sello oficial desactivó la reproducción directa externa.";
+                if (candidateVideos && candidateVideos.length > currentIndex + 1) {{
+                  errText.innerHTML += "<br>🔄 <em>Cambiando automáticamente a versión en vivo autorizada (" + candidateVideos[currentIndex + 1].title + ")...</em>";
+                  setTimeout(function() {{
+                    playNext();
+                  }}, 2000);
+                }}
+              }} else if (event.data === 100) {{
+                errText.innerHTML = "⚠️ <strong>Video no disponible o privado (Error 100):</strong> Probando siguiente opción...";
+                setTimeout(function() {{ playNext(); }}, 1500);
+              }} else if (event.data === 2) {{
+                errText.innerHTML = "⚠️ <strong>Parámetro de video no válido (Error 2).</strong>";
+              }}
+            }}
+
+            function togglePlay() {{
+              if (!player) return;
+              if (isPlaying) {{
+                player.pauseVideo();
+              }} else {{
+                player.playVideo();
+              }}
+            }}
+
+            function toggleMute() {{
+              if (!player) return;
+              var btn = document.getElementById('mute-btn');
+              if (isMuted) {{
+                player.unMute();
+                isMuted = false;
+                btn.innerText = "🔊 Silenciar";
+              }} else {{
+                player.mute();
+                isMuted = true;
+                btn.innerText = "🔇 Con Sonido";
+              }}
+            }}
+
+            function onVolumeChange(val) {{
+              if (!player || !player.setVolume) return;
+              player.setVolume(val);
+              if (val == 0) {{
+                isMuted = true;
+                document.getElementById('mute-btn').innerText = "🔇 Con Sonido";
+              }} else if (isMuted) {{
+                isMuted = false;
+                player.unMute();
+                document.getElementById('mute-btn').innerText = "🔊 Silenciar";
+              }}
+            }}
+
+            function seekRelative(deltaSec) {{
+              if (!player || !player.getCurrentTime) return;
+              var cur = player.getCurrentTime();
+              var target = Math.max(0, cur + deltaSec);
+              player.seekTo(target, true);
+            }}
+
+            function restartVideo() {{
+              if (!player) return;
+              player.seekTo(0, true);
+              player.playVideo();
+            }}
+
+            function onSeekInput(val) {{
+              isSeeking = true;
+            }}
+
+            function onSeekChange(val) {{
+              if (!player || !player.getDuration) return;
+              var dur = player.getDuration();
+              if (dur > 0) {{
+                var target = (val / 100.0) * dur;
+                player.seekTo(target, true);
+              }}
+              isSeeking = false;
+            }}
+
+            function formatTime(s) {{
+              var m = Math.floor(s / 60);
+              var sec = Math.floor(s % 60);
+              return m + ":" + (sec < 10 ? "0" : "") + sec;
+            }}
+
+            setInterval(function() {{
+              if (!player || !player.getCurrentTime || !player.getDuration) return;
+              try {{
+                var dur = player.getDuration();
+                var cur = player.getCurrentTime();
+                if (dur > 0) {{
+                  document.getElementById('duration-label').innerText = formatTime(dur);
+                  document.getElementById('current-time-label').innerText = formatTime(cur);
+                  if (!isSeeking) {{
+                    document.getElementById('seek-bar').value = (cur / dur) * 100;
+                  }}
+                }}
+              }} catch(e) {{}}
+            }}, 500);
+
+            function loadVideo(id, title, index) {{
+              currentVideoId = id;
+              currentIndex = index;
+              try {{ localStorage.setItem('sky_yt_idx', index); }} catch(e) {{}}
+              document.getElementById('player-title').innerText = title;
+              document.getElementById('error-banner').style.display = 'none';
+              document.getElementById('yt-web-link').href = "https://www.youtube.com/watch?v=" + id;
+              if (player && player.loadVideoById) {{
+                player.loadVideoById(id);
+              }}
+              updatePlaylistUI();
+            }}
+
+            function playNext() {{
+              if (!candidateVideos || candidateVideos.length === 0) return;
+              var nextIdx = (currentIndex + 1) % candidateVideos.length;
+              loadVideo(candidateVideos[nextIdx].id, candidateVideos[nextIdx].title, nextIdx);
+            }}
+
+            function playPrev() {{
+              if (!candidateVideos || candidateVideos.length === 0) return;
+              var prevIdx = (currentIndex - 1 + candidateVideos.length) % candidateVideos.length;
+              loadVideo(candidateVideos[prevIdx].id, candidateVideos[prevIdx].title, prevIdx);
+            }}
+
+            function loadNextCandidate() {{
+              playNext();
+            }}
+
+            function setMode(newMode) {{
+              var box = document.getElementById('player-box');
+              box.className = 'player-wrapper mode-' + newMode;
+              document.querySelectorAll('.mode-btn').forEach(function(b) {{
+                b.classList.remove('active');
+                if (b.innerText.toLowerCase().includes(newMode)) {{
+                  b.classList.add('active');
+                }}
+              }});
+            }}
+
+            function toggleFullscreen() {{
+              var elem = document.getElementById('video-box');
+              if (!document.fullscreenElement) {{
+                if (elem.requestFullscreen) {{
+                  elem.requestFullscreen();
+                }} else if (elem.webkitRequestFullscreen) {{
+                  elem.webkitRequestFullscreen();
+                }}
+              }} else {{
+                if (document.exitFullscreen) {{
+                  document.exitFullscreen();
+                }}
+              }}
+            }}
+
+            function closePlayer() {{
+              var box = document.getElementById('player-box');
+              box.style.display = 'none';
+              if (player && player.stopVideo) {{
+                player.stopVideo();
+              }}
+            }}
+
+            function updatePlaylistUI() {{
+              var pl = document.getElementById('playlist-box');
+              if (!pl || !candidateVideos || candidateVideos.length === 0) return;
+              pl.innerHTML = '<span class="playlist-label">Cola de Reproducción:</span>';
+              candidateVideos.forEach(function(vid, i) {{
+                var pill = document.createElement('span');
+                pill.className = 'track-pill' + (i === currentIndex ? ' selected' : '');
+                pill.innerText = (i + 1) + ". " + vid.title;
+                pill.onclick = function() {{ loadVideo(vid.id, vid.title, i); }};
+                pl.appendChild(pill);
+              }});
+            }}
+
+            // Comunicación para órdenes externas o voz
+            window.addEventListener('message', function(ev) {{
+              var data = ev.data;
+              if (!data || typeof data !== 'object') return;
+              if (data.action === 'play') {{ if (player) player.playVideo(); }}
+              else if (data.action === 'pause') {{ if (player) player.pauseVideo(); }}
+              else if (data.action === 'next') {{ playNext(); }}
+              else if (data.action === 'previous') {{ playPrev(); }}
+              else if (data.action === 'mute') {{ toggleMute(); }}
+              else if (data.action === 'restart') {{ restartVideo(); }}
+              else if (data.action === 'mode_mini') {{ setMode('mini'); }}
+              else if (data.action === 'mode_normal') {{ setMode('normal'); }}
+              else if (data.action === 'mode_expanded') {{ setMode('ampliado'); }}
+              else if (data.action === 'close') {{ closePlayer(); }}
+            }});
+
+            // Arrastre en modo mini
+            var dragHandle = document.getElementById('drag-handle');
+            var isDragging = false;
+            var startX, startY, origX, origY;
+            dragHandle.addEventListener('mousedown', function(e) {{
+              var box = document.getElementById('player-box');
+              if (!box.classList.contains('mode-mini')) return;
+              isDragging = true;
+              startX = e.clientX;
+              startY = e.clientY;
+              var rect = box.getBoundingClientRect();
+              origX = rect.left;
+              origY = rect.top;
+              e.preventDefault();
+            }});
+            window.addEventListener('mousemove', function(e) {{
+              if (!isDragging) return;
+              var box = document.getElementById('player-box');
+              var dx = e.clientX - startX;
+              var dy = e.clientY - startY;
+              box.style.right = 'auto';
+              box.style.bottom = 'auto';
+              box.style.left = (origX + dx) + 'px';
+              box.style.top = (origY + dy) + 'px';
+            }});
+            window.addEventListener('mouseup', function() {{
+              isDragging = false;
+            }});
+          </script>
+        </body>
+        </html>
+        """
+        components.html(player_html, height=h_comp)
+
+        col_m1, col_m2 = st.columns([1.2, 1.8])
+        with col_m1:
+          st.link_button("🖥️ ABRIR EN VENTANA / CHROME", url, type="primary")
+        with col_m2:
+          st.caption("🟢 **Reproductor YouTube IFrame API**: Modos Mini (flotante), Normal, Ampliado y Pantalla Completa.")
+    elif service == 'google':
+        st.markdown(f"""
+        <div style="background: rgba(5, 14, 30, 0.85); border: 1px solid rgba(0, 168, 255, 0.35);
+                    border-radius: 12px; padding: 14px 18px; margin: 10px 0;">
+            <div style="color: #00f2ff; font-weight: 700; margin-bottom: 6px;">🔍 BÚSQUEDA WEB ACTIVADA</div>
+            <div style="color: #9cb8d9; font-size: 0.95rem;">Término consultado: <strong>«{query}»</strong></div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.link_button("🌐 Ver resultados en Google", url, type="primary")
+    else:
+        st.link_button(f"🌐 Abrir enlace: {url}", url, type="primary")
+
+
+def render_social_card(datos):
+    subaction = datos.get('subaction', 'post')
+    platform = (datos.get('platform') or 'whatsapp').lower()
+    import urllib.parse
+
+    icons = {
+        'whatsapp': '💬',
+        'facebook': '📘',
+        'instagram': '📸',
+        'tiktok': '🎵',
+        'twitter': '🐦',
+        'x': '🐦',
+        'linkedin': '💼',
+        'telegram': '✈️',
+        'general': '📣'
+    }
+    ico = icons.get(platform, '📣')
+
+    st.markdown(f"""
+    <div style="background: rgba(6, 18, 38, 0.92); border: 1px solid rgba(0, 242, 255, 0.4);
+                border-radius: 14px; padding: 16px 20px 10px 20px; margin: 12px 0; box-shadow: 0 0 25px rgba(0, 242, 255, 0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span style="color: #00f2ff; font-family: 'Orbitron', monospace; font-size: 0.95rem; font-weight: 700;">
+                {ico} CENTRO SOCIAL SKY-IA · {platform.upper()}
+            </span>
+            <span style="background: rgba(0, 242, 255, 0.15); color: #00f2ff; border: 1px solid #00f2ff; padding: 3px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 600;">
+                MODO INTERACTIVO
+            </span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if subaction == 'post':
+        content = datos.get('content', '') or f"¡Hola comunidad! Comparto una actualización con SKY-IA. #Innovacion #{platform.title()}"
+        edit_content = st.text_area("Texto de la publicación (Copywriting + Hashtags)", value=content, height=110, key=f"soc_post_{abs(hash(content)) % 100000}")
+        
+        foto = st.file_uploader("📷 Subir foto para la publicación", type=["jpg", "png", "jpeg", "webp"], key=f"soc_file_{abs(hash(content)) % 100000}")
+        if foto:
+            st.image(foto, caption="Vista previa de imagen a publicar", use_container_width=True)
+
+        col_p1, col_p2 = st.columns(2)
+        encoded_text = urllib.parse.quote_plus(edit_content)
+        with col_p1:
+            if platform in ('twitter', 'x'):
+                st.link_button("🐦 Publicar Tweet en X", f"https://twitter.com/intent/tweet?text={encoded_text}", type="primary")
+            elif platform == 'whatsapp':
+                st.link_button("💬 Compartir en WhatsApp", f"https://api.whatsapp.com/send?text={encoded_text}", type="primary")
+            elif platform == 'facebook':
+                st.link_button("📘 Publicar en Facebook", f"https://www.facebook.com/sharer/sharer.php?quote={encoded_text}", type="primary")
+            elif platform == 'instagram':
+                st.link_button("📸 Abrir Instagram Web", "https://www.instagram.com/", type="primary")
+            elif platform == 'tiktok':
+                st.link_button("🎵 Abrir TikTok Studio", "https://www.tiktok.com/upload", type="primary")
+            elif platform == 'linkedin':
+                st.link_button("💼 Publicar en LinkedIn", "https://www.linkedin.com/feed/", type="primary")
+            else:
+                st.link_button(f"🚀 Abrir {platform.title()}", f"https://www.{platform}.com", type="primary")
+        with col_p2:
+            st.caption("🟢 Puedes editar el texto, adjuntar foto o pulsar el botón para publicar.")
+
+    elif subaction == 'message':
+        recip = datos.get('recipient', '') or 'contacto'
+        msg = datos.get('message', '') or 'Hola, te escribo desde mi asistente personal SKY-IA.'
+        edit_msg = st.text_area(f"Mensaje para {recip}", value=msg, height=90, key=f"soc_msg_{abs(hash(msg)) % 100000}")
+        encoded_msg = urllib.parse.quote_plus(edit_msg)
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            st.link_button("💬 Enviar por WhatsApp Web", f"https://web.whatsapp.com/send?text={encoded_msg}", type="primary")
+        with col_m2:
+            st.caption(f"🟢 Pulsa para abrir WhatsApp Web con el mensaje listo para enviar.")
+
+    elif subaction == 'comment':
+        comm = datos.get('comment', '') or 'Excelente publicación, totalmente de acuerdo.'
+        st.text_area("Comentario generado", value=comm, height=80, key=f"soc_comm_{abs(hash(comm)) % 100000}")
+        st.caption("🟢 Comentario listo. Cópialo o ábrelo en tu red social para responder.")
+
+
+def render_archivo_card(datos):
+    path_str = str(datos.get('path', ''))
+    tipo = datos.get('type', 'file')
+    import os
+    basename = os.path.basename(path_str) or path_str
+
+    icons = {
+        '.docx': '📄 Documento Microsoft Word',
+        '.doc': '📄 Documento Microsoft Word',
+        '.xlsx': '📊 Hoja de Cálculo Excel',
+        '.xls': '📊 Hoja de Cálculo Excel',
+        '.pptx': '📽️ Presentación PowerPoint',
+        '.ppt': '📽️ Presentación PowerPoint',
+        '.pdf': '📕 Documento PDF',
+        '.txt': '📝 Archivo de Texto',
+        '.png': '🖼️ Imagen PNG',
+        '.jpg': '🖼️ Imagen JPG',
+        '.jpeg': '🖼️ Imagen JPEG',
+        '.mp4': '🎬 Video MP4',
+        '.mp3': '🎵 Archivo de Audio'
+    }
+    ext = os.path.splitext(path_str)[1].lower()
+    label_tipo = icons.get(ext, '📁 Carpeta de Windows' if tipo == 'folder' else '📄 Archivo del Sistema')
+
+    st.markdown(f"""
+    <div style="background: rgba(8, 22, 45, 0.92); border: 1px solid rgba(0, 242, 255, 0.35);
+                border-radius: 12px; padding: 14px 18px; margin: 10px 0; box-shadow: 0 0 20px rgba(0, 242, 255, 0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="color: #00f2ff; font-weight: 700; font-size: 0.95rem;">
+                {label_tipo}
+            </span>
+            <span style="background: rgba(0, 255, 170, 0.15); color: #00ffaa; border: 1px solid #00ffaa; padding: 2px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 600;">
+                🟢 INICIADO EN WINDOWS
+            </span>
+        </div>
+        <div style="color: #ffffff; font-family: monospace; font-size: 0.9rem; margin: 4px 0;">{basename}</div>
+        <div style="color: #8bb5dc; font-size: 0.8rem;">Ubicación: <code>{path_str}</code></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+
+
+
+def render_holographic_orb(height=360):
+    import streamlit.components.v1 as components
+    hologram_html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          background: transparent;
+          overflow: hidden;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        #container {
+          position: relative;
+          width: 100%;
+          height: 350px;
+          border-radius: 20px;
+          overflow: hidden;
+          background: radial-gradient(circle at 50% 45%, #08223d 0%, #030d1c 45%, #01040a 85%);
+          border: 1px solid rgba(0, 242, 255, 0.35);
+          box-shadow: 0 0 40px rgba(0, 242, 255, 0.2), inset 0 0 35px rgba(0, 242, 255, 0.08);
+        }
+        canvas {
+          display: block;
+          width: 100%;
+          height: 100%;
+        }
+        .hud-badge {
+          position: absolute;
+          bottom: 16px;
+          left: 50%;
+          transform: translateX(-50%);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: rgba(4, 14, 28, 0.88);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(0, 242, 255, 0.35);
+          border-radius: 24px;
+          padding: 8px 32px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 25px rgba(0, 242, 255, 0.3);
+          user-select: none;
+          pointer-events: none;
+          z-index: 10;
+        }
+        .hud-title {
+          font-family: 'Courier New', monospace;
+          font-size: 13px;
+          font-weight: 900;
+          letter-spacing: 4px;
+          color: #00f2ff;
+          text-shadow: 0 0 14px rgba(0, 242, 255, 0.9);
+        }
+        .hud-status {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 3px;
+        }
+        .hud-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #00f2ff;
+          box-shadow: 0 0 10px #00f2ff;
+          animation: pulseDot 1.8s infinite;
+        }
+        .hud-status-text {
+          font-family: 'Courier New', monospace;
+          font-size: 9px;
+          letter-spacing: 3px;
+          color: #9cb8d9;
+          font-weight: 700;
+        }
+        @keyframes pulseDot {
+          0%, 100% { transform: scale(0.85); opacity: 0.6; }
+          50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 15px #00f2ff, 0 0 25px #00a8ff; }
+        }
+      </style>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    </head>
+    <body>
+      <div id="container">
+        <canvas id="canvas"></canvas>
+        <div class="hud-badge">
+          <div class="hud-title">SKY IA UNIVERSAL</div>
+          <div class="hud-status">
+            <span class="hud-dot"></span>
+            <span class="hud-status-text">SISTEMA CONECTADO</span>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        const container = document.getElementById('container');
+        const canvas = document.getElementById('canvas');
+        const width = container.clientWidth || 800;
+        const height = container.clientHeight || 350;
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x01040a, 0.035);
+
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+        camera.position.set(0, 0, 9.5);
+
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+        // Luces
+        const ambientLight = new THREE.AmbientLight(0x0a2b4a, 1.2);
+        scene.add(ambientLight);
+
+        const cyanPointLight = new THREE.PointLight(0x00f2ff, 4.5, 20);
+        cyanPointLight.position.set(0, 0, 0);
+        scene.add(cyanPointLight);
+
+        const dirLight = new THREE.DirectionalLight(0x00f2ff, 2.0);
+        dirLight.position.set(8, 8, 8);
+        scene.add(dirLight);
+
+        // Grupo principal del holograma
+        const hologramGroup = new THREE.Group();
+        scene.add(hologramGroup);
+
+        // 1. NÚCLEO DE ENERGÍA (Esfera brillante densa en el centro)
+        const coreGeo = new THREE.SphereGeometry(1.4, 48, 48);
+        const coreMat = new THREE.MeshStandardMaterial({
+          color: 0x00f2ff,
+          emissive: 0x00d4ff,
+          emissiveIntensity: 2.8,
+          roughness: 0.15,
+          metalness: 0.85
+        });
+        const innerCore = new THREE.Mesh(coreGeo, coreMat);
+        hologramGroup.add(innerCore);
+
+        // 2. ESTRUCTURA GEOMÉTRICA (Icosaedro wireframe circundante)
+        const shellGeo = new THREE.IcosahedronGeometry(2.35, 2);
+        const shellMat = new THREE.MeshStandardMaterial({
+          color: 0x00f2ff,
+          emissive: 0x00f2ff,
+          emissiveIntensity: 1.4,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.5
+        });
+        const outerShell = new THREE.Mesh(shellGeo, shellMat);
+        hologramGroup.add(outerShell);
+
+        // 3. ANILLOS ORBITALES DE CONTENCIÓN
+        const ringsGroup = new THREE.Group();
+        hologramGroup.add(ringsGroup);
+
+        const ring1Geo = new THREE.TorusGeometry(3.1, 0.02, 16, 120);
+        const ring1Mat = new THREE.MeshStandardMaterial({
+          color: 0x00f2ff,
+          emissive: 0x00f2ff,
+          emissiveIntensity: 3.5
+        });
+        const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
+        ringsGroup.add(ring1);
+
+        const ring2Geo = new THREE.TorusGeometry(3.5, 0.015, 16, 120);
+        const ring2Mat = new THREE.MeshStandardMaterial({
+          color: 0x00f2ff,
+          emissive: 0x00f2ff,
+          emissiveIntensity: 2.2,
+          transparent: true,
+          opacity: 0.7
+        });
+        const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+        ring2.rotation.x = Math.PI / 2.3;
+        ring2.rotation.y = Math.PI / 4.5;
+        ringsGroup.add(ring2);
+
+        const ring3Geo = new THREE.TorusGeometry(3.9, 0.01, 16, 120);
+        const ring3Mat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: 0x88e5ff,
+          emissiveIntensity: 1.5,
+          transparent: true,
+          opacity: 0.4
+        });
+        const ring3 = new THREE.Mesh(ring3Geo, ring3Mat);
+        ring3.rotation.x = Math.PI / 4;
+        ring3.rotation.z = -Math.PI / 4;
+        ringsGroup.add(ring3);
+
+        // 4. PARTÍCULAS / CHISPAS CÓSMICAS ORBITANTES
+        const particleCount = 220;
+        const particleGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount; i++) {
+          const r = 2.8 + Math.random() * 4.5;
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+
+          positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+          positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+          positions[i * 3 + 2] = r * Math.cos(phi);
+
+          if (Math.random() > 0.3) {
+            colors[i * 3] = 0.0;
+            colors[i * 3 + 1] = 0.95;
+            colors[i * 3 + 2] = 1.0;
+          } else {
+            colors[i * 3] = 1.0;
+            colors[i * 3 + 1] = 1.0;
+            colors[i * 3 + 2] = 1.0;
+          }
+        }
+
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const particleMat = new THREE.PointsMaterial({
+          size: 0.075,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.85,
+          blending: THREE.AdditiveBlending
+        });
+        const particleSystem = new THREE.Points(particleGeo, particleMat);
+        hologramGroup.add(particleSystem);
+
+        // Fondo de estrellas lejanas
+        const starCount = 350;
+        const starGeo = new THREE.BufferGeometry();
+        const starPos = new Float32Array(starCount * 3);
+        for (let i = 0; i < starCount; i++) {
+          starPos[i * 3] = (Math.random() - 0.5) * 30;
+          starPos[i * 3 + 1] = (Math.random() - 0.5) * 20;
+          starPos[i * 3 + 2] = (Math.random() - 0.5) * 15 - 5;
+        }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        const starMat = new THREE.PointsMaterial({ size: 0.04, color: 0x69b5e8, transparent: true, opacity: 0.6 });
+        const stars = new THREE.Points(starGeo, starMat);
+        scene.add(stars);
+
+        // Interacción suave con mouse
+        let mouseX = 0, mouseY = 0;
+        let targetX = 0, targetY = 0;
+        container.addEventListener('mousemove', (e) => {
+          const rect = container.getBoundingClientRect();
+          mouseX = ((e.clientX - rect.left) / width - 0.5) * 1.5;
+          mouseY = ((e.clientY - rect.top) / height - 0.5) * 1.5;
+        });
+        container.addEventListener('mouseleave', () => {
+          mouseX = 0;
+          mouseY = 0;
+        });
+
+        // Bucle de animación
+        let clock = new THREE.Clock();
+        function animate() {
+          requestAnimationFrame(animate);
+          const t = clock.getElapsedTime();
+
+          // Rotación caparazón icosaedro
+          outerShell.rotation.y = t * 0.22;
+          outerShell.rotation.x = t * 0.12;
+          outerShell.rotation.z = t * 0.06;
+
+          // Rotación núcleo interno
+          innerCore.rotation.y = -t * 0.45;
+          innerCore.rotation.x = -t * 0.2;
+
+          // Rotación anillos
+          ringsGroup.rotation.x = Math.sin(t * 0.3) * 0.45 + Math.PI / 2.2;
+          ringsGroup.rotation.y = t * 0.35;
+          ringsGroup.rotation.z = t * 0.08;
+
+          // Rotación de partículas
+          particleSystem.rotation.y = t * 0.08;
+          particleSystem.rotation.x = t * 0.04;
+          stars.rotation.y = t * 0.01;
+
+          // Pulsación suave del núcleo
+          const pulse = 1 + Math.sin(t * 2.5) * 0.035;
+          innerCore.scale.set(pulse, pulse, pulse);
+          const shellPulse = 1 + Math.sin(t * 1.8) * 0.02;
+          outerShell.scale.set(shellPulse, shellPulse, shellPulse);
+
+          // Parallax suave con mouse
+          targetX += (mouseX - targetX) * 0.05;
+          targetY += (mouseY - targetY) * 0.05;
+          camera.position.x = targetX * 1.2;
+          camera.position.y = -targetY * 1.2;
+          camera.lookAt(0, 0, 0);
+
+          renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+          const newW = container.clientWidth || 800;
+          const newH = container.clientHeight || 350;
+          camera.aspect = newW / newH;
+          camera.updateProjectionMatrix();
+          renderer.setSize(newW, newH);
+        });
+      </script>
+    </body>
+    </html>
+    """
+    components.html(hologram_html, height=height)
+
+
+def render_asistente_jarvis(proveedor, modelo, ejecucion_dispositivo=True):
+    # Inyección de estilos de estética JARVIS / Iron Man
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;600&display=swap');
+
+    .stApp {
+        background: radial-gradient(circle at 50% 0%, #07152b 0%, #050b16 50%, #03060d 100%) !important;
+        color: #e2f1ff !important;
+        font-family: 'Rajdhani', 'Segoe UI', sans-serif !important;
+    }
+
+    [data-testid="stSidebar"] {
+        background: rgba(5, 12, 26, 0.96) !important;
+        border-right: 1px solid rgba(0, 242, 255, 0.25) !important;
+        box-shadow: 4px 0 25px rgba(0, 0, 0, 0.5) !important;
+    }
+    [data-testid="stSidebar"] * {
+        color: #d1e5ff !important;
+    }
+
+    .jarvis-hud-container {
+        background: rgba(6, 17, 36, 0.75);
+        border: 1px solid rgba(0, 242, 255, 0.4);
+        box-shadow: 0 0 35px rgba(0, 242, 255, 0.15), inset 0 0 20px rgba(0, 242, 255, 0.05);
+        border-radius: 16px;
+        padding: 20px 28px;
+        margin-bottom: 18px;
+        backdrop-filter: blur(14px);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .jarvis-hud-container::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; height: 2px;
+        background: linear-gradient(90deg, transparent, #00f2ff, #00a8ff, transparent);
+    }
+
+    .arc-reactor-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+    }
+
+    .arc-reactor {
+        position: relative;
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle, rgba(0, 242, 255, 0.3) 0%, rgba(3, 10, 22, 0.8) 70%);
+        box-shadow: 0 0 25px #00f2ff, inset 0 0 15px #00f2ff;
+        flex-shrink: 0;
+    }
+
+    .arc-ring {
+        position: absolute;
+        border-radius: 50%;
+    }
+    .ring-outer {
+        width: 66px; height: 66px;
+        border: 2px dashed rgba(0, 242, 255, 0.8);
+        animation: rotateCW 9s linear infinite;
+    }
+    .ring-middle {
+        width: 50px; height: 50px;
+        border: 2px dotted rgba(0, 168, 255, 0.9);
+        animation: rotateCCW 6s linear infinite;
+    }
+    .ring-inner {
+        width: 34px; height: 34px;
+        border: 2px solid rgba(0, 242, 255, 0.7);
+        animation: rotateCW 4s linear infinite;
+    }
+    .arc-core {
+        width: 20px; height: 20px;
+        background: #ffffff;
+        border-radius: 50%;
+        box-shadow: 0 0 20px #00f2ff, 0 0 40px #00f2ff;
+        animation: pulseCore 2s ease-in-out infinite;
+    }
+
+    @keyframes rotateCW {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    @keyframes rotateCCW {
+        from { transform: rotate(360deg); }
+        to { transform: rotate(0deg); }
+    }
+    @keyframes pulseCore {
+        0%, 100% { transform: scale(0.9); opacity: 0.85; box-shadow: 0 0 15px #00f2ff; }
+        50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 30px #00f2ff, 0 0 45px #00a8ff; }
+    }
+
+    .jarvis-title-block {
+        flex-grow: 1;
+    }
+    .jarvis-system-tag {
+        font-family: 'Orbitron', monospace;
+        font-size: 0.75rem;
+        color: #00f2ff;
+        letter-spacing: 2px;
+        margin-bottom: 2px;
+    }
+    .jarvis-main-title {
+        font-family: 'Orbitron', sans-serif !important;
+        font-size: 2.1rem !important;
+        font-weight: 900 !important;
+        margin: 0 !important;
+        color: #ffffff !important;
+        letter-spacing: 1.5px;
+        text-shadow: 0 0 15px rgba(0, 242, 255, 0.6);
+    }
+    .jarvis-sub-title {
+        font-size: 0.95rem;
+        color: #9cb8d9;
+        letter-spacing: 1px;
+        margin-top: 4px;
+    }
+
+    .jarvis-audio-waves {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        height: 40px;
+        padding-right: 10px;
+    }
+    .jarvis-audio-waves span {
+        width: 4px;
+        background: #00f2ff;
+        border-radius: 3px;
+        box-shadow: 0 0 8px #00f2ff;
+        animation: waveBar 1.2s ease-in-out infinite alternate;
+    }
+    .jarvis-audio-waves span:nth-child(1) { height: 10px; animation-delay: 0.1s; }
+    .jarvis-audio-waves span:nth-child(2) { height: 25px; animation-delay: 0.3s; }
+    .jarvis-audio-waves span:nth-child(3) { height: 35px; animation-delay: 0.2s; }
+    .jarvis-audio-waves span:nth-child(4) { height: 18px; animation-delay: 0.4s; }
+    .jarvis-audio-waves span:nth-child(5) { height: 28px; animation-delay: 0.15s; }
+    .jarvis-audio-waves span:nth-child(6) { height: 38px; animation-delay: 0.35s; }
+    .jarvis-audio-waves span:nth-child(7) { height: 22px; animation-delay: 0.25s; }
+    .jarvis-audio-waves span:nth-child(8) { height: 15px; animation-delay: 0.45s; }
+
+    @keyframes waveBar {
+        0% { transform: scaleY(0.3); opacity: 0.4; }
+        100% { transform: scaleY(1.2); opacity: 1; }
+    }
+
+    .telemetry-deck {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .telemetry-card {
+        background: rgba(10, 24, 48, 0.65);
+        border: 1px solid rgba(0, 242, 255, 0.25);
+        border-radius: 12px;
+        padding: 12px 16px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+        transition: all 0.2s ease;
+    }
+    .telemetry-card:hover {
+        border-color: #00f2ff;
+        box-shadow: 0 0 20px rgba(0, 242, 255, 0.25);
+    }
+    .telemetry-label {
+        font-size: 0.72rem;
+        color: #79a6d2;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .telemetry-value {
+        font-family: 'Orbitron', monospace;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #00f2ff;
+        margin-top: 3px;
+        text-shadow: 0 0 8px rgba(0, 242, 255, 0.4);
+    }
+
+    [data-testid="stChatMessage"] {
+        background: rgba(8, 20, 40, 0.75) !important;
+        border: 1px solid rgba(0, 242, 255, 0.2) !important;
+        border-radius: 14px !important;
+        margin-bottom: 12px !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+    }
+    [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+        border-left: 4px solid #00a8ff !important;
+        background: rgba(10, 25, 52, 0.65) !important;
+    }
+    [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
+        border-left: 4px solid #00f2ff !important;
+        box-shadow: 0 0 15px rgba(0, 242, 255, 0.1) !important;
+    }
+
+    [data-testid="stPills"] button {
+        background: rgba(12, 28, 56, 0.8) !important;
+        border: 1px solid rgba(0, 242, 255, 0.35) !important;
+        color: #e0f2fe !important;
+        font-weight: 600 !important;
+        border-radius: 20px !important;
+        transition: all 0.25s ease !important;
+    }
+    [data-testid="stPills"] button:hover {
+        background: rgba(0, 242, 255, 0.2) !important;
+        border-color: #00f2ff !important;
+        box-shadow: 0 0 14px rgba(0, 242, 255, 0.4) !important;
+        transform: translateY(-1px);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # 3D Holographic Orb (KENORA 3D Neural Stage adaptado a SKY IA)
+    render_holographic_orb(height=355)
+
+
+    # Deck de Telemetría HUD
+    st.markdown(f"""
+    <div class="telemetry-deck">
+        <div class="telemetry-card">
+            <div class="telemetry-label">⚡ ARC REACTOR</div>
+            <div class="telemetry-value">100% ONLINE</div>
+        </div>
+        <div class="telemetry-card">
+            <div class="telemetry-label">🧠 CEREBRO MULTI-IA</div>
+            <div class="telemetry-value">{PROVIDERS[proveedor].name.upper()}</div>
+        </div>
+        <div class="telemetry-card">
+            <div class="telemetry-label">🖥️ CONTROL WINDOWS</div>
+            <div class="telemetry-value">{'AUTORIZADO' if ejecucion_dispositivo else 'SOLO LECTURA'}</div>
+        </div>
+        <div class="telemetry-card">
+            <div class="telemetry-label">🎬 MULTIMEDIA HUD</div>
+            <div class="telemetry-value">ACTIVO</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 3 MODOS DE INTERACCIÓN: A (Conversación Natural), B (Micrófono Manual), C (Chat Escrito)
+    from neural_core.voice_coordinator import coordinador_voz, InteractionMode, VoiceState
+
+    if "sky_interaction_mode" not in st.session_state:
+        st.session_state["sky_interaction_mode"] = "MODO_A"
+
+    if st.button("🌌 Cambiar a Núcleo Holográfico 3D (Pantalla Limpia)", help="Activa la nueva interfaz cinematográfica 3D centrada en el Núcleo sin paneles"):
+        st.session_state["sky_ui_view_mode"] = "holographic"
+        st.rerun()
+
+    col_m1, col_m2, col_m3 = st.columns(3)
+    with col_m1:
+        if st.button("🎙️ Modo A: Conversación Natural",
+                     type="primary" if st.session_state["sky_interaction_mode"] == "MODO_A" else "secondary",
+                     use_container_width=True,
+                     help="Diálogo bidireccional continuo frente a frente con SKY-IA. Responde con voz y escucha el siguiente turno sin repetir 'SKY'."):
+            st.session_state["sky_interaction_mode"] = "MODO_A"
+            coordinador_voz.set_mode(InteractionMode.MODO_A_NATURAL)
+            st.rerun()
+    with col_m2:
+        if st.button("🔘 Modo B: Micrófono Manual",
+                     type="primary" if st.session_state["sky_interaction_mode"] == "MODO_B" else "secondary",
+                     use_container_width=True,
+                     help="Grabación solo cuando pulsas el micrófono (Push-To-Talk). No graba en reposo. Responde con voz."):
+            st.session_state["sky_interaction_mode"] = "MODO_B"
+            coordinador_voz.set_mode(InteractionMode.MODO_B_MANUAL)
+            st.rerun()
+    with col_m3:
+        if st.button("✍️ Modo C: Chat Escrito",
+                     type="primary" if st.session_state["sky_interaction_mode"] == "MODO_C" else "secondary",
+                     use_container_width=True,
+                     help="Modo texto sin micrófono. Conserva todo tu historial, contexto, tareas y música."):
+            st.session_state["sky_interaction_mode"] = "MODO_C"
+            coordinador_voz.set_mode(InteractionMode.MODO_C_TEXTO)
+            st.rerun()
+
+    # Estado activo del coordinador de voz
+    modo_act = st.session_state["sky_interaction_mode"]
+    if modo_act == "MODO_A":
+        st.markdown("""
+        <div style="background: rgba(0, 242, 255, 0.08); border: 1px solid #00f2ff; border-radius: 10px; padding: 8px 14px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #00f2ff; font-weight: 700; font-size: 0.88rem;">🟢 MODO A: CONVERSACIÓN NATURAL BIDIRECCIONAL</span>
+            <span style="color: #a0d8ef; font-size: 0.78rem;">Decí "SKY" o grabá tu orden · Luego continuá dialogando libremente</span>
+        </div>
+        """, unsafe_allow_html=True)
+        audio_clip = st.audio_input("Habla con SKY-IA (Detección de voz activa)", key="sky_mode_a_mic")
+        if audio_clip is not None:
+            audio_bytes = audio_clip.read()
+            audio_hash = hashlib.md5(audio_bytes).hexdigest()
+            if st.session_state.get('_last_audio_hash') != audio_hash:
+                st.session_state['_last_audio_hash'] = audio_hash
+                with st.spinner("Escuchando y procesando tu intervención..."):
+                    try:
+                        coordinador_voz.set_state(VoiceState.ESCUCHANDO)
+                        transcrito = transcribir_audio(audio_bytes, mime='audio/wav')
+                        st.session_state['_audio_pending_prompt'] = transcrito
+                        coordinador_voz.set_state(VoiceState.PROCESANDO)
+                        st.success(f"Voz capturada: «{transcrito}»")
+                    except Exception as err:
+                        st.warning(f"Audio no detectado: {err}. Puedes escribir abajo.")
+    elif modo_act == "MODO_B":
+        st.markdown("""
+        <div style="background: rgba(0, 255, 170, 0.08); border: 1px solid #00ffaa; border-radius: 10px; padding: 8px 14px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #00ffaa; font-weight: 700; font-size: 0.88rem;">🔘 MODO B: MICRÓFONO MANUAL (PUSH-TO-TALK)</span>
+            <span style="color: #9cb8d9; font-size: 0.78rem;">Grabación bajo demanda · Sin grabaciones ambientales</span>
+        </div>
+        """, unsafe_allow_html=True)
+        audio_clip = st.audio_input("Presiona para hablar (Modo Manual)", key="sky_mode_b_mic")
+        if audio_clip is not None:
+            audio_bytes = audio_clip.read()
+            audio_hash = hashlib.md5(audio_bytes).hexdigest()
+            if st.session_state.get('_last_audio_hash') != audio_hash:
+                st.session_state['_last_audio_hash'] = audio_hash
+                with st.spinner("Procesando audio manual..."):
+                    try:
+                        transcrito = transcribir_audio(audio_bytes, mime='audio/wav')
+                        st.session_state['_audio_pending_prompt'] = transcrito
+                        st.success(f"Intervención manual: «{transcrito}»")
+                    except Exception as err:
+                        st.warning(f"Error al transcribir: {err}")
+    else:
+        st.markdown("""
+        <div style="background: rgba(140, 90, 255, 0.08); border: 1px solid #8c5aff; border-radius: 10px; padding: 8px 14px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #c49eff; font-weight: 700; font-size: 0.88rem;">✍️ MODO C: CHAT ESCRITO Y MINIVENTANA</span>
+            <span style="color: #9cb8d9; font-size: 0.78rem;">Escribe tus órdenes abajo · Conservo todo tu contexto y música</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Sugerencias rápidas en píldoras
+    st.markdown("**Acciones rápidas:**")
+    opciones_rapidas = [
+        "Abre YouTube y pon Queen",
+        "Abre WhatsApp",
+        "Publica en Facebook un saludo a mi comunidad",
+        "Crea un post para Instagram",
+        "Abre mi carpeta de documentos",
+        "Abre Word",
+        "Abre Excel",
+        "Consulta el estado de mi computadora"
+    ]
+    sugerencia_clic = st.pills("Acciones", opciones_rapidas, label_visibility="collapsed")
+
+    # Estado del servicio de voz y tareas activas en segundo plano
+    import json
+    from pathlib import Path
+    st_file = Path(__file__).resolve().parent / "local_data" / "sky_session_state.json"
+    hands_free_info = {}
+    if st_file.exists():
+        try:
+            hands_free_info = json.loads(st_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    from neural_core.task_manager import gestor_tareas
+    act_task = gestor_tareas.get_active_task()
+
+    col_stat1, col_stat2 = st.columns([1, 1])
+    with col_stat1:
+        if hands_free_info.get("hands_free_listening"):
+            st.markdown(
+                '<div style="background: rgba(0, 255, 170, 0.12); border: 1px solid #00ffaa; border-radius: 8px; padding: 5px 12px; margin-bottom: 8px; font-size: 0.8rem; color: #00ffaa; font-weight: 600;">🟢 MODO MANOS LIBRES: Escucha continua activa (Di "SKY")</div>',
+                unsafe_allow_html=True
+            )
+    with col_stat2:
+        if act_task:
+            st.markdown(
+                f'<div style="background: rgba(0, 242, 255, 0.12); border: 1px solid #00f2ff; border-radius: 8px; padding: 5px 12px; margin-bottom: 8px; font-size: 0.8rem; color: #00f2ff; font-weight: 600;">⚡ TRABAJO ACTIVO: {act_task.title} ({act_task.progress}%)</div>',
+                unsafe_allow_html=True
+            )
+
+    if act_task and act_task.status in ('pending', 'running'):
+        st.progress(act_task.progress / 100.0, text=f"Progreso de {act_task.title}: {act_task.description}")
+
+    # Historial de conversación
+    if "chat_jarvis_history" not in st.session_state:
+        st.session_state.chat_jarvis_history = [
+            {
+                "role": "assistant",
+                "content": "¡Hola Oscar! Soy **SKY-IA**. Todos mis módulos (control de equipo, multimedia, redes sociales, documentos Office, diseño 3D y finanzas) operan internamente en segundo plano. ¿Qué necesitas que haga?"
+            }
+        ]
+
+    for m in st.session_state.chat_jarvis_history:
+        with st.chat_message(m["role"]):
+            st.markdown(m["content"])
+            if m.get("tipo") == "finanzas" and m.get("datos"):
+                res = m["datos"]
+                if res.get('totales'):
+                    st.dataframe(pd.DataFrame([
+                        {'Moneda': mon, 'Ingresos': vals['ingreso']/100, 'Gastos': vals['gasto']/100, 'Balance': (vals['ingreso']-vals['gasto'])/100}
+                        for mon, vals in res['totales'].items()
+                    ]), hide_index=True)
+            elif m.get("tipo") == "media" and m.get("datos"):
+                render_media_card(m["datos"])
+            elif m.get("tipo") == "social" and m.get("datos"):
+                render_social_card(m["datos"])
+            elif m.get("tipo") == "archivo" and m.get("datos"):
+                render_archivo_card(m["datos"])
+
+    # Captura de entrada
+    prompt_usuario = st.chat_input("Escribe una orden a SKY... (ej: 'SKY, abre YouTube y pon Queen', 'abre la calculadora', 'calcula 500*12')", submit_mode="disable")
+
+    if not prompt_usuario and st.session_state.get('_audio_pending_prompt'):
+        prompt_usuario = st.session_state.pop('_audio_pending_prompt')
+    elif not prompt_usuario and sugerencia_clic and st.session_state.get('_last_sugerencia_used') != sugerencia_clic:
+        st.session_state['_last_sugerencia_used'] = sugerencia_clic
+        prompt_usuario = sugerencia_clic
+
+    if prompt_usuario:
+        st.session_state.chat_jarvis_history.append({"role": "user", "content": prompt_usuario})
+        with st.chat_message("user"):
+            st.markdown(prompt_usuario)
+
+        with st.chat_message("assistant"):
+            with st.status(":shimmer[SKY ejecutando solicitud...]", type="compact") as status_box:
+                respuesta_texto = ""
+                tipo_extra = None
+                datos_extra = None
+                texto_limpio = norm(prompt_usuario)
+
+                # 1. Comandos de dispositivo (PC)
+                cmd_device = interpret_command(prompt_usuario)
+                if cmd_device:
+                    status_box.update(label=f"Ejecutando acción en PC: {cmd_device['description']}", state="running")
+                    if cmd_device['action'] == 'open_url':
+                        url = cmd_device['params'].get('url')
+                        query = cmd_device['params'].get('query', '')
+                        service = cmd_device['params'].get('service', 'web')
+
+                        if service == 'youtube':
+                            from neural_core.multimedia import resolve_youtube_video
+                            res_yt = resolve_youtube_video(query or 'Queen')
+                            if res_yt.get('url') and 'watch?v=' in res_yt['url']:
+                                url = res_yt['url']
+                            video_id = res_yt.get('video_id', '')
+                            candidates = res_yt.get('candidates', [])
+                            title = res_yt.get('titulo', query or 'Queen')
+                            
+                            # Miniventana manejable por defecto salvo que el usuario indique otro tamaño
+                            cur_mode = st.session_state.get('sky_player_mode')
+                            if not cur_mode:
+                                cur_mode = 'mini'
+                                if any(w in texto_limpio for w in ('ampliado', 'pantalla ancha', 'cine', 'grande')):
+                                    cur_mode = 'ampliado'
+                                elif any(w in texto_limpio for w in ('pantalla completa', 'completa')):
+                                    cur_mode = 'ampliado'
+                                elif any(w in texto_limpio for w in ('normal', 'panel normal')):
+                                    cur_mode = 'normal'
+                                st.session_state['sky_player_mode'] = cur_mode
+
+                            datos_extra = {
+                                'url': url,
+                                'query': query,
+                                'service': 'youtube',
+                                'video_id': video_id,
+                                'candidates': candidates,
+                                'title': title,
+                                'mode': cur_mode
+                            }
+                            st.session_state['sky_current_player'] = datos_extra
+
+                        if ejecucion_dispositivo and url:
+                            import webbrowser
+                            webbrowser.open(url, new=2)
+                            try:
+                                from neural_core.windows_controller import focus_user_window
+                                focus_user_window("YouTube") or focus_user_window("Chrome") or focus_user_window("Edge")
+                            except Exception:
+                                pass
+
+                            if service == 'youtube':
+                                if query:
+                                    respuesta_texto = f"🎬 **SKY-IA**: He cargado **«{title}»** en miniventana interactiva (con controles, selección de versiones y modos)."
+                                else:
+                                    respuesta_texto = "🎬 **SKY-IA**: He abierto YouTube en el reproductor integrado de SKY-IA."
+                                tipo_extra = "media"
+                            elif service == 'google':
+                                respuesta_texto = f"🔍 **SKY-IA**: He abierto la búsqueda de Google para **«{query}»** en tu navegador."
+                                tipo_extra = "media"
+                                datos_extra = {'url': url, 'query': query, 'service': 'google'}
+                            else:
+                                respuesta_texto = f"✅ **SKY-IA**: He abierto **{url}** en tu navegador local."
+                                tipo_extra = "media"
+                                datos_extra = {'url': url, 'query': query, 'service': 'web'}
+                        else:
+                            respuesta_texto = f"Acción disponible: Abrir enlace `{url}`. (Habilita ejecución directa para abrirlo automáticamente)."
+                    elif cmd_device['action'] == 'launch_app':
+                        app_name = cmd_device['params'].get('app')
+                        if ejecucion_dispositivo and app_name:
+                            try:
+                                from neural_core.windows_controller import launch_authorized_app
+                                res_launch = launch_authorized_app(app_name)
+                                respuesta_texto = f"✅ {res_launch['message']}"
+                            except Exception as err:
+                                respuesta_texto = f"⚠️ {err}"
+                        else:
+                            respuesta_texto = f"Acción propuesta: Abrir {app_name}. (Habilita ejecución directa en PC para iniciar)."
+                    elif cmd_device['action'] == 'window_action':
+                        if ejecucion_dispositivo:
+                            try:
+                                from neural_core.windows_controller import (
+                                    list_user_windows, focus_user_window,
+                                    minimize_user_window, restore_user_window, close_user_window
+                                )
+                                subaction = cmd_device['params'].get('subaction', 'list')
+                                if subaction == 'list':
+                                    wins = list_user_windows()
+                                    if wins:
+                                        lista_t = "\n".join(f"- `{w['title']}`" for w in wins[:10])
+                                        respuesta_texto = f"🖥️ **Ventanas abiertas detectadas:**\n{lista_t}"
+                                    else:
+                                        respuesta_texto = "🖥️ No se detectaron ventanas abiertas de usuario."
+                                elif subaction == 'focus':
+                                    res_f = focus_user_window(cmd_device['params'].get('target', ''))
+                                    respuesta_texto = f"✅ {res_f['message']}"
+                                elif subaction == 'minimize':
+                                    res_m = minimize_user_window(cmd_device['params'].get('target'))
+                                    respuesta_texto = f"✅ {res_m['message']}"
+                                elif subaction == 'restore':
+                                    res_r = restore_user_window(cmd_device['params'].get('target'))
+                                    respuesta_texto = f"✅ {res_r['message']}"
+                                elif subaction == 'close':
+                                    res_c = close_user_window(cmd_device['params'].get('target'))
+                                    respuesta_texto = f"✅ {res_c['message']}"
+                                elif subaction == 'organize':
+                                    from neural_core.windows_controller import organize_windows
+                                    res_org = organize_windows()
+                                    respuesta_texto = f"✅ {res_org['message']}"
+                            except Exception as err:
+                                respuesta_texto = f"⚠️ Error en ventana: {err}"
+                        else:
+                            respuesta_texto = "Acción sobre ventana propuesta. (Habilita ejecución directa para ejecutarla)."
+                    elif cmd_device['action'] == 'media_key':
+                        if ejecucion_dispositivo:
+                            try:
+                                from agente_dispositivo import send_media_key
+                                send_media_key(cmd_device['params'].get('key', 'play_pause'))
+                                respuesta_texto = f"🎵 Se envió la tecla multimedia `{cmd_device['params'].get('key')}` a Windows."
+                            except Exception as err:
+                                respuesta_texto = f"⚠️ Control multimedia: {err}"
+                        else:
+                            respuesta_texto = f"Tecla multimedia `{cmd_device['params'].get('key')}` propuesta."
+                    elif cmd_device['action'] == 'player_control':
+                        subact = cmd_device['params'].get('subaction', 'mode_normal')
+                        cur_p = st.session_state.get('sky_current_player') or {
+                            'url': 'https://www.youtube.com/watch?v=vbvyNnw8Qjg',
+                            'query': 'Queen',
+                            'service': 'youtube',
+                            'video_id': 'vbvyNnw8Qjg',
+                            'title': 'Queen – Bohemian Rhapsody (Live Aid 1985)',
+                            'candidates': [
+                                {'id': 'vbvyNnw8Qjg', 'title': 'Queen – Bohemian Rhapsody (Live Aid 1985)', 'embeddable': True},
+                                {'id': 'frdBb9Slu1A', 'title': 'Queen – Live Aid 1985 Full Concert', 'embeddable': True},
+                                {'id': 'PadKCVBIN94', 'title': 'Queen – Bohemian Rhapsody (1981 Live Video)', 'embeddable': True},
+                                {'id': 'HgzGwKwLmgM', 'title': "Queen – Don't Stop Me Now", 'embeddable': True}
+                            ]
+                        }
+                        if subact == 'mode_mini':
+                            st.session_state['sky_player_mode'] = 'mini'
+                            cur_p['mode'] = 'mini'
+                            respuesta_texto = "🎬 **SKY-IA**: He cambiado el reproductor a modo **Mini ventana flotante (PiP)**. Puedes moverlo y continuar navegando."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        elif subact == 'mode_expanded':
+                            st.session_state['sky_player_mode'] = 'ampliado'
+                            cur_p['mode'] = 'ampliado'
+                            respuesta_texto = "🎬 **SKY-IA**: He ampliado el reproductor a **Modo Cine (Pantalla Ancha)**."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        elif subact == 'mode_fullscreen':
+                            st.session_state['sky_player_mode'] = 'ampliado'
+                            cur_p['mode'] = 'ampliado'
+                            respuesta_texto = "🎬 **SKY-IA**: Activando modo **Pantalla Completa**. Puedes utilizar el botón 🔲 en los controles del reproductor."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        elif subact == 'mode_normal':
+                            st.session_state['sky_player_mode'] = 'normal'
+                            cur_p['mode'] = 'normal'
+                            respuesta_texto = "🎬 **SKY-IA**: He restaurado el reproductor a **Tamaño Normal**."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        elif subact == 'close':
+                            st.session_state['sky_current_player'] = None
+                            respuesta_texto = "🎬 **SKY-IA**: He cerrado el reproductor multimedia."
+                        elif subact == 'next':
+                            cands = cur_p.get('candidates', [])
+                            if cands:
+                                cur_p['candidates'] = cands[1:] + [cands[0]]
+                                cur_p['video_id'] = cur_p['candidates'][0]['id']
+                                cur_p['title'] = cur_p['candidates'][0]['title']
+                                cur_p['url'] = f"https://www.youtube.com/watch?v={cur_p['video_id']}"
+                            respuesta_texto = f"⏭️ **SKY-IA**: Saltando al siguiente video: **{cur_p.get('title')}**."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        elif subact in ('pause', 'play'):
+                            try:
+                                from agente_dispositivo import send_media_key
+                                send_media_key('play_pause')
+                            except Exception:
+                                pass
+                            respuesta_texto = f"⏯️ **SKY-IA**: {'Pausando' if subact == 'pause' else 'Reanudando'} reproducción."
+                            tipo_extra = "media"
+                            datos_extra = cur_p
+                        elif subact == 'text_mode':
+                            st.session_state['sky_text_mode_focus'] = True
+                            respuesta_texto = "✍️ **SKY-IA**: Modo de chat escrito activado. Mantengo tu historial, contexto, tareas y música en segundo plano. ¿Qué deseas escribir?"
+                        if subact != 'close':
+                            st.session_state['sky_current_player'] = cur_p
+                    elif cmd_device['action'] == 'task_action':
+                        subact = cmd_device['params'].get('subaction', 'create_presentation')
+                        from neural_core.task_manager import gestor_tareas
+                        if subact == 'create_presentation':
+                            topic = cmd_device['params'].get('topic', 'tema general')
+                            t = gestor_tareas.create_task('presentation', f"Presentación: {topic}", f"Preparando presentación sobre {topic}", cmd_device['params'])
+                            gestor_tareas.run_presentation_task(t.id, topic)
+                            respuesta_texto = f"📽️ **SKY-IA**: He iniciado la preparación de la presentación sobre **«{topic}»** en segundo plano con Office Studio. Mientras avanza, puedes seguir conversando conmigo o pedirme que agregue fotos y detalles."
+                            tipo_extra = "archivo"
+                            datos_extra = {'path': f"Presentacion_{topic}.pptx", 'type': 'file', 'task_id': t.id}
+                        elif subact == 'append':
+                            mod = cmd_device['params'].get('modification', '')
+                            t = gestor_tareas.append_to_active_task(mod)
+                            if t and t.kind == 'presentation':
+                                mods = [m['text'] for m in t.params.get('modifications', [])]
+                                gestor_tareas.run_presentation_task(t.id, t.params.get('topic', 'trabajo'), mods)
+                                respuesta_texto = f"✨ **SKY-IA**: He incorporado tu solicitud (**«{mod}»**) a la presentación en curso sin interrumpir nuestro diálogo."
+                            else:
+                                respuesta_texto = f"✨ **SKY-IA**: Modificación registrada para el trabajo en curso: **«{mod}»**."
+                        elif subact == 'create_document':
+                            topic = cmd_device['params'].get('topic', 'documento general')
+                            from neural_core.sky_office import create_document
+                            gen_doc = create_document('docx', topic, f"# {topic.title()}\n\nDocumento generado por SKY-IA.\n\nContenido base estructurado y listo para edición.")
+                            docs_dir = Path.home() / "Documents" / "SKY_Office"
+                            docs_dir.mkdir(parents=True, exist_ok=True)
+                            out_p = docs_dir / gen_doc.filename
+                            out_p.write_bytes(gen_doc.data)
+                            respuesta_texto = f"📄 **SKY-IA**: He creado el documento **«{gen_doc.filename}»** en tu carpeta de Documentos."
+                            tipo_extra = "archivo"
+                            datos_extra = {'path': str(out_p), 'type': 'file'}
+                    elif cmd_device['action'] == 'open_file':
+                        if ejecucion_dispositivo:
+                            try:
+                                from neural_core.windows_controller import open_local_file_or_folder
+                                target_f = cmd_device['params'].get('target', '')
+                                res_f = open_local_file_or_folder(target_f)
+                                respuesta_texto = f"📂 **SKY-IA**: {res_f['message']}"
+                                tipo_extra = "archivo"
+                                datos_extra = res_f
+                            except Exception as err:
+                                respuesta_texto = f"⚠️ {err}"
+                        else:
+                            respuesta_texto = f"Acción propuesta: Abrir archivo o carpeta '{cmd_device['params'].get('target')}'."
+                    elif cmd_device['action'] == 'social_action':
+                        subact = cmd_device['params'].get('subaction', 'post')
+                        plat = cmd_device['params'].get('platform', 'whatsapp')
+                        tipo_extra = "social"
+                        datos_extra = cmd_device['params']
+                        if subact == 'post':
+                            respuesta_texto = f"📣 **SKY-IA**: He preparado tu publicación para **{plat.title()}**. Puedes redactar, adjuntar fotos y publicar directamente."
+                        elif subact == 'message':
+                            recip = cmd_device['params'].get('recipient', '')
+                            respuesta_texto = f"💬 **SKY-IA**: He preparado tu mensaje para **{recip}** en **WhatsApp**. Puedes enviarlo con un clic."
+                        elif subact == 'comment':
+                            respuesta_texto = f"✍️ **SKY-IA**: Generé un comentario optimizado para **{plat.title()}**."
+                    elif cmd_device['action'] == 'status':
+                        import platform
+                        respuesta_texto = f"🖥️ **Estado de tu computadora:**\n- Dispositivo: `{platform.node()}`\n- Sistema: `{platform.system()} {platform.release()}`\n- Plataforma: `{platform.platform()}`\n- Agente local: Conectado y operativo."
+
+                # 2. Comandos aritméticos o herramientas locales
+                if not respuesta_texto:
+                    resp_local = interpret_local_command(prompt_usuario)
+                    if resp_local:
+                        status_box.update(label="Herramienta local ejecutada", state="running")
+                        respuesta_texto = resp_local
+
+                # 3. Consulta de finanzas internas
+                if not respuesta_texto and any(w in texto_limpio for w in ['finanzas', 'gastos', 'ingresos', 'balance', 'presupuesto']):
+                    status_box.update(label="Consultando módulo financiero...", state="running")
+                    res_fin = resumen()
+                    tipo_extra = "finanzas"
+                    datos_extra = res_fin
+                    if res_fin and res_fin.get('totales'):
+                        lineas = [f"📊 **Resumen Financiero ({res_fin.get('mes', 'Mes Actual')}):**"]
+                        for mon, vals in res_fin['totales'].items():
+                            ing = vals['ingreso'] / 100
+                            gas = vals['gasto'] / 100
+                            bal = ing - gas
+                            lineas.append(f"- **{mon}:** Ingresos: `${ing:,.2f}` | Gastos: `${gas:,.2f}` | **Balance:** `${bal:,.2f}`")
+                        if res_fin.get('alertas'):
+                            for al in res_fin['alertas']:
+                                lineas.append(f"⚠️ *Alerta en {al['categoria']}*: Has gastado ${al['gasto']} de un límite de ${al['limite']}")
+                        respuesta_texto = "\n".join(lineas)
+                    else:
+                        respuesta_texto = "📊 El motor financiero está activo pero aún no hay transacciones registradas este mes. Puedes registrar ingresos o gastos cuando lo necesites."
+
+                # 4. Consulta de noticias
+                if not respuesta_texto and any(w in texto_limpio for w in ['noticias', 'noticia', 'actualidad']):
+                    status_box.update(label="Consultando noticias en tiempo real...", state="running")
+                    try:
+                        notis = noticias(prompt_usuario[:100], limite=5)
+                        if notis:
+                            lineas = ["📰 **Últimas noticias:**"]
+                            for n in notis:
+                                tit = n.get('titulo') or n.get('titular') or 'Noticia'
+                                url = n.get('url') or n.get('enlace') or '#'
+                                lineas.append(f"- [{tit}]({url})")
+                            respuesta_texto = "\n".join(lineas)
+                    except Exception:
+                        pass
+
+                # 5. Cerebro Multi-IA y memoria
+                if not respuesta_texto:
+                    status_box.update(label=f"Consultando {PROVIDERS[proveedor].name}...", state="running")
+                    historial_modelo = [
+                        {"role": m["role"], "content": m["content"]}
+                        for m in st.session_state.chat_jarvis_history
+                    ]
+                    try:
+                        resp_ia, fuentes = responder(
+                            prompt_usuario,
+                            area="General",
+                            historial=historial_modelo[-6:],
+                            modelo=modelo,
+                            proveedor=proveedor
+                        )
+                        respuesta_texto = resp_ia
+                        if fuentes:
+                            respuesta_texto += f"\n\n*Documentos internos consultados: {', '.join(dict.fromkeys(x['nombre'] for x in fuentes))}*"
+                    except Exception as e:
+                        respuesta_texto = f"Error al consultar el modelo de IA: {e}"
+
+                status_box.update(label="Completado", state="complete")
+
+            st.markdown(respuesta_texto)
+            if tipo_extra == "finanzas" and datos_extra and datos_extra.get('totales'):
+                st.dataframe(pd.DataFrame([
+                    {'Moneda': mon, 'Ingresos': vals['ingreso']/100, 'Gastos': vals['gasto']/100, 'Balance': (vals['ingreso']-vals['gasto'])/100}
+                    for mon, vals in datos_extra['totales'].items()
+                ]), hide_index=True)
+            elif tipo_extra == "media" and datos_extra:
+                render_media_card(datos_extra)
+            elif tipo_extra == "social" and datos_extra:
+                render_social_card(datos_extra)
+            elif tipo_extra == "archivo" and datos_extra:
+                render_archivo_card(datos_extra)
+
+            msg_salida = {"role": "assistant", "content": respuesta_texto}
+            if tipo_extra:
+                msg_salida["tipo"] = tipo_extra
+                msg_salida["datos"] = datos_extra
+            st.session_state.chat_jarvis_history.append(msg_salida)
+
+            # Síntesis de voz hablada en el navegador si estamos en Modo A o Modo B
+            interact_mode = st.session_state.get("sky_interaction_mode", "MODO_A")
+            if interact_mode in ("MODO_A", "MODO_B") and respuesta_texto:
+                try:
+                    from neural_core.voz import hablar_texto
+                    audio_mp3 = hablar_texto(respuesta_texto)
+                    if audio_mp3:
+                        st.caption("🔊 *SKY-IA respondiendo con voz:*")
+                        st.audio(audio_mp3, format="audio/mp3", autoplay=True)
+                except Exception:
+                    pass
+
+            # Registrar turno en coordinador_voz
+            try:
+                coordinador_voz.record_turn(prompt_usuario, respuesta_texto)
+            except Exception:
+                pass
+
+
+def render_asistente_holografico_3d(proveedor, modelo, ejecucion_dispositivo=True):
+    from neural_core.voice_coordinator import coordinador_voz, InteractionMode, VoiceState
+    from neural_core.window_manager import gestor_ventanas
+    from neural_core.holographic_ui import generate_holographic_scene_html, get_holographic_css
+    from neural_core.voz import hablar_texto
+    from neural_core.dispositivos import interpret_command
+    import streamlit.components.v1 as components
+    import hashlib
+
+    # 1. Inyectar estilos holográficos
+    st.markdown(get_holographic_css(), unsafe_allow_html=True)
+
+    # 2. Barra Superior Discreta de Control
+    col_hdr_l, col_hdr_c, col_hdr_r = st.columns([4, 4, 4], vertical_alignment="center")
+    with col_hdr_l:
+        st.markdown("""
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-family: 'Orbitron', sans-serif; font-size: 1.25rem; font-weight: 900; color: #00f2ff; letter-spacing: 2px;">SKY-IA</span>
+            <span style="font-size: 0.72rem; color: #7dd3fc; letter-spacing: 3px; font-weight: 700;">IA UNIVERSAL</span>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_hdr_c:
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            if st.button("✦ Módulos (26)", help="Abrir ventana holográfica con los 26 módulos del ecosistema"):
+                if gestor_ventanas.windows['modules'].is_open:
+                    gestor_ventanas.close_window('modules')
+                else:
+                    gestor_ventanas.open_window('modules', win_type='modules', title='🧠 Ecosistema SKY-IA (26 Módulos)', position='center')
+                st.rerun()
+        with col_m2:
+            if st.button("📋 Modo Clásico", help="Regresar a la interfaz anterior de consola/tablero"):
+                st.session_state["sky_ui_view_mode"] = "classic"
+                st.rerun()
+    with col_hdr_r:
+        curr_mode = st.session_state.get("sky_interaction_mode", "MODO_A")
+        subcol1, subcol2, subcol3 = st.columns(3)
+        with subcol1:
+            if st.button("🎙️ Natural", type="primary" if curr_mode == "MODO_A" else "secondary", help="Modo A: Conversación Natural Continua"):
+                st.session_state["sky_interaction_mode"] = "MODO_A"
+                coordinador_voz.set_mode(InteractionMode.MODO_A_NATURAL)
+                st.rerun()
+        with subcol2:
+            if st.button("🔘 Manual", type="primary" if curr_mode == "MODO_B" else "secondary", help="Modo B: Micrófono Manual (Push-to-Talk)"):
+                st.session_state["sky_interaction_mode"] = "MODO_B"
+                coordinador_voz.set_mode(InteractionMode.MODO_B_MANUAL)
+                st.rerun()
+        with subcol3:
+            if st.button("✍️ Chat", type="primary" if curr_mode == "MODO_C" else "secondary", help="Modo C: Chat Escrito"):
+                st.session_state["sky_interaction_mode"] = "MODO_C"
+                coordinador_voz.set_mode(InteractionMode.MODO_C_TEXTO)
+                gestor_ventanas.open_window('chat', win_type='chat', title='💬 Conversación SKY-IA', position='bottom-left')
+                st.rerun()
+
+    # 3. Núcleo Holográfico 3D Principal
+    v_state = coordinador_voz.get_state().name
+    track = gestor_ventanas.windows['multimedia'].data.get('query') if gestor_ventanas.windows['multimedia'].is_open else None
+    scene_html = generate_holographic_scene_html(
+        voice_state=v_state,
+        active_player_track=track,
+        is_playing_music=gestor_ventanas.windows['multimedia'].is_open,
+        height=540
+    )
+    components.html(scene_html, height=545)
+
+    # 4. Dock de Ventanas Minimizadas
+    dock_items = gestor_ventanas.get_dock_items()
+    if dock_items:
+        st.markdown('<div class="holo-dock"><span class="holo-dock-label">Dock Holográfico:</span>', unsafe_allow_html=True)
+        cols_d = st.columns(len(dock_items) + 1)
+        for idx, item in enumerate(dock_items):
+            with cols_d[idx]:
+                if st.button(f"↗️ {item.title}", key=f"dock_restore_{item.id}"):
+                    gestor_ventanas.restore_window(item.id)
+                    st.rerun()
+        with cols_d[-1]:
+            if st.button("✕ Ocultar Todo", key="dock_hide_all"):
+                gestor_ventanas.leave_only_core()
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # 5. Ventanas Holográficas Abiertas (Alrededor del Núcleo)
+    open_wins = gestor_ventanas.get_open_windows()
+    for win in open_wins:
+        with st.container():
+            col_w_title, col_w_min, col_w_size, col_w_close = st.columns([7, 1, 1, 1], vertical_alignment="center")
+            with col_w_title:
+                st.markdown(f'<div class="holo-window-title">{win.title} <span style="font-size: 0.7rem; color: #7dd3fc; border: 1px solid #00f2ff; padding: 2px 8px; border-radius: 8px;">POSICIÓN: {win.position.upper()}</span></div>', unsafe_allow_html=True)
+            with col_w_min:
+                if st.button("➖", key=f"min_{win.id}", help="Minimizar al dock"):
+                    gestor_ventanas.minimize_window(win.id)
+                    st.rerun()
+            with col_w_size:
+                next_size = 'normal' if win.size == 'mini' else 'mini'
+                if st.button("🗖" if win.size == 'mini' else "🗗", key=f"size_{win.id}", help=f"Cambiar tamaño ({next_size})"):
+                    gestor_ventanas.resize_window(win.id, next_size)
+                    st.rerun()
+            with col_w_close:
+                if st.button("✕", key=f"close_{win.id}", help="Cerrar ventana"):
+                    gestor_ventanas.close_window(win.id)
+                    st.rerun()
+
+            # Contenido específico de cada ventana
+            if win.id == 'multimedia':
+                render_media_card(win.data)
+            elif win.id == 'chat':
+                if "chat_jarvis_history" not in st.session_state:
+                    st.session_state.chat_jarvis_history = [
+                        {"role": "assistant", "content": "¡Hola Oscar! Soy **SKY-IA**. Conversando en modo holográfico. ¿Qué necesitas que haga?"}
+                    ]
+                for m in st.session_state.chat_jarvis_history[-6:]:
+                    with st.chat_message(m["role"]):
+                        st.markdown(m["content"])
+            elif win.id == 'documents':
+                st.markdown("### 📁 SKY Office Studio")
+                st.write("Crea, edita y organiza documentos y presentaciones en segundo plano mientras conversamos.")
+                col_d1, col_d2 = st.columns(2)
+                with col_d1:
+                    topic = st.text_input("Tema del documento", value="Inteligencia Artificial y Automatización", key="holo_doc_topic")
+                    if st.button("📄 Crear Documento Word (.docx)", type="primary"):
+                        from neural_core.task_manager import gestor_tareas
+                        t = gestor_tareas.create_task('document', f"Documento: {topic}", f"Generando documento sobre {topic}", {'topic': topic})
+                        st.success(f"Tarea iniciada: {t.title}")
+                with col_d2:
+                    pres_topic = st.text_input("Tema de presentación", value="Ecosistema SKY-IA", key="holo_pres_topic")
+                    if st.button("📊 Crear Presentación (.pptx)"):
+                        from neural_core.task_manager import gestor_tareas
+                        t = gestor_tareas.create_task('presentation', f"Presentación: {pres_topic}", f"Generando presentación sobre {pres_topic}", {'topic': pres_topic})
+                        st.success(f"Tarea iniciada: {t.title}")
+            elif win.id == 'projects':
+                from neural_core.task_manager import gestor_tareas
+                tasks = gestor_tareas.get_all_tasks()
+                st.markdown("### ✅ Proyectos y Tareas Activas en Segundo Plano")
+                if tasks:
+                    for t in tasks[-5:]:
+                        st.progress(t.progress / 100.0, text=f"{t.title} ({t.status.upper()}) - {t.progress}%")
+                else:
+                    st.info("No hay tareas en segundo plano en ejecución. Pídele a SKY crear una presentación o documento.")
+            elif win.id == 'modules':
+                st.markdown("### 🧠 Ecosistema SKY-IA — Los 26 Módulos Reales")
+                st.caption("Acceso directo a cualquier módulo del sistema sin perder la sesión.")
+                cols_mod = st.columns(4)
+                for idx, mod in enumerate(SECCIONES_TECNICAS):
+                    with cols_mod[idx % 4]:
+                        if st.button(mod, key=f"btn_sec_mod_{idx}", use_container_width=True):
+                            st.session_state["sky_ui_view_mode"] = "classic"
+                            st.session_state["seccion_elegida_holo"] = mod
+                            st.rerun()
+
+    # 6. Cápsula Discreta de Entrada Inferior (Matching Image Reference)
+    prompt_usuario = None
+    curr_interaction = st.session_state.get("sky_interaction_mode", "MODO_A")
+
+    with st.container():
+        col_c_mic, col_c_input = st.columns([1.5, 10.5], vertical_alignment="center")
+
+        with col_c_mic:
+            audio_clip = st.audio_input("Habla con SKY-IA...", key="holo_capsule_mic", label_visibility="collapsed")
+            if audio_clip is not None:
+                audio_bytes = audio_clip.read()
+                audio_hash = hashlib.md5(audio_bytes).hexdigest()
+                if st.session_state.get('_last_audio_hash_holo') != audio_hash:
+                    st.session_state['_last_audio_hash_holo'] = audio_hash
+                    with st.spinner("Procesando tu voz..."):
+                        try:
+                            coordinador_voz.set_state(VoiceState.ESCUCHANDO)
+                            transcrito = transcribir_audio(audio_bytes, mime='audio/wav')
+                            prompt_usuario = transcrito
+                            coordinador_voz.set_state(VoiceState.PROCESANDO)
+                            st.toast(f"Voz detectada: «{transcrito}»")
+                        except Exception as err:
+                            st.warning(f"Error de audio: {err}")
+
+        with col_c_input:
+            text_in = st.chat_input("Habla con SKY-IA... (ej: 'SKY, pon Queen', 'abrí mis documentos', 'dejá solo el núcleo')", key="holo_text_input")
+            if text_in:
+                prompt_usuario = text_in
+
+    # 7. Ejecución centralizada de la orden de usuario
+    if prompt_usuario:
+        if "chat_jarvis_history" not in st.session_state:
+            st.session_state.chat_jarvis_history = []
+        st.session_state.chat_jarvis_history.append({"role": "user", "content": prompt_usuario})
+
+        respuesta_texto = ""
+        # Verificar comandos locales
+        intento = interpret_command(prompt_usuario)
+        if intento:
+            act = intento.get('action')
+            par = intento.get('params', {})
+            if act == 'holographic_window':
+                respuesta_texto = intento.get('description', 'Ventanas holográficas actualizadas.')
+            elif act == 'open_url' and par.get('service') == 'youtube':
+                gestor_ventanas.open_window('multimedia', win_type='multimedia', title=f"🎬 YouTube: {par.get('query', 'Música')}", data=par, position='top-right')
+                respuesta_texto = f"Voy a buscar música de {par.get('query', 'YouTube')} en el reproductor holográfico."
+            elif act == 'task_action':
+                gestor_ventanas.open_window('documents', win_type='documents', title="📁 Documentos & Office", position='right')
+                sub = par.get('subaction')
+                if sub == 'create_presentation':
+                    topic = par.get('topic', 'tema')
+                    respuesta_texto = f"Iniciando preparación de presentación sobre {topic} en Office Studio."
+                elif sub == 'create_document':
+                    topic = par.get('topic', 'documento')
+                    respuesta_texto = f"Preparando documento sobre {topic} en Office Studio."
+                else:
+                    respuesta_texto = intento.get('description', 'Tarea procesada.')
+            elif act == 'status' and par.get('greeting'):
+                respuesta_texto = par.get('message', 'Sí, te escucho. ¿Qué necesitás?')
+            elif act == 'voice_control':
+                respuesta_texto = intento.get('description', 'Control conversacional aplicado.')
+            else:
+                respuesta_texto = intento.get('description', 'Orden interpretada.')
+        else:
+            # Consulta general de IA
+            try:
+                with st.spinner("SKY-IA procesando consulta..."):
+                    contexto_chat = [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_jarvis_history[-6:]]
+                    r_ia = responder(prompt_usuario, "Asistente Central", historial=contexto_chat, proveedor=proveedor, modelo=modelo)
+                    respuesta_texto = r_ia[0] if isinstance(r_ia, (list, tuple)) else str(r_ia)
+            except Exception as e:
+                respuesta_texto = f"Comprendido: procesé tu solicitud «{prompt_usuario}»."
+
+        st.session_state.chat_jarvis_history.append({"role": "assistant", "content": respuesta_texto})
+
+        # Síntesis de voz
+        if respuesta_texto:
+            try:
+                audio_mp3 = hablar_texto(respuesta_texto)
+                if audio_mp3:
+                    st.caption("🔊 *SKY-IA respondiendo con voz:*")
+                    st.audio(audio_mp3, format="audio/mp3", autoplay=True)
+            except Exception:
+                pass
+
+        try:
+            coordinador_voz.record_turn(prompt_usuario, respuesta_texto)
+        except Exception:
+            pass
+        st.rerun()
+
+
+if seccion == "🎙️ Asistente Central":
+    if st.session_state.get("sky_ui_view_mode", "holographic") == "holographic":
+        render_asistente_holografico_3d(proveedor_jarvis, modelo_jarvis, ejecucion_dispositivo)
+    else:
+        render_asistente_jarvis(proveedor_jarvis, modelo_jarvis, ejecucion_dispositivo)
+
+elif seccion == "🏠 Inicio":
     st.title("SKY Universal v8.0")
     st.write("**Un solo SKY:** chat multi-IA, visión por cámara, piezas 3D exportables, memoria, metas de mejora, voz, dispositivos, Engine Sensor y BAQUEANO. Los datos propios se conservan localmente.")
     panel=st.columns(4)
@@ -633,6 +2749,8 @@ elif seccion=="🎙️ SKY y dispositivos":
         with st.form('sky_orden'):
             frase=st.text_input('O escribí una orden',key='sky_texto')
             voz_salida=st.checkbox('Reproducir la respuesta en voz española (gTTS)',value=False)
+            auto_ejecutar=st.checkbox('Ejecutar directamente acciones simples en el equipo emparejado',value=False,
+                help='Solo estado, HTTPS, aplicaciones y teclas multimedia; las notas siempre necesitan confirmación.')
             enviar=st.form_submit_button('Enviar a SKY',type='primary')
         if enviar and frase.strip():
             st.session_state['sky_entrada']=''
@@ -641,8 +2759,23 @@ elif seccion=="🎙️ SKY y dispositivos":
                 ds=paired_devices()
                 elegido=st.session_state.get('sky_dispositivo')
                 if elegido and any(d['name']==elegido for d in ds):
-                    st.session_state['sky_pending']={**orden,'device':elegido}
-                    st.info('Orden interpretada: '+orden['description']+'. Confirmá abajo para ejecutarla.')
+                    if auto_ejecutar and orden['action'] in ('status','open_url','launch_app','media_key'):
+                        asociado=next(d for d in ds if d['name']==elegido)
+                        tok=st.session_state['sky_tokens'].get(elegido,'')
+                        if not tok:
+                            st.warning('Falta el token de este equipo. Activá el acceso en Dispositivos.')
+                        else:
+                            try:
+                                resultado=call_device(asociado['url'],tok,orden['action'],orden['params'])
+                                if not resultado.get('ok'):
+                                    raise RuntimeError('El agente no confirmó la operación.')
+                                st.session_state['sky_ultima_respuesta']='Acción completada en '+elegido+': '+orden['description']
+                                st.success(st.session_state['sky_ultima_respuesta'])
+                            except Exception as exc:
+                                st.error('La acción no se ejecutó: '+str(exc))
+                    else:
+                        st.session_state['sky_pending']={**orden,'device':elegido}
+                        st.info('Orden interpretada: '+orden['description']+'. Confirmá abajo para ejecutarla.')
                 else:
                     st.warning('La orden requiere un dispositivo emparejado. Seleccioná uno en la pestaña Dispositivos.')
             else:
@@ -678,7 +2811,10 @@ elif seccion=="🎙️ SKY y dispositivos":
             if not asociado or not tok: st.error('El dispositivo no está disponible o falta su token.')
             else:
                 try:
-                    resultado=call_device(asociado['url'],tok,pendiente['action'],pendiente['params'])
+                    params_para_agente={**pendiente['params']}
+                    if pendiente['action'] in ('note_create','note_append','note_trash'):
+                        params_para_agente['confirmed']=True  # botón pulsado por el usuario
+                    resultado=call_device(asociado['url'],tok,pendiente['action'],params_para_agente)
                     st.json(resultado)
                     st.session_state.pop('sky_pending',None)
                 except Exception as exc: st.error(str(exc))

@@ -18,7 +18,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak
       - name: Install scoped test dependencies
         run: |
-          python -m pip install -U pip
+          python -m pip install -U pip 'setuptools>=83'
           python -m pip install -r requirements_studio.txt pytest opencv-python-headless cryptography pip-audit
       - name: Audit Python dependencies
         run: python -m pip_audit --local --progress-spinner off
@@ -36,3 +36,5 @@ jobs:
           tests/test_sky_v10_3_global.py
           tests/test_sky_v10_4_secure_global.py
           tests/test_sky_v10_5_global.py
+          tests/test_sky_devices.py tests/test_sky_jarvis_local.py
+          tests/test_sky_public_secrets.py tests/test_sky_notes_local.py

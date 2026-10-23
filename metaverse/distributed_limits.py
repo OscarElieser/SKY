@@ -1,6 +1,7 @@
 """Atomic Redis rate-limiter. Fail closed when explicitly configured for public use."""
 from __future__ import annotations
 import hashlib,os,time
+from .secrets_v107 import get_secret
 
 _REDIS=None
 
@@ -11,7 +12,10 @@ def redis_client():
         return None
     try:import redis
     except ImportError as exc:raise RuntimeError('Instalá redis para habilitar límites distribuidos') from exc
-    obj=redis.Redis.from_url(os.environ['SKY_REDIS_URL'],socket_connect_timeout=2,socket_timeout=2,decode_responses=True)
+    password=get_secret('SKY_REDIS_PASSWORD')
+    # Secrets from Docker are mounted as files; never print password in health checks.
+    options={'password': password} if password else {}
+    obj=redis.Redis.from_url(os.environ['SKY_REDIS_URL'],socket_connect_timeout=2,socket_timeout=2,decode_responses=True,**options)
     obj.ping()
     _REDIS=obj
     return obj

@@ -1,4 +1,4 @@
-"""SKY v11.1 — Capacidades del Asistente Personal sobre tu dispositivo.
+"""SKY v12 — Capacidades del Asistente Personal sobre tu dispositivo.
 
 Cada capacidad es una función concreta y acotada (multimedia, volumen, apps,
 archivos en carpetas permitidas, notificaciones, capturas, portapapeles...).
@@ -7,7 +7,13 @@ El DUEÑO decide qué se activa en su archivo local de política:
     ~/.neuralt/device_agent_policy.json
 
 La política sólo se modifica en el propio equipo (CLI del agente), nunca por
-red. Por defecto sólo están activas status, open_url y launch_app (como v4.3).
+red. Por defecto sólo están activas las capacidades de bajo riesgo (estado, webs,
+apps, multimedia, volumen, reproducir, avisos y tareas). Ventanas, escritura de
+texto, archivos, notas, capturas, portapapeles y bloqueo exigen activarlas.
+
+Compatibilidad con SKY JARVIS (v11.x): las variables de entorno del equipo
+SKY_WINDOW_ACTIONS=1, SKY_ALL_CAPABILITIES=1 y SKY_NOTES_ENABLED=1 también cuentan
+como autorización del dueño.
 
 Lo que SKY nunca hace, ni con el perfil completo: ejecutar comandos de shell
 arbitrarios, abrir ejecutables/scripts, descargar e instalar programas ni
@@ -46,11 +52,15 @@ CAPACIDADES: dict[str, Capacidad] = {c.id: c for c in [
     Capacidad('open_url', 'Abrir sitios web', 'Abrir páginas HTTPS en el navegador', ('open_url',), 'bajo'),
     Capacidad('launch_app', 'Abrir aplicaciones básicas', 'Calculadora, editor de texto, archivos y navegador', ('launch_app',), 'bajo'),
     Capacidad('apps_extra', 'Más aplicaciones', 'Spotify, VLC, Chrome, Firefox, VS Code, Word, Excel, PowerPoint, WhatsApp, Telegram, cámara, ajustes y tus apps personalizadas', ('launch_app',), 'bajo'),
-    Capacidad('media', 'Control multimedia', 'Reproducir/pausar, siguiente, anterior y detener', ('media_control',), 'bajo'),
+    Capacidad('media', 'Control multimedia', 'Reproducir/pausar, siguiente, anterior y detener', ('media_control', 'media_key'), 'bajo'),
     Capacidad('volume', 'Volumen', 'Subir, bajar, silenciar o fijar el volumen', ('volume',), 'bajo'),
     Capacidad('play_media', 'Reproducir música y video', 'Buscar y reproducir en YouTube, YouTube Music o Spotify, o un archivo multimedia de tus carpetas', ('play_media',), 'bajo'),
     Capacidad('notify', 'Notificaciones', 'Mostrar avisos en el escritorio', ('notify',), 'bajo'),
-    Capacidad('files', 'Archivos y carpetas', 'Listar y abrir documentos, música y videos SOLO dentro de las carpetas que autorices', ('open_path', 'list_path'), 'medio'),
+    Capacidad('tasks', 'Tareas en segundo plano', 'Preparar presentaciones y documentos mientras seguís trabajando', ('task_action',), 'bajo'),
+    Capacidad('files', 'Archivos y carpetas', 'Abrir tus carpetas (Documentos, Descargas… incluso en OneDrive) y documentos; listar y abrir dentro de las carpetas que autorices', ('open_path', 'list_path', 'open_file'), 'medio'),
+    Capacidad('windows', 'Ventanas del escritorio', 'Listar, enfocar, minimizar, restaurar, organizar y cerrar ventanas', ('window_action', 'organize_windows'), 'medio'),
+    Capacidad('notes', 'Notas locales', 'Crear notas, agregarles texto y enviarlas a una papelera recuperable (~/.neuralt/notes)', ('note_create', 'note_append', 'note_trash'), 'medio'),
+    Capacidad('type_text', 'Escribir en la app activa', 'Teclear un texto dictado dentro de la ventana que está al frente', ('type_text',), 'alto'),
     Capacidad('screenshot', 'Capturas de pantalla', 'Guardar una captura en ~/.neuralt/capturas', ('screenshot',), 'medio'),
     Capacidad('clipboard', 'Portapapeles', 'Leer o escribir texto del portapapeles', ('clipboard_get', 'clipboard_set'), 'alto'),
     Capacidad('lock', 'Bloquear equipo', 'Bloquear la sesión de inmediato', ('lock_screen',), 'bajo'),
@@ -75,19 +85,36 @@ DESCRIPCION_ACCIONES = {
     'clipboard_get': 'Leer el portapapeles',
     'clipboard_set': 'Copiar texto al portapapeles',
     'lock_screen': 'Bloquear el equipo',
+    'media_key': 'Enviar tecla multimedia (reproducir, pista, volumen)',
+    'open_file': 'Abrir una carpeta del usuario o un documento',
+    'window_action': 'Gestionar ventanas abiertas del escritorio',
+    'organize_windows': 'Organizar las ventanas lado a lado',
+    'type_text': 'Escribir texto en la aplicación activa',
+    'note_create': 'Crear nota local',
+    'note_append': 'Agregar texto a una nota local',
+    'note_trash': 'Enviar una nota a la papelera recuperable',
+    'task_action': 'Tarea en segundo plano (presentación, documento)',
 }
 
+# Acciones que aplica la propia interfaz de SKY (reproductor interno, ventanas
+# holográficas, flujo de voz, borradores para redes). El agente las reconoce
+# pero no actúa sobre el sistema operativo ni las reporta como verificadas.
+ACCIONES_INTERFAZ = frozenset({'player_control', 'voice_control', 'holographic_window', 'social_action'})
+TECLAS_VOLUMEN = frozenset({'volume_up', 'volume_down', 'mute'})
+
+_BAJO_RIESGO = ['status', 'open_url', 'launch_app', 'apps_extra', 'media', 'volume', 'play_media', 'notify', 'tasks']
 PERFILES = {
-    'basico': ['status', 'open_url', 'launch_app'],
-    'multimedia': ['status', 'open_url', 'launch_app', 'apps_extra', 'media', 'volume', 'play_media', 'notify'],
+    'basico': list(_BAJO_RIESGO),
+    'multimedia': list(_BAJO_RIESGO),
     'completo': list(CAPACIDADES),
 }
 # Acciones que el asistente puede ejecutar sin pedir clic de confirmación
-# cuando el dueño eligió ese perfil (siempre quedan en auditoría).
+# cuando el dueño eligió ese perfil (siempre quedan en auditoría). Ventanas,
+# archivos, notas, escritura y portapapeles SIEMPRE piden confirmación.
 AUTO_POR_PERFIL = {
-    'basico': [],
-    'multimedia': ['status', 'media', 'volume', 'play_media', 'notify'],
-    'completo': ['status', 'open_url', 'launch_app', 'apps_extra', 'media', 'volume', 'play_media', 'notify', 'lock'],
+    'basico': ['status', 'media', 'volume'],
+    'multimedia': ['status', 'open_url', 'launch_app', 'apps_extra', 'media', 'volume', 'play_media', 'notify', 'tasks'],
+    'completo': ['status', 'open_url', 'launch_app', 'apps_extra', 'media', 'volume', 'play_media', 'notify', 'tasks', 'lock'],
 }
 
 DEFAULT_FOLDERS = ['~/Music', '~/Videos', '~/Documents', '~/Downloads', '~/Pictures',
@@ -107,8 +134,27 @@ EXTENSIONES_MEDIA = {'.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.
 # ---------------------------------------------------------------- política
 
 def politica_por_defecto() -> dict:
-    return {'perfil': 'basico', 'enabled': list(PERFILES['basico']), 'auto_confirm': [],
+    return {'perfil': 'basico', 'enabled': list(PERFILES['basico']), 'auto_confirm': list(AUTO_POR_PERFIL['basico']),
             'allowed_folders': [], 'custom_apps': {}}
+
+
+def _autorizaciones_por_entorno() -> list[str]:
+    """Variables que el dueño fija en SU equipo (compatibilidad SKY JARVIS)."""
+    extra = []
+    if os.getenv('SKY_WINDOW_ACTIONS') == '1':
+        extra.append('windows')
+    if os.getenv('SKY_ALL_CAPABILITIES') == '1':
+        extra += ['files', 'windows', 'type_text']
+    if os.getenv('SKY_NOTES_ENABLED') == '1':
+        extra.append('notes')
+    return extra
+
+
+def _con_entorno(pol: dict) -> dict:
+    for cap in _autorizaciones_por_entorno():
+        if cap not in pol['enabled']:
+            pol['enabled'].append(cap)
+    return pol
 
 
 def cargar_politica(path: Path | None = None) -> dict:
@@ -118,9 +164,9 @@ def cargar_politica(path: Path | None = None) -> dict:
     try:
         data = json.loads(path.read_text(encoding='utf-8'))
     except (OSError, ValueError):
-        return base
+        return _con_entorno(base)
     if not isinstance(data, dict):
-        return base
+        return _con_entorno(base)
     enabled = [c for c in data.get('enabled', []) if c in CAPACIDADES]
     auto = [c for c in data.get('auto_confirm', []) if c in enabled]
     folders = [str(f)[:400] for f in data.get('allowed_folders', []) if isinstance(f, str)][:30]
@@ -130,14 +176,14 @@ def cargar_politica(path: Path | None = None) -> dict:
             key = name.strip().lower()[:40]
             if key and key.replace('_', '').replace('-', '').isalnum():
                 apps[key] = {k: v for k, v in spec.items() if k in ('windows', 'darwin', 'linux')}
-    return {'perfil': str(data.get('perfil', 'personalizado'))[:30], 'enabled': enabled or base['enabled'],
-            'auto_confirm': auto, 'allowed_folders': folders, 'custom_apps': apps}
+    return _con_entorno({'perfil': str(data.get('perfil', 'personalizado'))[:30], 'enabled': enabled or base['enabled'],
+                         'auto_confirm': auto, 'allowed_folders': folders, 'custom_apps': apps})
 
 
 def guardar_politica(politica: dict, path: Path | None = None) -> dict:
     path = Path(path or POLICY_PATH)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    clean = cargar_politica_desde_dict(politica)
+    clean = _sin_entorno(politica)
     path.write_text(json.dumps(clean, ensure_ascii=False, indent=2), encoding='utf-8')
     try:
         path.chmod(0o600)
@@ -146,18 +192,36 @@ def guardar_politica(politica: dict, path: Path | None = None) -> dict:
     return clean
 
 
-def cargar_politica_desde_dict(data: dict) -> dict:
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmp:
-        p = Path(tmp) / 'p.json'
-        p.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
-        return cargar_politica(p)
+def _sin_entorno(data: dict) -> dict:
+    """Normaliza un dict de política sin mezclar autorizaciones por variable de entorno."""
+    enabled = [c for c in data.get('enabled', []) if c in CAPACIDADES]
+    auto = [c for c in data.get('auto_confirm', []) if c in enabled]
+    folders = [str(f)[:400] for f in data.get('allowed_folders', []) if isinstance(f, str)][:30]
+    apps = {}
+    for name, spec in (data.get('custom_apps') or {}).items():
+        if isinstance(name, str) and isinstance(spec, dict) and len(apps) < 40:
+            key = name.strip().lower()[:40]
+            if key and key.replace('_', '').replace('-', '').isalnum():
+                apps[key] = {k: v for k, v in spec.items() if k in ('windows', 'darwin', 'linux')}
+    return {'perfil': str(data.get('perfil', 'personalizado'))[:30], 'enabled': enabled or list(PERFILES['basico']),
+            'auto_confirm': auto, 'allowed_folders': folders, 'custom_apps': apps}
+
+
+def cargar_politica_guardada(path: Path | None = None) -> dict:
+    """La política tal como está en disco (sin variables de entorno), para editarla."""
+    try:
+        data = json.loads(Path(path or POLICY_PATH).read_text(encoding='utf-8'))
+        if isinstance(data, dict):
+            return _sin_entorno(data)
+    except (OSError, ValueError):
+        pass
+    return politica_por_defecto()
 
 
 def aplicar_perfil(perfil: str, carpetas: list[str] | None = None, path: Path | None = None) -> dict:
     if perfil not in PERFILES:
         raise ValueError('Perfil desconocido. Usá: ' + ', '.join(PERFILES))
-    actual = cargar_politica(path)
+    actual = cargar_politica_guardada(path)
     folders = carpetas if carpetas is not None else (actual['allowed_folders'] or
                                                        [f for f in DEFAULT_FOLDERS if Path(f).expanduser().is_dir()])
     return guardar_politica({'perfil': perfil, 'enabled': PERFILES[perfil], 'auto_confirm': AUTO_POR_PERFIL[perfil],
@@ -170,15 +234,20 @@ def capacidad_de(accion: str) -> str:
     return ACCION_A_CAPACIDAD[accion]
 
 
+def capacidad_para(accion: str, params: dict | None = None) -> str:
+    """Capacidad concreta que exige una acción con sus parámetros."""
+    params = params or {}
+    if accion == 'launch_app':
+        return 'launch_app' if params.get('app', '') in APPS_BASICAS else 'apps_extra'
+    if accion == 'media_key' and params.get('key') in TECLAS_VOLUMEN:
+        return 'volume'
+    return capacidad_de(accion)
+
+
 def accion_habilitada(accion: str, politica: dict, params: dict | None = None) -> bool:
     if accion not in ACCION_A_CAPACIDAD:
         return False
-    if accion == 'launch_app':
-        app = (params or {}).get('app', '')
-        if app in APPS_BASICAS:
-            return 'launch_app' in politica['enabled']
-        return 'apps_extra' in politica['enabled']
-    return ACCION_A_CAPACIDAD[accion] in politica['enabled']
+    return capacidad_para(accion, params) in politica['enabled']
 
 
 def acciones_habilitadas(politica: dict) -> list[str]:
@@ -191,8 +260,7 @@ def acciones_habilitadas(politica: dict) -> list[str]:
 
 
 def requiere_confirmacion(accion: str, params: dict, politica: dict) -> bool:
-    cap = 'apps_extra' if accion == 'launch_app' and params.get('app') not in APPS_BASICAS else capacidad_de(accion)
-    return cap not in politica.get('auto_confirm', [])
+    return capacidad_para(accion, params) not in politica.get('auto_confirm', [])
 
 
 # ---------------------------------------------------------------- utilidades

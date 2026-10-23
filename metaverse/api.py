@@ -287,8 +287,7 @@ def run_tool(body:SkillRequest):
 
 UPLOADS_DIR = ROOT / 'local_data' / 'sky_uploads'
 GENERATED_DIR = ROOT / 'local_data' / 'sky_generated'
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-GENERATED_DIR.mkdir(parents=True, exist_ok=True)
+# La importación debe ser segura con --read-only; crear carpetas sólo al escribir.
 
 @app.get('/api/media/uploads/{filename}')
 def get_uploaded_media(filename: str):
@@ -318,6 +317,7 @@ async def upload_chat_file(file:UploadFile=File(...)):
     safe_name = f"{secrets.token_hex(4)}_{Path(filename).name}"
     local_path = UPLOADS_DIR / safe_name
     try:
+        UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
         local_path.write_bytes(data)
     except Exception:
         pass
@@ -582,10 +582,12 @@ def asistente_page():
 def client_bootstrap(request: Request):
     """Inicializa la sesión directa del creador/superadministrador en localhost."""
     client_ip = request.client.host if request.client else '127.0.0.1'
-    is_local = client_ip in ('127.0.0.1', '::1', 'localhost', 'testserver')
+    is_local = client_ip in ('127.0.0.1', '::1', 'localhost', 'testclient', 'testserver')
+    # En despliegues públicos, una conexión interna del proxy no prueba que sea el dueño.
+    reveal_owner_key = is_local and os.getenv('SKY_DEPLOYMENT_MODE', 'local').strip().lower() == 'local'
     return {
         'superadmin': 'oscarelieser.informatica.inatec@gmail.com',
-        'key': api_token() if is_local else '',
+        'key': api_token() if reveal_owner_key else '',
         'local': is_local,
         'ollama_active': True,
         'gemini_active': bool(os.getenv('GEMINI_API_KEY')),
@@ -606,6 +608,7 @@ def tool_image(body: dict):
             img_url = res['result'][0]
             token = secrets.token_hex(6)
             local_name = f"flux_{token}.jpg"
+            GENERATED_DIR.mkdir(parents=True, exist_ok=True)
             dest = GENERATED_DIR / local_name
             req = urllib.request.Request(img_url, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=15) as r, open(dest, 'wb') as f:

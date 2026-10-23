@@ -51,8 +51,29 @@ def _limpiar_wake(texto: str) -> str:
     return re.sub(r'^\s*(?:/sky|sky|oye sky|hey sky|ok sky)[\s,.:;!¡]*', '', texto, flags=re.I).strip()
 
 
+# Órdenes en las que manda el intérprete SKY JARVIS (dispositivos.interpret_command):
+# reproductor interno, ventanas, notas, tareas, redes y carpetas de Windows/OneDrive.
+_PRIORIDAD_JARVIS = frozenset({'player_control', 'holographic_window', 'voice_control', 'window_action',
+                               'organize_windows', 'note_create', 'note_append', 'note_trash',
+                               'task_action', 'social_action', 'open_file'})
+
+
 def interpretar(texto: str) -> dict | None:
-    """Convierte una orden en una propuesta de acción, o None si es conversación."""
+    """Une los dos intérpretes de SKY y devuelve una propuesta de acción, o None si es conversación."""
+    propio = _interpretar_propio(texto)
+    if propio and propio['action'] == 'list_path':
+        return propio
+    try:
+        jarvis = _interpretar_basico(_limpiar_wake(str(texto or ''))[:2000])
+    except Exception:
+        jarvis = None
+    if jarvis and jarvis.get('action') in _PRIORIDAD_JARVIS:
+        return jarvis
+    return propio or jarvis
+
+
+def _interpretar_propio(texto: str) -> dict | None:
+    """Intérprete del Asistente Personal (música por servicio, volumen exacto, equipo)."""
     original = _limpiar_wake(str(texto or ''))[:500]
     t = norm(original).strip(' .!?¿¡')
     if not t:
@@ -144,8 +165,7 @@ def interpretar(texto: str) -> dict | None:
         except Exception:
             pass
 
-    # --- intérprete básico v4.3 (calculadora, YouTube, Google, estado…)
-    return _interpretar_basico(original)
+    return None
 
 
 def _recortar_original(original: str, fragmento_norm: str) -> str | None:
@@ -248,7 +268,11 @@ def ejecutar_local_si_autorizado(propuesta: dict) -> dict | None:
     accion, params = propuesta['action'], propuesta.get('params', {})
     if not caps.accion_habilitada(accion, politica, params) or caps.requiere_confirmacion(accion, params, politica):
         return None
-    token = token_agente_local()
+    try:
+        from .sky_voice_actions import local_agent_credentials
+        base, token = local_agent_credentials()   # detecta 8766/8765 o SKY_DEVICE_PORT
+    except Exception:
+        base, token = url_agente_local(), token_agente_local()
     if not token:
         return None
-    return call_device(url_agente_local(), token, accion, params, timeout=12)
+    return call_device(base, token, accion, params, timeout=12)
