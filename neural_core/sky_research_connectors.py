@@ -32,6 +32,8 @@ def _query(value: str, maxlen:int=220)->str:
 
 
 def _get(host:str, path:str, params:dict, *, headers:dict|None=None, plain:bool=False):
+    if os.getenv("SKY_LOCAL_ONLY","").strip().lower() in ("1","true","yes","si","sí"):
+        raise ResearchConnectorError("Modo SKY_LOCAL_ONLY: las consultas académicas externas están bloqueadas.")
     if host not in _HOSTS.values() or not path.startswith("/") or "//" in path or ".." in path:
         raise ResearchInputError("Destino fuera del catálogo de proveedores.")
     url="https://"+host+path
