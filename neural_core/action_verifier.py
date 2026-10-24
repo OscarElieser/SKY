@@ -4,6 +4,7 @@ Registra y audita el ciclo de vida de cada orden ejecutada en Windows:
 Estados:
 - RECEIVED: Orden recibida e interpretada.
 - RUNNING: En proceso de ejecución en el sistema operativo.
+- DISPATCHED: Comando enviado/iniciado pero resultado físico NO confirmado.
 - VERIFIED: Ejecución física comprobada (proceso o ventana visible confirmado).
 - FAILED: Rechazada por el sistema operativo, error de permisos o recurso no encontrado.
 - NEEDS_CONFIRMATION: Acción sensible que requiere confirmación explícita del usuario.
@@ -73,6 +74,17 @@ class ActionVerifier:
         if rec:
             rec.status = "VERIFIED"
             rec.result = result
+            rec.execution_time_ms = round(duration_ms, 2)
+            rec.error = None
+            self._persist(rec)
+        return rec
+
+    def mark_dispatched(self, command_id: str, result: Dict[str, Any], duration_ms: float = 0.0) -> Optional[ActionRecord]:
+        """Keep SENT/RUNNING/PENDING separate from verified physical effects."""
+        rec = self._records.get(command_id)
+        if rec:
+            rec.status = "DISPATCHED"
+            rec.result = {k: v for k, v in result.items() if k not in ("text", "token", "secret", "password")}
             rec.execution_time_ms = round(duration_ms, 2)
             rec.error = None
             self._persist(rec)
