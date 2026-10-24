@@ -91,3 +91,26 @@ def test_sky_routes_regular_requests_itself():
     assert route_result({"tipo": "workflow", "propuesta": {
         "action": "unknown"
     }}) == "sky"
+
+
+def test_chat_and_stream_always_identify_sky_as_attention_center(client, monkeypatch):
+    from metaverse import asistente_api
+    from neural_core import sky_asistente_personal as assistant
+    monkeypatch.setattr(asistente_api, 'atender', lambda *args: {
+        'tipo': 'respuesta', 'mensaje': 'Respuesta interna', 'proveedor': 'local'})
+    monkeypatch.setattr(assistant, 'reglas', lambda *args: None)
+    monkeypatch.setattr(assistant, 'usar_cerebro', lambda *args: False)
+    monkeypatch.setattr(assistant, 'atender', lambda *args: {
+        'tipo': 'respuesta', 'mensaje': 'Respuesta interna', 'proveedor': 'local'})
+    headers = {'X-SKY-KEY': KEY}
+    body = {'texto': '¿Qué podés hacer por mí?', 'proveedor': 'none'}
+    normal = client.post('/api/asistente/mensaje', headers=headers, json=body)
+    assert normal.status_code == 200, normal.text
+    assert normal.json()['atendido_por'] == 'SKY'
+    assert normal.json()['rol_interno_sugerido'] == 'sky'
+    streamed = client.post('/api/asistente/stream', headers=headers, json=body)
+    assert streamed.status_code == 200, streamed.text
+    import json
+    last = json.loads(streamed.text.strip().splitlines()[-1])['final']
+    assert last['atendido_por'] == 'SKY'
+    assert last['rol_interno_sugerido'] == 'sky'
