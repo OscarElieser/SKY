@@ -866,6 +866,36 @@ def developer_syntax_check(body: dict):
         raise HTTPException(422, str(exc)) from exc
 
 
+@app.get('/api/developer/build/capabilities', dependencies=[Depends(require_key)])
+def developer_build_capabilities():
+    """Catálogo de ejecutores aislados, sin arrancar Docker ni descargar imágenes."""
+    from neural_core.sky_docker_builder import catalogue
+    return catalogue()
+
+
+@app.post('/api/developer/build/execute', dependencies=[Depends(require_key)])
+def developer_build_execute(body: dict, request: Request):
+    """Compilación real en Docker local, con consentimiento, PIN y opt-in separados."""
+    from neural_core import sentinel_identidad as ident
+    from .sentinel import exigir_pin
+    from neural_core.sky_docker_builder import build, RunnerInvalid, RunnerUnavailable
+    if not ident.pin_configurado():
+        raise HTTPException(403, "Configurá un PIN SKY SENTINEL antes de ejecutar código.")
+    exigir_pin(request, "compilar y ejecutar código externo en contenedor aislado")
+    if body.get("approved") is not True:
+        raise HTTPException(403, "Se necesita consentimiento explícito para ESTA ejecución.")
+    try:
+        return build(body.get("language", ""), body.get("files"),
+                     approved=True, expected_stdout=body.get("expected_stdout"),
+                     timeout_seconds=body.get("timeout_seconds", 15))
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except RunnerInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except RunnerUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
 # ==============================================================================
 # SKY UNIVERSAL KNOWLEDGE & EDUCATION ENGINE ENDPOINTS
 # ==============================================================================
