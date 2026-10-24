@@ -141,13 +141,21 @@
     feed.appendChild(c); scroll(); return c;
   }
   function resultText(res) {
-    if (!res) return 'Hecho.';
-    if (res.ok === false) return res.error || res.message || 'No se pudo completar.';
-    return res.message || 'Hecho.';
+    if (!res) return 'Sin resultado disponible.';
+    if (res.ok === false || res.status === 'FAILED') return res.error || res.message || 'No se pudo completar.';
+    const msg = res.message || '';
+    if (res.status === 'SENT') return (msg || 'Orden enviada') + ' (efecto aún no verificado).';
+    if (res.status === 'PENDING') return (msg || 'Tarea registrada') + ' (pendiente de completar).';
+    if (res.status === 'RUNNING') return (msg || 'Ejecución iniciada') + ' (sin comprobación final).';
+    if (res.status === 'RECEIVED') return (msg || 'Orden recibida') + ' (aún no ejecutada).';
+    if (res.status === 'NEEDS_CONFIRMATION') return msg || 'Esperando autorización.';
+    if (res.status === 'VERIFIED') return msg || 'Acción verificada.';
+    return msg || 'Solicitud procesada; estado final no verificado.';
   }
   function renderResult(card, res) {
-    const ok = res && res.ok !== false;
-    card.appendChild(el('div', 'res' + (ok ? '' : ' bad'), (ok ? '✓ ' : '✗ ') + resultText(res)));
+    const ok = res && res.ok !== false && res.status !== 'FAILED';
+    const verified = ok && res.status === 'VERIFIED';
+    card.appendChild(el('div', 'res' + (!ok ? ' bad' : ''), (!ok ? '✗ ' : verified ? '✓ ' : '• ') + resultText(res)));
     let detalle = '';
     if (Array.isArray(res && res.windows)) detalle = res.windows.map(w => '▸ ' + w.title).join('\n') || '(sin ventanas)';
     else if (Array.isArray(res && res.elementos)) detalle = res.elementos.map(e => (e.carpeta ? '[dir] ' : '      ') + e.nombre).join('\n') || '(vacía)';
