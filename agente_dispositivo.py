@@ -349,7 +349,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(404, {'ok': False, 'error': f'Acción {cid} no encontrada.'})
             return self.reply(200, {'ok': True, 'record': rec.to_dict()})
         if split.path == '/actions_history':
-            return self.reply(200, {'ok': True, 'actions': verificador_acciones.get_recent_actions(limit=30)})
+            try:
+                limit = max(1, min(int(query.get('limit', ['30'])[0]), 500))
+            except (ValueError, TypeError):
+                return self.reply(400, {'ok': False, 'error': 'Límite inválido.'})
+            return self.reply(200, {'ok': True, 'actions': verificador_acciones.get_recent_actions(limit=limit)})
         if split.path == '/tasks':
             from neural_core.task_manager import gestor_tareas
             return self.reply(200, {'ok': True, 'tasks': gestor_tareas.list_tasks(limit=12)})
