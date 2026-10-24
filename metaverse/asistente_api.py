@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from .api import require_key
 from neural_core import dispositivos, voz_inbox
+from neural_core.sky_approvals import approvals
 from neural_core import sky_capacidades as caps
 from neural_core.sky_asistente_personal import AYUDA, atender, token_agente_local, url_agente_local
 
@@ -43,12 +44,14 @@ class Mensaje(BaseModel):
 
 
 class OrdenCasa(BaseModel):
+    approval_token: str = Field(default='', max_length=100)
     service: str = Field(min_length=3, max_length=60)
     entity_ids: list[str] = Field(min_length=1, max_length=20)
     data: dict = Field(default_factory=dict)
 
 
 class Ejecucion(BaseModel):
+    approval_token: str = Field(default='', max_length=100)
     action: str = Field(min_length=2, max_length=40)
     params: dict = Field(default_factory=dict)
     dispositivo: str = Field(default=LOCAL, max_length=80)
@@ -86,6 +89,26 @@ def _llamar(nombre: str, request: Request, action: str, params: dict):
         raise HTTPException(502, str(exc)[:250])
 
 
+def _emitir_aprobacion(tipo: str, payload: dict, request: Request) -> str:
+    try:
+        return approvals.issue(tipo, payload, request)
+    except (RuntimeError, ValueError, TypeError) as exc:
+        raise HTTPException(503, str(exc)[:180]) from exc
+
+
+def _exigir_aprobacion(token: str, tipo: str, payload: dict, request: Request):
+    if not approvals.consume(token, tipo, payload, request):
+        raise HTTPException(403, 'La aprobación falta, caducó o no coincide con la operación mostrada.')
+
+
+def _payload_casa(service: str, ids: list[str], data: dict) -> dict:
+    return {'service': service, 'entity_ids': ids, 'data': data}
+
+
+def _payload_correo(para: str, asunto: str, cuerpo: str, en_respuesta_a: str) -> dict:
+    return {'para': para, 'asunto': asunto, 'cuerpo': cuerpo, 'en_respuesta_a': en_respuesta_a}
+
+
 @router.get('/ayuda')
 def ayuda():
     return {
@@ -105,9 +128,18 @@ def estado_dispositivo(request: Request, dispositivo: str = LOCAL):
 
 def _completar(resultado: dict, dispositivo: str, request: Request) -> dict:
     """Ejecuta lo automático (según la política del agente o SKY_HA_AUTO) y marca lo que pide confirmación."""
+    if resultado['tipo'] == 'correo':
+        b = resultado.get('borrador') or {}
+        resultado['approval_token'] = _emitir_aprobacion(
+            'correo', _payload_correo(b.get('para', ''), b.get('asunto', ''),
+                                     b.get('cuerpo', ''), b.get('en_respuesta_a', '')), request)
+        return resultado
     if resultado['tipo'] == 'casa':
         orden = resultado['propuesta']
         resultado['requiere_confirmacion'] = orden['requiere_confirmacion']
+        if orden['requiere_confirmacion']:
+            resultado['approval_token'] = _emitir_aprobacion(
+                'casa', _payload_casa(orden['service'], orden['entity_ids'], orden.get('data', {})), request)
         if not orden['requiere_confirmacion']:
             from neural_core import sky_home_assistant as casa
             try:
@@ -142,6 +174,11 @@ def _completar(resultado: dict, dispositivo: str, request: Request) -> dict:
             resultado['ejecucion'] = _llamar(dispositivo, request, propuesta['action'], propuesta['params'])
         except HTTPException as exc:
             resultado['ejecucion'] = {'ok': False, 'error': str(exc.detail)[:200]}
+    if resultado['requiere_confirmacion']:
+        resultado['approval_token'] = _emitir_aprobacion(
+            'accion',
+            {'action': propuesta['action'], 'params': propuesta['params'], 'dispositivo': dispositivo},
+            request)
     return resultado
 
 
@@ -189,6 +226,7 @@ def mensaje_stream(body: Mensaje, request: Request):
 
 
 class Correo(BaseModel):
+    approval_token: str = Field(default='', max_length=100)
     para: str = Field(min_length=6, max_length=254)
     asunto: str = Field(default='', max_length=200)
     cuerpo: str = Field(min_length=1, max_length=20000)
@@ -196,9 +234,11 @@ class Correo(BaseModel):
 
 
 @router.post('/correo')
-def enviar_correo(body: Correo):
+def enviar_correo(body: Correo, request: Request):
     """Envío confirmado por el dueño (un correo enviado no se puede deshacer)."""
     from neural_core import sky_correo
+    _exigir_aprobacion(body.approval_token, 'correo',
+                      _payload_correo(body.para, body.asunto, body.cuerpo, body.en_respuesta_a), request)
     try:
         return sky_correo.enviar(body.para, body.asunto, body.cuerpo, body.en_respuesta_a)
     except ValueError as exc:
@@ -210,6 +250,12 @@ def enviar_correo(body: Correo):
 @router.post('/ejecutar')
 def ejecutar(body: Ejecucion, request: Request):
     """Confirmación explícita del dueño desde el panel."""
+    if body.action not in caps.ACCION_A_CAPACIDAD:
+        raise HTTPException(400, 'Acción no permitida.')
+    if body.action != 'status':
+        _exigir_aprobacion(body.approval_token, 'accion',
+                          {'action': body.action, 'params': body.params, 'dispositivo': body.dispositivo},
+                          request)
     params = dict(body.params)
     if body.action in ('note_create', 'note_append', 'note_trash'):
         params['confirmed'] = True   # este clic ES la confirmación individual que exigen las notas
@@ -217,15 +263,37 @@ def ejecutar(body: Ejecucion, request: Request):
 
 
 @router.post('/casa')
-def ejecutar_casa(body: OrdenCasa):
+def ejecutar_casa(body: OrdenCasa, request: Request):
     """Confirmación del dueño para Home Assistant (luces, escenas, clima, cortinas, cerraduras)."""
     from neural_core import sky_home_assistant as casa
+    _exigir_aprobacion(body.approval_token, 'casa',
+                       _payload_casa(body.service, body.entity_ids, body.data), request)
     try:
         return casa.ejecutar(body.service, body.entity_ids, body.data)
     except ValueError as exc:
         raise HTTPException(400, str(exc)[:200])
     except RuntimeError as exc:
         raise HTTPException(502, str(exc)[:200])
+
+
+class CasaRapida(BaseModel):
+    service: str = Field(min_length=3, max_length=60)
+    entity_ids: list[str] = Field(min_length=1, max_length=20)
+    data: dict = Field(default_factory=dict)
+
+
+@router.post('/casa/preparar')
+def preparar_casa_rapida(body: CasaRapida, request: Request):
+    """El botón HUD prepara una orden de bajo riesgo; la ejecución exige token único."""
+    from neural_core import sky_home_assistant as casa
+    dominio, _, accion = body.service.partition('.')
+    if (dominio not in ('light', 'switch', 'fan', 'scene')
+            or accion not in casa.SERVICIOS_PERMITIDOS.get(dominio, set())
+            or any(not entity.startswith(dominio + '.') for entity in body.entity_ids)
+            or body.data):
+        raise HTTPException(403, 'La operación requiere una propuesta explícita.')
+    return {'approval_token': _emitir_aprobacion(
+        'casa', _payload_casa(body.service, body.entity_ids, {}), request)}
 
 
 @router.get('/verificar/{command_id}')
@@ -243,8 +311,19 @@ def verificar_accion(command_id: str, request: Request, dispositivo: str = LOCAL
 
 
 @router.get('/voz')
-def voz_pendientes():
-    return {'pendientes': voz_inbox.read_inbox()}
+def voz_pendientes(request: Request):
+    pending = []
+    for entry in voz_inbox.read_inbox():
+        if not isinstance(entry, dict):
+            continue
+        item = dict(entry)
+        action = item.get('action')
+        if action not in caps.ACCION_A_CAPACIDAD:
+            continue
+        item['approval_token'] = _emitir_aprobacion(
+            'accion', {'action': action, 'params': item.get('params', {}), 'dispositivo': LOCAL}, request)
+        pending.append(item)
+    return {'pendientes': pending}
 
 
 @router.delete('/voz/{entry_id}')
