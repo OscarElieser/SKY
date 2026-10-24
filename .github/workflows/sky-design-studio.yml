@@ -1,0 +1,112 @@
+name: SKY Design Studio — real React and Flutter builds
+
+on:
+  pull_request:
+    paths:
+      - 'neural_core/sky_design_studio.py'
+      - 'templates/sky_design_react/**'
+      - 'templates/sky_design_flutter/**'
+      - 'metaverse/api.py'
+      - 'metaverse/static/hud.js'
+      - 'tests/test_sky_design_studio.py'
+      - '.github/workflows/sky-design-studio.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'neural_core/sky_design_studio.py'
+      - 'templates/sky_design_react/**'
+      - 'templates/sky_design_flutter/**'
+      - 'metaverse/api.py'
+      - 'metaverse/static/hud.js'
+      - 'tests/test_sky_design_studio.py'
+      - '.github/workflows/sky-design-studio.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  design-api-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: SKY Python dependencies for its private API
+        run: python -m pip install -r requirements_social.txt -r requirements_studio.txt pytest
+      - name: Syntax checks and authenticated design API regression
+        run: |
+          python -m py_compile neural_core/sky_design_studio.py metaverse/api.py tests/test_sky_design_studio.py
+          node --check metaverse/static/hud.js
+          PYTHONPATH=. python -m pytest -q tests/test_sky_design_studio.py tests/test_sky_developer_workbench.py
+
+  react-real-production-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Generate actually customized React source tree
+        env:
+          SKY_TEST_DIR: ${{ runner.temp }}/sky-react-design
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          import os
+          from pathlib import Path
+          from neural_core.sky_design_studio import create_design
+          folder=Path(os.environ["SKY_TEST_DIR"])
+          result=create_design("Diseño Turismo SKY", "Turismo comunitario con rutas de naturaleza", platform="react")
+          for name,code in result["files"].items():
+              output=folder / name
+              output.parent.mkdir(parents=True, exist_ok=True)
+              output.write_text(code, encoding="utf-8")
+          assert result["generated_sources_built_now"] is False
+          print("Generated",len(result["files"]),"editable files")
+          PY
+      - name: Install project-local pinned React/Motion/Lucide/Inter/Vite libraries
+        working-directory: ${{ runner.temp }}/sky-react-design
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Build actual Vite production bundle
+        working-directory: ${{ runner.temp }}/sky-react-design
+        run: |
+          npm run build
+          test -f dist/index.html
+          test -n "$(find dist/assets -maxdepth 1 -name '*.js' -print -quit)"
+          test -n "$(find dist/assets -maxdepth 1 -name '*.css' -print -quit)"
+      - name: Audit production dependencies for high severity vulnerabilities
+        working-directory: ${{ runner.temp }}/sky-react-design
+        run: npm audit --omit=dev --audit-level=high
+
+  flutter-real-sdk-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Fetch Flutter Animate from pub.dev
+        working-directory: templates/sky_design_flutter
+        run: flutter pub get
+      - name: Static Dart analysis using installed Flutter SDK
+        working-directory: templates/sky_design_flutter
+        run: flutter analyze
+      - name: Actual Flutter widget interactions
+        working-directory: templates/sky_design_flutter
+        run: flutter test --reporter expanded
+      - name: Compile Flutter app to production web assets
+        working-directory: templates/sky_design_flutter
+        run: |
+          flutter build web --release
+          test -f build/web/index.html
