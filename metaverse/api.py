@@ -664,6 +664,10 @@ app.include_router(sky_asistente_router)
 from .impacto_api import router as sky_impacto_router
 app.include_router(sky_impacto_router, dependencies=[Depends(require_key)])
 
+# SKY Aula: módulo aislado, comparte la autenticación principal.
+from .academy_api import router as sky_academy_router
+app.include_router(sky_academy_router)
+
 from .hud_api import router as sky_hud_router
 app.include_router(sky_hud_router)
 
@@ -672,6 +676,10 @@ def hud_page():
     resp=FileResponse(STATIC/'hud.html')
     resp.headers['Cache-Control']='no-cache, no-store, must-revalidate'
     return resp
+
+@app.get('/aula')
+def sky_aula_page():
+    return FileResponse(STATIC/'sky-academy.html',headers={'Cache-Control':'no-store'})
 
 @app.get('/asistente')
 def asistente_page():
