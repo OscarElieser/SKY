@@ -264,6 +264,10 @@ class ObjectRequest(BaseModel):
     version:int=Field(ge=1)
     object:dict
 
+class WorldInteractionRequest(BaseModel):
+    version:int=Field(ge=1)
+    object_id:str=Field(min_length=1,max_length=64)
+
 class PositionMessage(BaseModel):
     type:str
     avatar:str='SKY'
@@ -354,6 +358,22 @@ def build_world_campus(wid:str,body:PromptRequest):
     except ValueError as exc:raise HTTPException(422,str(exc)) from exc
     except KeyError as exc:raise HTTPException(404,'Mundo no existe') from exc
     except RuntimeError as exc:raise HTTPException(409,str(exc)) from exc
+
+
+@app.post('/api/worlds/{wid}/interact',dependencies=[Depends(require_key)])
+async def interact_with_world_object(wid:str,body:WorldInteractionRequest):
+    """Save real device/board/door state, broadcast only after committed storage."""
+    current=get_world(wid)
+    if current is None:raise HTTPException(404,'Mundo no existe')
+    try:
+        from .world_interactions import toggle
+        changed,event=toggle(current['scene'],body.object_id)
+        updated=save_scene(wid,changed,body.version)
+    except KeyError as exc:raise HTTPException(404,str(exc)) from exc
+    except ValueError as exc:raise HTTPException(422,str(exc)) from exc
+    except RuntimeError as exc:raise HTTPException(409,str(exc)) from exc
+    await _send_all(wid,{'type':'interact','version':updated['version'],**event})
+    return {'world':updated,'interaction':event}
 
 
 @app.post('/api/worlds/{wid}/objects',dependencies=[Depends(require_key)])
