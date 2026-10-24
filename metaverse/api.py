@@ -177,6 +177,13 @@ app.include_router(telemetria_router)
 @app.get('/office')
 def office_home():return FileResponse(STATIC/'office.html')
 
+@app.get('/aula/3d/computadora')
+def aula_computer_3d():
+    # Fixed public educational model; never exposes teacher/student records.
+    return FileResponse(STATIC/'sky-aula-computer-3d.html',
+                        headers={"Cache-Control":"public, max-age=180"})
+
+
 class OfficeRequest(BaseModel):
     kind: str=Field(default='docx',max_length=5)
     title: str=Field(default='Mi creación SKY',max_length=160)
