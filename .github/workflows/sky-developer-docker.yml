@@ -9,6 +9,10 @@ on:
       - 'tests/test_sky_docker_builder.py'
       - 'tests/test_sky_docker_live.py'
       - 'docker/sky-typescript/**'
+      - 'docker/sky-web/**'
+      - 'tests/test_sky_web_live.py'
+      - 'docker/sky-web/**'
+      - 'tests/test_sky_web_live.py'
       - '.github/workflows/sky-developer-docker.yml'
   push:
     branches: [main]
@@ -40,6 +44,7 @@ jobs:
         run: |
           python -m py_compile neural_core/sky_docker_builder.py metaverse/api.py tests/test_sky_docker_builder.py tests/test_sky_docker_live.py
           node --check metaverse/static/hud.js
+          node --check docker/sky-web/smoke.cjs
       - name: Verify fail-closed and prior programming interfaces
         run: PYTHONPATH=. python -m pytest -q tests/test_sky_docker_builder.py tests/test_sky_programming_capabilities.py tests/test_developer_core.py
 
@@ -59,10 +64,11 @@ jobs:
           docker pull node:22-alpine
           docker pull gcc:14-bookworm
           docker build -t sky-typescript:5.7.3 docker/sky-typescript
-          docker image inspect python:3.12-alpine node:22-alpine gcc:14-bookworm sky-typescript:5.7.3 >/dev/null
+          docker build -t sky-web:2026-10 docker/sky-web
+          docker image inspect python:3.12-alpine node:22-alpine gcc:14-bookworm sky-typescript:5.7.3 sky-web:2026-10 >/dev/null
       - name: Execute actual offline compilation, execution, and tests inside Docker
         env:
           SKY_CODE_RUNNER_ENABLED: '1'
           SKY_CODE_RUNNER_CONTAINER_ACK: '1'
           SKY_LIVE_DOCKER_TEST: '1'
-        run: PYTHONPATH=. python -m pytest -q tests/test_sky_docker_live.py
+        run: PYTHONPATH=. python -m pytest -q tests/test_sky_docker_live.py tests/test_sky_web_live.py
