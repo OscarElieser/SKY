@@ -135,6 +135,7 @@ def status(politica: dict | None = None) -> dict:
         'allowed_apps': apps_permitidas(politica),
         'allowed_folders': len(politica['allowed_folders']),
         'system': caps.info_sistema(),
+        'parada_emergencia': caps.parada_activa(),
         'timestamp': datetime.now(timezone.utc).isoformat(),
     }
 
@@ -167,6 +168,10 @@ def _validar(action: str, params: dict, politica: dict) -> None:
         raise ValueError('Parámetros inválidos.')
     if action in caps.ACCIONES_INTERFAZ:
         return
+    parada = caps.parada_activa() if action != 'status' else None
+    if parada:
+        raise Desactivada('SKY está en parada de emergencia desde ' + str(parada.get('desde', '')) +
+                          '. Levantala desde el HUD (Permisos → Reanudar) para volver a ejecutar acciones.')
     if action not in caps.ACCION_A_CAPACIDAD:
         raise ValueError(f"Acción '{action}' no permitida.")
     if action == 'launch_app':

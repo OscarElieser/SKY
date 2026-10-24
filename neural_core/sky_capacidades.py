@@ -259,7 +259,61 @@ def acciones_habilitadas(politica: dict) -> list[str]:
     return out
 
 
+# ---------------------------------------------------------------- parada de emergencia
+# Un archivo local que el agente revisa en cada acción: mientras exista, no ejecuta nada (salvo «status»).
+# Se activa al instante por voz («SKY, para todo»); levantarla siempre exige un clic del dueño.
+
+def _parada_path() -> Path:
+    return Path.home() / '.neuralt' / 'sky_parada.json'
+
+
+def parada_activa() -> dict | None:
+    try:
+        datos = json.loads(_parada_path().read_text(encoding='utf-8'))
+        return datos if isinstance(datos, dict) else {'motivo': 'parada'}
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return {'motivo': 'parada (archivo ilegible)'}
+
+
+def activar_parada(motivo: str = 'Orden del dueño') -> dict:
+    datos = {'motivo': ' '.join(str(motivo).split())[:200], 'desde': datetime.now().isoformat(timespec='seconds')}
+    p = _parada_path()
+    p.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    p.write_text(json.dumps(datos, ensure_ascii=False), encoding='utf-8')
+    return datos
+
+
+def levantar_parada() -> bool:
+    try:
+        _parada_path().unlink()
+        return True
+    except FileNotFoundError:
+        return False
+
+
+# Niveles de riesgo (prompt maestro §9): 1 consultar/borradores · 2 modificar o reversible · 3 irreversible/externo.
+NIVEL_1 = frozenset({'status', 'list_path', 'open_url', 'launch_app', 'media_control', 'media_key', 'volume', 'play_media',
+                     'notify', 'open_file', 'open_path', 'lock_screen', 'player_control', 'voice_control', 'holographic_window'})
+NIVEL_3 = frozenset({'note_trash', 'social_action'})
+NIVELES_TEXTO = {1: 'bajo riesgo', 2: 'riesgo moderado', 3: 'alto riesgo'}
+
+
+def nivel_riesgo(accion: str, params: dict | None = None) -> int:
+    params = params or {}
+    if accion in NIVEL_3:
+        return 3
+    if accion == 'window_action':
+        return 2 if str(params.get('subaction', '')) in ('close', 'minimize', 'organize') else 1
+    if accion in NIVEL_1:
+        return 1
+    return 2
+
+
 def requiere_confirmacion(accion: str, params: dict, politica: dict) -> bool:
+    if nivel_riesgo(accion, params) >= 3:
+        return True   # alto riesgo: confirmación expresa por acción, siempre
     return capacidad_para(accion, params) not in politica.get('auto_confirm', [])
 
 

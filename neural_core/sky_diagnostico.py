@@ -89,6 +89,20 @@ def revisar() -> list[dict]:
     yt = bool(os.getenv('YOUTUBE_API_KEY') or os.getenv('GOOGLE_API_KEY'))
     r.append(_item('youtube', 'Reproductor interno de YouTube', yt, 'configurado' if yt else 'sin clave',
                    'Opcional: YOUTUBE_API_KEY en .env.', importante=False))
+    # v12.3
+    from . import sky_whatsapp, sky_cerebro, sky_perfil
+    e = sky_whatsapp.estado()
+    r.append(_item('whatsapp', 'WhatsApp (API oficial de Meta)', e['configurado'],
+                   ('número …' + e['dueno'][-4:] + (' · ventana abierta' if e['ventana_abierta'] else ' · escribile a SKY para abrir la ventana de 24 h'))
+                   if e['configurado'] else 'falta: ' + ', '.join(e['faltan'] or ['valores válidos']),
+                   'Opcional: seguí docs/guias/SKY_WHATSAPP.md y abrí el puente (SKY_INICIAR.bat → W).', importante=False))
+    m = sky_cerebro.motor()
+    r.append(_item('cerebro', 'Cerebro con herramientas', m != 'ollama' or sky_cerebro._ollama_ok(),
+                   'local (Ollama)' if m == 'ollama' else f'en la nube: {m}',
+                   'Iniciá Ollama (ollama serve) o elegí SKY_CEREBRO=nube con una clave de Claude, GPT o Gemini.', importante=False))
+    perfil_ok = bool(sky_perfil._util(sky_perfil.leer(crear=False)))
+    r.append(_item('perfil', 'Tu perfil (USER.md)', perfil_ok, str(sky_perfil.ruta()) if perfil_ok else 'sin completar',
+                   'Completalo en el HUD: Módulos → Perfil.', importante=False))
     r.append(_item('sistema', 'Sistema operativo', True, f'{platform.system()} {platform.release()}', importante=False))
     return r
 

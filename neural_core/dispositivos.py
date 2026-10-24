@@ -61,6 +61,25 @@ def validate_endpoint(url: str) -> str:
 
 
 def call_device(url: str, token: str, action: str='status', params: dict | None=None, timeout: int=7):
+    """Llama al agente y registra el resultado real en los KPIs de SKY (sin parámetros ni tokens)."""
+    import time
+    from . import sky_metricas
+    inicio = time.perf_counter()
+    tipo = 'agente' if action == 'status' else 'accion'
+    try:
+        res = _call_device(url, token, action, params, timeout)
+    except Exception as exc:
+        sky_metricas.registrar(tipo, action, False, (time.perf_counter()-inicio)*1000, detalle=str(exc))
+        raise
+    ok, motivo = sky_metricas.resultado_ok(res)
+    if tipo == 'agente' and ok and not sky_metricas.toca_muestra('agente:' + str(url), 60):
+        return res   # el estado se consulta seguido: una muestra por minuto alcanza (los fallos siempre se registran)
+    sky_metricas.registrar(tipo, action, ok, (time.perf_counter()-inicio)*1000, detalle=motivo,
+                           origen=str(res.get('status', ''))[:20] if isinstance(res, dict) else '')
+    return res
+
+
+def _call_device(url: str, token: str, action: str='status', params: dict | None=None, timeout: int=7):
     if action not in ACTION_CAPABILITIES:
         raise ValueError('Acción no permitida por NeuralT.')
     if not token or len(token.strip()) < 32:

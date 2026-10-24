@@ -212,6 +212,27 @@ def manage_windows_startup(install: bool = True) -> bool:
             return False
 
 
+def _whatsapp_configurado() -> bool:
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(WORKSPACE / ".env", override=False)
+    except Exception:
+        pass
+    try:
+        from neural_core.sky_whatsapp import configurado
+        return configurado()
+    except Exception:
+        return False
+
+
+def _registrar_reinicio(name: str, codigo) -> None:
+    try:
+        from neural_core import sky_metricas
+        sky_metricas.registrar("servicio", "reinicio", False, detalle=f"{name} terminó con código {codigo}")
+    except Exception:
+        pass
+
+
 class SkySupervisor:
     """Supervisor unificado de procesos de SKY-IA."""
 
@@ -223,6 +244,8 @@ class SkySupervisor:
         self.execute_safe = execute_safe
         self.with_voice = with_voice
         self.processes: Dict[str, subprocess.Popen] = {}
+        self.specs: Dict[str, tuple] = {}
+        self.reinicios: Dict[str, list] = {}
         self.running = False
 
     def start_all(self):
@@ -254,18 +277,16 @@ class SkySupervisor:
         print(f"[SKY] Iniciando Agente de Dispositivo en 127.0.0.1:{PORTS['agent']}...")
         agent_env = os.environ.copy()
         agent_env["SKY_DEVICE_PORT"] = str(PORTS["agent"])
-        self.processes["agent"] = subprocess.Popen(
-            [PYTHON_EXE, str(WORKSPACE / "agente_dispositivo.py")],
-            cwd=str(WORKSPACE),
-            env=agent_env
-        )
+        self._iniciar("agent", [PYTHON_EXE, str(WORKSPACE / "agente_dispositivo.py")], agent_env)
 
         # 3. Iniciar API del Metaverso / Servicios (Puerto 8765)
         print(f"[SKY] Iniciando API y Metaverso en 127.0.0.1:{PORTS['api']}...")
-        self.processes["api"] = subprocess.Popen(
-            [PYTHON_EXE, "-m", "uvicorn", "metaverse.api:app", "--host", "127.0.0.1", "--port", str(PORTS["api"])],
-            cwd=str(WORKSPACE)
-        )
+        self._iniciar("api", [PYTHON_EXE, "-m", "uvicorn", "metaverse.api:app", "--host", "127.0.0.1", "--port", str(PORTS["api"])])
+
+        # 3b. Puente de WhatsApp (v12.3): sólo si está configurado en .env
+        if _whatsapp_configurado():
+            print("[SKY] Iniciando puente de WhatsApp en 127.0.0.1:8770 (publicalo con: tailscale funnel --bg 8770)...")
+            self._iniciar("whatsapp", [PYTHON_EXE, str(WORKSPACE / "sky_whatsapp_puente.py")])
 
         # 4. Iniciar Escucha de Voz Continua (sky_manos_libres.py)
         model_dir = WORKSPACE / "modelos" / "vosk-model-es"
@@ -278,18 +299,12 @@ class SkySupervisor:
                 voice_args.append("--execute-safe")
 
             print("[SKY] Iniciando escucha de voz continua en segundo plano...")
-            self.processes["voice"] = subprocess.Popen(
-                voice_args,
-                cwd=str(WORKSPACE)
-            )
+            self._iniciar("voice", voice_args)
 
         # 5. Iniciar Streamlit opcional (Puerto 8501)
         if self.with_ui:
             print(f"[SKY] Iniciando interfaz visual Streamlit en http://127.0.0.1:{PORTS['streamlit']}...")
-            self.processes["streamlit"] = subprocess.Popen(
-                [PYTHON_EXE, "-m", "streamlit", "run", "app.py", "--server.port", str(PORTS["streamlit"]), "--server.address", "127.0.0.1"],
-                cwd=str(WORKSPACE)
-            )
+            self._iniciar("streamlit", [PYTHON_EXE, "-m", "streamlit", "run", "app.py", "--server.port", str(PORTS["streamlit"]), "--server.address", "127.0.0.1"])
 
         self.running = True
         if self.open_browser:
@@ -308,15 +323,31 @@ class SkySupervisor:
         print("[SKY] o interactuar mediante la API/Agente sin requerir Streamlit.")
         print("[SKY] Presioná Ctrl+C para finalizar de forma segura.\n")
 
+    def _iniciar(self, name: str, args: list, env: Optional[dict] = None) -> None:
+        self.specs[name] = (args, env)
+        self.processes[name] = subprocess.Popen(args, cwd=str(WORKSPACE), env=env)
+
     def monitor(self):
         """Supervisa los procesos y maneja su cierre limpio."""
         try:
             while self.running:
                 for name, proc in list(self.processes.items()):
                     ret = proc.poll()
-                    if ret is not None and name not in self.reported:
+                    if ret is None:
+                        continue
+                    # v12.3: reinicio controlado (máx. 5 por hora y proceso) para que SKY siga disponible.
+                    ahora = time.time()
+                    recientes = [t for t in self.reinicios.get(name, []) if ahora - t < 3600]
+                    if len(recientes) < 5 and name in self.specs:
+                        print(f"[SKY] '{name}' se detuvo (código {ret}); reiniciando ({len(recientes) + 1}/5 esta hora)...")
+                        _registrar_reinicio(name, ret)
+                        time.sleep(3)
+                        self.reinicios[name] = recientes + [ahora]
+                        args, env = self.specs[name]
+                        self._iniciar(name, args, env)
+                    elif name not in self.reported:
                         self.reported.add(name)
-                        print(f"[AVISO] El proceso '{name}' finalizó con código {ret}.")
+                        print(f"[AVISO] El proceso '{name}' falló demasiadas veces; queda detenido. Revisá: python sky_diagnostico.py")
                 time.sleep(2.0)
         except KeyboardInterrupt:
             print("\n[SKY] Señal de interrupción recibida. Deteniendo servicios...")

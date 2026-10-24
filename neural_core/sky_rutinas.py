@@ -275,11 +275,17 @@ def rutinas_programadas(ahora: datetime | None = None) -> list[dict]:
     """Rutinas cuya hora llegó hoy y todavía no corrieron (marca la ejecución)."""
     ahora = ahora or datetime.now()
     salida = []
+    try:
+        from .sky_capacidades import parada_activa
+        if parada_activa():
+            return []   # SENTINEL: con la parada de emergencia activa no corre ninguna automatización
+    except Exception:
+        return []
     with _LOCK:
         data = agenda()
         for r in data['rutinas']:
             hora = r.get('hora')
-            if not hora or not re.fullmatch(r'\d{1,2}:\d{2}', str(hora)):
+            if not hora or not re.fullmatch(r'\d{1,2}:\d{2}', str(hora)) or r.get('activa') is False:
                 continue
             dias = r.get('dias') or list(range(7))
             if ahora.weekday() not in dias:
@@ -294,23 +300,62 @@ def rutinas_programadas(ahora: datetime | None = None) -> list[dict]:
     return salida
 
 
+PASOS_SIMPLES = ('saludo', 'recordatorios_hoy', 'correo_resumen', 'correo_borradores', 'intereses', 'borradores_pendientes')
+
+
+def validar_pasos(pasos_crudos) -> list[dict]:
+    """Pasos admitidos en rutinas, skills y tareas programadas (v12.3). Todo lo demás se descarta."""
+    from .sky_capacidades import ACCION_A_CAPACIDAD
+    pasos = []
+    for p in list(pasos_crudos or [])[:12]:
+        tipo = p.get('tipo') if isinstance(p, dict) else None
+        texto = ' '.join(str(p.get('texto', '') if isinstance(p, dict) else '').split())
+        if tipo in PASOS_SIMPLES:
+            pasos.append({'tipo': tipo})
+        elif tipo == 'decir' and texto:
+            pasos.append({'tipo': 'decir', 'texto': texto[:300]})
+        elif tipo == 'orden' and texto:
+            pasos.append({'tipo': 'orden', 'texto': texto[:200]})
+        elif tipo in ('noticias', 'aprender') and str(p.get('tema', '')).strip():
+            pasos.append({'tipo': tipo, 'tema': ' '.join(str(p['tema']).split())[:100]})
+        elif tipo == 'kpi':
+            pasos.append({'tipo': 'kpi', 'diagnostico': bool(p.get('diagnostico'))})
+        elif tipo == 'skill' and re.fullmatch(r'[a-z0-9-]{1,40}', str(p.get('id', ''))):
+            pasos.append({'tipo': 'skill', 'id': str(p['id'])})
+        elif tipo == 'accion' and isinstance(p.get('params', {}), dict) and p.get('action') in ACCION_A_CAPACIDAD:
+            pasos.append({'tipo': 'accion', 'action': p['action'], 'params': p.get('params', {}),
+                          'description': str(p.get('description', p['action']))[:120]})
+    if not pasos:
+        raise ValueError('No hay pasos válidos.')
+    return pasos
+
+
+def activar_rutina(rutina_id: str, activa: bool) -> dict | None:
+    with _LOCK:
+        data = agenda()
+        for r in data['rutinas']:
+            if r.get('id') == rutina_id:
+                r['activa'] = bool(activa)
+                _escribir(AGENDA_PATH, data)
+                return r
+    return None
+
+
+def borrar_rutina(rutina_id: str) -> bool:
+    with _LOCK:
+        data = agenda()
+        antes = len(data['rutinas'])
+        data['rutinas'] = [r for r in data['rutinas'] if r.get('id') != rutina_id]
+        _escribir(AGENDA_PATH, data)
+        return len(data['rutinas']) != antes
+
+
 def guardar_rutina(rutina: dict) -> dict:
     """Crea o reemplaza una rutina validada (pasos: saludo, recordatorios_hoy, correo_resumen, decir, accion)."""
     nombre = ' '.join(str(rutina.get('nombre', '')).split())[:60]
     if not nombre:
         raise ValueError('La rutina necesita un nombre.')
-    pasos = []
-    for p in rutina.get('pasos', [])[:12]:
-        tipo = p.get('tipo') if isinstance(p, dict) else None
-        if tipo in ('saludo', 'recordatorios_hoy', 'correo_resumen'):
-            pasos.append({'tipo': tipo})
-        elif tipo == 'decir' and str(p.get('texto', '')).strip():
-            pasos.append({'tipo': 'decir', 'texto': str(p['texto'])[:300]})
-        elif tipo == 'accion' and isinstance(p.get('params', {}), dict):
-            from .sky_capacidades import ACCION_A_CAPACIDAD
-            if p.get('action') in ACCION_A_CAPACIDAD:
-                pasos.append({'tipo': 'accion', 'action': p['action'], 'params': p.get('params', {}),
-                              'description': str(p.get('description', p['action']))[:120]})
+    pasos = validar_pasos(rutina.get('pasos', []))
     if not pasos:
         raise ValueError('La rutina no tiene pasos válidos.')
     hora = rutina.get('hora')
@@ -318,7 +363,8 @@ def guardar_rutina(rutina: dict) -> dict:
         raise ValueError('Hora inválida (usá HH:MM).')
     item = {'id': re.sub(r'[^a-z0-9-]+', '-', _norm(nombre)).strip('-')[:40] or uuid.uuid4().hex[:8],
             'nombre': nombre, 'frases': [_norm(f)[:60] for f in rutina.get('frases', []) if str(f).strip()][:6] or [_norm(nombre)],
-            'hora': hora, 'dias': [d for d in rutina.get('dias', []) if isinstance(d, int) and 0 <= d <= 6], 'pasos': pasos}
+            'hora': hora, 'dias': [d for d in rutina.get('dias', []) if isinstance(d, int) and 0 <= d <= 6], 'pasos': pasos,
+            'activa': rutina.get('activa', True) is not False}
     with _LOCK:
         data = agenda()
         data['rutinas'] = [r for r in data['rutinas'] if r.get('id') != item['id']] + [item]
@@ -326,29 +372,98 @@ def guardar_rutina(rutina: dict) -> dict:
     return item
 
 
-def ejecutar_rutina(rutina: dict, ahora: datetime | None = None) -> dict:
-    """Arma lo que SKY dice y ejecuta. Las acciones pasan por la política del agente."""
+def _orden(texto: str) -> dict:
+    """Un paso «orden»: se interpreta con las reglas (sin IA) y se ejecuta según los permisos del dueño."""
+    from . import sky_asistente_personal as asis
+    propuesta = asis.interpretar(texto)
+    if propuesta:
+        return {'tipo': 'accion', 'propuesta': propuesta}
+    r = interpretar(texto)
+    if r:
+        return asis.resolver_especial(r)
+    try:
+        from . import sky_home_assistant as casa
+        orden = casa.interpretar(texto)
+        if orden:
+            return {'tipo': 'casa', 'propuesta': orden}
+    except Exception:
+        pass
+    return {'tipo': 'error', 'mensaje': f'No entendí la orden «{texto}».'}
+
+
+def ejecutar_rutina(rutina: dict, ahora: datetime | None = None, _nivel: int = 0) -> dict:
+    """Arma lo que SKY dice y ejecuta. Las acciones pasan por la política del agente:
+    lo que no es automático queda pendiente de tu confirmación. Nada de nivel 3 se ejecuta solo."""
     ahora = ahora or datetime.now()
-    frases, acciones = [], []
+    frases, acciones, casas = [], [], []
     for p in rutina.get('pasos', []):
         tipo = p.get('tipo')
-        if tipo == 'saludo':
-            momento = 'Buenos días' if ahora.hour < 12 else 'Buenas tardes' if ahora.hour < 19 else 'Buenas noches'
-            frases.append(f'{momento}, Oscar. Son las {ahora:%H:%M}.')
-        elif tipo == 'recordatorios_hoy':
-            frases.append(resumen_hoy(ahora))
-        elif tipo == 'correo_resumen':
-            try:
+        try:
+            if tipo == 'saludo':
+                momento = 'Buenos días' if ahora.hour < 12 else 'Buenas tardes' if ahora.hour < 19 else 'Buenas noches'
+                frases.append(f'{momento}, Oscar. Son las {ahora:%H:%M}.')
+            elif tipo == 'recordatorios_hoy':
+                frases.append(resumen_hoy(ahora))
+            elif tipo == 'correo_resumen':
                 from . import sky_correo
                 if sky_correo.configurado():
                     frases.append(sky_correo.resumen_para_voz())
-            except Exception:
-                frases.append('No pude revisar tu correo.')
-        elif tipo == 'decir':
-            frases.append(p.get('texto', ''))
-        elif tipo == 'accion':
-            acciones.append({'action': p['action'], 'params': p.get('params', {}), 'description': p.get('description', p['action'])})
-    resultados = []
+            elif tipo == 'correo_borradores':
+                from . import sky_correo, sky_borradores
+                if not sky_correo.configurado():
+                    frases.append('No preparé borradores: el correo no está configurado.')
+                else:
+                    r = sky_borradores.preparar()
+                    if r['nuevos']:
+                        frases.append(f"Te preparé {len(r['nuevos'])} borradores de respuesta; esperan tu aprobación.")
+                    elif r['error']:
+                        frases.append('No pude redactar borradores: ' + r['error'])
+                    else:
+                        frases.append('No hay correos nuevos para responder.')
+            elif tipo == 'borradores_pendientes':
+                from . import sky_borradores
+                frases.append(sky_borradores.describir())
+            elif tipo == 'decir':
+                frases.append(p.get('texto', ''))
+            elif tipo == 'kpi':
+                from . import sky_metricas
+                datos = sky_metricas.resumen('hoy', ahora)
+                frases.append(sky_metricas.diagnosticar(datos) if p.get('diagnostico') else sky_metricas.describir(datos))
+            elif tipo == 'noticias':
+                from . import sky_aprendizaje
+                items = sky_aprendizaje.noticias_de(p['tema'], 3)
+                frases.append(f"Sobre {p['tema']}: " + '; '.join(i['titular'] for i in items) + '.' if items
+                              else f"No encontré noticias de {p['tema']}.")
+            elif tipo == 'aprender':
+                from . import sky_aprendizaje
+                frases.append(f"Aprendí sobre {p['tema']}: " + sky_aprendizaje.aprender_tema(p['tema'])['resumen'])
+            elif tipo == 'intereses':
+                from . import sky_aprendizaje
+                hechos = sky_aprendizaje.actualizar_intereses(ahora, maximo=5)
+                if hechos:
+                    frases.append('Novedades de tus temas: ' + '; '.join(hechos) + '.')
+            elif tipo == 'skill' and _nivel < 3:
+                from . import sky_skills
+                sk = sky_skills.obtener(p['id'])
+                if sk:
+                    sub = ejecutar_rutina(sk, ahora, _nivel + 1)
+                    frases.append(sub['mensaje'])
+                    casas.extend(sub['acciones'])
+                else:
+                    frases.append(f"No encontré la skill «{p['id']}».")
+            elif tipo == 'accion':
+                acciones.append({'action': p['action'], 'params': p.get('params', {}), 'description': p.get('description', p['action'])})
+            elif tipo == 'orden':
+                r = _orden(p['texto'])
+                if r['tipo'] == 'accion':
+                    acciones.append(r['propuesta'])
+                elif r['tipo'] == 'casa':
+                    casas.append(_casa_paso(r['propuesta']))
+                elif r.get('mensaje'):
+                    frases.append(r['mensaje'])
+        except Exception as exc:   # un paso que falla no frena la rutina, pero se informa
+            frases.append(f'No pude completar un paso ({tipo}): {str(exc)[:100]}.')
+    resultados = list(casas)
     for a in acciones:
         try:
             from .sky_asistente_personal import ejecutar_local_si_autorizado
@@ -361,6 +476,22 @@ def ejecutar_rutina(rutina: dict, ahora: datetime | None = None) -> dict:
             resultados.append({'description': a['description'], 'estado': 'pendiente'})
         else:
             resultados.append({'description': a['description'], 'estado': 'ok' if hecho.get('ok', True) else 'error'})
-    if any(r['estado'] == 'pendiente' for r in resultados):
+    if _nivel == 0 and any(r['estado'] == 'pendiente' for r in resultados):
         frases.append('Dejé algunas acciones pendientes de tu confirmación.')
+    if _nivel == 0 and any(r['estado'] == 'no_ejecutada' for r in resultados):
+        frases.append('Hay órdenes de la casa que no ejecuté porque necesitan tu confirmación en el momento.')
     return {'mensaje': ' '.join(f for f in frases if f), 'acciones': resultados}
+
+
+def _casa_paso(orden: dict) -> dict:
+    from . import sky_capacidades as caps
+    if orden.get('requiere_confirmacion') or caps.parada_activa():
+        # La casa no tiene bandeja de pendientes: lo sensible (cerraduras, clima, cortinas) se pide en el momento.
+        return {'description': orden['description'], 'estado': 'no_ejecutada',
+                'motivo': 'requiere tu confirmación: pedímelo directamente'}
+    try:
+        from . import sky_home_assistant as casa
+        res = casa.ejecutar(orden['service'], orden['entity_ids'], orden.get('data', {}))
+        return {'description': orden['description'], 'estado': 'ok' if res.get('ok', True) else 'error'}
+    except Exception as exc:
+        return {'description': orden['description'], 'estado': 'error', 'error': str(exc)[:120]}

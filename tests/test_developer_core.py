@@ -18,6 +18,13 @@ from neural_core.github_reader import (
 )
 from metaverse.api import app
 
+
+def _llave_dueno():
+    """SENTINEL v12.5: la API es privada; las pruebas usan la llave del dueño como lo hace la interfaz."""
+    from metaverse.api import api_token
+    return api_token()
+
+
 def test_developer_core_knowledge_file():
     """Verifica que el archivo maestro de conocimiento tecnológico exista y esté completo."""
     assert CORE_FILE.is_file()
@@ -75,7 +82,7 @@ def test_analyze_tech_stack():
 
 def test_developer_api_endpoints():
     """Verifica los endpoints de API del módulo desarrollador."""
-    client = TestClient(app)
+    client = TestClient(app, headers={'X-SKY-KEY': _llave_dueno()})
     
     # 1. Catálogo de fuentes
     r_sources = client.get("/api/developer/sources")

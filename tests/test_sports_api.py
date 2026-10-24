@@ -3,7 +3,14 @@ import pytest
 from fastapi.testclient import TestClient
 from metaverse.api import app
 
-client = TestClient(app)
+
+def _llave_dueno():
+    """SENTINEL v12.5: la API es privada; las pruebas usan la llave del dueño como lo hace la interfaz."""
+    from metaverse.api import api_token
+    return api_token()
+
+
+client = TestClient(app, headers={'X-SKY-KEY': _llave_dueno()})
 
 
 def test_api_sports_match():
