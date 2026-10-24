@@ -969,7 +969,14 @@
     function showStep(data) {
       const step=data.step || {};
       status.textContent='Momento '+(step.stage_number||'?')+'/'+(step.total_stages||7)+' · '+(step.stage_name||'');
-      speech.textContent=step.voice_ready_text||'No hay explicación.';
+      speech.replaceChildren(document.createTextNode(step.voice_ready_text||'No hay explicación.'));
+      if(step.real_life_case && step.real_life_case.available){
+        const box=el('div','note','Caso para practicar: '+step.real_life_case.scenario);
+        const list=el('ol','');
+        (step.real_life_case.steps||[]).forEach(v=>list.append(el('li','',v)));
+        box.append(list,el('div','s',step.real_life_case.reflection));
+        speech.append(box);
+      }
       next.disabled=false;speakBtn.disabled=false;feedback.disabled=false;
       if(step.visual_3d && step.visual_3d.available) {
         computer3d.textContent='Abrir escena 3D del tema';
