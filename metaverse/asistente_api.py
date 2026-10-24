@@ -453,7 +453,7 @@ def ciclo_siguiente(ident: str, body: CicloApproval, request: Request):
         raise HTTPException(422, str(exc)) from exc
     except ciclo.CycleConflict as exc:
         raise HTTPException(409, str(exc)) from exc
-    sky_metricas.registrar('tarea', 'sky-ciclo', result['state'] not in ('FAILED',),
+    sky_metricas.registrar('tarea', 'sky-ciclo', result.get('last_step', {}).get('status') == 'VERIFIED',
                            (time.perf_counter()-start)*1000, origen=result['state'])
     return result
 
