@@ -1,0 +1,48 @@
+name: SKY API - Windows verification
+on:
+  pull_request:
+    paths:
+      - "agente_dispositivo.py"
+      - "metaverse/asistente_api.py"
+      - "metaverse/hud_api.py"
+      - "metaverse/static/hud.js"
+      - "neural_core/action_verifier.py"
+      - "neural_core/dispositivos.py"
+      - "neural_core/sky_approvals.py"
+      - "neural_core/sky_execution_metrics.py"
+      - "tests/test_sky_api_*.py"
+      - "tests/test_windows_desktop_control.py"
+      - ".github/workflows/sky-api-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-api-regression:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install SKY API and testing dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements_studio.txt pytest
+      - name: Compile SKY API modules
+        shell: pwsh
+        run: |
+          python -m py_compile metaverse/asistente_api.py metaverse/hud_api.py agente_dispositivo.py neural_core/action_verifier.py neural_core/sky_approvals.py neural_core/sky_execution_metrics.py
+      - name: Test action approvals, receipts and localhost API on Windows
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "."
+          python -m pytest -q tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py
+      - name: Test Windows agent controls without modifying user devices
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "."
+          python -m pytest -q tests/test_windows_desktop_control.py
