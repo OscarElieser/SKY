@@ -185,3 +185,13 @@ def test_write_endpoints_also_require_owner(client):
         "student_response": "Tres",
     })
     assert res.status_code in (401, 403)
+
+
+def test_windows_acceptance_readonly_report():
+    from scripts.sky_windows_acceptance import build_report
+    report = build_report(probe_ollama=False)
+    assert report["live_microphone_stt_verified"] is False
+    assert report["live_piper_tts_verified"] is False
+    assert report["windows_agent_action_verified"] is False
+    assert report["action_approval_chain_verified"] is False
+    assert report["overall_real_device_validation"] == "pending_manual_execution"
