@@ -4,6 +4,8 @@ Registra y audita el ciclo de vida de cada orden ejecutada en Windows:
 Estados:
 - RECEIVED: Orden recibida e interpretada.
 - RUNNING: En proceso de ejecución en el sistema operativo.
+- SENT: Orden enviada, efecto final no verificado.
+- PENDING: Tarea en cola, aún no completada.
 - VERIFIED: Ejecución física comprobada (proceso o ventana visible confirmado).
 - FAILED: Rechazada por el sistema operativo, error de permisos o recurso no encontrado.
 - NEEDS_CONFIRMATION: Acción sensible que requiere confirmación explícita del usuario.
@@ -30,7 +32,7 @@ class ActionRecord:
     action: str
     target: str
     device: str
-    status: str  # RECEIVED, RUNNING, VERIFIED, FAILED, NEEDS_CONFIRMATION
+    status: str  # RECEIVED, RUNNING, SENT, PENDING, VERIFIED, FAILED, NEEDS_CONFIRMATION
     created_at: str
     execution_time_ms: float = 0.0
     result: Dict[str, Any] = field(default_factory=dict)
@@ -65,6 +67,20 @@ class ActionVerifier:
         rec = self._records.get(command_id)
         if rec:
             rec.status = "RUNNING"
+            self._persist(rec)
+        return rec
+
+    def mark_dispatched(self, command_id: str, status: str, result: Dict[str, Any],
+                        duration_ms: float = 0.0) -> Optional[ActionRecord]:
+        """Registra una acción aceptada sin afirmar que su efecto se verificó."""
+        if status not in ('SENT', 'RUNNING', 'PENDING'):
+            raise ValueError('Estado no final inválido.')
+        rec = self._records.get(command_id)
+        if rec:
+            rec.status = status
+            rec.result = result
+            rec.execution_time_ms = round(duration_ms, 2)
+            rec.error = None
             self._persist(rec)
         return rec
 
