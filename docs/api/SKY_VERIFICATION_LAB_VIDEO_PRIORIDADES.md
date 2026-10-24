@@ -68,6 +68,12 @@ Primero enviá un PDF propio a `POST /documents/extract`. La respuesta contiene 
 
 En el equipo donde se instalará SKY:
 
+```bat
+.venv\Scripts\python.exe -m scripts.sky_windows_acceptance --probe-ollama
+```
+
+El comando emite un reporte JSON **sin claves, capturas ni grabaciones**. Solo prueba la disponibilidad local indicada, no certifica audio ni acciones de escritorio.
+
 1. Ejecutar `SKY_INICIAR.bat`, opción 7 para diagnóstico, y verificar que arranquen FastAPI y el agente.
 2. Probar micrófono real y reconocimiento con «SKY, contame qué hora es». Verificar que SKY escuchó la voz, no solamente que cargó Vosk.
 3. Activar Piper y comprobar salida de audio, interrupción y latencia observable en KPIs.
