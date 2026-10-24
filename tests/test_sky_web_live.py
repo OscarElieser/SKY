@@ -109,7 +109,7 @@ def test_generated_sky_web_starter_is_verified_in_real_offline_docker():
     """The actual SKY starter must validate HTML5, CSS3 and JS and pass DOM smoke."""
     from neural_core.sky_developer_workbench import scaffold_web
     template = scaffold_web("SKY ejemplo", "Diseño accesible y adaptable")
-    outcome = runner.build("Web", template["files"], approved=True, timeout_seconds=24)
+    outcome = build("Web", template["files"], approved=True, timeout_seconds=24)
     assert outcome["ok"] is True, outcome
     assert outcome["compile"]["verified"] is True
     assert outcome["run"]["verified"] is True
