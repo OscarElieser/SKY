@@ -31,6 +31,7 @@ Voz manos libres ──┘   /api/hud/*             │   ledger verificable (/a
 | POST | `/api/asistente/mensaje` | `{texto, historial?, proveedor?, dispositivo?, modo: "chat"\|"voz"}` |
 | POST | `/api/asistente/stream` | Igual que `/mensaje`, en NDJSON: `{"delta": "…"}` mientras el modelo habla y `{"final": {...}}` al terminar |
 | POST | `/api/asistente/ejecutar` | `{action, params, dispositivo?}`: confirmación del dueño |
+| GET | `/api/asistente/verificar/{command_id}` | Consulta estado real del agente; `?dispositivo=local` por defecto |
 | POST | `/api/asistente/correo` | `{para, asunto, cuerpo, en_respuesta_a?}`: envío confirmado por el dueño |
 | POST | `/api/asistente/casa` | `{service, entity_ids, data?}`: confirmación para Home Assistant |
 | GET | `/api/asistente/dispositivo` | Estado y capacidades del agente |
@@ -40,6 +41,35 @@ Voz manos libres ──┘   /api/hud/*             │   ledger verificable (/a
 Respuestas de `/mensaje`: `respuesta` (puede traer `recordatorio`, `correos` o `acciones` de una rutina), `local`, `error`, `accion` (con `requiere_confirmacion`, `ejecucion`, `aviso` o `interfaz`), `casa` (con `requiere_confirmacion` y `ejecucion`) y `correo` (con `borrador`, siempre requiere confirmación).
 
 Orden de decisión: reglas rápidas (agenda, rutinas, WhatsApp, correo, equipo, casa) → cerebro con herramientas (Ollama, `neural_core/sky_cerebro.py`) → respuesta de la IA.
+
+## Recibos de ejecución verificados (rama de desarrollo)
+
+El agente conserva un registro por `command_id`, y SKY permite consultar su último estado
+sin ejecutar de nuevo la orden.
+
+`GET /api/asistente/verificar/cmd_123` requiere `X-SKY-KEY` y, si está habilitada, `X-SKY-SESSION`.
+Los dispositivos remotos conservan el mecanismo de autorización por `X-SKY-DEVICE-TOKEN`.
+La respuesta incluye `status`, `verified` y `record`, sin credenciales.
+
+Significado de los estados:
+
+| Estado | Significado | `verified` |
+|---|---|---|
+| `RECEIVED` | Recibida | `false` |
+| `SENT` | Enviada al programa o sistema; el efecto no está acreditado | `false` |
+| `PENDING` | Tarea en cola, pendiente de finalización | `false` |
+| `RUNNING` | Iniciada, todavía sin comprobación final | `false` |
+| `VERIFIED` | La herramienta reportó comprobación de la acción | `true` |
+| `FAILED` | Falló | `false` |
+| `NEEDS_CONFIRMATION` | Espera una autorización explícita | `false` |
+
+Un acuse `SENT` de una tecla multimedia **no prueba** que la reproducción haya cambiado.
+Tampoco `PENDING` demuestra que un documento esté terminado.
+La verificación por `command_id` puede recuperarse del registro local tras reiniciar el agente.
+
+Estos recibos dependen de la comprobación que realmente implemente cada herramienta;
+`VERIFIED` no equivale a una inspección universal de cualquier aplicación.
+La ejecución física completa de Windows, voz y otros dispositivos requiere pruebas allí.
 
 ## HUD
 
