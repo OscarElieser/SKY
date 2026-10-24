@@ -44,6 +44,7 @@ class Mensaje(BaseModel):
     modo: str = Field(default='chat', pattern='^(chat|voz)$')
     source_text: str = Field(default='', max_length=12000)
     document_format: str = Field(default='auto', max_length=12)
+    lesson_id: str = Field(default='', max_length=64)
 
 
 class OrdenCasa(BaseModel):
@@ -232,6 +233,921 @@ def _supervisar_si_pedido(body: Mensaje) -> dict | None:
     return {
         "tipo": "respuesta", "mensaje": message,
         "proveedor": "sky-supervisor", "supervisor": proposal,
+    }
+
+
+def _clase_sky_si_pedido(body: Mensaje) -> dict | None:
+    """Explicit classroom commands, one step per response. SKY owns narration."""
+    import re
+    from neural_core import sky_aula
+    request = body.texto.strip()
+    root = r'^\s*(?:(?:oye|hey|ok)\s+)?sky[\s,;:!¡-]+'
+    next_cmd = re.match(
+        root + r'(?:siguiente\s+(?:paso|momento)\s+(?:de\s+)?(?:la\s+)?clase|'
+               r'continúa\s+(?:la\s+)?clase|continua\s+(?:la\s+)?clase)\s*
+    """Retrieve trusted-to-be-user-supplied excerpts, never treat them as commands."""
+    import re
+    match = re.match(
+        r'^\s*(?:(?:oye|hey|ok)\s+)?sky[\s,;:!¡-]+'
+        r'(?:busca|buscá|consulta|consultá|qué\s+dice|que\s+dice)\s+'
+        r'(?:en\s+)?(?:mis\s+documentos|mi\s+biblioteca|mis\s+archivos)'
+        r'(?:\s+(?:sobre|acerca\s+de|de))?\s*[:,-]?\s*(?P<query>.{3,500})$',
+        texto.strip(), re.IGNORECASE
+    )
+    if not match:
+        return None
+    from neural_core import sky_knowledge_library as knowledge
+    try:
+        found = knowledge.search(match.group('query').strip(), limit=4)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(503, str(exc)[:180]) from exc
+    if not found["results"]:
+        message = "SKY no encontró coincidencias en tus documentos guardados."
+    else:
+        excerpts = [
+            "Fuente: " + item["filename"] + " (" + item["citation"] + ")\n"
+            "Fragmento: " + item["excerpt"][:550]
+            for item in found["results"][:4]
+        ]
+        message = (
+            "SKY encontró estos fragmentos en tu biblioteca privada. "
+            "Son datos aportados, no hechos verificados externamente:\n\n"
+            + "\n\n".join(excerpts)
+        )
+    return {
+        "tipo": "respuesta", "mensaje": message,
+        "proveedor": "sky-private-knowledge",
+        "knowledge": found, "model_weights_updated": False,
+    }
+
+
+def _centrar_en_sky(resultado: dict) -> dict:
+    """SKY remains the only visible assistant."""
+    if not isinstance(resultado, dict):
+        return resultado
+    value = dict(resultado)
+    value["atendido_por"] = "SKY"
+    value["rol_interno_sugerido"] = sky_internal_roles.route_result(value)
+    return value
+
+
+@router.post('/mensaje')
+def mensaje(body: Mensaje, request: Request):
+    creado = _crear_subagente_si_pedido(body.texto)
+    if creado:
+        return _centrar_en_sky(creado)
+    supervision = _supervisar_si_pedido(body)
+    if supervision:
+        return _centrar_en_sky(supervision)
+    conocimiento = _consultar_biblioteca_si_pedido(body.texto)
+    if conocimiento:
+        return _centrar_en_sky(conocimiento)
+    clase = _clase_sky_si_pedido(body)
+    if clase:
+        return _centrar_en_sky(clase)
+    resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
+    return _centrar_en_sky(_completar(resultado, body.dispositivo, request))
+
+
+@router.post('/stream')
+def mensaje_stream(body: Mensaje, request: Request):
+    """Igual que /mensaje, pero cuando responde el modelo local envía el texto a medida que
+    se genera (NDJSON: {"delta": "..."} … {"final": {...}}), para que SKY hable sin esperar."""
+    from fastapi.responses import StreamingResponse
+    from neural_core import sky_asistente_personal as asis
+
+    def eventos():
+        historial = [t.model_dump() for t in body.historial]
+        def linea(obj):
+            return json.dumps(obj, ensure_ascii=False) + '\n'
+        texto = body.texto.strip()
+        creado = _crear_subagente_si_pedido(texto)
+        if creado:
+            yield linea({'final': _centrar_en_sky(creado)})
+            return
+        supervision = _supervisar_si_pedido(body)
+        if supervision:
+            yield linea({'final': _centrar_en_sky(supervision)})
+            return
+        conocimiento = _consultar_biblioteca_si_pedido(texto)
+        if conocimiento:
+            yield linea({'final': _centrar_en_sky(conocimiento)})
+            return
+        clase = _clase_sky_si_pedido(body)
+        if clase:
+            yield linea({'final': _centrar_en_sky(clase)})
+            return
+        r = asis.reglas(texto) if texto else None
+        if r or not texto or not asis.usar_cerebro(body.proveedor):
+            yield linea({'final': _centrar_en_sky(_completar(r or asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request))})
+            return
+        from neural_core import sky_cerebro
+        completo = ''
+        for evento, valor in sky_cerebro.decidir_eventos(texto, asis._turnos(historial), body.modo):
+            if evento == 'delta':
+                completo += valor
+                yield linea({'delta': valor})
+            elif evento == 'herramienta':
+                yield linea({'final': _centrar_en_sky(_completar(asis.resolver_especial(valor), body.dispositivo, request))})
+                return
+            elif evento == 'fin':
+                yield linea({'final': _centrar_en_sky({'tipo': 'respuesta', 'mensaje': valor, 'proveedor': 'ollama', 'transmitido': True})})
+                return
+            elif evento == 'error':
+                if completo:
+                    yield linea({'final': _centrar_en_sky({'tipo': 'respuesta', 'mensaje': completo, 'proveedor': 'ollama', 'transmitido': True})})
+                else:
+                    yield linea({'final': _centrar_en_sky(_completar(asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request))})
+                return
+    return StreamingResponse(eventos(), media_type='application/x-ndjson', headers={'Cache-Control': 'no-store'})
+
+
+class Correo(BaseModel):
+    approval_token: str = Field(default='', max_length=100)
+    para: str = Field(min_length=6, max_length=254)
+    asunto: str = Field(default='', max_length=200)
+    cuerpo: str = Field(min_length=1, max_length=20000)
+    en_respuesta_a: str = Field(default='', max_length=300)
+
+
+@router.post('/correo')
+def enviar_correo(body: Correo, request: Request):
+    """Envío confirmado por el dueño (un correo enviado no se puede deshacer)."""
+    from neural_core import sky_correo
+    _exigir_aprobacion(body.approval_token, 'correo',
+                      _payload_correo(body.para, body.asunto, body.cuerpo, body.en_respuesta_a), request)
+    try:
+        return sky_correo.enviar(body.para, body.asunto, body.cuerpo, body.en_respuesta_a)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200])
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200])
+
+
+@router.post('/ejecutar')
+def ejecutar(body: Ejecucion, request: Request):
+    """Confirmación explícita del dueño desde el panel."""
+    if body.action not in caps.ACCION_A_CAPACIDAD:
+        raise HTTPException(400, 'Acción no permitida.')
+    if body.action != 'status':
+        _exigir_aprobacion(body.approval_token, 'accion',
+                          {'action': body.action, 'params': body.params, 'dispositivo': body.dispositivo},
+                          request)
+    params = dict(body.params)
+    if body.action in ('note_create', 'note_append', 'note_trash'):
+        params['confirmed'] = True   # este clic ES la confirmación individual que exigen las notas
+    return _llamar(body.dispositivo, request, body.action, params)
+
+
+@router.post('/casa')
+def ejecutar_casa(body: OrdenCasa, request: Request):
+    """Confirmación del dueño para Home Assistant (luces, escenas, clima, cortinas, cerraduras)."""
+    from neural_core import sky_home_assistant as casa
+    _exigir_aprobacion(body.approval_token, 'casa',
+                       _payload_casa(body.service, body.entity_ids, body.data), request)
+    try:
+        return casa.ejecutar(body.service, body.entity_ids, body.data)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200])
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200])
+
+
+class CasaRapida(BaseModel):
+    service: str = Field(min_length=3, max_length=60)
+    entity_ids: list[str] = Field(min_length=1, max_length=20)
+    data: dict = Field(default_factory=dict)
+
+
+@router.post('/casa/preparar')
+def preparar_casa_rapida(body: CasaRapida, request: Request):
+    """El botón HUD prepara una orden de bajo riesgo; la ejecución exige token único."""
+    from neural_core import sky_home_assistant as casa
+    dominio, _, accion = body.service.partition('.')
+    if (dominio not in ('light', 'switch', 'fan', 'scene')
+            or accion not in casa.SERVICIOS_PERMITIDOS.get(dominio, set())
+            or any(not entity.startswith(dominio + '.') for entity in body.entity_ids)
+            or body.data):
+        raise HTTPException(403, 'La operación requiere una propuesta explícita.')
+    return {'approval_token': _emitir_aprobacion(
+        'casa', _payload_casa(body.service, body.entity_ids, {}), request)}
+
+
+@router.get('/verificar/{command_id}')
+def verificar_accion(command_id: str, request: Request, dispositivo: str = LOCAL):
+    """Consulta el estado del agente; sólo VERIFIED acredita una acción comprobada."""
+    try:
+        url, token = _destino(dispositivo, request)
+        return dispositivos.verify_device_action(url, token, command_id, timeout=5)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200]) from exc
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)[:200]) from exc
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200]) from exc
+
+
+@router.get('/voz')
+def voz_pendientes(request: Request):
+    pending = []
+    for entry in voz_inbox.read_inbox()[-8:]:
+        if not isinstance(entry, dict):
+            continue
+        item = dict(entry)
+        action = item.get('action')
+        if action not in caps.ACCION_A_CAPACIDAD:
+            continue
+        item['approval_token'] = _emitir_aprobacion(
+            'accion', {'action': action, 'params': item.get('params', {}), 'dispositivo': LOCAL}, request)
+        pending.append(item)
+    return {'pendientes': pending}
+
+
+@router.delete('/voz/{entry_id}')
+def voz_descartar(entry_id: str):
+    if len(entry_id) > 64:
+        raise HTTPException(400, 'Identificador inválido.')
+    voz_inbox.dismiss_inbox(entry_id)
+    return {'ok': True}
+,
+        texto.strip(), re.IGNORECASE
+    )
+    if not match:
+        return None
+    from neural_core import sky_knowledge_library as knowledge
+    try:
+        result = knowledge.search(match.group('query').strip(), limit=4)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(503, str(exc)[:180]) from exc
+    if not result["results"]:
+        message = "SKY no encontró coincidencias en tus documentos indexados."
+    else:
+        fragments = []
+        for item in result["results"][:4]:
+            fragments.append(
+                f'Fuente: {item["filename"]} ({item["citation"]})\n'
+                f'Fragmento: {item["excerpt"][:550]}'
+            )
+        message = (
+            "SKY encontró estos fragmentos en tu biblioteca privada. "
+            "El contenido proviene de tus archivos y aún no es un hecho verificado:\n\n"
+            + "\n\n".join(fragments)
+        )
+    return {
+        "tipo": "respuesta", "proveedor": "sky-private-knowledge",
+        "mensaje": message, "knowledge": result,
+        "model_weights_updated": False,
+    }
+
+
+def _centrar_en_sky(resultado: dict) -> dict:
+    """SKY is always the only user-facing assistant."""
+    if not isinstance(resultado, dict):
+        return resultado
+    value = dict(resultado)
+    value["atendido_por"] = "SKY"
+    value["rol_interno_sugerido"] = sky_internal_roles.route_result(value)
+    return value
+
+
+@router.post('/mensaje')
+def mensaje(body: Mensaje, request: Request):
+    creado = _crear_subagente_si_pedido(body.texto)
+    if creado:
+        return _centrar_en_sky(creado)
+    supervision = _supervisar_si_pedido(body)
+    if supervision:
+        return _centrar_en_sky(supervision)
+    resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
+    return _centrar_en_sky(_completar(resultado, body.dispositivo, request))
+
+
+@router.post('/stream')
+def mensaje_stream(body: Mensaje, request: Request):
+    """Igual que /mensaje, pero cuando responde el modelo local envía el texto a medida que
+    se genera (NDJSON: {"delta": "..."} … {"final": {...}}), para que SKY hable sin esperar."""
+    from fastapi.responses import StreamingResponse
+    from neural_core import sky_asistente_personal as asis
+
+    def eventos():
+        historial = [t.model_dump() for t in body.historial]
+        def linea(obj):
+            return json.dumps(obj, ensure_ascii=False) + '\n'
+        texto = body.texto.strip()
+        creado = _crear_subagente_si_pedido(texto)
+        if creado:
+            yield linea({'final': _centrar_en_sky(creado)})
+            return
+        supervision = _supervisar_si_pedido(body)
+        if supervision:
+            yield linea({'final': _centrar_en_sky(supervision)})
+            return
+        r = asis.reglas(texto) if texto else None
+        if r or not texto or not asis.usar_cerebro(body.proveedor):
+            yield linea({'final': _centrar_en_sky(_completar(r or asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request))})
+            return
+        from neural_core import sky_cerebro
+        completo = ''
+        for evento, valor in sky_cerebro.decidir_eventos(texto, asis._turnos(historial), body.modo):
+            if evento == 'delta':
+                completo += valor
+                yield linea({'delta': valor})
+            elif evento == 'herramienta':
+                yield linea({'final': _centrar_en_sky(_completar(asis.resolver_especial(valor), body.dispositivo, request))})
+                return
+            elif evento == 'fin':
+                yield linea({'final': _centrar_en_sky({'tipo': 'respuesta', 'mensaje': valor, 'proveedor': 'ollama', 'transmitido': True})})
+                return
+            elif evento == 'error':
+                if completo:
+                    yield linea({'final': _centrar_en_sky({'tipo': 'respuesta', 'mensaje': completo, 'proveedor': 'ollama', 'transmitido': True})})
+                else:
+                    yield linea({'final': _centrar_en_sky(_completar(asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request))})
+                return
+    return StreamingResponse(eventos(), media_type='application/x-ndjson', headers={'Cache-Control': 'no-store'})
+
+
+class Correo(BaseModel):
+    approval_token: str = Field(default='', max_length=100)
+    para: str = Field(min_length=6, max_length=254)
+    asunto: str = Field(default='', max_length=200)
+    cuerpo: str = Field(min_length=1, max_length=20000)
+    en_respuesta_a: str = Field(default='', max_length=300)
+
+
+@router.post('/correo')
+def enviar_correo(body: Correo, request: Request):
+    """Envío confirmado por el dueño (un correo enviado no se puede deshacer)."""
+    from neural_core import sky_correo
+    _exigir_aprobacion(body.approval_token, 'correo',
+                      _payload_correo(body.para, body.asunto, body.cuerpo, body.en_respuesta_a), request)
+    try:
+        return sky_correo.enviar(body.para, body.asunto, body.cuerpo, body.en_respuesta_a)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200])
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200])
+
+
+@router.post('/ejecutar')
+def ejecutar(body: Ejecucion, request: Request):
+    """Confirmación explícita del dueño desde el panel."""
+    if body.action not in caps.ACCION_A_CAPACIDAD:
+        raise HTTPException(400, 'Acción no permitida.')
+    if body.action != 'status':
+        _exigir_aprobacion(body.approval_token, 'accion',
+                          {'action': body.action, 'params': body.params, 'dispositivo': body.dispositivo},
+                          request)
+    params = dict(body.params)
+    if body.action in ('note_create', 'note_append', 'note_trash'):
+        params['confirmed'] = True   # este clic ES la confirmación individual que exigen las notas
+    return _llamar(body.dispositivo, request, body.action, params)
+
+
+@router.post('/casa')
+def ejecutar_casa(body: OrdenCasa, request: Request):
+    """Confirmación del dueño para Home Assistant (luces, escenas, clima, cortinas, cerraduras)."""
+    from neural_core import sky_home_assistant as casa
+    _exigir_aprobacion(body.approval_token, 'casa',
+                       _payload_casa(body.service, body.entity_ids, body.data), request)
+    try:
+        return casa.ejecutar(body.service, body.entity_ids, body.data)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200])
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200])
+
+
+class CasaRapida(BaseModel):
+    service: str = Field(min_length=3, max_length=60)
+    entity_ids: list[str] = Field(min_length=1, max_length=20)
+    data: dict = Field(default_factory=dict)
+
+
+@router.post('/casa/preparar')
+def preparar_casa_rapida(body: CasaRapida, request: Request):
+    """El botón HUD prepara una orden de bajo riesgo; la ejecución exige token único."""
+    from neural_core import sky_home_assistant as casa
+    dominio, _, accion = body.service.partition('.')
+    if (dominio not in ('light', 'switch', 'fan', 'scene')
+            or accion not in casa.SERVICIOS_PERMITIDOS.get(dominio, set())
+            or any(not entity.startswith(dominio + '.') for entity in body.entity_ids)
+            or body.data):
+        raise HTTPException(403, 'La operación requiere una propuesta explícita.')
+    return {'approval_token': _emitir_aprobacion(
+        'casa', _payload_casa(body.service, body.entity_ids, {}), request)}
+
+
+@router.get('/verificar/{command_id}')
+def verificar_accion(command_id: str, request: Request, dispositivo: str = LOCAL):
+    """Consulta el estado del agente; sólo VERIFIED acredita una acción comprobada."""
+    try:
+        url, token = _destino(dispositivo, request)
+        return dispositivos.verify_device_action(url, token, command_id, timeout=5)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200]) from exc
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)[:200]) from exc
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200]) from exc
+
+
+@router.get('/voz')
+def voz_pendientes(request: Request):
+    pending = []
+    for entry in voz_inbox.read_inbox()[-8:]:
+        if not isinstance(entry, dict):
+            continue
+        item = dict(entry)
+        action = item.get('action')
+        if action not in caps.ACCION_A_CAPACIDAD:
+            continue
+        item['approval_token'] = _emitir_aprobacion(
+            'accion', {'action': action, 'params': item.get('params', {}), 'dispositivo': LOCAL}, request)
+        pending.append(item)
+    return {'pendientes': pending}
+
+
+@router.delete('/voz/{entry_id}')
+def voz_descartar(entry_id: str):
+    if len(entry_id) > 64:
+        raise HTTPException(400, 'Identificador inválido.')
+    voz_inbox.dismiss_inbox(entry_id)
+    return {'ok': True}
+,
+        request, re.IGNORECASE
+    )
+    if next_cmd:
+        if not body.lesson_id:
+            return {
+                "tipo":"respuesta","mensaje":(
+                    "Indicá una clase activa o abrí SKY Aula para continuar exactamente "
+                    "la misma sesión, sin perder el orden de los pasos."),
+                "proveedor":"sky-aula","lesson_id":None,
+            }
+        try:
+            result = sky_aula.next_stage(body.lesson_id)
+        except KeyError:
+            return {"tipo":"respuesta","mensaje":"Esta clase expiró; iniciá otra sesión.",
+                    "proveedor":"sky-aula"}
+        text = result.get("step",{}).get("voice_ready_text") or (
+            "La clase terminó. Podés empezar otra."
+        )
+        return {"tipo":"respuesta","mensaje":text,"proveedor":"sky-aula",
+                "lesson_id":body.lesson_id,"academy":result}
+    match = re.match(
+        root + r'(?:impart[ií]|enseñ[aá]|prepar[aá]|dame|inicia|iniciá)\s+'
+               r'(?:una\s+)?clase\s+(?:de|sobre)\s+(?P<topic>.{4,160}?)\s+'
+               r'(?:para\s+)?(?:nivel\s+)?'
+               r'(?P<level>inicial|primaria|secundaria|media|t[eé]cnica?|'
+               r'universitaria?|maestr[ií]a|doctorado)\s*
+    """Retrieve trusted-to-be-user-supplied excerpts, never treat them as commands."""
+    import re
+    match = re.match(
+        r'^\s*(?:(?:oye|hey|ok)\s+)?sky[\s,;:!¡-]+'
+        r'(?:busca|buscá|consulta|consultá|qué\s+dice|que\s+dice)\s+'
+        r'(?:en\s+)?(?:mis\s+documentos|mi\s+biblioteca|mis\s+archivos)'
+        r'(?:\s+(?:sobre|acerca\s+de|de))?\s*[:,-]?\s*(?P<query>.{3,500})$',
+        texto.strip(), re.IGNORECASE
+    )
+    if not match:
+        return None
+    from neural_core import sky_knowledge_library as knowledge
+    try:
+        found = knowledge.search(match.group('query').strip(), limit=4)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(503, str(exc)[:180]) from exc
+    if not found["results"]:
+        message = "SKY no encontró coincidencias en tus documentos guardados."
+    else:
+        excerpts = [
+            "Fuente: " + item["filename"] + " (" + item["citation"] + ")\n"
+            "Fragmento: " + item["excerpt"][:550]
+            for item in found["results"][:4]
+        ]
+        message = (
+            "SKY encontró estos fragmentos en tu biblioteca privada. "
+            "Son datos aportados, no hechos verificados externamente:\n\n"
+            + "\n\n".join(excerpts)
+        )
+    return {
+        "tipo": "respuesta", "mensaje": message,
+        "proveedor": "sky-private-knowledge",
+        "knowledge": found, "model_weights_updated": False,
+    }
+
+
+def _centrar_en_sky(resultado: dict) -> dict:
+    """SKY remains the only visible assistant."""
+    if not isinstance(resultado, dict):
+        return resultado
+    value = dict(resultado)
+    value["atendido_por"] = "SKY"
+    value["rol_interno_sugerido"] = sky_internal_roles.route_result(value)
+    return value
+
+
+@router.post('/mensaje')
+def mensaje(body: Mensaje, request: Request):
+    creado = _crear_subagente_si_pedido(body.texto)
+    if creado:
+        return _centrar_en_sky(creado)
+    supervision = _supervisar_si_pedido(body)
+    if supervision:
+        return _centrar_en_sky(supervision)
+    conocimiento = _consultar_biblioteca_si_pedido(body.texto)
+    if conocimiento:
+        return _centrar_en_sky(conocimiento)
+    resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
+    return _centrar_en_sky(_completar(resultado, body.dispositivo, request))
+
+
+@router.post('/stream')
+def mensaje_stream(body: Mensaje, request: Request):
+    """Igual que /mensaje, pero cuando responde el modelo local envía el texto a medida que
+    se genera (NDJSON: {"delta": "..."} … {"final": {...}}), para que SKY hable sin esperar."""
+    from fastapi.responses import StreamingResponse
+    from neural_core import sky_asistente_personal as asis
+
+    def eventos():
+        historial = [t.model_dump() for t in body.historial]
+        def linea(obj):
+            return json.dumps(obj, ensure_ascii=False) + '\n'
+        texto = body.texto.strip()
+        creado = _crear_subagente_si_pedido(texto)
+        if creado:
+            yield linea({'final': _centrar_en_sky(creado)})
+            return
+        supervision = _supervisar_si_pedido(body)
+        if supervision:
+            yield linea({'final': _centrar_en_sky(supervision)})
+            return
+        conocimiento = _consultar_biblioteca_si_pedido(texto)
+        if conocimiento:
+            yield linea({'final': _centrar_en_sky(conocimiento)})
+            return
+        r = asis.reglas(texto) if texto else None
+        if r or not texto or not asis.usar_cerebro(body.proveedor):
+            yield linea({'final': _centrar_en_sky(_completar(r or asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request))})
+            return
+        from neural_core import sky_cerebro
+        completo = ''
+        for evento, valor in sky_cerebro.decidir_eventos(texto, asis._turnos(historial), body.modo):
+            if evento == 'delta':
+                completo += valor
+                yield linea({'delta': valor})
+            elif evento == 'herramienta':
+                yield linea({'final': _centrar_en_sky(_completar(asis.resolver_especial(valor), body.dispositivo, request))})
+                return
+            elif evento == 'fin':
+                yield linea({'final': _centrar_en_sky({'tipo': 'respuesta', 'mensaje': valor, 'proveedor': 'ollama', 'transmitido': True})})
+                return
+            elif evento == 'error':
+                if completo:
+                    yield linea({'final': _centrar_en_sky({'tipo': 'respuesta', 'mensaje': completo, 'proveedor': 'ollama', 'transmitido': True})})
+                else:
+                    yield linea({'final': _centrar_en_sky(_completar(asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request))})
+                return
+    return StreamingResponse(eventos(), media_type='application/x-ndjson', headers={'Cache-Control': 'no-store'})
+
+
+class Correo(BaseModel):
+    approval_token: str = Field(default='', max_length=100)
+    para: str = Field(min_length=6, max_length=254)
+    asunto: str = Field(default='', max_length=200)
+    cuerpo: str = Field(min_length=1, max_length=20000)
+    en_respuesta_a: str = Field(default='', max_length=300)
+
+
+@router.post('/correo')
+def enviar_correo(body: Correo, request: Request):
+    """Envío confirmado por el dueño (un correo enviado no se puede deshacer)."""
+    from neural_core import sky_correo
+    _exigir_aprobacion(body.approval_token, 'correo',
+                      _payload_correo(body.para, body.asunto, body.cuerpo, body.en_respuesta_a), request)
+    try:
+        return sky_correo.enviar(body.para, body.asunto, body.cuerpo, body.en_respuesta_a)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200])
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200])
+
+
+@router.post('/ejecutar')
+def ejecutar(body: Ejecucion, request: Request):
+    """Confirmación explícita del dueño desde el panel."""
+    if body.action not in caps.ACCION_A_CAPACIDAD:
+        raise HTTPException(400, 'Acción no permitida.')
+    if body.action != 'status':
+        _exigir_aprobacion(body.approval_token, 'accion',
+                          {'action': body.action, 'params': body.params, 'dispositivo': body.dispositivo},
+                          request)
+    params = dict(body.params)
+    if body.action in ('note_create', 'note_append', 'note_trash'):
+        params['confirmed'] = True   # este clic ES la confirmación individual que exigen las notas
+    return _llamar(body.dispositivo, request, body.action, params)
+
+
+@router.post('/casa')
+def ejecutar_casa(body: OrdenCasa, request: Request):
+    """Confirmación del dueño para Home Assistant (luces, escenas, clima, cortinas, cerraduras)."""
+    from neural_core import sky_home_assistant as casa
+    _exigir_aprobacion(body.approval_token, 'casa',
+                       _payload_casa(body.service, body.entity_ids, body.data), request)
+    try:
+        return casa.ejecutar(body.service, body.entity_ids, body.data)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200])
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200])
+
+
+class CasaRapida(BaseModel):
+    service: str = Field(min_length=3, max_length=60)
+    entity_ids: list[str] = Field(min_length=1, max_length=20)
+    data: dict = Field(default_factory=dict)
+
+
+@router.post('/casa/preparar')
+def preparar_casa_rapida(body: CasaRapida, request: Request):
+    """El botón HUD prepara una orden de bajo riesgo; la ejecución exige token único."""
+    from neural_core import sky_home_assistant as casa
+    dominio, _, accion = body.service.partition('.')
+    if (dominio not in ('light', 'switch', 'fan', 'scene')
+            or accion not in casa.SERVICIOS_PERMITIDOS.get(dominio, set())
+            or any(not entity.startswith(dominio + '.') for entity in body.entity_ids)
+            or body.data):
+        raise HTTPException(403, 'La operación requiere una propuesta explícita.')
+    return {'approval_token': _emitir_aprobacion(
+        'casa', _payload_casa(body.service, body.entity_ids, {}), request)}
+
+
+@router.get('/verificar/{command_id}')
+def verificar_accion(command_id: str, request: Request, dispositivo: str = LOCAL):
+    """Consulta el estado del agente; sólo VERIFIED acredita una acción comprobada."""
+    try:
+        url, token = _destino(dispositivo, request)
+        return dispositivos.verify_device_action(url, token, command_id, timeout=5)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200]) from exc
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)[:200]) from exc
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200]) from exc
+
+
+@router.get('/voz')
+def voz_pendientes(request: Request):
+    pending = []
+    for entry in voz_inbox.read_inbox()[-8:]:
+        if not isinstance(entry, dict):
+            continue
+        item = dict(entry)
+        action = item.get('action')
+        if action not in caps.ACCION_A_CAPACIDAD:
+            continue
+        item['approval_token'] = _emitir_aprobacion(
+            'accion', {'action': action, 'params': item.get('params', {}), 'dispositivo': LOCAL}, request)
+        pending.append(item)
+    return {'pendientes': pending}
+
+
+@router.delete('/voz/{entry_id}')
+def voz_descartar(entry_id: str):
+    if len(entry_id) > 64:
+        raise HTTPException(400, 'Identificador inválido.')
+    voz_inbox.dismiss_inbox(entry_id)
+    return {'ok': True}
+,
+        texto.strip(), re.IGNORECASE
+    )
+    if not match:
+        return None
+    from neural_core import sky_knowledge_library as knowledge
+    try:
+        result = knowledge.search(match.group('query').strip(), limit=4)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(503, str(exc)[:180]) from exc
+    if not result["results"]:
+        message = "SKY no encontró coincidencias en tus documentos indexados."
+    else:
+        fragments = []
+        for item in result["results"][:4]:
+            fragments.append(
+                f'Fuente: {item["filename"]} ({item["citation"]})\n'
+                f'Fragmento: {item["excerpt"][:550]}'
+            )
+        message = (
+            "SKY encontró estos fragmentos en tu biblioteca privada. "
+            "El contenido proviene de tus archivos y aún no es un hecho verificado:\n\n"
+            + "\n\n".join(fragments)
+        )
+    return {
+        "tipo": "respuesta", "proveedor": "sky-private-knowledge",
+        "mensaje": message, "knowledge": result,
+        "model_weights_updated": False,
+    }
+
+
+def _centrar_en_sky(resultado: dict) -> dict:
+    """SKY is always the only user-facing assistant."""
+    if not isinstance(resultado, dict):
+        return resultado
+    value = dict(resultado)
+    value["atendido_por"] = "SKY"
+    value["rol_interno_sugerido"] = sky_internal_roles.route_result(value)
+    return value
+
+
+@router.post('/mensaje')
+def mensaje(body: Mensaje, request: Request):
+    creado = _crear_subagente_si_pedido(body.texto)
+    if creado:
+        return _centrar_en_sky(creado)
+    supervision = _supervisar_si_pedido(body)
+    if supervision:
+        return _centrar_en_sky(supervision)
+    resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
+    return _centrar_en_sky(_completar(resultado, body.dispositivo, request))
+
+
+@router.post('/stream')
+def mensaje_stream(body: Mensaje, request: Request):
+    """Igual que /mensaje, pero cuando responde el modelo local envía el texto a medida que
+    se genera (NDJSON: {"delta": "..."} … {"final": {...}}), para que SKY hable sin esperar."""
+    from fastapi.responses import StreamingResponse
+    from neural_core import sky_asistente_personal as asis
+
+    def eventos():
+        historial = [t.model_dump() for t in body.historial]
+        def linea(obj):
+            return json.dumps(obj, ensure_ascii=False) + '\n'
+        texto = body.texto.strip()
+        creado = _crear_subagente_si_pedido(texto)
+        if creado:
+            yield linea({'final': _centrar_en_sky(creado)})
+            return
+        supervision = _supervisar_si_pedido(body)
+        if supervision:
+            yield linea({'final': _centrar_en_sky(supervision)})
+            return
+        r = asis.reglas(texto) if texto else None
+        if r or not texto or not asis.usar_cerebro(body.proveedor):
+            yield linea({'final': _centrar_en_sky(_completar(r or asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request))})
+            return
+        from neural_core import sky_cerebro
+        completo = ''
+        for evento, valor in sky_cerebro.decidir_eventos(texto, asis._turnos(historial), body.modo):
+            if evento == 'delta':
+                completo += valor
+                yield linea({'delta': valor})
+            elif evento == 'herramienta':
+                yield linea({'final': _centrar_en_sky(_completar(asis.resolver_especial(valor), body.dispositivo, request))})
+                return
+            elif evento == 'fin':
+                yield linea({'final': _centrar_en_sky({'tipo': 'respuesta', 'mensaje': valor, 'proveedor': 'ollama', 'transmitido': True})})
+                return
+            elif evento == 'error':
+                if completo:
+                    yield linea({'final': _centrar_en_sky({'tipo': 'respuesta', 'mensaje': completo, 'proveedor': 'ollama', 'transmitido': True})})
+                else:
+                    yield linea({'final': _centrar_en_sky(_completar(asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request))})
+                return
+    return StreamingResponse(eventos(), media_type='application/x-ndjson', headers={'Cache-Control': 'no-store'})
+
+
+class Correo(BaseModel):
+    approval_token: str = Field(default='', max_length=100)
+    para: str = Field(min_length=6, max_length=254)
+    asunto: str = Field(default='', max_length=200)
+    cuerpo: str = Field(min_length=1, max_length=20000)
+    en_respuesta_a: str = Field(default='', max_length=300)
+
+
+@router.post('/correo')
+def enviar_correo(body: Correo, request: Request):
+    """Envío confirmado por el dueño (un correo enviado no se puede deshacer)."""
+    from neural_core import sky_correo
+    _exigir_aprobacion(body.approval_token, 'correo',
+                      _payload_correo(body.para, body.asunto, body.cuerpo, body.en_respuesta_a), request)
+    try:
+        return sky_correo.enviar(body.para, body.asunto, body.cuerpo, body.en_respuesta_a)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200])
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200])
+
+
+@router.post('/ejecutar')
+def ejecutar(body: Ejecucion, request: Request):
+    """Confirmación explícita del dueño desde el panel."""
+    if body.action not in caps.ACCION_A_CAPACIDAD:
+        raise HTTPException(400, 'Acción no permitida.')
+    if body.action != 'status':
+        _exigir_aprobacion(body.approval_token, 'accion',
+                          {'action': body.action, 'params': body.params, 'dispositivo': body.dispositivo},
+                          request)
+    params = dict(body.params)
+    if body.action in ('note_create', 'note_append', 'note_trash'):
+        params['confirmed'] = True   # este clic ES la confirmación individual que exigen las notas
+    return _llamar(body.dispositivo, request, body.action, params)
+
+
+@router.post('/casa')
+def ejecutar_casa(body: OrdenCasa, request: Request):
+    """Confirmación del dueño para Home Assistant (luces, escenas, clima, cortinas, cerraduras)."""
+    from neural_core import sky_home_assistant as casa
+    _exigir_aprobacion(body.approval_token, 'casa',
+                       _payload_casa(body.service, body.entity_ids, body.data), request)
+    try:
+        return casa.ejecutar(body.service, body.entity_ids, body.data)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200])
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200])
+
+
+class CasaRapida(BaseModel):
+    service: str = Field(min_length=3, max_length=60)
+    entity_ids: list[str] = Field(min_length=1, max_length=20)
+    data: dict = Field(default_factory=dict)
+
+
+@router.post('/casa/preparar')
+def preparar_casa_rapida(body: CasaRapida, request: Request):
+    """El botón HUD prepara una orden de bajo riesgo; la ejecución exige token único."""
+    from neural_core import sky_home_assistant as casa
+    dominio, _, accion = body.service.partition('.')
+    if (dominio not in ('light', 'switch', 'fan', 'scene')
+            or accion not in casa.SERVICIOS_PERMITIDOS.get(dominio, set())
+            or any(not entity.startswith(dominio + '.') for entity in body.entity_ids)
+            or body.data):
+        raise HTTPException(403, 'La operación requiere una propuesta explícita.')
+    return {'approval_token': _emitir_aprobacion(
+        'casa', _payload_casa(body.service, body.entity_ids, {}), request)}
+
+
+@router.get('/verificar/{command_id}')
+def verificar_accion(command_id: str, request: Request, dispositivo: str = LOCAL):
+    """Consulta el estado del agente; sólo VERIFIED acredita una acción comprobada."""
+    try:
+        url, token = _destino(dispositivo, request)
+        return dispositivos.verify_device_action(url, token, command_id, timeout=5)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200]) from exc
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)[:200]) from exc
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200]) from exc
+
+
+@router.get('/voz')
+def voz_pendientes(request: Request):
+    pending = []
+    for entry in voz_inbox.read_inbox()[-8:]:
+        if not isinstance(entry, dict):
+            continue
+        item = dict(entry)
+        action = item.get('action')
+        if action not in caps.ACCION_A_CAPACIDAD:
+            continue
+        item['approval_token'] = _emitir_aprobacion(
+            'accion', {'action': action, 'params': item.get('params', {}), 'dispositivo': LOCAL}, request)
+        pending.append(item)
+    return {'pendientes': pending}
+
+
+@router.delete('/voz/{entry_id}')
+def voz_descartar(entry_id: str):
+    if len(entry_id) > 64:
+        raise HTTPException(400, 'Identificador inválido.')
+    voz_inbox.dismiss_inbox(entry_id)
+    return {'ok': True}
+,
+        request, re.IGNORECASE
+    )
+    if not match:
+        return None
+    level_aliases = {
+        "media":"secundaria","técnica":"tecnico","técnico":"tecnico",
+        "tecnica":"tecnico","universitaria":"universitario",
+        "universitario":"universitario","maestría":"maestria",
+    }
+    raw_level = match.group("level").lower()
+    level = level_aliases.get(raw_level,raw_level)
+    try:
+        result=sky_aula.start(
+            topic=match.group("topic"),level=level,
+            reference_text=body.source_text,
+        )
+    except (ValueError, RuntimeError) as exc:
+        return {"tipo":"respuesta","mensaje":"No se pudo abrir la clase: "+str(exc)[:180],
+                "proveedor":"sky-aula"}
+    text=result["step"]["voice_ready_text"]
+    return {
+        "tipo":"respuesta","mensaje":text,"proveedor":"sky-aula",
+        "lesson_id":result["lesson_id"],
+        "academy":result,
     }
 
 
