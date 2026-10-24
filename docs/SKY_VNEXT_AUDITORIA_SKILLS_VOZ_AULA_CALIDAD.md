@@ -114,3 +114,24 @@ Documentación API utilizada:
    funcionamiento universal perfecto.
 
 **No fusionar a producción sin validar las condiciones anteriores.**
+
+
+## Prueba física futura en Windows (solo al ejecutar manualmente)
+
+El script `scripts/sky_e2e_pc_real.py` no se ejecuta en GitHub Actions
+ni automáticamente al iniciar SKY. En una PC Windows, con el agente SKY ya
+corriendo en localhost y sus permisos configurados, permite comprobar el
+ciclo real con una aplicación y un documento nuevo:
+
+```powershell
+python scripts/sky_e2e_pc_real.py --help
+python scripts/sky_e2e_pc_real.py --confirm --app calculator
+python scripts/sky_e2e_pc_real.py --confirm --app word --open-document
+```
+
+Si Word no está instalado o no tiene permiso, la prueba falla sin fingir
+que abrió. Cada ejecución conserva un reporte sin tokens en
+`Documentos/SKY_E2E` (incluye posible redirección OneDrive). El comando
+`--media-test` modifica el estado Play/Pausa y solo debe usarse
+cuando el propietario lo solicite expresamente. Estas comprobaciones NO
+prueban por sí solas el micrófono o la reproducción acústica del equipo.
