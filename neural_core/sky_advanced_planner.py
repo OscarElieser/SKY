@@ -223,7 +223,7 @@ def enrich_plan(plan: dict, *, mode: str = "advanced", project_id: str | None = 
                   model_modified_permissions=False, quality_checks=[],
                   planning_summary="", degraded_reason=None,
                   advisory_roles=sky_roles.select_roles(plan["request"], max_roles=4))
-    if mode == "deterministic" or plan.get("blockers") or len(result["steps"]) == 1:
+    if mode == "deterministic" or plan.get("blockers"):
         return result
     if os.getenv("SKY_ADVANCED_PLANNER", "auto").lower() in ("off", "disabled", "0"):
         result["degraded_reason"] = "Modelo local deshabilitado por configuración."
