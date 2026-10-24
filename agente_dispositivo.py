@@ -298,10 +298,21 @@ def execute_action(action: str, params: dict, politica: dict | None = None) -> d
         verificador_acciones.mark_failed(rec.command_id, str(exc)[:200], (time.time() - t0) * 1000)
         raise
     res.setdefault('command_id', rec.command_id)
-    if res.get('ok', True):
-        verificador_acciones.mark_verified(rec.command_id, {k: v for k, v in res.items() if k != 'text'}, (time.time() - t0) * 1000)
+    # Una orden aceptada o enviada NO demuestra que la aplicación haya actuado.
+    # Conservar el estado real: SENT/PENDING/RUNNING no son éxito verificado.
+    estado = str(res.get('status', 'RUNNING')).upper()
+    detalle = {k: v for k, v in res.items() if k != 'text'}
+    duracion = (time.time() - t0) * 1000
+    if res.get('ok') is False or estado == 'FAILED':
+        verificador_acciones.mark_failed(rec.command_id, str(res.get('message', ''))[:200], duracion)
+    elif estado == 'VERIFIED':
+        verificador_acciones.mark_verified(rec.command_id, detalle, duracion)
     else:
-        verificador_acciones.mark_failed(rec.command_id, str(res.get('message', ''))[:200], (time.time() - t0) * 1000)
+        verificador_acciones.mark_dispatched(
+            rec.command_id,
+            estado if estado in ('SENT', 'PENDING', 'RUNNING') else 'RUNNING',
+            detalle, duracion,
+        )
     return res
 
 
