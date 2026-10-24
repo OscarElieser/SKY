@@ -268,6 +268,21 @@ O usá la **opción 9** del menú principal. Para revisar directamente los módu
 
 Los flujos de [GitHub Actions](https://github.com/OscarElieser/SKY/actions) verifican suites delimitadas de regresión, seguridad, API y módulos. El éxito de un flujo **no garantiza** que cada micrófono, cámara, app, teléfono, modelo o cuenta de terceros funcione fuera del entorno de pruebas.
 
+## 🔬 SKY Verification Lab — seguimiento de las seis prioridades
+
+Tras revisar el video sobre skills, subagentes, conectores, seguridad y memoria, se añadió una capa **de verificación no intrusiva** sobre la API actual:
+
+- **Inventario honesto:** subagentes y skills propios, estado de preparación de GitHub/Supabase/Vercel y ausencia de cliente MCP general confirmado.
+- **Pruebas de entorno:** señales de disponibilidad de Ollama, Piper y paquetes de voz; sin afirmar pruebas físicas de micrófono ni ejecución en Windows.
+- **Evidencia y citas:** lectura digital de PDF con hash SHA256 y páginas reales, DOCX/texto sin páginas inventadas y localización de citas con revisión humana.
+- **Evaluación formativa privada:** criterios y preguntas para revisión docente sin almacenar ni calificar automáticamente respuestas.
+- **KPIs reales:** aprovechamiento de la telemetría de SKY, con valores nulos cuando no se registraron muestras.
+- **Vista previa de orquestación:** consulta de roles y skills antes de delegar, **sin ejecutar herramientas ni crear permisos**.
+
+Entrá a `GET /api/sky/verification/capabilities` con tus credenciales del dueño. Guía detallada: [SKY Verification Lab y validación en Windows](docs/api/SKY_VERIFICATION_LAB_VIDEO_PRIORIDADES.md).
+
+**Pendiente:** conexión MCP conforme al protocolo oficial y ensayos completos de voz, Ollama, agentes, permisos y hardware en tu computadora. Los chequeos automáticos no sustituyen esas pruebas.
+
 ## 🗺️ Prioridades siguientes
 
 - Validar voz, Ollama, Piper, permisos y acciones reales en el equipo Windows de destino.
