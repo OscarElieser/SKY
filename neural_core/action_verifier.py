@@ -112,7 +112,29 @@ class ActionVerifier:
         return rec
 
     def get_action(self, command_id: str) -> Optional[ActionRecord]:
-        return self._records.get(command_id)
+        """Busca primero en memoria y, tras reinicios, recupera el último estado del ledger."""
+        record = self._records.get(command_id)
+        if record:
+            return record
+        if not self.ledger_file.exists():
+            return None
+        last = None
+        fields = set(ActionRecord.__dataclass_fields__)
+        try:
+            with self.ledger_file.open('r', encoding='utf-8') as log:
+                for line in log:
+                    try:
+                        raw = json.loads(line)
+                        if not isinstance(raw, dict) or raw.get('command_id') != command_id:
+                            continue
+                        last = ActionRecord(**{key: value for key, value in raw.items() if key in fields})
+                    except (ValueError, TypeError, KeyError):
+                        continue
+        except OSError:
+            return None
+        if last:
+            self._records[command_id] = last
+        return last
 
     def get_recent_actions(self, limit: int = 25) -> List[Dict[str, Any]]:
         if not self.ledger_file.exists():
