@@ -93,11 +93,11 @@ def is_sequence(text: str) -> bool:
     """Only explicit multi-action imperatives are intercepted from regular chat."""
     if not isinstance(text, str) or len(text) > 1500:
         return False
-    raw = re.sub(r"^(?:(?:oye|hey|ok)\\s+)?sky[\\s,:!¡-]+", "", text.strip(), flags=re.I)
+    raw = re.sub(r"^(?:(?:oye|hey|ok)\s+)?sky[\s,:!¡-]+", "", text.strip(), flags=re.I)
     starts = re.match(r"^(?:abre|abr[ií]|abrir|inicia|lanza|ejecuta|pon|pone|muestra|m[uú]estrame|"
-                      r"silencia|baja|sube|escribe|minimiza|restaura|cierra|reproduce)\\b", raw, re.I)
-    return bool(starts and re.search(r"\\s+(?:y\\s+luego|y\\s+despu[eé]s|luego|despu[eé]s|"
-                                      r"a\\s+continuaci[oó]n)\\s+", raw, re.I))
+                      r"silencia|baja|sube|escribe|minimiza|restaura|cierra|reproduce)\b", raw, re.I)
+    return bool(starts and re.search(r"\s+(?:y\s+luego|y\s+despu[eé]s|luego|despu[eé]s|"
+                                      r"a\s+continuaci[oó]n)\s+", raw, re.I))
 
 
 def from_text(text: str) -> list[dict]:
