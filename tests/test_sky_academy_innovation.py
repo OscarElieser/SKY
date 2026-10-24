@@ -336,3 +336,26 @@ def test_owner_can_start_other_levels_by_voice(client,level,voice_command):
     assert data["proveedor"]=="sky-aula"
     assert data["academy"]["plan"]["level"]==level
     assert data["lesson_id"].startswith("lesson_")
+
+
+
+def test_interactive_lesson_response_is_formative_without_recording_student_text(client):
+    from neural_core import sky_aula
+    created=client.post("/api/sky/academy/education/sessions",headers=auth(),
+                        json=lesson(level="secundaria"))
+    assert created.status_code==201,created.text
+    ident=created.json()["lesson_id"]
+    answer="Creo que la respuesta depende del orden de los números en la secuencia."
+    reply=client.post("/api/sky/academy/education/sessions/"+ident+"/respond",
+                      headers=auth(),json={"answer":answer})
+    assert reply.status_code==200,reply.text
+    data=reply.json()
+    assert data["central_agent"]=="SKY"
+    assert not data["correctness_graded"]
+    assert not data["response_recorded"]
+    assert not data["student_personal_data_saved"]
+    assert "comprobarla" in data["voice_ready_text"]
+    assert answer not in repr(sky_aula._SESSIONS[ident])
+    nxt=client.get("/api/sky/academy/education/sessions/"+ident,
+                   headers=auth())
+    assert nxt.json()["step"]["stage_number"]==1
