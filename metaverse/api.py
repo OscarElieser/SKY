@@ -896,6 +896,65 @@ def developer_build_execute(body: dict, request: Request):
         raise HTTPException(503, str(exc)) from exc
 
 
+# SKY Developer Workbench shares the existing private API and SENTINEL guard.
+@app.get('/api/developer/workbench/catalogue', dependencies=[Depends(require_key)])
+def developer_ecosystem(category: str = '', query: str = '', limit: int = 80):
+    from neural_core.sky_developer_workbench import ecosystem, WorkbenchInvalid
+    try:
+        return ecosystem(category or None, query, limit)
+    except WorkbenchInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.get('/api/developer/workbench/readiness', dependencies=[Depends(require_key)])
+def developer_sdk_readiness():
+    from neural_core.sky_developer_workbench import sdk_readiness
+    return sdk_readiness()
+
+
+@app.post('/api/developer/workbench/inspect', dependencies=[Depends(require_key)])
+def developer_inspect(body: dict):
+    from neural_core.sky_developer_workbench import inspect_project, WorkbenchInvalid
+    try:
+        return inspect_project(body.get('files'))
+    except WorkbenchInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.post('/api/developer/workbench/explain', dependencies=[Depends(require_key)])
+def developer_explain_lines(body: dict):
+    from neural_core.sky_developer_workbench import explain_code, WorkbenchInvalid
+    try:
+        return explain_code(body.get('language', ''),
+                            body.get('source', ''),
+                            body.get('start_line', 1), body.get('max_lines', 80))
+    except WorkbenchInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.post('/api/developer/workbench/starter/web', dependencies=[Depends(require_key)])
+def developer_starter_web(body: dict):
+    from neural_core.sky_developer_workbench import scaffold_web, WorkbenchInvalid
+    try:
+        return scaffold_web(body.get('title', 'Mi proyecto SKY'),
+                            body.get('subtitle', 'Sitio web creado con SKY'))
+    except WorkbenchInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.get('/api/developer/workbench/packages/lookup', dependencies=[Depends(require_key)])
+def developer_package_lookup(registry: str, name: str):
+    from neural_core.sky_developer_workbench import (
+        lookup_package, WorkbenchInvalid, RegistryUnavailable
+    )
+    try:
+        return lookup_package(registry, name)
+    except WorkbenchInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except RegistryUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
 # ==============================================================================
 # SKY UNIVERSAL KNOWLEDGE & EDUCATION ENGINE ENDPOINTS
 # ==============================================================================
