@@ -141,6 +141,7 @@ class SupervisorRequest(BaseModel):
     request: str = Field(min_length=8, max_length=3000)
     planner_mode: str = Field(default='advanced', pattern='^(advanced|deterministic)$')
     source_text: str = Field(default='', max_length=12000)
+    document_format: str = Field(default='auto', max_length=12)
     project_id: str | None = Field(default=None, max_length=120)
     request_id: str | None = Field(default=None, max_length=100)
 
