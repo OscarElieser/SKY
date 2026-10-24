@@ -971,7 +971,10 @@ def developer_design_create(body: dict):
                              platform=body.get('platform', 'react'),
                              domain=body.get('domain', ''),
                              style=body.get('style', 'auto'),
-                             layout=body.get('layout', 'auto'))
+                             layout=body.get('layout', 'auto'),
+                             icon_pack=body.get('icon_pack', 'lucide'),
+                             font_family=body.get('font_family', 'inter'),
+                             motion=body.get('motion', 'normal'))
     except DesignInvalid as exc:
         raise HTTPException(422, str(exc)) from exc
 
@@ -985,7 +988,10 @@ def developer_design_download(body: dict):
                                 platform=body.get('platform', 'react'),
                                 domain=body.get('domain', ''),
                                 style=body.get('style', 'auto'),
-                                layout=body.get('layout', 'auto'))
+                                layout=body.get('layout', 'auto'),
+                                icon_pack=body.get('icon_pack', 'lucide'),
+                                font_family=body.get('font_family', 'inter'),
+                                motion=body.get('motion', 'normal'))
         payload = design_archive(project)
     except DesignInvalid as exc:
         raise HTTPException(422, str(exc)) from exc

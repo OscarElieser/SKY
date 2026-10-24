@@ -116,3 +116,67 @@ jobs:
         run: |
           flutter build web --release
           test -f build/web/index.html
+
+
+  react-selectable-library-packs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - icons: tabler
+            font: manrope
+            motion: none
+          - icons: lucide
+            font: poppins
+            motion: normal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Generate real React project using selected packages
+        env:
+          SKY_TEST_DIR: ${{ runner.temp }}/sky-react-pack
+          ICON_PACK: ${{ matrix.icons }}
+          FONT_FAMILY: ${{ matrix.font }}
+          MOTION_MODE: ${{ matrix.motion }}
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from neural_core.sky_design_studio import create_design
+          folder=Path(os.environ['SKY_TEST_DIR'])
+          result=create_design('Portal SKY', 'Turismo cultural animado', platform='react',
+                               icon_pack=os.environ['ICON_PACK'],
+                               font_family=os.environ['FONT_FAMILY'],
+                               motion=os.environ['MOTION_MODE'])
+          for name,src in result['files'].items():
+              dest=folder/name
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              dest.write_text(src, encoding='utf-8')
+          package=json.loads((folder/'package.json').read_text())
+          assert result['selected_libraries']['font_family']==os.environ['FONT_FAMILY']
+          assert '@fontsource/'+os.environ['FONT_FAMILY'] in package['dependencies']
+          if os.environ['ICON_PACK']=='tabler':
+              assert package['dependencies']['@tabler/icons-react']=='3.49.0'
+              assert 'IconSparkles' in (folder/'src/App.jsx').read_text()
+          PY
+      - name: Actually install selected npm packages
+        working-directory: ${{ runner.temp }}/sky-react-pack
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Compile actual production JS and local self-hosted font assets
+        working-directory: ${{ runner.temp }}/sky-react-pack
+        run: |
+          npm run build
+          test -f dist/index.html
+          test -n "$(find dist/assets -maxdepth 1 -name '*.js' -print -quit)"
+          test -n "$(find dist/assets -maxdepth 1 -name '*.css' -print -quit)"
+          test -n "$(find dist/assets -maxdepth 1 -name '*.woff2' -print -quit)"
+      - name: Check production dependencies for high severity vulnerabilities
+        working-directory: ${{ runner.temp }}/sky-react-pack
+        run: npm audit --omit=dev --audit-level=high
