@@ -13,6 +13,8 @@ import time
 from typing import Any
 
 from . import sky_evidence_lab as evidence
+from . import sky_aula_multimedia as multimedia
+from . import sky_aula_assessment as assessment
 
 LEVELS = {
     "inicial": {
@@ -132,8 +134,8 @@ def lesson(topic: str, level: str, duration_minutes: int = 45,
         "speak_supported_by_client":True,
         "speech_engine_status":"client_must_verify_available_speech_synthesis",
         "child_data_collected":False,
-        "multimedia": __import__("neural_core.sky_aula_multimedia",fromlist=["teaching_support"]).teaching_support(topic,level),
-        "assessment_available": __import__("neural_core.sky_aula_assessment",fromlist=["alternatives"]).alternatives()["types"],
+        "multimedia": multimedia.teaching_support(topic,level),
+        "assessment_available": assessment.alternatives()["types"],
         "evidence_gaps":([
             "Falta contenido didáctico respaldado por fuentes y el programa oficial."
         ] if not has_material else [
