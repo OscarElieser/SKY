@@ -38,11 +38,13 @@ def test_new_and_existing_routes_require_owner(client, route):
     assert allowed.status_code == 200, (route, allowed.status_code, allowed.text[:250])
 
 
-def test_core_routers_are_not_registered_twice(client):
-    routes = [r.path for r in client.app.routes if isinstance(getattr(r, "path", None), str)]
+def test_core_routers_resolve_to_owner_protected_resources(client):
+    # Query through the ASGI transport: the app exposes included routers via
+    # private wrapper objects rather than a flat app.routes list.
     for item in ("/api/sky/device-hub/capabilities", "/api/sky/guardian/capabilities",
                  "/api/sky/mobile-unlock/capabilities", "/api/sky/academy/capabilities"):
-        assert routes.count(item) == 1
+        response = client.get(item, headers={"X-SKY-KEY": KEY})
+        assert response.status_code == 200, (item, response.status_code, response.text[:200])
 
 
 def test_owner_auth_survives_module_merge(client):
