@@ -12,7 +12,6 @@ import re
 from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, build_opener, HTTPRedirectHandler, HTTPSHandler
 
-from neural_core.github_reader import find_repository_entry
 
 UNIVERSITIES = (
     {"id": "unan_repo", "name": "UNAN-Managua - repositorio institucional", "country": "Nicaragua", "url": "https://repositorio.unan.edu.ni/"},
@@ -167,6 +166,7 @@ def read_github_reference(repository: str, path: str) -> dict:
 
     No acepta URL libre, branch arbitraria, token del solicitante ni archivos ejecutables.
     """
+    from neural_core.github_reader import find_repository_entry
     entry = find_repository_entry(repository) if isinstance(repository, str) else None
     if not entry:
         raise ValueError("Repositorio no registrado en knowledge/repositories/sources.json.")
