@@ -101,6 +101,18 @@ def acciones():
     return {'acciones': list(reversed(list(ultimo.values())))[:30]}
 
 
+@router.get('/kpis/ejecuciones')
+def kpis_ejecuciones():
+    """KPIs del historial disponible del agente, sin afirmar completados los despachados."""
+    from neural_core.sky_execution_metrics import summarize_action_receipts
+    try:
+        eventos = _get_agente('/actions_history?limit=500').get('actions', [])
+        return {'available': True, **summarize_action_receipts(eventos)}
+    except (RuntimeError, ValueError, OSError, urllib.error.URLError) as exc:
+        return {'available': False, 'reason': str(exc)[:160], 'total_actions': 0,
+                'completion_success_pct': None}
+
+
 @router.get('/tareas')
 def tareas():
     try:
