@@ -615,6 +615,8 @@ from .mobile_unlock_api import router as sky_mobile_unlock_router
 app.include_router(sky_mobile_unlock_router)
 from .device_hub_api import router as sky_device_hub_router
 app.include_router(sky_device_hub_router)
+from .knowledge_api import router as sky_knowledge_router
+app.include_router(sky_knowledge_router)
 
 # SKY v10.2: private subtitle and multilingual narration tools.
 from .global_media_api import router as sky_global_media_router
