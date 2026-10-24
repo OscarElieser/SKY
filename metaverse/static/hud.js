@@ -2312,6 +2312,26 @@
         ul.appendChild(li);
       });
       cont.appendChild(ul);
+      // Real-time global deployment readiness; this does not claim certification.
+      try {
+        const global = await api('/api/sky/global/readiness');
+        cont.appendChild(el('h3', '', 'SKY GLOBAL · comprobación operativa'));
+        cont.appendChild(el('p', 'muted',
+          global.global_ready ? 'Comprobaciones registradas como superadas' :
+          'Despliegue mundial todavía NO acreditado · verificá las alertas siguientes'));
+        const checks = el('ul', 'diag-list');
+        global.checks.forEach(item => {
+          const ok = item.status === 'pass';
+          const pending = item.status === 'unverified';
+          const li = el('li', ok ? 'ok' : (pending ? 'opt' : 'bad'));
+          li.appendChild(el('b', '', (ok ? '✔ ' : pending ? '· ' : '✖ ') + item.id));
+          li.appendChild(el('small', '', item.detail));
+          checks.appendChild(li);
+        });
+        cont.appendChild(checks);
+      } catch (globalError) {
+        cont.appendChild(el('p', 'muted', 'Diagnóstico mundial no disponible: ' + globalError.message));
+      }
     } catch (e) { cont.textContent = 'No se pudo revisar: ' + e.message; }
   }
 
