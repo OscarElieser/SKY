@@ -177,6 +177,87 @@ def plan(*, owner_attested: bool, source_carrier: str,
     }
 
 
+
+def att_s23fe_tigo(*, owner_attested: bool,
+                   observed_state: str = "unknown",
+                   owner_reports_paid_off: bool | None = None,
+                   att_unlock_confirmation: bool = False,
+                   tigo_calls_work: bool = False,
+                   tigo_data_work: bool = False,
+                   tigo_sms_work: bool = False) -> dict[str, Any]:
+    """Tailored S23 FE flow, never inventing carrier approval or a successful unlock.
+
+    Optional flags are user reports, not evidence the SKY agent inspected.
+    No IMEI or other secret identifier is accepted, stored or sent to a portal.
+    """
+    _check_owner(owner_attested)
+    if observed_state not in CARRIER_STATES:
+        raise ValueError("Estado de bloqueo no reconocido.")
+    base = plan(
+        owner_attested=True, source_carrier="ATT",
+        target_carrier="TIGO_NI", os_family="android",
+        observed_state=observed_state,
+    )
+    eligibility = (
+        "AT&T exige normalmente: compra hace al menos 60 días, equipo totalmente "
+        "pagado, no reportado como perdido/robado y cuenta sin restricciones."
+    )
+    checkpoints = [
+        {
+            "step":"diagnose",
+            "status":"ready_for_owner_check",
+            "action":"Con el S23 FE encendido, revisá Ajustes > Acerca del teléfono > Información de software > Versión de software del proveedor de servicio. AT&T publica la interpretación del sufijo ATT/ATT para Samsung de esta generación.",
+        },
+        {
+            "step":"carrier_eligibility",
+            "status":"owner_reports_paid_off" if owner_reports_paid_off is True
+                     else "owner_reports_unpaid" if owner_reports_paid_off is False
+                     else "not_verified",
+            "action":"Comprobá los requisitos de elegibilidad directamente con AT&T.",
+        },
+        {
+            "step":"request_unlock",
+            "status":"owner_reports_carrier_confirmation" if att_unlock_confirmation
+                     else "pending_official_carrier_decision",
+            "action":"Abrí https://www.att.com/deviceunlock/; AT&T puede aceptar solicitudes de no clientes si el equipo es elegible. Introducí el IMEI solo en el portal oficial, no en SKY.",
+        },
+        {
+            "step":"finish_on_device",
+            "status":"pending_verification",
+            "action":"Seguí las instrucciones de AT&T para Samsung. Si se entrega un código, no lo adivinés ni intentés múltiples códigos incorrectos. Probá con SIM Tigo tras la liberación.",
+        },
+        {
+            "step":"tigo_network_test",
+            "status":"owner_reports_full_service" if (
+                att_unlock_confirmation and
+                tigo_calls_work and tigo_data_work and tigo_sms_work
+            ) else "needs_real_network_tests",
+            "action":"Con Tigo, comprobá registro en red, llamadas, SMS y datos móviles. Revisá APN solo si la SIM ya es aceptada y faltan datos.",
+        },
+    ]
+    reported_ready = bool(att_unlock_confirmation and tigo_calls_work
+                          and tigo_data_work and tigo_sms_work)
+    return {
+        **base,
+        "device":"Samsung Galaxy S23 FE",
+        "device_family":"SM-S711 (confirmar la variante en Ajustes)",
+        "origin_carrier":"AT&T US",
+        "target_sim":"Tigo Nicaragua",
+        "carrier_policy":eligibility,
+        "checkpoints":checkpoints,
+        "att_unlock_confirmation_owner_reported":bool(att_unlock_confirmation),
+        "owner_reports_tigo_service":reported_ready,
+        "sky_independently_verified_unlock":False,
+        "carrier_unlock_verified":False,
+        "unlock_performed":False,
+        "usb_can_release_carrier_lock":False,
+        "owner_guidance":(
+            "Si AT&T aprueba la liberación, SKY puede verificar las señales que "
+            "el equipo permita y ayudarte a configurar Tigo; no puede liberar "
+            "el bloqueo impuesto por AT&T sin su autorización."
+        ),
+    }
+
 def catalogue() -> dict[str, Any]:
     return {
         "product": "SKY Mobile Unlock Assistant",

@@ -24,6 +24,27 @@ class CarrierPlan(BaseModel):
     observed_state: str = Field(default="unknown", max_length=40)
 
 
+class S23FECheck(BaseModel):
+    owner_attested: bool = False
+    observed_state: str = Field(default="unknown", max_length=40)
+    owner_reports_paid_off: bool | None = None
+    att_unlock_confirmation: bool = False
+    tigo_calls_work: bool = False
+    tigo_sms_work: bool = False
+    tigo_data_work: bool = False
+
+
+@router.post("/s23fe/att-tigo")
+def s23fe_att_tigo(body: S23FECheck):
+    """Guide owner through official AT&T eligibility/unlock and Tigo verification."""
+    try:
+        return mobile.att_s23fe_tigo(**body.model_dump())
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @router.get("/capabilities")
 def capabilities():
     return mobile.catalogue()

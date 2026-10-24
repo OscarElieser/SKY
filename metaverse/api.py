@@ -7,7 +7,7 @@ import os,secrets,time,asyncio,json,math
 from pathlib import Path
 from typing import Optional
 from contextlib import asynccontextmanager
-from fastapi import FastAPI,HTTPException,Depends,WebSocket,WebSocketDisconnect,Request,Query,File,UploadFile
+from fastapi import FastAPI,HTTPException,Depends,WebSocket,WebSocketDisconnect,Request,Query,File,UploadFile,Form
 from fastapi.responses import FileResponse,Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import APIKeyHeader
@@ -363,7 +363,9 @@ def get_generated_media(filename: str):
 
 
 @app.post('/api/chat/upload',dependencies=[Depends(require_key)])
-async def upload_chat_file(file: UploadFile=File(...)):
+async def upload_chat_file(file: UploadFile=File(...),
+                           remember_document: bool=Form(default=False),
+                           owner_attested: bool=Form(default=False)):
     """Lectura privada acotada; NO memoriza automáticamente contenido no verificado."""
     from neural_core.sky_multimodal_reader import analyze,MAX_BYTES
     from neural_core import sky_multimodal_reader
@@ -396,12 +398,28 @@ async def upload_chat_file(file: UploadFile=File(...)):
             except OSError: pass
             media_url=_signed_media_url(name)
         text=result.get('text','')
+        document_id=None
+        index_status='not_requested'
+        if remember_document:
+            if not owner_attested:
+                raise HTTPException(403, 'Confirmá autorización para conservar el documento.')
+            from neural_core import sky_knowledge_library as lib
+            try:
+                indexed=lib.ingest(file.filename or '',bytes(raw),
+                                   owner_attested=True,consent_to_index=True)
+            except ValueError as exc:
+                raise HTTPException(422,str(exc)[:200]) from exc
+            except RuntimeError as exc:
+                raise HTTPException(503,str(exc)[:200]) from exc
+            document_id=indexed['doc_id']
+            index_status=indexed['status']
         return {'ok':True,'filename':result['filename'],'size_bytes':len(raw),
                 'media_type':('video' if ext in sky_multimodal_reader.VIDEO_EXTS
                               else 'audio' if ext in sky_multimodal_reader.AUDIO_EXTS
                               else 'image' if ext in sky_multimodal_reader.IMAGE_EXTS
                               else 'document'),
-                'media_url':media_url,'doc_id':None,
+                'media_url':media_url,'doc_id':document_id,
+                'knowledge_index_status':index_status,
                 'chars_extracted':len(text),'summary':text[:800],
                 'full_text':text[:30000],
                 'content_extracted':result['content_extracted'],
@@ -615,6 +633,8 @@ from .mobile_unlock_api import router as sky_mobile_unlock_router
 app.include_router(sky_mobile_unlock_router)
 from .device_hub_api import router as sky_device_hub_router
 app.include_router(sky_device_hub_router)
+from .knowledge_api import router as sky_knowledge_router
+app.include_router(sky_knowledge_router)
 
 # SKY v10.2: private subtitle and multilingual narration tools.
 from .global_media_api import router as sky_global_media_router
