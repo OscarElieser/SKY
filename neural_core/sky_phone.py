@@ -108,6 +108,22 @@ def _local_only():
         raise PhoneUnavailable("El modo SKY_LOCAL_ONLY impide conexiones telefónicas externas.")
 
 
+def _country_permission(number: str):
+    """Guard spend via owner-selected international dialing prefix allowlist.
+
+    Default +505 only. International destinations must be explicitly enabled
+    by the owner in BOTH SKY config and Twilio Geo Permissions.
+    """
+    digits = normalize(number)[1:]
+    raw = os.getenv("SKY_PHONE_ALLOWED_PREFIXES", "505")
+    codes = {s.strip().lstrip("+") for s in raw.split(",") if s.strip()}
+    if any(not re.fullmatch(r"[1-9][0-9]{0,3}",s) for s in codes) or len(codes)>35:
+        raise PhoneInvalid("Lista de prefijos autorizados inválida.")
+    if not any(digits.startswith(prefix) for prefix in codes):
+        raise PhoneInvalid("País no habilitado en SKY_PHONE_ALLOWED_PREFIXES.")
+    return True
+
+
 def _credentials(service: str):
     sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
     token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
@@ -178,6 +194,7 @@ def _verified(state: dict) -> str:
 
 def _check_destination(state: dict, number: str):
     dest = normalize(number)
+    _country_permission(dest)
     if dest in state.get("blocked", []):
         raise PhoneInvalid("Número bloqueado dentro de SKY.")
     return dest
@@ -196,6 +213,8 @@ def readiness() -> dict:
                                               os.getenv("TWILIO_AUTH_TOKEN") and
                                               os.getenv("TWILIO_PHONE_NUMBER")),
             "paid_actions_enabled":_cost_enabled(),
+            "international_prefixes_authorized":sorted(
+                set(x.strip() for x in os.getenv("SKY_PHONE_ALLOWED_PREFIXES","505").split(",") if x.strip())),
             "blocked_count":len(state.get("blocked", [])),
             "video_host":_video_host(),
             "phone_carrier_sim_control":False,
@@ -214,6 +233,7 @@ def begin_verify(number: str, *, approved: bool) -> dict:
     if os.getenv("SKY_PHONE_ALLOW_VERIFY") != "1":
         raise PhoneUnavailable("Verificación no habilitada: SKY_PHONE_ALLOW_VERIFY=1.")
     number = normalize(number)
+    _country_permission(number)
     sid, token, service = _credentials("verify")
     with LOCK:
         state = _load()
@@ -405,4 +425,6 @@ def capabilities()->dict:
             "inbound":"not implemented",
             "no_recording":True,
             "send_limits":{"sms_per_day":10,"calls_per_day":3,"verify_per_day":5},
-            "user_consent_required":True,"owner_pin_required":True}
+            "user_consent_required":True,"owner_pin_required":True,
+            "default_allowed_country_prefix":"505",
+            "international_destinations_require_owner_allowlist":True}
