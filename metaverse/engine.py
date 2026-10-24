@@ -34,11 +34,27 @@ def validate_object(raw:dict[str,Any])->dict[str,Any]:
     if not name:raise ValueError('Nombre vacío')
     oid=str(raw.get('id') or uuid.uuid4().hex)
     if not re.fullmatch('[A-Za-z0-9_-]{1,64}',oid):raise ValueError('ID inválido')
-    return {'id':oid,'name':name,'kind':kind,
-            'position':_vector(raw.get('position',[0,0,0])),
-            'rotation':_vector(raw.get('rotation',[0,0,0])),
-            'scale':_vector(raw.get('scale',[1,1,1]),positive=True),
-            'color':_hex(raw.get('color','#56B8CA'))}
+    result = {'id':oid,'name':name,'kind':kind,
+              'position':_vector(raw.get('position',[0,0,0])),
+              'rotation':_vector(raw.get('rotation',[0,0,0])),
+              'scale':_vector(raw.get('scale',[1,1,1]),positive=True),
+              'color':_hex(raw.get('color','#56B8CA'))}
+    # Scene objects carry only bounded, declarative interactions. No HTML/JS.
+    interaction = raw.get('interaction')
+    if interaction is not None:
+        if not isinstance(interaction, dict):
+            raise ValueError('Interacción inválida')
+        category = interaction.get('type')
+        if category not in ('terminal', 'whiteboard', 'light', 'door'):
+            raise ValueError('Tipo de interacción no permitido')
+        if type(interaction.get('active', False)) is not bool:
+            raise ValueError('El estado de interacción debe ser booleano')
+        label = interaction.get('description', '')
+        if not isinstance(label, str) or len(label)>240:
+            raise ValueError('Descripción de interacción demasiado larga')
+        result['interaction']={'type':category,'active':interaction.get('active', False),
+                               'description':label}
+    return result
 
 def object3d(name, kind, x,y,z,sx,sy,sz,color,rot_y=0.0):
     return validate_object({'name':name,'kind':kind,'position':[x,y,z],
