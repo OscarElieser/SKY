@@ -202,7 +202,7 @@ def _apply_local_order(plan: dict, suggestion: dict) -> dict:
     return {**plan,
             "steps": revised,
             "assigned_roles": list(dict.fromkeys(item["agent"] for item in revised)),
-            "planner_backend": "ollama_local",
+            "planner_backend": _backend() + "_local",
             "planner_mode": "advanced",
             "quality_checks": [_clean_text(q, 160) for q in checks if _clean_text(q, 160)],
             "planning_summary": _clean_text(suggestion["summary"], 350),
