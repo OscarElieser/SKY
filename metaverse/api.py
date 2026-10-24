@@ -1040,3 +1040,21 @@ def universal_benchmark():
 
 
 
+
+
+# SKY Skillpack: adaptadores autenticados (sin reemplazar la API actual).
+@app.get('/api/skillpack/catalogue', dependencies=[Depends(require_key)])
+def skillpack_catalogue():
+    from neural_core.sky_skillpack import catalogue
+    return catalogue()
+
+
+@app.post('/api/skillpack/execute/{skill_id}', dependencies=[Depends(require_key)])
+def skillpack_execute(skill_id: str, body: dict):
+    from neural_core.sky_skillpack import execute, SkillInvalid, SkillUnavailable
+    try:
+        return execute(skill_id, body)
+    except SkillInvalid as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SkillUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
