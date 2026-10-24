@@ -877,6 +877,7 @@
   /* ------------------------------------------------------------------ módulos */
   const MODULOS = [
     { id: 'clasico', t: 'Clásico', d: 'Chat multi-IA, adjuntos, imágenes y búsqueda', url: '/sky' },
+    { id: 'aula', t: 'Docencia', d: 'Clases con voz, videos, 3D y evaluación por tres saberes', accion: () => abrirAula() },
     { id: 'creative', t: 'Creative', d: 'Video, animación y edición por capas', url: '/creative' },
     { id: 'office', t: 'Office', d: 'Word, Excel, PowerPoint y PDF', url: '/office' },
     { id: 'flows', t: 'Flujos', d: 'Automatizaciones con aprobación', url: '/flows' },
@@ -904,6 +905,217 @@
         if (window.matchMedia('(max-width:900px)').matches) mostrarPanel('core');
       });
       box.appendChild(b);
+    });
+  }
+
+  /* ------------------------------------------------------------------ SKY Aula existente: extensión multimedia y evaluativa */
+  const AULA = { raiz: null, lesson: null };
+  function abrirAula() {
+    if (!AULA.raiz || !ventanas.has('aula')) AULA.raiz = el('div', 'kpi');
+    abrirVentana('aula', 'SKY Docente · Aula interactiva', AULA.raiz, { w: 1000, h: 730 });
+    if (AULA.raiz.dataset.ready) return;
+    AULA.raiz.dataset.ready = '1';
+    const root = AULA.raiz;
+    const title = seccion(root, 'Preparar clase con SKY');
+    const fields = el('div', 'kpi-bar');
+    const topic = el('input','hab-in'); topic.type='text'; topic.maxLength=160;
+    topic.placeholder='Tema (ej.: partes de la computadora)'; topic.setAttribute('aria-label','Tema de la clase');
+    const level = el('select','hab-in');
+    ['inicial','primaria','secundaria','tecnico','universitario','maestria','doctorado'].forEach(v=>{
+      const opt=el('option','',v);opt.value=v;level.append(opt);
+    });level.value='tecnico';level.setAttribute('aria-label','Nivel educativo');
+    const goal = el('input','hab-in');goal.type='text';goal.maxLength=300;
+    goal.placeholder='Objetivo de aprendizaje'; goal.setAttribute('aria-label','Objetivo');
+    const ref = el('textarea','hab-in');ref.maxLength=12000;ref.rows=3;
+    ref.placeholder='Material del programa o texto de referencia (opcional; se señala como no verificado)';
+    const start = el('button','btn primary','Iniciar clase');start.type='button';
+    fields.append(topic,level,goal);title.append(fields,ref,start);
+    const lessonPanel=seccion(root,'Explicación guiada y práctica');
+    const status=el('div','s','Prepará una clase para comenzar.');lessonPanel.append(status);
+    const speech=el('div','res','');
+    speech.setAttribute('aria-live','polite');lessonPanel.append(speech);
+    const actions=el('div','btns');
+    const next=el('button','btn','Siguiente momento');next.type='button';next.disabled=true;
+    const speakBtn=el('button','btn','SKY, explicá con voz');speakBtn.type='button';speakBtn.disabled=true;
+    const answer=el('input','hab-in');answer.type='text';answer.maxLength=800;
+    answer.placeholder='Respuesta o explicación del estudiante (sin datos personales)';
+    const feedback=el('button','btn','Retroalimentar');feedback.type='button';feedback.disabled=true;
+    actions.append(next,speakBtn,answer,feedback);lessonPanel.append(actions);
+    const resources=seccion(root,'Recursos educativos · búsqueda voluntaria');
+    const resourceActions=el('div','btns');
+    const videos=el('button','btn','Buscar videos en YouTube');videos.type='button';
+    const research=el('button','btn','Buscar bibliografía');research.type='button';
+    const computer3d=el('button','btn','Explorar computadora 3D');computer3d.type='button';
+    resourceActions.append(videos,research,computer3d);resources.append(resourceActions);
+    const results=el('div','res','');resources.append(results);
+    const guideForm=el('div','res','');
+    const guideId=el('input','hab-in');guideId.type='text';guideId.maxLength=11;
+    guideId.placeholder='ID del video seleccionado';guideId.setAttribute('aria-label','Identificador YouTube');
+    const transcript=el('textarea','hab-in');transcript.rows=3;transcript.maxLength=15000;
+    transcript.placeholder='Texto o transcripción aportado por el docente (100–15.000 caracteres)';
+    transcript.setAttribute('aria-label','Transcripción para explicación del video');
+    const prepareGuide=el('button','btn','Explicar video por partes');prepareGuide.type='button';
+    guideForm.append(el('div','s','Para explicar el contenido del video, aportá su transcripción o notas verificadas. SKY no inventa haber visto sus escenas.'),
+      guideId,transcript,prepareGuide);
+    resources.append(guideForm);
+    const guideResult=el('div','res','');resources.append(guideResult);
+    prepareGuide.addEventListener('click',async()=>{
+      prepareGuide.disabled=true;guideResult.replaceChildren();
+      try{
+        const data=await api('/api/sky/academy/education/resources/video-guide',{
+          method:'POST',body:JSON.stringify({
+            topic:settings().topic,video_id:guideId.value.trim(),transcript:transcript.value})});
+        guideResult.append(el('div','s',data.warning));
+        for(const part of data.parts){
+          const paragraph=el('p','',part.voice_ready_text);
+          guideResult.append(paragraph,el('div','s',part.question));
+          const speakPart=el('button','btn','SKY explica parte '+part.number);
+          speakPart.type='button';
+          speakPart.addEventListener('click',()=>speak(part.voice_ready_text));
+          guideResult.append(speakPart);
+        }
+      }catch(e){guideResult.textContent='Guía no disponible: '+e.message;}
+      finally{prepareGuide.disabled=false;}
+    });
+    const evaluation=seccion(root,'Evaluación · conocer / hacer / ser y convivir');
+    const options=el('div','btns'),kind=el('select','hab-in'),mode=el('select','hab-in');
+    ['rubrica','lista_cotejo','guia_observacion','ticket_salida','estudio_caso',
+     'portafolio','autoevaluacion','coevaluacion','prueba_practica','cuestionario'].forEach(v=>{
+      const o=el('option','',v.replaceAll('_',' '));o.value=v;kind.append(o);
+    });
+    ['diagnostica','formativa','sumativa'].forEach(v=>{
+      const o=el('option','',v);o.value=v;mode.append(o);
+    });
+    const build=el('button','btn primary','Generar instrumento');build.type='button';
+    const download=el('button','btn','Descargar en Word');download.type='button';
+    options.append(mode,kind,build,download);evaluation.append(options);
+    const evalResult=el('div','res','');evaluation.append(evalResult);
+    function settings() {
+      if (topic.value.trim().length < 3) throw Error('Indicá el tema de la clase.');
+      return {topic:topic.value.trim(),level:level.value,
+        goal:goal.value.trim() || 'Explicar y aplicar '+topic.value.trim()};
+    }
+    function showStep(data) {
+      const step=data.step || {};
+      status.textContent='Momento '+(step.stage_number||'?')+'/'+(step.total_stages||7)+' · '+(step.stage_name||'');
+      speech.replaceChildren(document.createTextNode(step.voice_ready_text||'No hay explicación.'));
+      if(step.real_life_case && step.real_life_case.available){
+        const box=el('div','note','Caso para practicar: '+step.real_life_case.scenario);
+        const list=el('ol','');
+        (step.real_life_case.steps||[]).forEach(v=>list.append(el('li','',v)));
+        box.append(list,el('div','s',step.real_life_case.reflection));
+        speech.append(box);
+      }
+      next.disabled=false;speakBtn.disabled=false;feedback.disabled=false;
+      if(step.visual_3d && step.visual_3d.available) {
+        computer3d.textContent='Abrir escena 3D del tema';
+      }
+    }
+    start.addEventListener('click',async()=>{
+      start.disabled=true;
+      try{
+        const params=settings();
+        const data=await api('/api/sky/academy/education/sessions',{
+          method:'POST',body:JSON.stringify({topic:params.topic,level:params.level,
+          learning_goal:params.goal,reference_text:ref.value,duration_minutes:45})});
+        AULA.lesson=data.lesson_id;showStep(data);
+      }catch(e){speech.textContent='No se pudo iniciar la clase: '+e.message;}
+      finally{start.disabled=false;}
+    });
+    next.addEventListener('click',async()=>{
+      if(!AULA.lesson)return;
+      next.disabled=true;
+      try{
+        const data=await api('/api/sky/academy/education/sessions/'+
+          encodeURIComponent(AULA.lesson)+'/next',{method:'POST'});
+        if(data.no_more_steps){status.textContent='Clase concluida';next.disabled=true;return;}
+        showStep(data);
+      }catch(e){status.textContent=e.message;}
+    });
+    speakBtn.addEventListener('click',async()=>{if(speech.textContent)await speak(speech.textContent);});
+    feedback.addEventListener('click',async()=>{
+      if(!AULA.lesson||answer.value.trim().length<2)return;
+      feedback.disabled=true;
+      try{
+        const d=await api('/api/sky/academy/education/sessions/'+encodeURIComponent(AULA.lesson)+'/respond',{
+          method:'POST',body:JSON.stringify({answer:answer.value.trim()})});
+        speech.textContent=d.voice_ready_text||d.message||'';
+        if(S.voz)await speak(speech.textContent);
+      }catch(e){speech.textContent=e.message;}finally{feedback.disabled=false;}
+    });
+    videos.addEventListener('click',async()=>{
+      videos.disabled=true;results.replaceChildren();
+      try{
+        const d=await api('/api/sky/academy/education/resources/videos',{
+          method:'POST',body:JSON.stringify({...settings(),limit:4})});
+        results.append(el('div','s',d.message||d.status));
+        if(d.searched_live && d.videos.length){
+          d.videos.forEach(v=>{
+            const link=el('a','',v.title+' — '+v.channel);
+            link.href=v.watch_url;link.target='_blank';link.rel='noopener noreferrer';
+            const row=el('p','');row.append(link);results.append(row);
+            const watch=el('button','btn','Ver video autorizado');
+            watch.addEventListener('click',()=>{
+              guideId.value=v.id;
+              const video=document.createElement('iframe');
+              video.title='YouTube educativo: '+v.title;
+              video.src=v.embed_url;video.loading='lazy';video.allow='encrypted-media; picture-in-picture';
+              video.referrerPolicy='strict-origin-when-cross-origin';
+              video.style.width='100%';video.style.aspectRatio='16/9';
+              row.after(video);watch.disabled=true;
+            });row.append(watch);
+          });
+        }else if(d.fallback_search_url){
+          const link=el('a','','Abrir búsqueda de YouTube');link.href=d.fallback_search_url;
+          link.target='_blank';link.rel='noopener noreferrer';results.append(link);
+        }
+      }catch(e){results.textContent='Búsqueda no disponible: '+e.message;}
+      finally{videos.disabled=false;}
+    });
+    research.addEventListener('click',async()=>{
+      research.disabled=true;results.replaceChildren();
+      try{
+        const d=await api('/api/sky/academy/education/resources/research',{
+          method:'POST',body:JSON.stringify({...settings(),limit:5})});
+        results.append(el('div','s','Bibliografía '+d.status+
+          '. Son metadatos; SKY no ha leído artículos completos.'));
+        (d.items||[]).forEach(p=>results.append(el('p','',p.title||'Referencia sin título')));
+      }catch(e){results.textContent=e.message;}
+      finally{research.disabled=false;}
+    });
+    computer3d.addEventListener('click',()=>abrirVentana('aula-3d',
+      'SKY · Computadora tridimensional','/aula/3d/computadora',{w:1040,h:740}));
+    async function instrumentData() {
+      const v=settings();return api('/api/sky/academy/education/assessments',{
+        method:'POST',body:JSON.stringify({topic:v.topic,level:v.level,goal:v.goal,
+          instrument:kind.value,evaluation_type:mode.value})});
+    }
+    build.addEventListener('click',async()=>{
+      build.disabled=true;evalResult.replaceChildren();
+      try{
+        const d=await instrumentData();
+        evalResult.append(el('h3','',d.type+' · '+d.instrument));
+        for(const dimension of d.dimensions){
+          evalResult.append(el('p','',dimension.label+': '+dimension.criterion));
+          for(const l of dimension.levels||[]){
+            evalResult.append(el('div','s',l.value+' — '+l.label+': '+l.descriptor));
+          }
+        }
+        evalResult.append(el('div','s','Borrador: el docente revisa criterios y evidencias.'));
+      }catch(e){evalResult.textContent=e.message;}finally{build.disabled=false;}
+    });
+    download.addEventListener('click',async()=>{
+      download.disabled=true;
+      try{
+        const v=settings();const response=await fetch('/api/sky/academy/education/assessments/document',{
+          method:'POST',headers:headers(),body:JSON.stringify({topic:v.topic,level:v.level,
+           goal:v.goal,instrument:kind.value,evaluation_type:mode.value,kind:'docx'})});
+        if(!response.ok)throw Error('HTTP '+response.status);
+        const url=URL.createObjectURL(await response.blob());
+        const link=document.createElement('a');link.href=url;link.download='SKY-Aula-Evaluacion.docx';
+        link.click();setTimeout(()=>URL.revokeObjectURL(url),15000);
+      }catch(e){evalResult.textContent='Descarga no disponible: '+e.message;}
+      finally{download.disabled=false;}
     });
   }
 

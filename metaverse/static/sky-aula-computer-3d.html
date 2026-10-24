@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SKY Aula — Computadora 3D</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,Arial;background:#061321;color:#eefbff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column}
+header{padding:13px 20px;border-bottom:1px solid #234f64;display:flex;justify-content:space-between;align-items:center;gap:10px}
+h1{font-size:1.18rem;margin:0}button{border:1px solid #477c92;border-radius:10px;color:white;background:#16384a;padding:10px 13px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid #7dd9ed}button:hover{background:#22576d}
+main{display:grid;grid-template-columns:minmax(320px,2fr) minmax(260px,1fr);gap:12px;padding:12px;flex:1}
+section,aside{border:1px solid #1f526b;border-radius:16px;padding:16px;background:#0c2030}
+#view{height:clamp(370px,65vh,790px);position:relative}canvas{width:100%;height:100%;display:block}
+#fallback{padding:16px;display:none}.actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px}
+label{display:block;margin:10px 0}input[type=range]{width:min(100%,330px)}
+ul{padding-left:18px}li{margin:6px 0}small{color:#bad3df}#parts{display:flex;flex-wrap:wrap;gap:7px}
+#parts button[aria-pressed=true]{background:#1b7b91}
+#detail{line-height:1.65;min-height:170px}#detail h2{font-size:1.15rem}
+footer{padding:10px 18px;color:#aac7d2;font-size:.8rem}
+@media(max-width:850px){main{grid-template-columns:1fr}#view{height:48vh;min-height:310px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style></head>
+<body><header><h1>SKY Aula · Despiece didáctico 3D</h1><a href="/hud" style="color:#b5e8fa">Regresar a SKY</a></header>
+<main>
+<section><div class="actions">
+<button id="reset">Reconstruir</button><button id="explode">Desarmar virtualmente</button>
+<button id="voice">Explicar con voz</button><button id="stop">Detener voz</button>
+</div>
+<label for="distance">Separación de componentes: <output id="percent">0%</output></label>
+<input id="distance" aria-label="Separación de componentes" type="range" min="0" max="100" value="0">
+<div id="view" aria-label="Modelo esquemático tridimensional de una computadora: podés girarlo y seleccionar sus piezas">
+<div id="fallback" role="status">No se pudo cargar el motor 3D. Podés seguir usando los botones de componentes y sus explicaciones.</div></div>
+<small>Arrastrá para girar; usá la rueda para acercar o alejar. Modelo 3D esquemático, no representación exacta de un fabricante.</small>
+</section>
+<aside><h2>Componentes</h2><div id="parts"></div>
+<article id="detail" aria-live="polite"><h2>Seleccioná un componente</h2>Elegí una pieza o desarmá el equipo virtualmente para conocer cómo funciona.</article>
+<h3>Actividad de comprobación</h3>
+<p>¿Cuál es la diferencia entre RAM y SSD? ¿Qué sucede si falla la fuente de alimentación?</p>
+<small>Seguridad: esta es una simulación. Nunca abras internamente una fuente de alimentación ni manipules una computadora conectada a la corriente.</small>
+</aside></main><footer>SKY IA · Visualización educativa en tu navegador. El video o modelo no reemplaza la práctica supervisada.</footer>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+const parts=[
+{id:"case",label:"Gabinete",fn:"Protege y organiza los componentes y permite circulación de aire.",rel:"Contiene los demás componentes.",warning:"Desconectá el equipo antes de abrir.",s:[3.6,2.6,1.7],p:[0,0,0],color:"#22344a"},
+{id:"motherboard",label:"Placa madre",fn:"Comunica CPU, RAM, discos y periféricos.",rel:"Es la base de interconexión de los componentes.",warning:"Evitar descargas electrostáticas.",s:[2.1,1.65,.08],p:[0,.1,.15],color:"#167764"},
+{id:"cpu",label:"Procesador CPU",fn:"Ejecuta instrucciones y cálculos.",rel:"Intercambia datos con RAM y otros dispositivos.",warning:"No retirar disipadores con energía.",s:[.65,.65,.14],p:[-.35,.3,.4],color:"#c4d7e9"},
+{id:"ram",label:"Memoria RAM",fn:"Mantiene temporalmente datos de procesos activos.",rel:"El procesador accede a ella durante el trabajo.",warning:"Manipular los módulos sin energía.",s:[.13,.9,.12],p:[.65,.4,.4],color:"#22b18e"},
+{id:"ssd",label:"Almacenamiento SSD",fn:"Conserva archivos y programas al apagar.",rel:"Permite cargar archivos y programas a RAM.",warning:"No retirar unidades durante escritura.",s:[.85,.2,.55],p:[.5,-.6,.4],color:"#dfb266"},
+{id:"psu",label:"Fuente de alimentación",fn:"Convierte y suministra electricidad a los componentes.",rel:"Alimenta la placa madre, discos y tarjetas.",warning:"Nunca abrir la fuente internamente.",s:[.9,.65,.9],p:[-1.05,-.7,.35],color:"#56687e"},
+{id:"gpu",label:"Tarjeta gráfica",fn:"Procesa gráficos cuando existe una GPU dedicada.",rel:"Intercambia datos con la CPU y la memoria.",warning:"No extraerla con tensión.",s:[1.3,.25,.44],p:[.05,-.25,.65],color:"#4e86d7"},
+{id:"cooling",label:"Refrigeración",fn:"Disipa el calor del procesador y componentes.",rel:"Evita sobrecalentamiento mediante transferencia de calor.",warning:"No acercar dedos a ventiladores en marcha.",s:[.78,.78,.25],p:[-.35,.3,.72],color:"#81b6d9"}
+];
+const $=id=>document.getElementById(id);const buttons=new Map();let selected=null;let three=null,anim=0;
+const detail=$("detail"),container=$("view"),distance=$("distance");
+function select(p){
+selected=p;
+for(const [id,button] of buttons)button.setAttribute("aria-pressed",String(id===p.id));
+detail.replaceChildren();
+const title=document.createElement("h2");title.textContent=p.label;detail.append(title);
+for(const [heading,value] of [["Función",p.fn],["Relación",p.rel],["Seguridad",p.warning]]){
+const text=document.createElement("p");const strong=document.createElement("strong");strong.textContent=heading+": ";text.append(strong,document.createTextNode(value));detail.append(text);
+}
+if(three)three.highlight(p.id);
+}
+for(const p of parts){const b=document.createElement("button");b.textContent=p.label;b.setAttribute("aria-pressed","false");
+b.addEventListener("click",()=>select(p));$("parts").append(b);buttons.set(p.id,b);}
+function separation(v){distance.value=String(v);$("percent").textContent=v+"%";if(three)three.explode(Number(v)/100);}
+$("reset").addEventListener("click",()=>separation(0));
+$("explode").addEventListener("click",()=>separation(100));
+distance.addEventListener("input",()=>separation(Number(distance.value)));
+$("voice").addEventListener("click",()=>{
+if(!selected||!("speechSynthesis" in window))return;
+window.speechSynthesis.cancel();
+const msg=new SpeechSynthesisUtterance(selected.label+". "+selected.fn+". "+selected.rel+". Recomendación de seguridad: "+selected.warning);
+msg.lang="es-ES";msg.rate=.88;window.speechSynthesis.speak(msg);
+});
+$("stop").addEventListener("click",()=>{"speechSynthesis" in window&&window.speechSynthesis.cancel();});
+try{
+const THREE=await import("three");
+const {OrbitControls}=await import("three/addons/controls/OrbitControls.js");
+const scene=new THREE.Scene();scene.background=new THREE.Color("#081726");
+const camera=new THREE.PerspectiveCamera(48,1,.1,100);camera.position.set(5,3,7);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"low-power"});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));container.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x325b79,2.4));
+const light=new THREE.DirectionalLight(0xffffff,2.2);light.position.set(4,7,8);scene.add(light);
+const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.minDistance=3;controls.maxDistance=18;
+const meshes=new Map(),raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
+for(const p of parts){
+const geo=new THREE.BoxGeometry(...p.s);const mat=new THREE.MeshStandardMaterial({color:p.color,roughness:.55,metalness:.25,transparent:p.id==="case",opacity:p.id==="case"?.20:1});
+const mesh=new THREE.Mesh(geo,mat);mesh.position.set(...p.p);mesh.userData.id=p.id;scene.add(mesh);meshes.set(p.id,mesh);
+const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0xb0ecf9,transparent:true,opacity:.35}));
+mesh.add(edges);
+}
+function explode(factor){
+parts.forEach((p,i)=>{
+const mesh=meshes.get(p.id);const direction=i===0?[0,0,-2.6]:[(i%3-1)*2.4,(Math.floor(i/3)-.7)*2.1,1.2+(i%2)*.65];
+mesh.position.set(p.p[0]+direction[0]*factor,p.p[1]+direction[1]*factor,p.p[2]+direction[2]*factor);
+});}
+function highlight(id){for(const [key,mesh] of meshes)mesh.material.emissive.setHex(key===id?0x236686:0x000000);}
+renderer.domElement.addEventListener("click",event=>{
+const rect=renderer.domElement.getBoundingClientRect();
+pointer.x=(event.clientX-rect.left)/rect.width*2-1;pointer.y=-(event.clientY-rect.top)/rect.height*2+1;
+raycaster.setFromCamera(pointer,camera);const hits=raycaster.intersectObjects([...meshes.values()]);
+if(hits.length){const p=parts.find(x=>x.id===hits[0].object.userData.id);if(p)select(p);}
+});
+function resize(){const w=Math.max(1,container.clientWidth),h=Math.max(1,container.clientHeight);
+camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);}
+new ResizeObserver(resize).observe(container);resize();
+let disposed=false;function frame(){if(disposed)return;controls.update();renderer.render(scene,camera);anim=requestAnimationFrame(frame);}
+frame();window.addEventListener("pagehide",()=>{disposed=true;cancelAnimationFrame(anim);controls.dispose();renderer.dispose();});
+three={explode,highlight};
+}catch(e){$("fallback").style.display="block";$("fallback").textContent="No está disponible el motor 3D (sin conexión o WebGL no compatible). Las descripciones siguen funcionando.";}
+select(parts[1]);
+</script></body></html>

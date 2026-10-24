@@ -13,6 +13,8 @@ import time
 from typing import Any
 
 from . import sky_evidence_lab as evidence
+from . import sky_aula_multimedia as multimedia
+from . import sky_aula_assessment as assessment
 
 LEVELS = {
     "inicial": {
@@ -132,6 +134,8 @@ def lesson(topic: str, level: str, duration_minutes: int = 45,
         "speak_supported_by_client":True,
         "speech_engine_status":"client_must_verify_available_speech_synthesis",
         "child_data_collected":False,
+        "multimedia": multimedia.teaching_support(topic,level),
+        "assessment_available": list(assessment.TYPES),
         "evidence_gaps":([
             "Falta contenido didáctico respaldado por fuentes y el programa oficial."
         ] if not has_material else [
@@ -230,6 +234,10 @@ def stage_output(plan: dict, index: int) -> dict:
         "requires_human_evaluation":True,
         "knowledge_from_verified_source":False,
         "message":speech,
+        "visual_3d":plan.get("multimedia",{}).get("3d_scene",{"available":False}) if ident in ("explicacion","demostracion") else {"available":False},
+        "supporting_video_requires_explicit_search":True,
+        "evaluation_dimensions":["conocer","hacer","ser"],
+        "real_life_case":plan.get("multimedia",{}).get("example",{"available":False}) if ident in ("demostracion","practica") else {"available":False},
     }
 
 
@@ -346,6 +354,10 @@ def catalogue() -> dict:
         "automatic_curriculum_verification":False,
         "independent_live_voice_output":False,
         "voice_ready_text":True,
+        "multimedia_extension":"sky_aula_multimedia",
+        "assessment_extension":"sky_aula_assessment",
+        "youtube_live_lookup_requires_key":True,
+        "computer_3d_schematic_viewer":"/aula/3d/computadora",
         "safe_for_minors": "no_student_data_collected_or_persisted",
         "medical_instruction":"educational_only_no_diagnosis_or_treatment",
     }
