@@ -84,6 +84,14 @@ def _validate_step(step: dict) -> dict:
     name = step.get("label", action)
     if not isinstance(name, str) or not 1 <= len(name) <= 120:
         raise CycleInvalid("Etiqueta de paso inválida.")
+    # Labels are visible through the status endpoint; never echo private text,
+    # file paths, or URLs that can contain personal query parameters.
+    private_labels = {
+        "type_text": "Escribir texto autorizado en la aplicación",
+        "open_file": "Abrir un archivo autorizado",
+        "open_url": "Solicitar apertura de página web",
+    }
+    name = private_labels.get(action, name)
     return {"action": action, "params": copy.deepcopy(params), "label": name,
             "risk": caps.nivel_riesgo(action, params), "state": "READY",
             "result": None, "command_id": None, "attempts": 0}
