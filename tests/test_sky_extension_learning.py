@@ -155,3 +155,52 @@ def test_authenticated_api_and_voice_text_routes_preserve_core():
     hud=Path("metaverse/static/hud.js").read_text(encoding="utf-8")
     assert "Recordar procedimiento" in hud and "SKY Extension Hub" in hud
     assert "requires_confirmation_each_step" in code
+
+
+def test_extension_router_never_executes_unapproved_and_excludes_sidecars(monkeypatch):
+    monkeypatch.delenv("SKY_LOCAL_ONLY",raising=False)
+    called=[]
+    from neural_core import sky_research_connectors as research
+    monkeypatch.setattr(research,"semantic_scholar",lambda query,limit=5:
+                        called.append((query,limit)) or {"ok":True,"items":[]})
+    with pytest.raises(hub.ExtensionInvalid):
+        hub.invoke("semantic-scholar",action="search",payload={"query":"enseñanza"},approved=False)
+    with pytest.raises(hub.ExtensionInvalid):
+        hub.invoke("openclaw",action="search",payload={},approved=True)
+    with pytest.raises(hub.ExtensionInvalid):
+        hub.invoke("n8n",action="dispatch",payload={},approved=True)
+    assert called==[]
+    assert hub.invoke("semantic-scholar",action="search",
+                      payload={"query":"enseñanza","limit":3},approved=True)["ok"] is True
+    assert called==[("enseñanza",3)]
+    assert len(hub.callable_tools())==9
+
+
+def test_hub_honors_local_mode_even_when_user_approved(monkeypatch):
+    monkeypatch.setenv("SKY_LOCAL_ONLY","1")
+    from neural_core import sky_skillpack
+    called=[]
+    monkeypatch.setattr(sky_skillpack,"execute",lambda *a,**k:called.append(1))
+    with pytest.raises(hub.ExtensionInvalid):
+        hub.invoke("firecrawl",action="scrape",payload={"url":"https://example.com"},approved=True)
+    assert called==[]
+
+
+def test_hub_requires_exact_actions_and_calls_owner_selected_local_model(monkeypatch):
+    monkeypatch.setenv("SKY_LOCAL_ONLY","1")
+    from neural_core import providers
+    seen=[]
+    monkeypatch.setattr(providers,"reply",lambda messages,provider,max_output_tokens:
+                        seen.append(provider) or "Hola desde SKY local")
+    with pytest.raises(hub.ExtensionInvalid):
+        hub.invoke("ollama",action="install",payload={"question":"hola"},approved=True)
+    response=hub.invoke("ollama",action="chat",payload={"question":"Hola"},approved=True)
+    assert response["answer"]=="Hola desde SKY local" and seen==["ollama"]
+    assert response["not_a_verified_external_fact"] is True
+
+
+def test_api_extension_dispatch_explicit_approval_and_pin():
+    api=Path("metaverse/api.py").read_text(encoding="utf-8")
+    assert '"/api/sky/extensions/{extension_id}/invoke"' in api
+    assert "exigir_pin(request,\"usar un proveedor externo con posible consumo\")" in api
+    assert '"/api/sky/extensions/actions"' in api
