@@ -40,9 +40,9 @@ class _SkyHomeState extends State<SkyHome> {
     super.dispose();
   }
   final features = const [
-    (Icons.auto_awesome, skyFeatureOne, 'Una interfaz con identidad y jerarquía.'),
-    (Icons.animation, skyFeatureTwo, 'Animaciones que acompañan la navegación.'),
-    (Icons.verified_user_outlined, skyFeatureThree, 'Contraste y controles accesibles.'),
+    (Icons.auto_awesome, skyFeatureOne, skyFeatureOneDetail),
+    (Icons.animation, skyFeatureTwo, skyFeatureTwoDetail),
+    (Icons.verified_user_outlined, skyFeatureThree, skyFeatureThreeDetail),
   ];
 
   void details(String title, String message) {
