@@ -78,6 +78,11 @@ def install(app):
         response=await call_next(request)
         if response.status_code==401 and (path.startswith('/api/') or path.startswith('/v1/')):
             with _LOCK:_ATTEMPTS[key].append(time.monotonic())
+            from neural_core.sky_sentinel_guard import register_denial
+            register_denial(ip,path)
+            # No remote unauthenticated request is ever allowed to lock
+            # or shut down Windows: that would be an easy denial-of-service.
+            response.headers['X-SKY-Access'] = 'denied'
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['Referrer-Policy']='no-referrer'
         # SKY v12: un módulo de SKY puede mostrarse DENTRO del HUD de SKY (mismo origen).
