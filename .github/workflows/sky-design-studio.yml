@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'neural_core/sky_design_studio.py'
+      - 'neural_core/sky_design_ai.py'
+      - 'tests/test_sky_design_ai.py'
       - 'templates/sky_design_react/**'
       - 'templates/sky_design_flutter/**'
       - 'metaverse/api.py'
@@ -14,6 +16,8 @@ on:
     branches: [main]
     paths:
       - 'neural_core/sky_design_studio.py'
+      - 'neural_core/sky_design_ai.py'
+      - 'tests/test_sky_design_ai.py'
       - 'templates/sky_design_react/**'
       - 'templates/sky_design_flutter/**'
       - 'metaverse/api.py'
@@ -41,9 +45,9 @@ jobs:
         run: python -m pip install -r requirements_social.txt -r requirements_studio.txt pytest
       - name: Syntax checks and authenticated design API regression
         run: |
-          python -m py_compile neural_core/sky_design_studio.py metaverse/api.py tests/test_sky_design_studio.py
+          python -m py_compile neural_core/sky_design_studio.py neural_core/sky_design_ai.py metaverse/api.py tests/test_sky_design_studio.py tests/test_sky_design_ai.py
           node --check metaverse/static/hud.js
-          PYTHONPATH=. python -m pytest -q tests/test_sky_design_studio.py tests/test_sky_developer_workbench.py
+          PYTHONPATH=. python -m pytest -q tests/test_sky_design_studio.py tests/test_sky_design_ai.py tests/test_sky_developer_workbench.py
 
   react-real-production-build:
     runs-on: ubuntu-latest
@@ -65,7 +69,18 @@ jobs:
           from pathlib import Path
           from neural_core.sky_design_studio import create_design
           folder=Path(os.environ["SKY_TEST_DIR"])
-          result=create_design("Diseño Turismo SKY", "Turismo comunitario con rutas de naturaleza", platform="react")
+          plan={
+              "subtitle":"El turismo se descubre en comunidad",
+              "description":"Explorá rutas responsables y negocios locales.",
+              "eyebrow":"EXPERIENCIAS · NICARAGUA",
+              "features":[
+                  {"title":"Rutas locales","detail":"Conectá con lugares cercanos.","icon":"compass"},
+                  {"title":"Gente de acá","detail":"Emprendimientos auténticos.","icon":"layers"},
+                  {"title":"Seguridad clara","detail":"Información verificable.","icon":"shield"},
+              ],"style":"aurora","layout":"immersive","palette_index":1,
+          }
+          result=create_design("Diseño Turismo SKY", "Turismo comunitario con rutas de naturaleza",
+                               platform="react",design_plan=plan)
           for name,code in result["files"].items():
               output=folder / name
               output.parent.mkdir(parents=True, exist_ok=True)
@@ -96,6 +111,27 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Generate model-directed Flutter app configuration
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          from pathlib import Path
+          from neural_core.sky_design_studio import create_design
+          plan={
+              "subtitle":"Aprender con proyectos reales",
+              "description":"Experiencias interactivas para desarrollar habilidades.",
+              "eyebrow":"EDUCACIÓN · TECNOLOGÍA",
+              "features":[
+                  {"title":"Explorar","detail":"Descubrí contenido confiable.","icon":"sparkles"},
+                  {"title":"Practicar","detail":"Resolvé actividades.","icon":"activity"},
+                  {"title":"Acceso universal","detail":"Aprendé con apoyo visual.","icon":"shield"},
+              ],"style":"monochrome","layout":"dashboard","palette_index":2,
+          }
+          project=create_design("SKY Studio","Educación interactiva",
+                                platform="flutter",design_plan=plan)
+          Path("templates/sky_design_flutter/lib/sky_config.dart").write_text(
+              project["files"]["lib/sky_config.dart"],encoding="utf-8")
+          assert project["ai_edited_tokens"] is True
+          PY
       - name: Fetch Flutter Animate from pub.dev
         working-directory: templates/sky_design_flutter
         run: flutter pub get
