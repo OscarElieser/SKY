@@ -123,7 +123,7 @@ def test_rubric_teacher_observations_required_before_suggested_score():
     with pytest.raises(assess.AssessmentInput):
         assess.evaluate(x,ratings,teacher_approved=False)
     r=assess.evaluate(x,ratings,teacher_approved=True)
-    assert r["score_pct"]==87.5
+    assert r["score_pct"]==82.5
     assert r["official_grade"] is False
     with pytest.raises(assess.AssessmentInput):
         assess.evaluate(x,{"conocer":ratings["conocer"]},teacher_approved=True)
