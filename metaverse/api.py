@@ -40,7 +40,7 @@ def api_token():
 scheme=APIKeyHeader(name='X-SKY-KEY',auto_error=False)
 def require_owner_key_only(token:Optional[str]=Depends(scheme)):
     if not token or not secrets.compare_digest(token,api_token()):
-        raise HTTPException(401,detail='Credenciales inválidas',headers={'WWW-Authenticate':'APIKey'})
+        raise HTTPException(401,detail='Acceso denegado',headers={'WWW-Authenticate':'APIKey'})
     return True
 
 def require_key(request:Request, owner_key:bool=Depends(require_owner_key_only)):
