@@ -170,6 +170,8 @@ def create_design(title: str, brief: str, *, platform: str = "react",
             "skyFeatureThree": _dart_literal(content["features"][2][0]),
             "skyColorPrimary": "0xFF" + palette[0][1:].upper(),
             "skyColorSecondary": "0xFF" + palette[1][1:].upper(),
+            "skyStyle": _dart_literal(chosen_style),
+            "skyLayout": _dart_literal(chosen_layout),
         }
         for name, value in replacements.items():
             pattern = rf"(?m)^(const {re.escape(name)}\s*=\s*)(?:'[^'\n]*'|0x[0-9A-Fa-f]{{8}});$"
