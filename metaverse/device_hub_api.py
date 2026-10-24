@@ -5,11 +5,12 @@ Discovery is explicit and transient; control uses existing approved action APIs.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel, Field
 
 from .api import require_key
 from neural_core import sky_secure_connectivity as hub
+from neural_core.sky_approvals import approvals
 
 router = APIRouter(prefix="/api/sky/device-hub", dependencies=[Depends(require_key)])
 
@@ -97,6 +98,62 @@ async def discover_wifi(body: Discovery):
         raise HTTPException(422, str(exc)) from exc
     except (RuntimeError, OSError) as exc:
         raise HTTPException(503, "mDNS no está disponible en la red local.") from exc
+
+
+class IRCommand(BaseModel):
+    hub_id: str = Field(min_length=28, max_length=28)
+    command: str = Field(min_length=3, max_length=20)
+
+
+class ApprovedIRCommand(IRCommand):
+    approval_token: str = Field(min_length=32, max_length=100)
+
+
+@router.post("/ir/prepare")
+def prepare_ir(body: IRCommand, request: Request):
+    """Prepares a single command; UI must display its exact TV and action."""
+    try:
+        device = hub.validate_ir_command(body.hub_id, body.command)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    token = approvals.issue(
+        "sky_ir_tv", {"hub_id": body.hub_id, "command": body.command}, request,
+    )
+    return {
+        "status": "NEEDS_CONFIRMATION",
+        "approval_token": token,
+        "expires_in_seconds": 180,
+        "target_name": device["name"],
+        "command": body.command,
+        "message": "Comprobá el televisor y confirmá expresamente antes de enviar IR.",
+    }
+
+
+@router.post("/ir/execute")
+def execute_ir(body: ApprovedIRCommand, request: Request):
+    """Owner approval bound to device ID + command; consumed before side effect."""
+    try:
+        hub.validate_ir_command(body.hub_id, body.command)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    accepted = approvals.consume(
+        body.approval_token, "sky_ir_tv",
+        {"hub_id": body.hub_id, "command": body.command}, request,
+    )
+    if not accepted:
+        raise HTTPException(403, "Autorización ausente, caducada o correspondiente a otra orden.")
+    try:
+        return hub.send_ir_tv(body.hub_id, body.command)
+    except (RuntimeError, OSError) as exc:
+        raise HTTPException(502, str(exc)[:200]) from exc
 
 
 @router.post("/security/audit-plan")
