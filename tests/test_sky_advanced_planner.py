@@ -140,3 +140,50 @@ def client_like_store(tmp_path, monkeypatch):
     monkeypatch.setenv("SKY_WORKFLOWS_DB", str(tmp_path / "workflows.sqlite3"))
     monkeypatch.setenv("SKY_WORKBENCH_DB", str(tmp_path / "workbench.sqlite3"))
     return tmp_path
+
+
+def test_llamacpp_engine_uses_only_loopback_api(monkeypatch):
+    from neural_core import sky_advanced_planner as p
+    monkeypatch.setenv("SKY_PLANNER_BACKEND", "llamacpp")
+    monkeypatch.setenv("SKY_PLANNER_LLAMACPP_URL", "http://127.0.0.1:8080")
+    monkeypatch.setenv("SKY_PLANNER_LLAMACPP_MODEL", "local-model")
+    opened = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+        def read(self, max_bytes=None):
+            return self.payload
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+
+    def fake_open(req, timeout):
+        opened.append(req)
+        if req.full_url.endswith("/v1/models"):
+            return FakeResponse(b'{"data":[{"id":"local-model"}]}')
+        assert req.full_url == "http://127.0.0.1:8080/v1/chat/completions"
+        payload = __import__("json").loads(req.data)
+        assert payload["response_format"]["type"] == "json_schema"
+        assert payload["stream"] is False
+        expected = '{"order":["document","experience"],"goals":{},"quality_checks":[],"summary":"Listo"}'
+        return FakeResponse(__import__("json").dumps(
+            {"choices":[{"message":{"content":expected}}]
+        ).encode("utf-8"))
+
+    monkeypatch.setattr(p, "_open", fake_open)
+    assert p.local_available()
+    result = p.enrich_plan(sample_plan())
+    assert result["planner_backend"] == "ollama_local" or result["planner_backend"] == "llamacpp_local"
+    assert result["steps"][1]["action"] == "document"
+    assert all(req.full_url.startswith("http://127.0.0.1:8080/") for req in opened)
+
+
+def test_llamacpp_engine_refuses_remote_host(monkeypatch):
+    from neural_core import sky_advanced_planner as p
+    monkeypatch.setenv("SKY_PLANNER_BACKEND", "llamacpp")
+    monkeypatch.setenv("SKY_PLANNER_LLAMACPP_URL", "http://evil.example:8080")
+    assert p.local_available() is False
+    result = p.enrich_plan(sample_plan())
+    assert result["planner_backend"] == "deterministic"
