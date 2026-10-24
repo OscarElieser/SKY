@@ -878,6 +878,7 @@
   const MODULOS = [
     { id: 'clasico', t: 'Clásico', d: 'Chat multi-IA, adjuntos, imágenes y búsqueda', url: '/sky' },
     { id: 'aula', t: 'Docencia', d: 'Clases con voz, videos, 3D y evaluación por tres saberes', accion: () => abrirAula() },
+    { id: 'telefono', t: 'Teléfono', d: 'Verificar número, SMS, llamadas y video autorizados', accion: () => abrirTelefono() },
     { id: 'creative', t: 'Creative', d: 'Video, animación y edición por capas', url: '/creative' },
     { id: 'office', t: 'Office', d: 'Word, Excel, PowerPoint y PDF', url: '/office' },
     { id: 'flows', t: 'Flujos', d: 'Automatizaciones con aprobación', url: '/flows' },
@@ -906,6 +907,191 @@
       });
       box.appendChild(b);
     });
+  }
+
+  /* ------------------------------------------------------------------ SKY Teléfono, con PIN y consentimiento explícito */
+  const PHONE = {root:null, video:null};
+  function abrirTelefono() {
+    if(!PHONE.root || !ventanas.has('telefono')) PHONE.root=el('div','kpi');
+    abrirVentana('telefono','SKY Teléfono · Comunicaciones verificadas',PHONE.root,{w:940,h:720});
+    if(PHONE.root.dataset.ready)return;
+    PHONE.root.dataset.ready='1';
+    const root=PHONE.root;
+    const intro=seccion(root,'Tu teléfono, conectado con tu permiso');
+    intro.append(el('div','s','SKY no controla la SIM ni sustituye a Claro, Tigo u otra operadora. SMS y llamadas utilizan Twilio; pueden generar cargos. Antes hay que verificar tu número y configurar el PIN SENTINEL.'));
+    const status=el('div','res','Comprobando la configuración…');intro.append(status);
+    const verify=seccion(root,'1. Verificar tu número personal');
+    const phone=el('input','hab-in');phone.type='tel';phone.placeholder='+505XXXXXXXX';
+    phone.autocomplete='tel';phone.maxLength=22;phone.setAttribute('aria-label','Tu número con código de país');
+    const codeInput=el('input','hab-in');codeInput.type='text';codeInput.inputMode='numeric';
+    codeInput.maxLength=10;codeInput.placeholder='Código recibido por SMS';
+    const verifyButtons=el('div','btns');
+    const request=el('button','btn','Solicitar código');request.type='button';
+    const finish=el('button','btn primary','Verificar número');finish.type='button';
+    const revoke=el('button','btn','Desvincular mi número');revoke.type='button';
+    verifyButtons.append(request,finish,revoke);verify.append(phone,codeInput,verifyButtons);
+    const actionSection=seccion(root,'2. Mensaje de texto o llamada telefónica');
+    const to=el('input','hab-in');to.type='tel';to.maxLength=22;
+    to.placeholder='Destinatario + código de país';to.setAttribute('aria-label','Número de contacto internacional');
+    const message=el('textarea','hab-in');message.rows=3;message.maxLength=800;
+    message.placeholder='Mensaje SMS (hasta 800 caracteres)';
+    const approvalRow=el('div','kpi-bar');
+    const consent=el('input','');consent.type='checkbox';consent.id='sky-phone-consent';
+    const consentLabel=el('label','', 'Tengo permiso para contactar a este número y entiendo los posibles costos.');
+    consentLabel.htmlFor=consent.id;approvalRow.append(consent,consentLabel);
+    const send=el('button','btn primary','Enviar SMS real');send.type='button';
+    const call=el('button','btn','Iniciar llamada al móvil y conectar');call.type='button';
+    const actionButtons=el('div','btns');actionButtons.append(send,call);
+    actionSection.append(to,message,approvalRow,actionButtons);
+    actionSection.append(el('div','s','La llamada primero suena en tu teléfono verificado; al contestar se conecta el destinatario. No usa el micrófono del navegador. Una llamada puede cobrar dos tramos.'));
+    const blockSection=seccion(root,'3. Bloquear y desbloquear en SKY');
+    blockSection.append(el('div','s','El bloqueo impide llamadas y SMS salientes por SKY hacia esos números; no bloquea llamadas de la SIM, Android, iOS ni de la compañía.'));
+    const block=el('button','btn','Bloquear destinatario');block.type='button';
+    const reload=el('button','btn','Actualizar bloqueos');reload.type='button';
+    const blockers=el('div','res','');blockSection.append(block,reload,blockers);
+    const video=seccion(root,'4. Videoconferencia dentro de SKY');
+    video.append(el('div','s','La videoconferencia funciona por Internet mediante un servicio externo autorizado. Solo comparte micrófono y cámara después de tu permiso en el navegador.'));
+    const create=el('button','btn primary','Preparar videoconferencia');create.type='button';
+    const enter=el('button','btn','Entrar a la sala');enter.type='button';enter.disabled=true;
+    const leave=el('button','btn','Salir y detener cámara');leave.type='button';leave.disabled=true;
+    const videoButtons=el('div','btns');videoButtons.append(create,enter,leave);
+    const invitation=el('div','res','');const roomHost=el('div','');
+    video.append(videoButtons,invitation,roomHost);
+    let pendingMeeting=null;
+    async function refresh(){
+      try{
+        const d=await api('/api/sky/phone/status');
+        status.textContent='Módulo: '+(d.enabled?'habilitado':'desactivado')+
+          ' · Tu número: '+(d.owner_phone_verified?(d.verified_number_masked||'verificado'):'sin verificar')+
+          ' · SMS/llamadas de pago: '+(d.paid_actions_enabled?'habilitados':'desactivados')+
+          ' · Bloqueados: '+d.blocked_count;
+      }catch(e){status.textContent='No pude consultar SKY Teléfono: '+e.message;}
+    }
+    async function post(path,payload,button){
+      button.disabled=true;
+      try{return await api('/api/sky/phone'+path,{
+        method:'POST',body:JSON.stringify(payload)
+      });}
+      finally{button.disabled=false;}
+    }
+    request.addEventListener('click',async()=>{
+      try{
+        const d=await post('/verify/start',{number:phone.value,approved:true},request);
+        status.textContent='Código solicitado a '+d.phone_masked+
+          '. Revisá tu SMS; no se verificó todavía.';
+      }catch(e){status.textContent=e.message;}
+    });
+    finish.addEventListener('click',async()=>{
+      try{
+        const d=await post('/verify/check',{number:phone.value,code:codeInput.value},finish);
+        codeInput.value='';
+        status.textContent=d.verified?'Número verificado correctamente.':'Código no aprobado. Revisá e intentá otra vez.';
+        await refresh();
+      }catch(e){status.textContent=e.message;}
+    });
+    revoke.addEventListener('click',async()=>{
+      if(!confirm('¿Desvincular tu número verificado de SKY?'))return;
+      try{await post('/verify/revoke',{approved:true},revoke);await refresh();}
+      catch(e){status.textContent=e.message;}
+    });
+    send.addEventListener('click',async()=>{
+      if(!consent.checked){status.textContent='Necesitás confirmar el permiso del destinatario.';return;}
+      if(!confirm('¿Enviar un SMS real a '+to.value+'? Puede tener costo.'))return;
+      try{
+        const d=await post('/sms',{to:to.value,message:message.value,
+          approved:true,recipient_consented:true},send);
+        status.textContent='SMS aceptado por proveedor: '+d.status+
+          '. Entrega al destinatario todavía NO verificada.';
+      }catch(e){status.textContent=e.message;}
+    });
+    call.addEventListener('click',async()=>{
+      if(!consent.checked){status.textContent='Confirmá primero el consentimiento.';return;}
+      if(!confirm('¿Llamar a tu móvil verificado y conectarte con '+to.value+
+          '? La llamada tiene costo y usa tu teléfono físico.'))return;
+      try{
+        const d=await post('/voice/callback',{to:to.value,
+          approved:true,recipient_consented:true},call);
+        status.textContent='Solicitud: '+d.status+
+          '. Atendé tu móvil verificado. La conexión no está confirmada todavía.';
+      }catch(e){status.textContent=e.message;}
+    });
+    block.addEventListener('click',async()=>{
+      if(!confirm('¿Bloquear '+to.value+' solamente dentro de SKY?'))return;
+      try{
+        await post('/blocked',{number:to.value,approved:true},block);
+        status.textContent='Bloqueo de SKY actualizado.';await refreshBlocks();await refresh();
+      }catch(e){status.textContent=e.message;}
+    });
+    async function refreshBlocks(){
+      blockers.replaceChildren();
+      try{
+        const d=await api('/api/sky/phone/blocked');
+        if(!d.numbers.length)blockers.textContent='Sin números bloqueados.';
+        d.numbers.forEach(item=>{
+          const row=el('div','kpi-bar');row.append(el('span','',item.masked));
+          const unblock=el('button','btn','Desbloquear');unblock.type='button';
+          unblock.addEventListener('click',async()=>{
+            if(!confirm('¿Permitir nuevamente las operaciones de SKY para '+item.masked+'?'))return;
+            unblock.disabled=true;
+            try{
+              await api('/api/sky/phone/blocked/'+encodeURIComponent(item.id),{
+                method:'DELETE',body:JSON.stringify({approved:true})});
+              await refreshBlocks();await refresh();
+            }catch(e){status.textContent=e.message;unblock.disabled=false;}
+          });
+          row.append(unblock);blockers.append(row);
+        });
+      }catch(e){blockers.textContent=e.message;}
+    }
+    reload.addEventListener('click',refreshBlocks);
+    create.addEventListener('click',async()=>{
+      if(!confirm('¿Preparar una sala de video externa? Los datos de audio/video se transmitirán al proveedor al ingresar.'))return;
+      try{
+        pendingMeeting=await post('/video/meeting',{approved:true},create);
+        enter.disabled=false;
+        invitation.replaceChildren(el('div','s',
+          'Sala preparada, todavía sin conexión. Copiá el enlace solo a personas invitadas.'));
+        const link=el('a','',pendingMeeting.meeting_url);
+        link.href=pendingMeeting.meeting_url;link.rel='noopener noreferrer';link.target='_blank';
+        invitation.append(link);
+        const copy=el('button','btn','Copiar invitación');copy.type='button';
+        copy.addEventListener('click',async()=>{
+          try{await navigator.clipboard.writeText(pendingMeeting.meeting_url);
+            copy.textContent='Copiado';}
+          catch(e){copy.textContent='Copiá el enlace manualmente';}
+        });invitation.append(copy);
+      }catch(e){status.textContent=e.message;}
+    });
+    enter.addEventListener('click',async()=>{
+      if(!pendingMeeting)return;
+      enter.disabled=true;
+      try{
+        const host=pendingMeeting.host;
+        if(!/^[a-z0-9][a-z0-9.-]{3,155}$/.test(host))throw Error('Host de video inválido.');
+        if(!window.JitsiMeetExternalAPI){
+          const script=document.createElement('script');
+          script.src='https://'+host+'/external_api.js';
+          script.async=true;
+          await new Promise((resolve,reject)=>{
+            script.addEventListener('load',resolve,{once:true});
+            script.addEventListener('error',()=>reject(Error('No se pudo cargar videoconferencia')),{once:true});
+            document.head.append(script);
+          });
+        }
+        roomHost.replaceChildren();
+        PHONE.video=new window.JitsiMeetExternalAPI(host,{
+          roomName:pendingMeeting.room,parentNode:roomHost,width:'100%',height:490,
+          configOverwrite:{prejoinPageEnabled:true,disableInviteFunctions:true}
+        });
+        leave.disabled=false;status.textContent='Sala externa abierta. Controlá permisos de micrófono y cámara.';
+      }catch(e){status.textContent='Video no disponible: '+e.message;enter.disabled=false;}
+    });
+    leave.addEventListener('click',()=>{
+      if(PHONE.video){try{PHONE.video.dispose();}catch(e){/* desactivar vista */}PHONE.video=null;}
+      roomHost.replaceChildren();leave.disabled=true;enter.disabled=false;
+      status.textContent='Vista de video cerrada en SKY.';
+    });
+    refresh();refreshBlocks();
   }
 
   /* ------------------------------------------------------------------ SKY Aula existente: extensión multimedia y evaluativa */
