@@ -146,6 +146,15 @@ class SupervisorRequest(BaseModel):
     request_id: str | None = Field(default=None, max_length=100)
 
 
+from neural_core import sky_capability_inventory as local_tools
+
+
+@router.get('/capabilities/local')
+def local_capabilities():
+    """Inventario local; no instala herramientas ni cambia sus permisos."""
+    return local_tools.inventory()
+
+
 @router.get('/supervisor/catalogue')
 def supervisor_catalogue():
     return {**supervisor.catalogue(), 'advanced_planner': advanced_planner.catalogue()}
