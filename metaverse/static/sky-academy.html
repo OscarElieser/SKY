@@ -111,6 +111,23 @@
    <button id="export-project-pdf" disabled>PDF</button>
    <button id="export-project-slides" disabled>PowerPoint</button>
   </div>
+  <div class="grid" style="margin-top:17px">
+   <label>Investigación en fuentes oficiales (elegí hasta cuatro)
+    <select id="project-sources" multiple size="5">
+     <option value="mined_meidi">MINED — Educación Inicial / MEIDI</option>
+     <option value="mined_primaria">MINED — Educación Primaria</option>
+     <option value="mined_secundaria">MINED — Educación Secundaria</option>
+     <option value="inatec_hackathon">INATEC — Plataforma Hackathon</option>
+     <option value="inatec_portal">Tecnológico Nacional</option>
+     <option value="unesco_education_ai">UNESCO — IA y educación</option>
+     <option value="who_health_ai">OMS — Ética de IA para la salud</option>
+    </select>
+   </label>
+   <div><p>SKY consultará únicamente estos portales oficiales, sin confundir extractos recuperados con hechos contrastados.</p>
+    <button id="project-verify-sources" type="button">Consultar fuentes oficiales</button>
+   </div>
+  </div>
+  <div id="research-output" role="status" aria-live="polite" style="white-space:pre-wrap;margin-top:12px;"></div>
   <div id="project-output" role="status" aria-live="polite">Definí el problema y SKY preparará el árbol de problemas, Canvas, validaciones y pitch.</div>
   <p class="note">Los resultados y cifras se muestran como hipótesis hasta que adjuntés evidencia comprobable. Esta herramienta no inventa estudios, beneficiarios ni presupuestos.</p>
  </section>
