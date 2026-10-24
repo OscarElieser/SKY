@@ -29,11 +29,24 @@ class Profile:
     image: str
     entry: str
     compile: str
-    run: str
+    run: str | None
     test: str | None = None
     suffixes: tuple[str, ...] = ()
 
 PROFILES: dict[str, Profile] = {
+    # HTML/CSS are declarative: only validation is applicable, no "compiled" fiction.
+    "HTML": Profile("sky-web:2026-10", "index.html",
+                    "html-validate --config /opt/sky-web/htmlvalidate.json index.html",
+                    None, None, (".html",)),
+    "CSS": Profile("sky-web:2026-10", "styles.css",
+                   "stylelint --config /opt/sky-web/stylelint.json styles.css",
+                   None, None, (".css",)),
+    "Web": Profile("sky-web:2026-10", "index.html",
+                   "html-validate --config /opt/sky-web/htmlvalidate.json index.html"
+                   " && stylelint --config /opt/sky-web/stylelint.json styles.css"
+                   " && node --check app.js",
+                   "node /opt/sky-web/smoke.cjs", None,
+                   (".html", ".css", ".js", ".svg", ".json")),
     "Python": Profile("python:3.12-alpine", "main.py",
                       "python3 -m py_compile main.py", "python3 main.py",
                       "python3 -m unittest discover -s tests -p 'test_*.py' -v",
@@ -136,6 +149,8 @@ def _source_archive(language: str, files: Mapping[str, str]) -> tuple[bytes, boo
         raise RunnerInvalid("Indicá de 1 a 16 archivos de código.")
     if profile.entry not in files:
         raise RunnerInvalid(f"Falta el archivo principal obligatorio: {profile.entry}")
+    if language == "Web" and not {"index.html", "styles.css", "app.js"}.issubset(files):
+        raise RunnerInvalid("Un proyecto web necesita index.html, styles.css y app.js.")
     total = 0
     validated: dict[str, bytes] = {}
     for name, value in files.items():
@@ -332,8 +347,17 @@ def build(language: str, files: dict[str, str], *, approved: bool = False,
             return {
                 "ok": False, "language": canonical, "image_id": image_id,
                 "compile": compile_step, "run": None, "tests": None,
-                "status": "compile_failed", "code_executed": False,
+                "status": "validation_failed" if profile.run is None else "compile_failed",
+                "code_executed": False,
                 "offline": True, "host_execution": False,
+            }
+        if profile.run is None:
+            return {
+                "ok": True, "language": canonical, "image_id": image_id,
+                "compile": compile_step, "run": None, "tests": None,
+                "status": "validated", "validation_verified": True,
+                "code_executed": False, "offline": True, "host_execution": False,
+                "rendered_in_real_browser": False, "human_end_to_end_certified": False,
             }
         run_command = profile.compile + "; " + profile.run if profile.run.startswith(
             "/work/"
@@ -354,6 +378,8 @@ def build(language: str, files: dict[str, str], *, approved: bool = False,
             "status": "verified" if success else "run_or_tests_failed",
             "code_executed": True, "offline": True, "host_execution": False,
             "execution_verified_by_cli": True, "human_end_to_end_certified": False,
+            "rendered_in_real_browser": False,
+            "dom_emulated": canonical == "Web",
         }
     finally:
         _ACTIVE.release()
