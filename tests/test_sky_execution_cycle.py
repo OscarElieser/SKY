@@ -143,7 +143,7 @@ def test_installable_shell_is_present_but_does_not_cache_private_data():
     static=Path("metaverse/static")
     for icon in ["sky-icon-192.png","sky-icon-512.png"]:
         raw=(static/icon).read_bytes()
-        assert raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+        assert raw.startswith(b"\x89PNG\r\n\x1a\n")
     html=(static/"hud.html").read_text(encoding="utf-8")
     assert 'rel="manifest"' in html and "sky-pwa-install.js" in html
     sw=(static/"sky-sw.js").read_text(encoding="utf-8")
