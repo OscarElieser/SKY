@@ -303,8 +303,11 @@ def execute_action(action: str, params: dict, politica: dict | None = None) -> d
         verificador_acciones.mark_failed(rec.command_id, str(exc)[:200], (time.time() - t0) * 1000)
         raise
     res.setdefault('command_id', rec.command_id)
-    if res.get('ok', True):
+    status = str(res.get('status', '')).upper()
+    if res.get('ok') is True and status == 'VERIFIED':
         verificador_acciones.mark_verified(rec.command_id, {k: v for k, v in res.items() if k != 'text'}, (time.time() - t0) * 1000)
+    elif res.get('ok') is True and status in ('SENT', 'RUNNING', 'PENDING', 'DISPATCHED'):
+        verificador_acciones.mark_dispatched(rec.command_id, res, (time.time() - t0) * 1000)
     else:
         verificador_acciones.mark_failed(rec.command_id, str(res.get('message', ''))[:200], (time.time() - t0) * 1000)
     return res
