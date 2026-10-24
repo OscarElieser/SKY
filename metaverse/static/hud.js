@@ -956,12 +956,21 @@
                         iconPack,fontPack,motionMode);
     const designBtns=el('div','btns'),designCreate=el('button','btn primary','Crear diseño real');
     const designDownload=el('button','btn','Descargar proyecto ZIP');
+    const designAI=el('button','btn','Diseñar con IA');designAI.type='button';
+    const modelProvider=el('select','hab-in'),cloudOk=el('input');
+    cloudOk.type='checkbox';cloudOk.checked=false;
+    [['ollama','Ollama local (sin nube)'],['openai','OpenAI'],['anthropic','Claude (Anthropic)'],
+     ['gemini','Gemini'],['mistral','Mistral'],['groq','Groq'],['deepseek','DeepSeek']].forEach(
+      ([v,label])=>{const o=el('option','',label);o.value=v;modelProvider.append(o);});
+    const cloudLabel=el('label','s',' Autorizo enviar SOLO nombre y descripción del diseño al proveedor externo seleccionado.');
+    cloudLabel.prepend(cloudOk);
+    cloudLabel.style.display='flex';cloudLabel.style.alignItems='center';cloudLabel.style.gap='7px';
     designCreate.type='button';designDownload.type='button';
-    designDownload.disabled=true;designBtns.append(designCreate,designDownload);
+    designDownload.disabled=true;designBtns.append(designCreate,designAI,designDownload);
     const designResult=el('pre','res','Generá el proyecto y comprobá sus dependencias. No equivale a compilarlo.');
     designResult.style.whiteSpace='pre-wrap';designResult.style.overflowWrap='anywhere';
-    designArea.append(designFields,designBtns,designResult);
-    let currentDesign=null, currentDesignArgs=null;
+    designArea.append(designFields,modelProvider,cloudLabel,designBtns,designResult);
+    let currentDesign=null, currentDesignArgs=null, currentDesignPlan=null;
     function designPayload(){
       return {title:designTitle.value,brief:designBrief.value,platform:designPlatform.value,
               style:designStyle.value,layout:designLayout.value,
@@ -969,7 +978,7 @@
     }
     designCreate.addEventListener('click',async()=>{
       designCreate.disabled=true;designDownload.disabled=true;
-      currentDesign=null;currentDesignArgs=null;
+      currentDesign=null;currentDesignArgs=null;currentDesignPlan=null;
       designResult.textContent='Generando archivos de diseño…';
       try {
         const payload=designPayload();
@@ -989,12 +998,43 @@
       }catch(e){designResult.textContent='Error de diseño: '+e.message;}
       finally{designCreate.disabled=false;}
     });
+    designAI.addEventListener('click',async()=>{
+      const cloud=modelProvider.value!=='ollama';
+      if(cloud&&!cloudOk.checked){
+        designResult.textContent='Para usar un modelo externo debés marcar el consentimiento de nube.';
+        return;
+      }
+      if(!confirm('¿Autorizás la consulta a '+modelProvider.value+' con el nombre y descripción del diseño? SKY no enviará archivos ni credenciales.'))return;
+      designAI.disabled=true;designDownload.disabled=true;
+      currentDesign=null;currentDesignArgs=null;currentDesignPlan=null;
+      try{
+        const args=designPayload();
+        const d=await api('/api/developer/design/ai/create',{
+          method:'POST',body:JSON.stringify({...args,approved:true,
+            provider:modelProvider.value,allow_cloud:cloud&&cloudOk.checked})});
+        currentDesign=d;currentDesignArgs=args;currentDesignPlan=d.design_plan;
+        designResult.textContent='Diseño dirigido por IA real: '+d.provider_used+'/'+d.model_used+
+          '\nNube usada: '+(d.cloud_used?'sí, autorizada':'no')+
+          '\nPropuesta creativa: '+d.design_plan.subtitle+
+          '\nDescripción: '+d.design_plan.description+
+          '\nComponentes: '+d.design_plan.features.map(x=>x.title+' — '+x.detail).join('; ')+
+          '\nEstilo: '+d.style+'; distribución: '+d.layout+
+          '\nPaquetes seleccionados: '+JSON.stringify(d.selected_libraries)+
+          '\nBibliotecas declaradas: '+JSON.stringify(d.libraries_declared)+
+          '\nGeneración estructurada: SÍ. SDK instalado en este equipo: NO comprobado.'+
+          '\nCompilación física de este diseño: NO realizada.';
+        designDownload.disabled=false;
+      }catch(e){designResult.textContent='No se pudo diseñar con IA: '+e.message;}
+      finally{designAI.disabled=false;}
+    });
     designDownload.addEventListener('click',async()=>{
       if(!currentDesignArgs||!currentDesign)return;
       designDownload.disabled=true;
       try{
+        const downloadPayload={...currentDesignArgs};
+        if(currentDesignPlan)downloadPayload.design_plan=currentDesignPlan;
         const r=await fetch('/api/developer/design/download',{
-          method:'POST',headers:headers(),body:JSON.stringify(currentDesignArgs)});
+          method:'POST',headers:headers(),body:JSON.stringify(downloadPayload)});
         if(!r.ok){
           let detail='Error HTTP '+r.status;
           try{const j=await r.json();detail=j.detail||detail;}catch{/* binary or non-json */}
