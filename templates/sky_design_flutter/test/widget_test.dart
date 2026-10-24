@@ -18,6 +18,7 @@ void main() {
   testWidgets('Search filters card content', (tester) async {
     await tester.pumpWidget(const SkyDesignApp());
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byType(TextField), 240.0);
     await tester.enterText(find.byType(TextField), 'no-existe-esta-capacidad');
     await tester.pumpAndSettle();
     expect(find.text('No hay resultados; probá con otra búsqueda.'), findsOneWidget);
