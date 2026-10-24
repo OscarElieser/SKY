@@ -136,6 +136,9 @@ def invoke(identifier:str,*,action:str,payload:dict,approved:bool)->dict:
         raise ExtensionInvalid("La herramienta necesita autorización expresa.")
     if identifier not in _CALLABLE or not isinstance(payload,dict):
         raise ExtensionInvalid("La herramienta no tiene un adaptador operativo aprobado.")
+    from .providers import local_only
+    if local_only() and identifier not in {"ollama","n8n"}:
+        raise ExtensionInvalid("SKY_LOCAL_ONLY bloquea la llamada a proveedores remotos.")
     if not isinstance(action,str) or len(action)>20:
         raise ExtensionInvalid("Acción inválida.")
     if len(payload)>6:
