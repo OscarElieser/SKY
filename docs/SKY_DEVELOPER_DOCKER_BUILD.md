@@ -16,6 +16,9 @@ Se integra en la API y HUD existentes. Este módulo NO sustituye SKY CORE, Docen
 
 | Lenguaje | Imagen Docker previa | Archivo principal |
 |---|---|---|
+| HTML5 / HTML | sky-web:2026-10 | index.html |
+| CSS3 / CSS | sky-web:2026-10 | styles.css |
+| Web (HTML5 + CSS3 + JavaScript) | sky-web:2026-10 | index.html, styles.css y app.js |
 | Python | python:3.12-alpine | main.py |
 | JavaScript | node:22-alpine | main.js |
 | TypeScript | sky-typescript:5.7.3 | main.ts |
@@ -28,7 +31,7 @@ Se integra en la API y HUD existentes. Este módulo NO sustituye SKY CORE, Docen
 | Ruby | ruby:3.3-alpine | main.rb |
 | Bash | bash:5.2 | main.sh |
 
-**Los 53 lenguajes/formalismos del catálogo SKY no se declaran compilados**: estos 11 son perfiles de ejecución disponibles cuando su imagen está realmente instalada. TypeScript exige una imagen personalizada construida explícitamente.
+**Los lenguajes/formalismos del catálogo SKY no se declaran compilados automáticamente.** Hay 11 perfiles previos de ejecución y 3 perfiles web nuevos. HTML5 y CSS3 son tecnologías declarativas: se validan mediante herramientas reales, NO se compilan ni se identifican como código ejecutado. Un proyecto Web ejecuta una prueba de DOM mediante jsdom (NO un navegador físico ni un test visual de Chrome/Firefox/Safari). TypeScript exige una imagen personalizada construida explícitamente.
 
 **No descargués todas las imágenes si no las necesitás:** algunas pesan cientos de MB o varios GB. Comprobá el espacio disponible, elegí los lenguajes que usarás y prepará sus imágenes individualmente.
 
@@ -45,6 +48,7 @@ docker pull php:8.3-cli-alpine
 docker pull ruby:3.3-alpine
 docker pull bash:5.2
 docker build -t sky-typescript:5.7.3 docker/sky-typescript
+docker build -t sky-web:2026-10 docker/sky-web
 ~~~
 
 Las etiquetas de imágenes pueden cambiar con el tiempo. SKY consulta el ID sha256 de la imagen predescargada antes de usarla y lo guarda en el resultado de la ejecución. Para entornos de alta seguridad, auditar y fijar los digests de las imágenes en el sistema propietario.
@@ -85,3 +89,31 @@ Se añadió tests/test_sky_docker_live.py, que realmente predescarga imágenes p
 Workflow: .github/workflows/sky-developer-docker.yml. El verde de CI demuestra únicamente los lenguajes y rutas allí ejercitados (Python y JavaScript). Los demás perfiles necesitan pruebas de sus propias imágenes en el dispositivo propietario.
 
 **No hay certificación de funcionamiento en tu Windows ni Android hasta ejecutar los casos de aceptación en los dispositivos reales.**
+
+## HTML5, CSS3 y proyecto Web
+
+SKY entiende HTML, HTML5, CSS, CSS3 y "Web" (tres archivos). En el HUD → Programación:
+
+- Elegí **HTML** para editar `index.html` y comprobar etiquetas HTML5, estructura y recomendaciones semánticas con **html-validate**.
+- Elegí **CSS** para editar `styles.css` y comprobar sintaxis, propiedades, valores y reglas CSS con **Stylelint**. Algunas reglas modernas no se pueden evaluar sin navegador real.
+- Elegí **Web** para editar simultáneamente `index.html`, `styles.css` y `app.js`. El perfil ejecuta HTML-validate, Stylelint, `node --check` y una prueba de carga DOM con **jsdom** (sin red en Docker).
+- El botón **Vista previa web** usa un `iframe` con origen aislado y CSP restrictiva, y solicita confirmación adicional; no concede acceso a archivos, API de SKY o cookies de la aplicación. Solo muestra una previsualización visual local. No valida diseño responsivo entre navegadores.
+- Si el usuario deja de enlazar `styles.css` o `app.js`, el proyecto Web falla la prueba de conexión del DOM en vez de fingir éxito.
+
+El ejemplo de solicitud API, después de construir la imagen de forma voluntaria y autenticar la petición:
+
+~~~json
+{
+  "language": "Web",
+  "files": {
+    "index.html": "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><title>SKY</title><link rel=\"stylesheet\" href=\"styles.css\"><script defer src=\"app.js\"></script></head><body><main><h1>Hola</h1></main></body></html>",
+    "styles.css": "main { color: #165d6f; }",
+    "app.js": "document.querySelector('h1').textContent = 'Funcionando';"
+  },
+  "approved": true
+}
+~~~
+
+**Alcance real**: HTML5/CSS3 son estándares abiertos de marcado/estilos, no intérpretes binarios. React, Vue, Angular, Next.js, Svelte, SCSS, Sass, Tailwind, TypeScript dentro de proyectos integrados, dependencias npm externas, servidor web completo, screenshots y compatibilidad cross-browser necesitan perfiles dedicados o herramientas adicionales. No aparecen mágicamente como "compilados" por validar HTML/CSS. La generación de código en esas tecnologías sigue disponible en SKY Developer, su ejecución verificada requiere entornos autorizados específicos.
+
+Referencia de validadores usados: [HTML-validate](https://html-validate.org/usage/) y [Stylelint](https://stylelint.io/user-guide/cli/).
