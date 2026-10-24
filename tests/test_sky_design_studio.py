@@ -126,7 +126,8 @@ def test_api_is_private_and_returns_valid_zip(monkeypatch):
         zipr=client.post("/api/developer/design/download",headers=headers,json=args)
         assert zipr.status_code==200
         assert zipr.headers["content-type"]=="application/zip"
-        assert zipr.headers["cache-control"]=="no-store"
+        assert "no-store" in zipr.headers["cache-control"]
+        assert "private" in zipr.headers["cache-control"]
         with zipfile.ZipFile(io.BytesIO(zipr.content)) as archive:
             assert "sky-design-react/src/config.json" in archive.namelist()
 
