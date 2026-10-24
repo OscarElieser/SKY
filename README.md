@@ -268,6 +268,18 @@ O usá la **opción 9** del menú principal. Para revisar directamente los módu
 
 Los flujos de [GitHub Actions](https://github.com/OscarElieser/SKY/actions) verifican suites delimitadas de regresión, seguridad, API y módulos. El éxito de un flujo **no garantiza** que cada micrófono, cámara, app, teléfono, modelo o cuenta de terceros funcione fuera del entorno de pruebas.
 
+## 🔌 SKY MCP Hub — cliente oficial con permisos
+
+SKY incorpora un cliente **Model Context Protocol v2** opcional dentro de su API existente, que permite descubrir herramientas MCP instaladas localmente y llamarlas **solamente con autorización individual y PIN del propietario**. No se descargan servidores ni se conceden accesos automáticamente.
+
+Referencias auditadas: Filesystem, Playwright, GitHub, Notion, Tavily, Mem0, ClickHouse, Google News y otras. Algunos enlaces son editores o asistentes (Claude Code, Cursor, Windsurf, Cline, Continue, LibreChat, Chainlit, Cherry Studio y NextChat), **no servidores que reemplacen el HUD**. Los proyectos archivados o no oficiales se documentan sin instalarse.
+
+**Configuración:** `requirements_mcp_optional.txt`, `~/.neuralt/mcp-servers.json`, `SKY_MCP_ENABLED=1` y una allowlist de herramientas. La API privada expone `/api/sky/mcp/catalogue`, `/discover`, `/prepare` y `/execute`. GitHub se fuerza a solo lectura y Filesystem exige una carpeta restringida.
+
+[Guía y auditoría completa de integraciones MCP](docs/api/SKY_MCP_HUB_INTEGRACIONES_2026.md).
+
+**Estado:** puente MCP desarrollado, desactivado por defecto; la instalación y autenticación de cada servidor requieren acciones explícitas en tu PC. No es un IDE autónomo ilimitado.
+
 ## 🔬 SKY Verification Lab — seguimiento de las seis prioridades
 
 Tras revisar el video sobre skills, subagentes, conectores, seguridad y memoria, se añadió una capa **de verificación no intrusiva** sobre la API actual:
