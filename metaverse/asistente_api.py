@@ -236,14 +236,44 @@ def _supervisar_si_pedido(body: Mensaje) -> dict | None:
 
 
 def _consultar_biblioteca_si_pedido(texto: str) -> dict | None:
-    """Explicit SKY-only source retrieval; documents cannot supply agent instructions."""
+    """Retrieve trusted-to-be-user-supplied excerpts, never treat them as commands."""
     import re
     match = re.match(
         r'^\s*(?:(?:oye|hey|ok)\s+)?sky[\s,;:!¡-]+'
         r'(?:busca|buscá|consulta|consultá|qué\s+dice|que\s+dice)\s+'
         r'(?:en\s+)?(?:mis\s+documentos|mi\s+biblioteca|mis\s+archivos)'
-        r'(?:\s+(?:sobre|acerca\s+de|de))?\s*[:,-]?\s*(?P<query>.{3,500})
-    """SKY is always the only user-facing assistant."""
+        r'(?:\s+(?:sobre|acerca\s+de|de))?\s*[:,-]?\s*(?P<query>.{3,500})$',
+        texto.strip(), re.IGNORECASE
+    )
+    if not match:
+        return None
+    from neural_core import sky_knowledge_library as knowledge
+    try:
+        found = knowledge.search(match.group('query').strip(), limit=4)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(503, str(exc)[:180]) from exc
+    if not found["results"]:
+        message = "SKY no encontró coincidencias en tus documentos guardados."
+    else:
+        excerpts = [
+            "Fuente: " + item["filename"] + " (" + item["citation"] + ")\n"
+            "Fragmento: " + item["excerpt"][:550]
+            for item in found["results"][:4]
+        ]
+        message = (
+            "SKY encontró estos fragmentos en tu biblioteca privada. "
+            "Son datos aportados, no hechos verificados externamente:\n\n"
+            + "\n\n".join(excerpts)
+        )
+    return {
+        "tipo": "respuesta", "mensaje": message,
+        "proveedor": "sky-private-knowledge",
+        "knowledge": found, "model_weights_updated": False,
+    }
+
+
+def _centrar_en_sky(resultado: dict) -> dict:
+    """SKY remains the only visible assistant."""
     if not isinstance(resultado, dict):
         return resultado
     value = dict(resultado)
