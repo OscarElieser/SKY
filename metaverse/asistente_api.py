@@ -313,7 +313,7 @@ def verificar_accion(command_id: str, request: Request, dispositivo: str = LOCAL
 @router.get('/voz')
 def voz_pendientes(request: Request):
     pending = []
-    for entry in voz_inbox.read_inbox():
+    for entry in voz_inbox.read_inbox()[-8:]:
         if not isinstance(entry, dict):
             continue
         item = dict(entry)
