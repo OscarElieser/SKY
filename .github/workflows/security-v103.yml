@@ -44,4 +44,4 @@ jobs:
           tests/test_sky_public_secrets.py tests/test_sky_notes_local.py
           tests/test_sky_v12_unificado.py tests/test_sky_v12_1_mejoras.py tests/test_sky_v11_1_asistente.py
           tests/test_windows_desktop_control.py tests/test_sky_jarvis_fase1.py
-          tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py
+          tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py tests/test_sky_subagents.py
