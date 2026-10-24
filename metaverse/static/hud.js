@@ -203,11 +203,24 @@
   let voces = [];
   function cargarVoces() { voces = ('speechSynthesis' in window) ? speechSynthesis.getVoices() : []; }
   if ('speechSynthesis' in window) { cargarVoces(); speechSynthesis.onvoiceschanged = cargarVoces; }
+  // Respect the explicitly chosen SKY interface language for supported OS voices.
+  // The browser/installed model still decides which voices and accents exist.
+  function idiomaVoz() {
+    const lang = String(window.SKYGlobalI18N?.locale() || document.documentElement.lang || 'es')
+      .trim().replace('_', '-').toLowerCase();
+    const defaults = { es:'es-419', en:'en-US', pt:'pt-BR', fr:'fr-FR',
+      de:'de-DE', it:'it-IT', ar:'ar-SA', zh:'zh-CN', ja:'ja-JP',
+      ko:'ko-KR', hi:'hi-IN', ru:'ru-RU', sw:'sw-KE' };
+    return lang.includes('-') ? lang : (defaults[lang] || lang || 'es-419');
+  }
   function vozLocal() {
-    const es = voces.filter(v => /^es/i.test(v.lang));
-    const pref = ['es-419', 'es-MX', 'es-US', 'es-NI', 'es-ES'];
-    const ordenar = (lst) => lst.sort((a, b) => (pref.indexOf(a.lang) + 99) % 99 - (pref.indexOf(b.lang) + 99) % 99);
-    return ordenar(es.filter(v => v.localService))[0] || ordenar(es)[0] || null;
+    const locale = idiomaVoz().toLowerCase(), root = locale.split('-')[0];
+    const disponibles = voces.filter(v => String(v.lang || '').toLowerCase().split('-')[0] === root);
+    disponibles.sort((a, b) => {
+      const score = v => (v.localService ? 0 : 10) + (v.lang.toLowerCase() === locale ? 0 : 1);
+      return score(a) - score(b);
+    });
+    return disponibles[0] || null;
   }
   function limpiarParaVoz(t) {
     return String(t || '').replace(/```[\s\S]*?```/g, ' (código en pantalla) ').replace(/\$\$?[^$]*\$\$?/g, ' ')
@@ -241,7 +254,9 @@
   }
   function encolar(texto) {
     if (!S.voz || !texto) return;
-    const item = { texto, audio: S.ttsLocal ? prepararPiper(texto) : null };
+    // Current Piper voice is Spanish. Never force it onto other selected languages.
+    const localPiper = S.ttsLocal && idiomaVoz().split('-')[0] === 'es';
+    const item = { texto, audio: localPiper ? prepararPiper(texto) : null };
     cola.push(item);
     if (!hablando) procesarCola();
   }
@@ -259,7 +274,7 @@
     return new Promise((resolve) => {
       if (!('speechSynthesis' in window)) { resolve(); return; }
       const u = new SpeechSynthesisUtterance(texto);
-      const v = vozLocal(); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'es-419';
+      const v = vozLocal(); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = idiomaVoz();
       u.rate = S.rate; u.onboundary = () => { S.pulse = 1; };
       u.onend = resolve; u.onerror = resolve;
       speechSynthesis.speak(u);
@@ -267,7 +282,8 @@
   }
   async function procesarCola() {
     hablando = true; S.speaking = true;
-    setState('speaking', S.ttsLocal ? 'Voz local (Piper)' : (vozLocal() && vozLocal().localService ? 'Voz local' : 'Voz del sistema'));
+    const piperSeleccionado = S.ttsLocal && idiomaVoz().split('-')[0] === 'es';
+    setState('speaking', piperSeleccionado ? 'Voz local (Piper)' : (vozLocal() && vozLocal().localService ? 'Voz local' : 'Voz del sistema'));
     while (cola.length) {
       const item = cola.shift();
       const blob = item.audio ? await item.audio : null;
@@ -351,7 +367,7 @@
       if (!hablo || !partes.length) { setState('idle', 'No escuché nada.'); return; }
       setState('thinking', 'Transcribiendo en tu equipo…');
       const ext = (rec.mimeType || '').includes('mp4') ? 'm4a' : 'webm';
-      const fd = new FormData(); fd.append('file', new Blob(partes, { type: rec.mimeType }), 'voz.' + ext); fd.append('language', 'es');
+      const fd = new FormData(); fd.append('file', new Blob(partes, { type: rec.mimeType }), 'voz.' + ext); fd.append('language', idiomaVoz().split('-')[0]);
       try {
         const r = await api('/api/global-media/stt/transcribe', { method: 'POST', body: fd });
         const texto = String(r.text || '').trim();
@@ -367,7 +383,7 @@
     if (!SR) throw new Error('sin reconocimiento de voz (usá Chrome/Edge o instalá faster-whisper)');
     try { await micAnalyser(); } catch { /* sólo visual */ }
     const rec = new SR(); S.recognition = rec;
-    rec.lang = 'es-419'; rec.interimResults = true; rec.maxAlternatives = 1;
+    rec.lang = idiomaVoz(); rec.interimResults = true; rec.maxAlternatives = 1;
     setState('listening', 'Dictado del navegador (puede usar la nube)');
     let final = '';
     rec.onresult = (ev) => {
@@ -432,7 +448,7 @@
     W.ocupado = true;
     try {
       const fd = new FormData(); fd.append('file', new Blob(partes, { type: mime }), (mime || '').includes('mp4') ? 'w.m4a' : 'w.webm');
-      fd.append('language', 'es');
+      fd.append('language', idiomaVoz().split('-')[0]);
       const r = await api('/api/global-media/stt/transcribe', { method: 'POST', body: fd });
       const orden = ordenDespertador(r.text);
       if (orden !== null) {
@@ -445,7 +461,7 @@
   function vigilarNavegador() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) throw new Error('el navegador no tiene reconocimiento de voz; instalá faster-whisper');
-    const sr = new SR(); W.sr = sr; sr.lang = 'es-419'; sr.continuous = true; sr.interimResults = false;
+    const sr = new SR(); W.sr = sr; sr.lang = idiomaVoz(); sr.continuous = true; sr.interimResults = false;
     sr.onresult = (ev) => {
       const txt = ev.results[ev.results.length - 1][0].transcript;
       const orden = ordenDespertador(txt);
@@ -2361,9 +2377,17 @@
   document.querySelectorAll('.mobile-tabs button').forEach(b => b.addEventListener('click', () => mostrarPanel(b.dataset.panel)));
   function reloj() {
     const d = new Date();
-    $('clock-time').textContent = d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
-    $('clock-date').textContent = d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+    const locale = idiomaVoz();
+    $('clock-time').textContent = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    $('clock-date').textContent = d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
   }
+
+  window.addEventListener('sky:languagechange', () => {
+    reloj();
+    // Recognition inherits this language for new sessions; changing browser support
+    // is not evidence that STT or TTS has been verified for the language.
+    if (W.sr) W.sr.lang = idiomaVoz();
+  });
 
   /* ------------------------------------------------------------------ inicio */
   async function iniciar() {
