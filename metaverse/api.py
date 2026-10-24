@@ -659,6 +659,10 @@ app.include_router(sky_security_router)
 from .global_media_api import router as sky_global_media_router
 app.include_router(sky_global_media_router)
 
+# SKY GLOBAL: private, evidence-based operational checks; never certify by configuration.
+from .global_readiness_api import router as sky_global_readiness_router
+app.include_router(sky_global_readiness_router)
+
 # SKY v10.3: local voice and dubbing routes (no network or new public controls).
 from .voice_v103_api import router as sky_voice_v103_router
 app.include_router(sky_voice_v103_router)
