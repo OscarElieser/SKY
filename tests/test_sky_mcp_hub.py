@@ -189,3 +189,32 @@ def test_mcp_sdk_v2_contract_when_installed():
     pytest.importorskip("mcp")
     from mcp import Client, StdioServerParameters
     assert Client and StdioServerParameters
+
+
+def test_fazt_context7_supabase_postgres_and_semgrep_catalogued(context):
+    client, _, _ = context
+    data = client.get("/api/sky/mcp/catalogue", headers=headers()).json()
+    items = {row["id"]: row for row in data["servers"]}
+    assert items["context7"]["transport"] == "stdio"
+    assert items["supabase"]["transport"] == "remote_oauth_pending"
+    assert items["postgres"]["transport"] == "stdio"
+    assert items["semgrep"]["transport"] == "stdio"
+    assert not items["supabase"]["active"]
+
+
+def test_postgresql_mcp_must_stay_restricted(context):
+    _, _, _ = context
+    file = hub._config_path()
+    data = json.loads(file.read_text())
+    data["servers"]["postgres"] = {
+        "enabled": True, "command": sys.executable, "args": ["--access-mode=unrestricted"],
+        "env_keys": [], "allowed_tools": ["list_schemas", "execute_sql"]
+    }
+    file.write_text(json.dumps(data))
+    with pytest.raises(hub.MCPDenied):
+        hub._server_spec("postgres")
+    data["servers"]["postgres"]["args"] = ["--access-mode=restricted"]
+    file.write_text(json.dumps(data))
+    assert hub._server_spec("postgres")["id"] == "postgres"
+    with pytest.raises(hub.MCPDenied):
+        hub.tool_policy("postgres", "execute_sql")
