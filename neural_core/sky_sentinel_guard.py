@@ -21,6 +21,7 @@ _LOCK = threading.RLock()
 _EVENTS: deque[tuple[float,str,str]] = deque(maxlen=512)
 _NONCE = secrets.token_bytes(24)
 _PENDING: dict[str,tuple[float,str]] = {}
+_SHUTDOWN_TIMER: threading.Timer | None = None
 _DENIAL_WINDOW_SECONDS = 300
 
 
@@ -88,18 +89,37 @@ def shutdown_confirmed(client_host: str, token: str, phrase: str) -> dict:
         if item is None or item[0] < time.monotonic() or item[1] != client_host:
             raise PermissionError("La autorización caducó o es inválida.")
         del _PENDING[digest] # consume before side-effect; never replay
-    # Avoid shell=True or arbitrary commands. Without /f Windows prompts for unsaved
-    # work and allows the owner to abort with 'shutdown /a' while the timer runs.
-    subprocess.run(
-        ["shutdown","/s","/t","120","/c","Apagado solicitado expresamente al asistente SKY"],
-        check=True,timeout=8,capture_output=True,text=True,
-    )
+    # Windows 'shutdown /t 120' implicitly forces closure on many versions,
+    # risking unsaved data. Instead, keep a cancellable timer and call /t 0
+    # WITHOUT /f after 120 seconds. If the service dies, the timer dies safely.
+    def _request_shutdown():
+        global _SHUTDOWN_TIMER
+        try:
+            subprocess.run(["shutdown","/s","/t","0"],check=True,timeout=8,
+                           capture_output=True,text=True)
+        finally:
+            with _LOCK:
+                _SHUTDOWN_TIMER = None
+
+    global _SHUTDOWN_TIMER
+    with _LOCK:
+        if _SHUTDOWN_TIMER is not None:
+            raise PermissionError("Ya existe una cuenta regresiva de apagado.")
+        timer=threading.Timer(120,_request_shutdown)
+        timer.daemon=True
+        _SHUTDOWN_TIMER=timer
+        timer.start()
     return {"shutdown_scheduled":True,"countdown_seconds":120,
-            "cancel":"shutdown /a", "reason":"explicit_owner_confirmation"}
+            "cancel":"POST /api/security/sentinel/shutdown/abort",
+            "reason":"explicit_owner_confirmation"}
 
 
 def abort_shutdown(client_host: str) -> dict:
     _local_owner_guard(client_host)
-    subprocess.run(["shutdown","/a"],check=True,timeout=8,
-                   capture_output=True,text=True)
+    global _SHUTDOWN_TIMER
+    with _LOCK:
+        if _SHUTDOWN_TIMER is None:
+            return {"shutdown_aborted":False,"reason":"not_scheduled"}
+        _SHUTDOWN_TIMER.cancel()
+        _SHUTDOWN_TIMER=None
     return {"shutdown_aborted":True}
