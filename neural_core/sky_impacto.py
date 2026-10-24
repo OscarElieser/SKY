@@ -63,7 +63,7 @@ CATEGORIES = {
 def _clean(value: str, length: int = 250) -> str:
     if not isinstance(value, str):
         raise ValueError("Se requiere texto.")
-    value = re.sub(r"\\s+", " ", value).strip()
+    value = re.sub(r"\s+", " ", value).strip()
     if not value or len(value) > length:
         raise ValueError(f"El texto debe tener entre 1 y {length} caracteres.")
     return value
@@ -135,10 +135,10 @@ def consult_source(source_id: str, *, timeout: float = 8.0) -> dict:
             charset = response.headers.get_content_charset() or "utf-8"
             content = raw.decode(charset, errors="replace")
             if mime == "text/html":
-                content = re.sub(r"<(script|style|nav|footer)\\b[^>]*>.*?</\\1>", " ", content,
+                content = re.sub(r"<(script|style|nav|footer)\b[^>]*>.*?</\1>", " ", content,
                                  flags=re.IGNORECASE | re.DOTALL)
                 content = re.sub(r"<[^>]+>", " ", content)
-            content = re.sub(r"\\s+", " ", unescape(content)).strip()
+            content = re.sub(r"\s+", " ", unescape(content)).strip()
             return {**outcome, "ok": True, "content": content[:6500],
                     "truncated": len(content) > 6500, "final_url": response.geturl(),
                     "note": "Extracto; no representa toda la fuente ni valida automáticamente sus afirmaciones."}
