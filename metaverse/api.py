@@ -40,7 +40,7 @@ def api_token():
 scheme=APIKeyHeader(name='X-SKY-KEY',auto_error=False)
 def require_owner_key_only(token:Optional[str]=Depends(scheme)):
     if not token or not secrets.compare_digest(token,api_token()):
-        raise HTTPException(401,detail='Credenciales inválidas',headers={'WWW-Authenticate':'APIKey'})
+        raise HTTPException(401,detail='Acceso denegado',headers={'WWW-Authenticate':'APIKey'})
     return True
 
 def require_key(request:Request, owner_key:bool=Depends(require_owner_key_only)):
@@ -323,73 +323,93 @@ UPLOADS_DIR = ROOT / 'local_data' / 'sky_uploads'
 GENERATED_DIR = ROOT / 'local_data' / 'sky_generated'
 # La importación debe ser segura con --read-only; crear carpetas sólo al escribir.
 
+
+def _signed_media_url(filename: str) -> str:
+    """Time-limited preview link; no reusable master API token in the URL."""
+    import hmac,hashlib
+    from urllib.parse import quote
+    expiry=int(time.time())+600
+    value=f"private-upload:{filename}:{expiry}".encode("utf-8")
+    signature=hmac.new(api_token().encode("utf-8"),value,hashlib.sha256).hexdigest()
+    return f"/api/media/uploads/{quote(filename)}?expires={expiry}&sig={signature}"
+
+
 @app.get('/api/media/uploads/{filename}')
-def get_uploaded_media(filename: str):
-    p = (UPLOADS_DIR / filename).resolve()
-    if not p.is_file() or not p.is_relative_to(UPLOADS_DIR.resolve()):
-        raise HTTPException(404, 'Archivo no encontrado')
-    return FileResponse(p)
+def get_uploaded_media(filename: str, expires: int=0, sig: str=''):
+    """Una vista privada necesita un enlace HMAC que caduca tras 10 minutos."""
+    import hmac,hashlib,re
+    if (not re.fullmatch(r'[a-f0-9]{32}\.[a-z0-9]{2,6}',filename) or
+            expires<int(time.time()) or expires>int(time.time())+600 or
+            not re.fullmatch(r'[a-f0-9]{64}',sig)):
+        raise HTTPException(403,'Acceso denegado al archivo.')
+    expected=hmac.new(api_token().encode("utf-8"),
+                      f"private-upload:{filename}:{expires}".encode("utf-8"),
+                      hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig,expected):
+        raise HTTPException(403,'Acceso denegado al archivo.')
+    p=UPLOADS_DIR/filename
+    if not p.is_file() or p.is_symlink() or not p.resolve().is_relative_to(UPLOADS_DIR.resolve()):
+        raise HTTPException(404,'Archivo no encontrado')
+    return FileResponse(p,headers={'Cache-Control':'private, no-store',
+                                  'X-Content-Type-Options':'nosniff'})
+
 
 @app.get('/api/media/generated/{filename}')
 def get_generated_media(filename: str):
-    p = (GENERATED_DIR / filename).resolve()
+    p=(GENERATED_DIR / filename).resolve()
     if not p.is_file() or not p.is_relative_to(GENERATED_DIR.resolve()):
-        raise HTTPException(404, 'Archivo generado no encontrado')
+        raise HTTPException(404,'Archivo generado no encontrado')
     return FileResponse(p)
 
+
 @app.post('/api/chat/upload',dependencies=[Depends(require_key)])
-async def upload_chat_file(file:UploadFile=File(...)):
-    """Sube un archivo de cualquier tipo (Video, Música, Audio, PDF, DOCX, XLSX, CSV, TXT, Código, etc.) sin restricciones."""
-    from neural_core.documentos import extraer_texto
-    from neural_core.storage import agregar_documento, guardar_memoria
-    from neural_core.sky_evolution import feedback
-    data = await file.read()
-    filename = file.filename or 'archivo_adjunto'
-    ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else ''
-    
-    # Guardar copia física local en sky_uploads para reproducción inmediata
-    safe_name = f"{secrets.token_hex(4)}_{Path(filename).name}"
-    local_path = UPLOADS_DIR / safe_name
+async def upload_chat_file(file: UploadFile=File(...)):
+    """Lectura privada acotada; NO memoriza automáticamente contenido no verificado."""
+    from neural_core.sky_multimodal_reader import analyze,MAX_BYTES
+    from neural_core import sky_multimodal_reader
+    raw=bytearray()
     try:
-        UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-        local_path.write_bytes(data)
-    except Exception:
-        pass
-
-    media_type = 'document'
-    if ext in ('mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv'):
-        media_type = 'video'
-    elif ext in ('mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'):
-        media_type = 'audio'
-    elif ext in ('png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'):
-        media_type = 'image'
-
-    try:
-        texto = extraer_texto(filename, data)
-    except Exception as exc:
-        texto = f"[Archivo {filename} ({len(data)} bytes) listo para procesamiento]"
-
-    doc_id = None
-    try:
-        doc_id = agregar_documento(filename, texto[:245000])
-    except Exception:
-        pass
-    try:
-        guardar_memoria(f"Archivo asimilado: '{filename}' ({media_type.upper()}, {round(len(data)/1024, 1)} KB). Conocimiento integrado.")
-        feedback("aprendizaje_documental", 5, f"Incorporado conocimiento desde archivo {filename}")
-    except Exception:
-        pass
-    return {
-        'ok': True,
-        'filename': filename,
-        'size_bytes': len(data),
-        'media_type': media_type,
-        'media_url': f'/api/media/uploads/{safe_name}',
-        'doc_id': doc_id,
-        'chars_extracted': len(texto),
-        'summary': texto[:800],
-        'full_text': texto[:30000]
-    }
+        while True:
+            chunk=await file.read(min(1024*1024,MAX_BYTES-len(raw)+1))
+            if not chunk: break
+            raw.extend(chunk)
+            if len(raw)>MAX_BYTES:
+                raise HTTPException(413,'Archivo supera el límite de 80 MB.')
+        try:
+            result=analyze(file.filename or '',bytes(raw))
+        except ValueError as exc:
+            raise HTTPException(422,str(exc)[:240]) from exc
+        # A separate explicit user action is needed to add a verified fact
+        # to SKY Neural Memory. File reading is NOT model self-training.
+        import re
+        from pathlib import Path
+        ext=result['extension']
+        media=result['extension'] in sky_multimodal_reader.VIDEO_EXTS|sky_multimodal_reader.AUDIO_EXTS|sky_multimodal_reader.IMAGE_EXTS
+        media_url=None
+        if media:
+            name=secrets.token_hex(16)+ext
+            UPLOADS_DIR.mkdir(parents=True,exist_ok=True)
+            path=UPLOADS_DIR/name
+            # Only application-created random filenames; prevent directory traversal.
+            with path.open('xb') as stream: stream.write(raw)
+            try: os.chmod(path,0o600)
+            except OSError: pass
+            media_url=_signed_media_url(name)
+        text=result.get('text','')
+        return {'ok':True,'filename':result['filename'],'size_bytes':len(raw),
+                'media_type':('video' if ext in sky_multimodal_reader.VIDEO_EXTS
+                              else 'audio' if ext in sky_multimodal_reader.AUDIO_EXTS
+                              else 'image' if ext in sky_multimodal_reader.IMAGE_EXTS
+                              else 'document'),
+                'media_url':media_url,'doc_id':None,
+                'chars_extracted':len(text),'summary':text[:800],
+                'full_text':text[:30000],
+                'content_extracted':result['content_extracted'],
+                'learning_performed':False,
+                'limitations':result['limitations'],
+                'metadata':result['metadata']}
+    finally:
+        await file.close()
 
 @app.get('/api/evolution/stats',dependencies=[Depends(require_key)])
 def evolution_stats():
@@ -585,6 +605,10 @@ install_sky_security(app)
 # SKY 10.2: optional creator TOTP + short-lived server-side sessions.
 from .security_api import router as sky_security_router
 app.include_router(sky_security_router)
+from .neural_memory_api import router as neural_memory_router
+app.include_router(neural_memory_router)
+from .multimodal_api import router as sky_multimodal_router
+app.include_router(sky_multimodal_router)
 
 # SKY v10.2: private subtitle and multilingual narration tools.
 from .global_media_api import router as sky_global_media_router

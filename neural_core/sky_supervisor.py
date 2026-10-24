@@ -286,6 +286,15 @@ def get_job(workflow_id: str) -> dict:
     completed = len(finished)
     if status == "completed" and completed != total:
         status = "needs_review"
+    # Only aggregate minimal verified execution metadata. Never memorize the
+    # request text, private documents or output automatically.
+    if status in ("completed", "failed"):
+        from . import sky_neural_memory as neural_memory
+        neural_memory.record_verified_outcome(
+            workflow_id,
+            list(dict.fromkeys(item["agent"] for item in flow["steps"])),
+            status, verified=(status == "completed" and completed == total),
+        )
     return {
         "central_agent": "SKY",
         "workflow_id": workflow_id,

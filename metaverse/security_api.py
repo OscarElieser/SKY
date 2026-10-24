@@ -40,3 +40,51 @@ def logout(session: str | None = Header(None, alias='X-SKY-SESSION')):
 @router.get('/api/security/owner-mfa/verify', dependencies=[Depends(require_key)])
 def verify_session():
     return {'authenticated':True,'second_factor':owner_mfa.required()}
+
+
+# SKY Sentinel — access denial logs and owner-controlled emergency procedures.
+from neural_core import sky_sentinel_guard as sentinel
+
+
+class ShutdownConfirmation(BaseModel):
+    confirmation_token: str = Field(min_length=32,max_length=100)
+    phrase: str = Field(min_length=10,max_length=60)
+
+
+def _host(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+@router.get('/api/security/sentinel/status',dependencies=[Depends(require_key)])
+def sentinel_status():
+    return sentinel.status()
+
+
+@router.post('/api/security/sentinel/shutdown/prepare',dependencies=[Depends(require_key)])
+def sentinel_prepare_shutdown(request: Request):
+    try:
+        return sentinel.prepare_shutdown(_host(request))
+    except PermissionError as exc:
+        raise HTTPException(403,str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(409,str(exc)) from exc
+
+
+@router.post('/api/security/sentinel/shutdown/confirm',dependencies=[Depends(require_key)])
+def sentinel_shutdown_confirm(body: ShutdownConfirmation,request: Request):
+    try:
+        return sentinel.shutdown_confirmed(_host(request),body.confirmation_token,body.phrase)
+    except PermissionError as exc:
+        raise HTTPException(403,str(exc)) from exc
+    except (RuntimeError,OSError) as exc:
+        raise HTTPException(409,str(exc)[:160]) from exc
+
+
+@router.post('/api/security/sentinel/shutdown/abort',dependencies=[Depends(require_key)])
+def sentinel_shutdown_abort(request: Request):
+    try:
+        return sentinel.abort_shutdown(_host(request))
+    except PermissionError as exc:
+        raise HTTPException(403,str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(409,str(exc)) from exc
