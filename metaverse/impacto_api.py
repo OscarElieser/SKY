@@ -120,6 +120,11 @@ class GitHubDocument(BaseModel):
     path: str = Field(min_length=1, max_length=160)
 
 
+class UniversityDocument(BaseModel):
+    source_id: str = Field(min_length=2, max_length=60)
+    path: str = Field(min_length=1, max_length=180)
+
+
 class SkillsRequest(BaseModel):
     task: str = Field(min_length=1, max_length=2500)
     selected: list[str] | None = Field(default=None, max_length=8)
@@ -161,6 +166,11 @@ def scholar_search(body: ScholarSearch):
 @router.post("/scholar/doi")
 def scholar_doi(body: DoiRequest):
     return _external(sky_scholarly.lookup_doi, body.doi)
+
+
+@router.post("/university/read")
+def university_read(body: UniversityDocument):
+    return _external(sky_scholarly.read_university_resource, body.source_id, body.path)
 
 
 @router.post("/repository/read")
