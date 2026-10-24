@@ -158,3 +158,128 @@ def check_claims(claims: list[dict]) -> dict:
         "all_facts_verified": False,
         "warning": "Una URL o una cita declarada no demuestran por sí solas la veracidad.",
     }
+
+
+
+def retrieve_official_sources(topic: str, source_ids: list[str]) -> dict:
+    """Fetch only vetted HTTPS catalogue URLs, on explicit owner instruction.
+
+    This is a limited, non-search-engine retrieval. HTML is UNTRUSTED DATA.
+    Retrieving an official site does not certify a particular claim or
+    establish that the site is up to date.
+    """
+    from datetime import datetime, timezone
+    from hashlib import sha256
+    from html.parser import HTMLParser
+    import ssl
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    if not isinstance(topic, str) or not 5 <= len(topic.strip()) <= 240:
+        raise ValueError("Tema inválido para consulta de fuentes.")
+    if not isinstance(source_ids, list) or not 1 <= len(source_ids) <= 4:
+        raise ValueError("Elegí de 1 a 4 referencias oficiales.")
+    if len(set(source_ids)) != len(source_ids) or any(x not in OFFICIAL_REGISTRY for x in source_ids):
+        raise ValueError("Solo se permiten identificadores únicos del catálogo de SKY.")
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, request, fp, code, msg, headers, newurl):
+            raise ValueError("El origen oficial redirigió; SKY no seguirá la redirección automáticamente.")
+
+    class CleanText(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.fragments=[]
+            self.hidden=0
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script","style","noscript","svg","form"):
+                self.hidden+=1
+        def handle_endtag(self, tag):
+            if tag in ("script","style","noscript","svg","form"):
+                self.hidden=max(0,self.hidden-1)
+            if not self.hidden and tag in ("p","h1","h2","h3","li","article"):
+                self.fragments.append("\n")
+        def handle_data(self, text):
+            if not self.hidden and len(self.fragments)<8000:
+                self.fragments.append(text)
+
+    requested = re.findall(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{4,}", topic.casefold())[:15]
+    responses=[]
+    for source_id in source_ids:
+        item=OFFICIAL_REGISTRY[source_id]
+        url=item["url"]
+        parsed=urllib.parse.urlsplit(url)
+        if parsed.scheme!="https" or parsed.username or parsed.password or parsed.fragment:
+            raise ValueError("La fuente del catálogo no cumple las reglas de HTTPS.")
+        # Verify exact host allowlist derived from reviewed registry, not user input.
+        verified_hosts={
+            urllib.parse.urlsplit(row["url"]).hostname for row in OFFICIAL_REGISTRY.values()
+        }
+        if parsed.hostname not in verified_hosts:
+            raise ValueError("Dominio no admitido por SKY.")
+        try:
+            req=urllib.request.Request(url,headers={
+                "User-Agent":"SKY-Evidence-Reader/1.0 (owner-initiated academic use)",
+                "Accept":"text/html,text/plain",
+            })
+            opener=urllib.request.build_opener(
+                urllib.request.ProxyHandler({}),
+                NoRedirect(),
+                urllib.request.HTTPSHandler(context=ssl.create_default_context()),
+            )
+            with opener.open(req,timeout=8) as response:
+                if response.status!=200:
+                    raise OSError("HTTP distinto de 200.")
+                typ=response.headers.get("Content-Type","").lower()
+                if "text/html" not in typ and "text/plain" not in typ:
+                    raise OSError("SKY admite solo HTML o texto oficial en este lector.")
+                raw=response.read(250_001)
+                if len(raw)>250_000:
+                    raise OSError("Documento remoto excede el límite de lectura.")
+                charset=response.headers.get_content_charset() or "utf-8"
+                try:
+                    html=raw.decode(charset,errors="replace")
+                except LookupError:
+                    html=raw.decode("utf-8",errors="replace")
+            if "html" in typ:
+                parser=CleanText()
+                parser.feed(html)
+                content=" ".join(" ".join(parser.fragments).split())[:25000]
+            else:
+                content=" ".join(html.split())[:25000]
+            if not content.strip():
+                raise OSError("La fuente no entregó texto utilizable.")
+            sections=[]
+            folded=content.casefold()
+            for word in requested:
+                pos=folded.find(word)
+                if pos>=0:
+                    sections.append(content[max(0,pos-180):min(len(content),pos+350)])
+                if len(sections)>=5:
+                    break
+            responses.append({
+                "id":source_id,"url":url,"label":item["label"],
+                "status":"official_page_retrieved_not_independently_verified",
+                "retrieved_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "retrieved_sha256":sha256(raw).hexdigest(),
+                "topic_excerpts":sections,"topic_match":bool(sections),
+                "site_publication_date_verified":False,
+                "text_instructions_executed":False,
+            })
+        except (OSError,ValueError,TimeoutError,urllib.error.URLError) as exc:
+            responses.append({
+                "id":source_id,"url":url,"label":item["label"],
+                "status":"unavailable_or_unsupported",
+                "error":"No se recuperó texto oficial verificable en esta solicitud.",
+                "topic_excerpts":[],
+            })
+    return {
+        "central_agent":"SKY",
+        "topic":topic.strip(),"sources":responses,
+        "pages_retrieved":sum(x["status"].startswith("official_page_retrieved") for x in responses),
+        "all_claims_verified":False,
+        "research_completed":False,
+        "needs_human_source_comparison":True,
+        "notice":"SKY consultó sólo enlaces preautorizados. Revisar los extractos, fechas de publicación y fuentes independientes.",
+    }
