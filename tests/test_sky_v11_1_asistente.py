@@ -375,7 +375,14 @@ def test_api_mensaje_propone_y_auto_ejecuta(monkeypatch):
     assert 'desactivada' in r['aviso']
     assert llamadas.count('lock_screen') == 0
     r = client.post('/api/asistente/ejecutar', headers=h, json={'action': 'lock_screen'})
+    assert r.status_code == 403 and llamadas.count('lock_screen') == 0
+    # Un clic confirmado solo es válido para la propuesta que el dueño vio.
+    propuesta = client.post('/api/asistente/mensaje', headers=h, json={'texto': 'bloquea la pantalla'}).json()
+    r = client.post('/api/asistente/ejecutar', headers=h, json={
+        'action': 'lock_screen', 'approval_token': propuesta['approval_token']})
     assert r.status_code == 200 and llamadas[-1] == 'lock_screen'
+    assert client.post('/api/asistente/ejecutar', headers=h, json={
+        'action': 'lock_screen', 'approval_token': propuesta['approval_token']}).status_code == 403
     assert client.post('/api/asistente/ejecutar', headers=h, json={'action': 'run_shell'}).status_code == 400
 
 
