@@ -59,3 +59,32 @@ Es posible que una plantilla Flutter tenga que generarse con el esqueleto Androi
 - https://docs.flutter.dev/ui/animations
 
 El generador no sustituye el sistema de compilación protegido por PIN de SKY ni elimina ninguna herramienta anterior.
+
+
+## Paquetes de diseño opcionales, instalados y usados en cada proyecto
+
+El usuario puede seleccionar desde SKY → Programación → SKY Design Studio las bibliotecas que utilizará la web React:
+
+| Elemento | Opciones | Evidencia |
+|---|---|---|
+| Iconos SVG | Lucide React (predeterminado), Tabler Icons React 3.49.0 | Los componentes de las tarjetas importan e instancian los iconos de la biblioteca seleccionada |
+| Tipografía autocontenida | Inter, Manrope 5.3.0, Poppins 5.3.0 | Se importan archivos CSS y WOFF2 de Fontsource en el bundle web |
+| Movimiento | Fluido, desactivado | Motion respeta la reducción del sistema y la preferencia explícita sin animación |
+
+Cada proyecto recibe únicamente los paquetes npm que necesita para las opciones seleccionadas, sin instalar librerías innecesarias ni ejecutar scripts de instalación de terceros en SKY. El archivo ZIP lleva la selección exacta y su manifiesto. No se añaden de forma global en la computadora del propietario.
+
+En Flutter, los iconos siguen siendo Material Icons y la fuente es la del sistema (hasta que haya perfiles de otras bibliotecas validados para Flutter). La opción sin animaciones es respetada también por los componentes Flutter.
+
+### Verificación automática
+
+El workflow **SKY Design Studio — real React and Flutter builds** instala y compila en CI dos proyectos React adicionales: Tabler + Manrope sin animaciones y Lucide + Poppins con animaciones. Verifica que los paquetes se hayan importado de verdad, que aparezcan fuentes WOFF2 en el bundle y que el build de producción finalice correctamente. Mantiene los análisis/pruebas Flutter y las pruebas de la API privada.
+
+Referencias y licencias:
+
+- https://www.npmjs.com/package/@tabler/icons-react
+- https://www.npmjs.com/package/@fontsource/manrope
+- https://www.npmjs.com/package/@fontsource/poppins
+- https://lucide.dev/
+- https://motion.dev/
+
+No hay garantía de que todos los paquetes de cualquier versión futura sean seguros o compatibles. La integridad depende de resolver las versiones concretas y comprobar el proyecto, no de prometer un catálogo universal.
