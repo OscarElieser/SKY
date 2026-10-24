@@ -12,6 +12,7 @@ on:
       - "neural_core/sky_execution_metrics.py"
       - "tests/test_sky_api_*.py"
       - "tests/test_windows_desktop_control.py"
+      - "scripts/sky_api_smoke_windows.py"
       - ".github/workflows/sky-api-windows.yml"
   workflow_dispatch:
 
@@ -35,7 +36,7 @@ jobs:
       - name: Compile SKY API modules
         shell: pwsh
         run: |
-          python -m py_compile metaverse/asistente_api.py metaverse/hud_api.py agente_dispositivo.py neural_core/action_verifier.py neural_core/sky_approvals.py neural_core/sky_execution_metrics.py
+          python -m py_compile metaverse/asistente_api.py metaverse/hud_api.py agente_dispositivo.py neural_core/action_verifier.py neural_core/sky_approvals.py neural_core/sky_execution_metrics.py scripts/sky_api_smoke_windows.py
       - name: Test action approvals, receipts and localhost API on Windows
         shell: pwsh
         run: |
