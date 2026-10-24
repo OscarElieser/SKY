@@ -13,6 +13,7 @@ Estados:
 from __future__ import annotations
 
 import json
+from collections import deque
 import os
 import platform
 import time
@@ -140,9 +141,10 @@ class ActionVerifier:
         if not self.ledger_file.exists():
             return [r.to_dict() for r in list(self._records.values())[-limit:]]
         try:
-            lines = self.ledger_file.read_text(encoding='utf-8').strip().splitlines()
+            with self.ledger_file.open('r', encoding='utf-8') as log:
+                lines = list(deque(log, maxlen=max(1, min(limit, 500))))
             records = []
-            for l in lines[-limit:]:
+            for l in lines:
                 try:
                     records.append(json.loads(l))
                 except Exception:
