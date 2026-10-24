@@ -12,6 +12,9 @@ on:
       - "neural_core/sky_execution_metrics.py"
       - "tests/test_sky_api_*.py"
       - "tests/test_windows_desktop_control.py"
+      - "tests/test_sky_subagents.py"
+      - "neural_core/sky_subagents.py"
+      - "metaverse/workflow_api.py"
       - "scripts/sky_api_smoke_windows.py"
       - ".github/workflows/sky-api-windows.yml"
   workflow_dispatch:
@@ -41,7 +44,7 @@ jobs:
         shell: pwsh
         run: |
           $env:PYTHONPATH = "."
-          python -m pytest -q tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py
+          python -m pytest -q tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py tests/test_sky_subagents.py
       - name: Test Windows agent controls without modifying user devices
         shell: pwsh
         run: |
