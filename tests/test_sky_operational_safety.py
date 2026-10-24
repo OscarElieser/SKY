@@ -65,3 +65,20 @@ def test_catalogo_no_confunde_telefonia_nativa_con_llamada_finalizada():
     caps = sky_phone.capabilities()
     assert "explicit user tap" in caps["native_dialer_sms"]
     assert caps["inbound"] == "not implemented"
+
+
+def test_diagnostico_real_no_certifica_con_solo_endpoints(monkeypatch):
+    from scripts import sky_integral_operational_check as probe
+    monkeypatch.setattr(probe, "_token", lambda: "token-local-de-prueba")
+    monkeypatch.setattr(probe, "_probe", lambda path, key: {
+        "reachable": True,
+        "http_status": 200,
+        "response": {"enabled": False, "actions_observed": 0,
+                     "windows_hardware_passed": None,
+                     "android_hardware_passed": None},
+    })
+    report=probe.run()
+    assert report["local_api_readiness_passed"] is True
+    assert report["operational_certification_integral"] is False
+    assert report["checks"]["telefono"]["feature_enabled"] is False
+    assert "android_device_and_permissions" in report["pending_physical_tests"]
