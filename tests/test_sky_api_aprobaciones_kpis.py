@@ -6,6 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from metaverse import api as _sky_main_api  # cargar la app antes de sus routers (evita dependencia circular)
 from metaverse import asistente_api
 from neural_core import sky_approvals, sky_execution_metrics
 
