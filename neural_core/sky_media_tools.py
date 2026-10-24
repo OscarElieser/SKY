@@ -327,7 +327,7 @@ def universal_web_search(query: str) -> Dict[str, Any]:
         url = f"https://html.duckduckgo.com/html/?q={encoded}"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
         with urllib.request.urlopen(req, timeout=10) as response:
-            html = response.read().decode('utf-8', errors='ignore')
+            html = response.read(300_000).decode('utf-8', errors='ignore')
             
             # Extraer títulos y enlaces básicos
             matches = re.findall(r'<a class="result__url" href="([^"]+)">(.*?)</a>', html)
@@ -342,18 +342,18 @@ def universal_web_search(query: str) -> Dict[str, Any]:
                     "content": f"Resultado indexado para: {query}"
                 })
             if results:
-                return {"ok": True, "query": query, "results": results}
+                return {"ok": True, "query": query, "results": results, "verified": False, "learning_performed": False}
     except Exception:
         pass
 
+    # Never invent a source or say that a web search succeeded if every
+    # authorized provider was unavailable. A fabricated search card would
+    # pollute SKY's future memory and deceive the owner.
     return {
-        "ok": True,
+        "ok": False,
         "query": query,
-        "results": [
-            {
-                "title": f"Información sobre: {query}",
-                "url": f"https://www.google.com/search?q={urllib.parse.quote_plus(query)}",
-                "content": f"Búsqueda universal procesada para '{query}'. Conexión web activa."
-            }
-        ]
+        "results": [],
+        "verified": False,
+        "error": "No se recuperaron resultados verificables. Comprobá conexión, motor y permisos.",
+        "learning_performed": False,
     }
