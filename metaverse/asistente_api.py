@@ -228,6 +228,20 @@ def ejecutar_casa(body: OrdenCasa):
         raise HTTPException(502, str(exc)[:200])
 
 
+@router.get('/verificar/{command_id}')
+def verificar_accion(command_id: str, request: Request, dispositivo: str = LOCAL):
+    """Consulta el estado del agente; sólo VERIFIED acredita una acción comprobada."""
+    try:
+        url, token = _destino(dispositivo, request)
+        return dispositivos.verify_device_action(url, token, command_id, timeout=5)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:200]) from exc
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)[:200]) from exc
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)[:200]) from exc
+
+
 @router.get('/voz')
 def voz_pendientes():
     return {'pendientes': voz_inbox.read_inbox()}
