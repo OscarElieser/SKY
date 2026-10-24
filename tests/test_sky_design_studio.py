@@ -139,3 +139,71 @@ def test_template_paths_are_local_and_fixed(monkeypatch):
     assert studio._ROOT.name == "templates"
     assert set(studio._ALLOWED) == {"react","flutter"}
     assert studio.studio_capabilities()["code_execution_on_generation"] is False
+
+
+
+def test_react_uses_selected_real_icon_pack_font_and_reduced_motion():
+    d=studio.create_design(
+        "Parque Natural", "Turismo inmersivo para familias", platform="react",
+        icon_pack="tabler", font_family="manrope", motion="none")
+    deps=d["libraries_declared"]
+    assert deps["@tabler/icons-react"]=="3.49.0"
+    assert deps["@fontsource/manrope"]=="5.3.0"
+    assert "@fontsource/inter" not in deps
+    assert "from '@tabler/icons-react'" in d["files"]["src/App.jsx"]
+    assert "sparkles: IconSparkles" in d["files"]["src/App.jsx"]
+    assert "font-family:Manrope" in d["files"]["src/style.css"]
+    assert "@fontsource/manrope/400.css" in d["files"]["src/main.jsx"]
+    assert "data-motion={config.motion}" in d["files"]["src/App.jsx"]
+    assert "animation:none!important" in d["files"]["src/style.css"]
+    assert d["selected_libraries"]["icon_pack"]=="tabler"
+    assert d["libraries_installed_on_user_device"] is False
+
+
+def test_poppins_is_imported_not_just_listed():
+    d=studio.create_design("Museo SKY", "Museo de historia y cultura",
+                           font_family="poppins")
+    assert d["libraries_declared"]["@fontsource/poppins"] == "5.3.0"
+    assert "@fontsource/inter" not in d["libraries_declared"]
+    assert "@fontsource/poppins/700.css" in d["files"]["src/main.jsx"]
+    assert "font-family:Poppins" in d["files"]["src/style.css"]
+
+
+def test_flutter_respects_motion_selection_and_rejects_react_packages():
+    d=studio.create_design("Salud", "Bienestar",platform="flutter",motion="none")
+    assert 'const skyMotion = "none";' in d["files"]["lib/sky_config.dart"]
+    assert "skyMotion == 'none'" in d["files"]["lib/main.dart"]
+    assert d["selected_libraries"]["icon_pack"] == "Material Icons"
+    for opts in ({"icon_pack":"tabler"},{"font_family":"poppins"}):
+        with pytest.raises(studio.DesignInvalid):
+            studio.create_design("SKY","Educación",platform="flutter",**opts)
+
+
+@pytest.mark.parametrize("opts", [
+    {"icon_pack":"untrusted-js"},
+    {"font_family":"https://invalid/"},
+    {"motion":"while(true){}"},
+])
+def test_unapproved_library_and_motion_options_are_rejected(opts):
+    with pytest.raises(studio.DesignInvalid):
+        studio.create_design("Test","Sitio Web",**opts)
+
+
+def test_authenticated_api_remembers_library_selection_in_download(monkeypatch):
+    monkeypatch.setenv("SKY_API_KEY","sky-design-options-auth-test-private-key-2026")
+    from metaverse.api import app,api_token
+    with TestClient(app) as client:
+        headers={"X-SKY-KEY":api_token()}
+        request={"title":"Portal SKY","brief":"Educación","platform":"react",
+                 "icon_pack":"tabler","font_family":"manrope","motion":"none"}
+        data=client.post("/api/developer/design/create",headers=headers,json=request)
+        assert data.status_code==200,data.text
+        assert data.json()["selected_libraries"]["icon_pack"]=="tabler"
+        archive=client.post("/api/developer/design/download",headers=headers,json=request)
+        assert archive.status_code==200
+        with zipfile.ZipFile(io.BytesIO(archive.content)) as bundle:
+            pkg=json.loads(bundle.read("sky-design-react/package.json"))
+            assert "@tabler/icons-react" in pkg["dependencies"]
+            assert "@fontsource/manrope" in pkg["dependencies"]
+            manifest=json.loads(bundle.read("sky-design-react/SKY_MANIFEST.json"))
+            assert manifest["selected_libraries"]["motion"]=="none"
