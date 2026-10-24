@@ -64,6 +64,9 @@ class _SkyHomeState extends State<SkyHome> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
+    final dashboard = skyLayout == 'dashboard';
+    final immersive = skyLayout == 'immersive';
+    final minimal = skyStyle == 'monochrome';
     final wide = width >= 760;
     final primary = const Color(skyColorPrimary);
     final reduced = MediaQuery.disableAnimationsOf(context);
@@ -107,12 +110,12 @@ class _SkyHomeState extends State<SkyHome> {
                 padding: EdgeInsets.symmetric(
                   horizontal: wide ? 35 : 20, vertical: 26),
                 children: [
-                  animate(Text('SKY  /  EXPERIENCIA INMERSIVA',
+                  animate(Text(minimal ? 'SKY  /  EXPERIENCIA MINIMAL' : 'SKY  /  EXPERIENCIA INMERSIVA',
                     style: TextStyle(
                       fontSize: 11, letterSpacing: 2.1, color: primary)), 0),
                   const SizedBox(height: 18),
                   animate(Text(skySubtitle, style: TextStyle(
-                    fontSize: wide ? 60 : 38, height: 1.1,
+                    fontSize: wide ? (dashboard ? 44 : immersive ? 68 : 60) : (dashboard ? 32 : immersive ? 43 : 38), height: 1.1,
                     fontWeight: FontWeight.bold, letterSpacing: -1.7)), 80),
                   const SizedBox(height: 15),
                   animate(const Text(skyDescription,
@@ -139,9 +142,9 @@ class _SkyHomeState extends State<SkyHome> {
                   ]), 150),
                   const SizedBox(height: 30),
                   animate(Container(
-                    height: 208,
+                    height: dashboard ? 154 : immersive ? 286 : 208,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(26),
+                      borderRadius: BorderRadius.circular(minimal ? 10 : 26),
                       border: Border.all(color: primary.withValues(alpha: .35)),
                       gradient: const LinearGradient(colors: [
                         Color(0x663BABB0), Color(0x558A75DF)
