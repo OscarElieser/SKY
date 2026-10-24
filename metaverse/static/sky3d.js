@@ -182,7 +182,32 @@ let u={proj:gl.getUniformLocation(pr,'uProj'),view:gl.getUniformLocation(pr,'uVi
 function color(c){return [1,3,5].map(i=>parseInt(c.slice(i,i+2),16)/255)}
 function drawShape(kind,position,scale,shade,rot=0){let m=buffers[kind]||buffers.box;gl.bindBuffer(gl.ARRAY_BUFFER,m.buffer);gl.enableVertexAttribArray(pa);gl.enableVertexAttribArray(na);gl.vertexAttribPointer(pa,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(na,3,gl.FLOAT,false,24,12);gl.uniformMatrix4fv(u.model,false,matrix(...position,...scale,rot));gl.uniform3fv(u.color,color(shade));gl.drawArrays(gl.TRIANGLES,0,m.count)}
 function drawObject(o){const [x,y,z]=o.position,[sx,sy,sz]=o.scale;const a=o.rotation?.[1]||0;let c=o.color,k=o.kind;if(k==='tree'||k==='palm'){drawShape('cylinder',[x,y+sy*.34,z],[sx*.23,sy*.68,sz*.23],'#795139',a);drawShape(k==='palm'?'sphere':'cone',[x,y+sy*.76,z],[sx,sy*.6,sz],c,a)}else if(k==='house'){drawShape('box',[x,y+sy*.35,z],[sx,sy*.7,sz],c,a);drawShape('cone',[x,y+sy*.93,z],[sx*1.3,sy*.53,sz*1.3],'#AE6659',a)}else drawShape(k==='rock'?'sphere':k==='platform'||k==='tower'?'box':k,[x,y+(k==='torus'?0:sy*.5),z],[sx,sy,sz],c,a)}
-function drawFrame(proj,view,viewport){gl.viewport(...viewport);gl.uniformMatrix4fv(u.proj,false,proj);gl.uniformMatrix4fv(u.view,false,view);let sky=world?.scene?.sky||'#0D233B';let c=color(sky);gl.uniform3fv(u.sky,c);gl.clearColor(...c,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);for(let obj of world?.scene?.objects||[])drawObject(obj);for(let p of peers.values()){if(p.id===selfId||!p.position)continue;let [x,y,z]=p.position;drawShape('cylinder',[x,y+.8,z],[.45,1.3,.45],'#64CEDF');drawShape('sphere',[x,y+1.7,z],[.48,.48,.48],'#F5C99E')}}
+function drawAvatar(position,shade,moving=false){
+  // Procedural body parts are real WebGL meshes, not rigged glTF characters.
+  const [x,y,z]=position;
+  if(![x,y,z].every(Number.isFinite))return;
+  const tint=/^#[0-9A-Fa-f]{6}$/.test(shade)?shade:'#2EC4B6';
+  const stride=moving?Math.sin(performance.now()/105)*.13:0;
+  drawShape('cylinder',[x,y+.94,z],[.48,.83,.34],tint);
+  drawShape('sphere',[x,y+1.57,z],[.43,.43,.43],'#F5C99E');
+  drawShape('cylinder',[x-.34,y+.91,z],[.16,.72,.16],tint);
+  drawShape('cylinder',[x+.34,y+.91,z],[.16,.72,.16],tint);
+  drawShape('cylinder',[x-.15,y+.30,z+stride],[.17,.60,.22],'#213A55');
+  drawShape('cylinder',[x+.15,y+.30,z-stride],[.17,.60,.22],'#213A55');
+}
+function drawFrame(proj,view,viewport){
+  gl.viewport(...viewport);
+  gl.uniformMatrix4fv(u.proj,false,proj);gl.uniformMatrix4fv(u.view,false,view);
+  let sky=world?.scene?.sky||'#0D233B', c=color(sky);
+  gl.uniform3fv(u.sky,c);gl.clearColor(...c,1);
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  for(const object of world?.scene?.objects||[])drawObject(object);
+  for(const peer of peers.values()){
+    if(peer.id===selfId||!peer.position)continue;
+    drawAvatar(peer.position,peer.color);
+  }
+  drawAvatar([avatar.x,avatar.y,avatar.z],avatarColor,performance.now()-lastWalkAt<250);
+}
 function render(){if(!webxr){let dpr=Math.min(devicePixelRatio||1,2);let w=Math.max(1,Math.floor(canvas.clientWidth*dpr)),h=Math.max(1,Math.floor(canvas.clientHeight*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}let target=[avatar.x,2,avatar.z-2];let eye=[target[0]+Math.cos(pitch)*Math.sin(yaw)*distance,target[1]+Math.sin(pitch)*distance,target[2]+Math.cos(pitch)*Math.cos(yaw)*distance];drawFrame(perspective(.9,w/h,.1,300),lookAt(eye,target),[0,0,w,h]);}requestAnimationFrame(render)}
 view3d={canvas,gl,drawFrame};requestAnimationFrame(render);
 canvas.addEventListener('pointerdown',e=>{dragging=true;downX=e.clientX;downY=e.clientY;canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!dragging)return;yaw-=(e.clientX-downX)*.008;pitch=Math.min(1.45,Math.max(.05,pitch+(e.clientY-downY)*.008));downX=e.clientX;downY=e.clientY});canvas.addEventListener('pointerup',()=>dragging=false);canvas.addEventListener('pointercancel',()=>dragging=false);canvas.addEventListener('wheel',e=>{distance=Math.max(4,Math.min(80,distance*(e.deltaY>0?1.12:.89)));e.preventDefault()},{passive:false});
@@ -214,7 +239,14 @@ function startFallbackRenderer(canvas){
     const target=[avatar.x,2,avatar.z-2],eye=[target[0]+Math.cos(pitch)*Math.sin(yaw)*distance,target[1]+Math.sin(pitch)*distance,target[2]+Math.cos(pitch)*Math.cos(yaw)*distance];
     const fw=norm(sub(target,eye)),right=norm(cross(fw,[0,1,0])),up=cross(right,fw);const focal=Math.min(w,h)*1.12;
     const paint=[];
-    for(let ob of world?.scene?.objects||[])for(let obj of shapeList(ob)){
+    const avatars2d=[{
+      kind:'box',position:[avatar.x,avatar.y,avatar.z],scale:[.55,1.7,.4],color:avatarColor
+    }];
+    for(const peer of peers.values()){
+      if(peer.id===selfId||!Array.isArray(peer.position))continue;
+      avatars2d.push({kind:'box',position:peer.position,scale:[.55,1.7,.4],color:peer.color||'#2EC4B6'});
+    }
+    for(let ob of [...(world?.scene?.objects||[]),...avatars2d])for(let obj of shapeList(ob)){
       let [x,y,z]=obj.pos,[a,b,c]=obj.size,cs=obj.color;
       const corners=[];for(let j of [-.5,.5])for(let k of [-.5,.5])for(let l of [-.5,.5])corners.push([x+j*a,y+k*b,z+l*c]);
       const pts=corners.map(v=>project(v,eye,fw,right,up,focal,w,h));
