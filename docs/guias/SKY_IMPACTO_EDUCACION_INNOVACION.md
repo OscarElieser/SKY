@@ -75,3 +75,76 @@ Existe el flujo independiente `.github/workflows/sky-impacto-tests.yml`, que com
 6. Ampliar conectores sólo con APIs públicas documentadas y/o credenciales expresamente autorizadas, sin acceso no autorizado a redes gubernamentales.
 
 **Nada de lo anterior debe presentarse como implementado antes de superar pruebas y demostrar ejecución real en el equipo destino.**
+
+
+## Extensión SKY Scholar + SKY Pro Skills (23 octubre 2026)
+
+### Investigación desde universidades, Google Académico y GitHub
+
+La implementación nueva amplía la API sin borrar o cambiar sus contratos anteriores.
+
+**Fuentes académicas programadas:**
+- OpenAlex \`https://api.openalex.org/works\` (buscar trabajos, afiliaciones y metadatos bibliográficos); variable opcional \`OPENALEX_API_KEY\` configurada en el equipo, jamás en GitHub.
+- Crossref \`https://api.crossref.org/works\` (búsqueda y comprobación de DOI por registro). El registro DOI no verifica el texto íntegro.
+- Google Académico genera un enlace \`https://scholar.google.com/scholar?q=...\` para búsqueda manual, **no scraping ni supuesta API oficial**.
+- Catálogo de repositorios universitarios de Nicaragua: UNAN-Managua y biblioteca, biblioteca UNI y repositorio UCN. Referencias globales: MIT OpenCourseWare, Harvard, Stanford, Oxford y Cambridge; son enlaces públicos, no cuentas conectadas.
+- Lectura controlada de archivos textuales en GitHub **solo de repositorios registrados** en \`knowledge/repositories/sources.json\`; no se aceptan repositorios arbitrarios por URL, ramas libres ni archivos ejecutables.
+- PDF/DOCX/TXT/MD/RST enviados por el usuario se leen reutilizando \`neural_core/documentos.py\`, hasta 5 MB, con salida limitada. Una imagen escaneada sin texto debe advertir que se requiere OCR: no aparenta haber leído lo que no pudo interpretar.
+- Composición de borradores documentados por \`/api/impacto/research/write\`: obtiene hasta cinco referencias bibliográficas y solicita al **proveedor de IA que ya utiliza SKY** un borrador con advertencias de evidencia. Puede consumir tokens/costos del proveedor según la configuración. No genera resultados experimentales ni citas textuales a partir de solo metadatos.
+
+### Nuevas rutas autenticadas (misma \`X-SKY-KEY\` y 2FA)
+
+| Método | Ruta | Nota |
+|---|---|---|
+| GET | \`/api/impacto/university/repositories?country=Nicaragua\` | Catálogo, no conexión privada |
+| GET | \`/api/impacto/scholar/google-link?query=...\` | Enlace para abrir Scholar manualmente |
+| POST | \`/api/impacto/scholar/search\` | OpenAlex o Crossref; datos reales o error explícito |
+| POST | \`/api/impacto/scholar/doi\` | Metadatos registrados de DOI |
+| POST | \`/api/impacto/repository/read\` | Repositorio de GitHub autorizado |
+| POST | \`/api/impacto/document/read\` | Archivo subido bajo petición |
+| GET | \`/api/impacto/skills\` | Perfiles profesionales integrados |
+| POST | \`/api/impacto/skills/plan\` | Selecciona guías por contexto |
+| POST | \`/api/impacto/research/write\` | Búsqueda de metadatos + borrador con IA existente |
+
+Solicitudes de ejemplo (mismo servidor local, con el token ya configurado):
+
+\`\`\`bash
+curl -sS http://127.0.0.1:8765/api/impacto/scholar/search \
+  -H "X-SKY-KEY: $SKY_API_KEY" -H "Content-Type: application/json" \
+  -d '{"query":"innovación educativa Nicaragua","provider":"openalex","limit":5}'
+
+curl -sS http://127.0.0.1:8765/api/impacto/repository/read \
+  -H "X-SKY-KEY: $SKY_API_KEY" -H "Content-Type: application/json" \
+  -d '{"repository":"python/cpython","path":"README.md"}'
+
+curl -sS http://127.0.0.1:8765/api/impacto/skills/plan \
+  -H "X-SKY-KEY: $SKY_API_KEY" -H "Content-Type: application/json" \
+  -d '{"task":"mejorar un informe de marketing y diseñar infografía","selected":["humanize","impeccable","marketing"]}'
+\`\`\`
+
+### Perfiles profesionales propios de SKY
+
+\`neural_core/sky_pro_skills.py\` ofrece guías para:
+**Humanize** (redacción natural sin cambiar hechos), **Impeccable** (jerarquía, contraste, diseño y accesibilidad), investigación, docencia, ingeniería, programación, contabilidad, administración, marketing, recursos humanos, ciencia, innovación, analítica, arquitectura y producción creativa.
+
+Las directrices son activadas por términos del usuario en la API de texto y los flujos de voz ya existentes. Son **perfiles creados para SKY**, no copias ni ejecuciones de los proyectos originales Humanizer o Impeccable.
+
+Para Antigravity se añadieron habilidades locales en formato \`SKILL.md\` bajo \`.agents/skills/\`:
+
+- \`sky-humanize\`
+- \`sky-impeccable\`
+- \`sky-academic-research\`
+- \`sky-professional-global\`
+
+Pueden descubrirse al abrir el proyecto con un agente que soporte skills de proyecto. No instalan ejecutables de terceros.
+
+**Opcional, sólo tras revisión de licencias/dependencias:** el usuario podrá instalar el proyecto externo Impeccable con el procedimiento documentado en https://impeccable.style/; el proyecto externo Humanizer en https://github.com/blader/humanizer . No se instalan ni ejecutan automáticamente.
+
+### Alcance de pruebas
+
+\`\`\`bash
+python -m pip install pytest fastapi httpx python-multipart
+PYTHONPATH=. pytest -q tests/test_sky_impacto.py tests/test_sky_scholarly_skills.py
+\`\`\`
+
+Las respuestas académicas continúan exigiendo verificación humana de los trabajos citados antes de presentarse como tesis, informe pericial, estudio científico o respuesta profesional certificada.
