@@ -232,6 +232,10 @@ def sky_home():
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
+@app.get('/aula')
+def sky_aula_page():
+    return FileResponse(STATIC/'sky-academy.html',headers={'Cache-Control':'no-store'})
+
 @app.get('/flows')
 def workflows_page():return FileResponse(STATIC/'flows.html')
 
