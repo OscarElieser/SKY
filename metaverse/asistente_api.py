@@ -223,6 +223,14 @@ def mensaje(body: Mensaje, request: Request):
     academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
     if academy is not None:
         return _medir_turno(academy, inicio)
+    from neural_core import sky_execution_cycle as ciclo
+    if ciclo.is_sequence(body.texto):
+        try:
+            plan = ciclo.create(ciclo.from_text(body.texto), dispositivo=body.dispositivo, origin=body.modo)
+            return _medir_turno({'tipo': 'ciclo', 'mensaje': 'Preparé el ciclo; confirmá cada paso.',
+                                 'ciclo': plan, 'proveedor': 'sky-cycle'}, inicio)
+        except (ciclo.CycleInvalid, ciclo.CycleConflict) as exc:
+            return _medir_turno({'tipo': 'error', 'mensaje': 'No puedo planificar esa secuencia: ' + str(exc)[:180]}, inicio)
     resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
     return _medir_turno(_completar(resultado, body.dispositivo, request), inicio)
 
@@ -245,6 +253,15 @@ def mensaje_stream(body: Mensaje, request: Request):
         academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
         if academy is not None:
             yield final(academy)
+            return
+        from neural_core import sky_execution_cycle as ciclo
+        if ciclo.is_sequence(body.texto):
+            try:
+                plan = ciclo.create(ciclo.from_text(body.texto), dispositivo=body.dispositivo, origin=body.modo)
+                yield final({'tipo': 'ciclo', 'mensaje': 'Preparé el ciclo; confirmá cada paso.',
+                             'ciclo': plan, 'proveedor': 'sky-cycle'})
+            except (ciclo.CycleInvalid, ciclo.CycleConflict) as exc:
+                yield final({'tipo': 'error', 'mensaje': 'No puedo planificar esa secuencia: ' + str(exc)[:180]})
             return
         original = body.texto.strip()
         texto = asis.preparar(original) if original else original
