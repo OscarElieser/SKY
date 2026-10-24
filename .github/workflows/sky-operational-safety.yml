@@ -6,6 +6,7 @@ on:
       - 'neural_core/windows_controller.py'
       - 'neural_core/sky_phone.py'
       - 'tests/test_sky_operational_safety.py'
+      - 'scripts/sky_integral_operational_check.py'
       - '.github/workflows/sky-operational-safety.yml'
   push:
     branches: [main]
@@ -32,6 +33,6 @@ jobs:
       - name: Dependencias para pruebas
         run: python -m pip install 'pytest>=8,<10' 'sympy>=1.13,<2'
       - name: Validar sintaxis
-        run: python -m py_compile neural_core/factcheck_engine.py neural_core/windows_controller.py neural_core/sky_phone.py tests/test_sky_operational_safety.py
+        run: python -m py_compile neural_core/factcheck_engine.py neural_core/windows_controller.py neural_core/sky_phone.py tests/test_sky_operational_safety.py scripts/sky_integral_operational_check.py
       - name: Verificar que SKY no inventa hechos ni acciones terminadas
         run: PYTHONPATH=. python -m pytest -q tests/test_sky_operational_safety.py
