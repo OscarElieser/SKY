@@ -622,6 +622,36 @@
         setState('idle', 'Pendiente de verificación');
       } else if (plan.state === 'VERIFIED') {
         card.appendChild(el('div', 'res', 'Todos los pasos tienen resultado VERIFIED.'));
+        const canRemember = plan.steps.every(x => ['status', 'launch_app'].includes(x.action));
+        if (canRemember) {
+          const field = el('input', 'hab-in');
+          field.type = 'text'; field.maxLength = 60;
+          field.placeholder = 'Nombre del procedimiento verificado';
+          field.setAttribute('aria-label', 'Nombre para recordar el procedimiento');
+          const save = el('button', 'btn', 'Recordar procedimiento');
+          save.type = 'button';
+          save.addEventListener('click', async () => {
+            if (field.value.trim().length < 3) {
+              card.appendChild(el('div', 'res bad', 'Escribí un nombre de al menos 3 caracteres.'));
+              return;
+            }
+            save.disabled = true;
+            try {
+              const res = await api('/api/sky/learning/capture', {
+                method: 'POST', body: JSON.stringify({
+                  cycle_id: plan.id, name: field.value.trim(), approved: true
+                })
+              });
+              card.appendChild(el('div', 'res', 'Procedimiento guardado: ' + res.name +
+                '. Podés decir «SKY, repetí procedimiento ' + res.id + '».'));
+              save.remove(); field.remove();
+            } catch (err) {
+              save.disabled = false;
+              card.appendChild(el('div', 'res bad', 'No se guardó: ' + err.message));
+            }
+          });
+          card.append(field, save);
+        }
         setState('idle', 'Ciclo verificado');
       } else {
         setState('error', 'Ciclo ' + plan.state);
@@ -1180,6 +1210,59 @@
     // Integraciones
     const si = seccion(c, 'Integraciones (tener una cuenta no es tener su API)');
     si.appendChild(tabla(['Plataforma', 'Vía', 'Estado', 'Para qué', 'Nota'], d.integraciones.map(i => [i.nombre, i.via, i.estado, i.uso, i.nota])));
+    // Extension Hub: catálogo informativo, jamás instala o ejecuta software externo.
+    const extSection = seccion(c, 'SKY Extension Hub');
+    extSection.appendChild(el('div', 's', 'Herramientas externas opcionales. SKY CORE conserva su identidad y permisos.'));
+    try {
+      const ext = await api('/api/sky/extensions');
+      extSection.appendChild(tabla(['Herramienta', 'Área', 'Tipo', 'Estado'],
+        ext.extensions.map(x => [x.name, x.domain, x.mode, x.state])));
+    } catch (e) {
+      extSection.appendChild(el('div', 's', 'Catálogo no disponible: ' + e.message));
+    }
+    // Verified Experience: only named, confirmed replay plans; no automatic tasks.
+    const learnedSection = seccion(c, 'Procedimientos comprobados');
+    learnedSection.appendChild(el('div', 's', 'Solo se guardan acciones confirmadas; al repetirlas SKY solicitará cada autorización.'));
+    try {
+      const memo = await api('/api/sky/learning/procedures');
+      if (!memo.procedures.length) learnedSection.appendChild(el('div', 's', 'Todavía no hay procedimientos aprendidos.'));
+      memo.procedures.forEach(p => {
+        const row = el('div', 'kpi-atajo');
+        row.appendChild(el('span', '', p.name + ' · ' + p.steps + ' pasos · ' +
+          p.evidence_count + ' comprobación(es)'));
+        const run = el('button', 'btn', 'Preparar');
+        run.type = 'button';
+        run.addEventListener('click', async () => {
+          run.disabled = true;
+          try {
+            const answer = await api('/api/sky/learning/procedures/' +
+              encodeURIComponent(p.id) + '/plan', {
+              method: 'POST', body: JSON.stringify({ device: 'local', origin: 'chat' })
+            });
+            await cicloUI({ciclo: answer.ciclo}, 'chat');
+          } catch (err) {
+            row.appendChild(el('div', 'res bad', err.message));
+          }
+          run.disabled = false;
+        });
+        const forget = el('button', 'btn', 'Olvidar');
+        forget.type = 'button';
+        forget.addEventListener('click', async () => {
+          forget.disabled = true;
+          try {
+            await api('/api/sky/learning/procedures/' + encodeURIComponent(p.id), {
+              method: 'DELETE', body: JSON.stringify({ approved: true })
+            });
+            HAB.cargar();
+          } catch (err) {
+            row.appendChild(el('div', 'res bad', err.message)); forget.disabled = false;
+          }
+        });
+        row.append(run, forget); learnedSection.appendChild(row);
+      });
+    } catch (e) {
+      learnedSection.appendChild(el('div', 's', 'Memoria comprobada no disponible: ' + e.message));
+    }
   };
 
   /* ------------------------------------------------------------------ SKY SENTINEL — Security Center */
