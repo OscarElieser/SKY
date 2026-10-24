@@ -90,7 +90,7 @@ def catalogue() -> dict:
     configured = {}
     try:
         cfg = _load_config()
-        configured = cfg.get("servers", {})
+        configured = {k: v for k, v in cfg.get("servers", {}).items() if isinstance(v, dict)}
     except (OSError, ValueError, MCPDenied):
         pass
     return {
@@ -160,8 +160,27 @@ def _server_spec(server_id: str) -> dict:
         raise MCPDenied("Definí explícitamente los nombres de herramientas autorizadas.")
     if not isinstance(keys, list) or any(k not in _CREDENTIALS.get(server_id, set()) for k in keys):
         raise MCPDenied("Se solicitó una variable de entorno no autorizada.")
-    if server_id == "github" and "GITHUB_READ_ONLY" in keys:
-        raise MCPDenied("Configurar GitHub en modo solo lectura desde el servidor.")
+    if server_id == "github":
+        # Aplicar read-only también a nivel del servidor y evitar flags que cambien modo.
+        if ("stdio" not in args or not any(a == "--read-only" for a in args)
+                or any(a == "--read-write" for a in args)):
+            raise MCPDenied("GitHub MCP necesita stdio y --read-only.")
+    if server_id == "filesystem":
+        # Un único directorio de trabajo independiente. El MCP de filesystem
+        # acepta rutas adicionales en args: no permitir que amplíen el alcance.
+        chosen = os.getenv("SKY_MCP_FILES_ROOT", "").strip()
+        if (Path(command).name.lower() not in {"node", "node.exe"}
+                or len(args) != 2 or not chosen or not Path(chosen).is_absolute()):
+            raise MCPDenied("Filesystem exige Node y un único SKY_MCP_FILES_ROOT explícito.")
+        allowed_root = Path(chosen)
+        if (not allowed_root.is_dir() or allowed_root.is_symlink()
+                or allowed_root.resolve() in {Path.home().resolve(), Path(allowed_root.anchor).resolve()}
+                or any(part.lower() in {".ssh", ".neuralt", ".git", "appdata"} for part in allowed_root.parts)
+                or Path(args[-1]).resolve() != allowed_root.resolve()):
+            raise MCPDenied("Directorio del Filesystem MCP demasiado amplio o no autorizado.")
+        script = Path(args[0])
+        if not script.is_absolute() or not script.is_file() or script.suffix.lower() not in {".js", ".mjs"}:
+            raise MCPDenied("Instalá antes el servidor filesystem y declaralo como script local de Node.")
     allowed_env = {k: os.environ[k] for k in _CORE_ENV if k in os.environ}
     allowed_env.update({k: os.environ[k] for k in keys if os.getenv(k)})
     # Forzar la protección propia del backend aunque el usuario olvidó declararla.
