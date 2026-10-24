@@ -103,9 +103,13 @@ def build_campus(prompt: str, seed: int = 42) -> tuple[dict, dict]:
             interact("door", "Permite entrar o cerrar este espacio", True))
         add(f"Luz · {name}", "sphere", x, 2.03, z,
             .54, .54, .54, "#FFF2B1", interact("light", "Encender o apagar la iluminación de referencia", True))
+        note = ("SKY Aula: componentes de la computadora, CPU, memoria, "
+                "almacenamiento y seguridad." if use == "computers" else
+                "SKY Aula: objetivos, actividades y conclusiones de la sesión.")
+        board = interact("whiteboard", "Editar apuntes de la clase y guardar su contenido")
+        board["content"] = note
         add(f"Pizarra · {name}", "box", x, .85, z-depth/2+.29,
-            2.25, 1.3, .12, "#334155",
-            interact("whiteboard", "Activar la pizarra y explicar el propósito del espacio"))
+            2.25, 1.3, .12, "#334155", board)
         if use in ("computers", "classroom", "reception"):
             # Furniture is solid. Monitors have true toggled state and color.
             for i in (-1, 1):
