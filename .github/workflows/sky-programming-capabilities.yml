@@ -1,0 +1,38 @@
+name: SKY Programación multilenguaje — diagnóstico real
+
+on:
+  pull_request:
+    paths:
+      - 'neural_core/sky_programming_capabilities.py'
+      - 'neural_core/developer_core.py'
+      - 'metaverse/api.py'
+      - 'tests/test_sky_programming_capabilities.py'
+      - '.github/workflows/sky-programming-capabilities.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'neural_core/sky_programming_capabilities.py'
+      - 'neural_core/developer_core.py'
+      - 'metaverse/api.py'
+      - 'tests/test_sky_programming_capabilities.py'
+      - '.github/workflows/sky-programming-capabilities.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  programming-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar dependencias de pruebas SKY
+        run: python -m pip install -r requirements_social.txt -r requirements_studio.txt pytest
+      - name: Revisar sintaxis del nuevo motor y API existente
+        run: python -m py_compile neural_core/sky_programming_capabilities.py neural_core/developer_core.py metaverse/api.py tests/test_sky_programming_capabilities.py
+      - name: Probar lenguajes, análisis, privacidad y endpoints
+        run: PYTHONPATH=. python -m pytest -q tests/test_sky_programming_capabilities.py tests/test_developer_core.py tests/test_codebase_indexer.py

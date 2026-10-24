@@ -846,6 +846,26 @@ def developer_analyze(body: dict):
     text = body.get('prompt', '') or body.get('text', '')
     return {'ok': True, 'analysis': analyze_tech_stack(text)}
 
+@app.get('/api/developer/toolchains', dependencies=[Depends(require_key)])
+def developer_toolchains(language: str = ''):
+    """Detecta los compiladores presentes en PATH sin ejecutar código ni exponer rutas."""
+    from neural_core.sky_programming_capabilities import toolchain_status
+    try:
+        return toolchain_status(language or None)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.post('/api/developer/syntax-check', dependencies=[Depends(require_key)])
+def developer_syntax_check(body: dict):
+    """Valida sintaxis Python/JSON sin ejecutar código arbitrario."""
+    from neural_core.sky_programming_capabilities import validate_source
+    try:
+        return validate_source(body.get('language', ''), body.get('code', ''))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 # ==============================================================================
 # SKY UNIVERSAL KNOWLEDGE & EDUCATION ENGINE ENDPOINTS
 # ==============================================================================
