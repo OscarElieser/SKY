@@ -11,6 +11,8 @@ import html
 import json
 import os
 import re
+import shutil
+import sys
 import tomllib
 import urllib.error
 import urllib.parse
@@ -549,6 +551,53 @@ def scaffold_web(title: str = "Mi proyecto SKY", subtitle: str = "Sitio web crea
     }
 
 
+_SDK_EXECUTABLES: dict[str, tuple[str, ...]] = {
+    "Docker (contenedores)": ("docker",),
+    "Git": ("git",),
+    "Node.js": ("node",),
+    "npm": ("npm", "npm.cmd"),
+    "Python": ("python", "python3"),
+    "Flutter": ("flutter", "flutter.bat"),
+    "Dart": ("dart", "dart.exe"),
+    "Android SDK / adb": ("adb", "adb.exe"),
+    "Gradle": ("gradle", "gradle.bat"),
+    "Java JDK": ("javac", "javac.exe"),
+    "Kotlin": ("kotlinc", "kotlinc.bat"),
+    "Xcode (solo macOS)": ("xcodebuild",),
+    "Swift": ("swiftc",),
+    "Unity Editor": ("unity-editor", "Unity"),
+    "Godot Engine": ("godot", "godot4", "Godot"),
+    "Unreal Build Tool": ("UnrealBuildTool",),
+    ".NET / C#": ("dotnet",),
+    "Rust": ("rustc",),
+    "Go": ("go",),
+    "VS Code CLI": ("code", "code.cmd"),
+    "Visual Studio IDE": ("devenv", "devenv.exe"),
+    "C/C++ toolchain": ("gcc", "clang", "cl"),
+}
+
+
+def sdk_readiness() -> dict[str, Any]:
+    """Read-only executable discovery; no invoking SDKs or tools."""
+    platforms = []
+    for name, binaries in _SDK_EXECUTABLES.items():
+        found = next((p for p in binaries if shutil.which(p)), None)
+        platforms.append({
+            "tool": name,
+            "found_on_path": bool(found),
+            "executable_name": found,
+            "state": "on_path_unverified" if found else "not_found_on_path",
+            "installed_verified": False,
+            "build_or_device_test_run": False,
+            "requires_macos": name == "Xcode (solo macOS)",
+        })
+    return {
+        "ok": True, "host_platform": sys.platform, "tools": platforms,
+        "read_only": True, "commands_executed": False,
+        "note": "Un IDE puede estar instalado sin agregar un comando al PATH. Xcode exige macOS.",
+    }
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -559,7 +608,7 @@ def _registry_endpoint(registry: str, name: str) -> str:
         raise WorkbenchInvalid("Registro o nombre de paquete no permitido.")
     safe = urllib.parse.quote(name, safe="")
     if registry == "npm":
-        return "https://registry.npmjs.org/" + safe
+        return "https://registry.npmjs.org/" + safe + "/latest"
     if registry == "pypi":
         return "https://pypi.org/pypi/" + safe + "/json"
     return "https://pub.dev/api/packages/" + safe
@@ -592,8 +641,7 @@ def lookup_package(registry: str, package: str) -> dict[str, Any]:
             latest = item.get("version") if isinstance(item, dict) else None
             description = item.get("summary") if isinstance(item, dict) else None
         elif registry == "npm":
-            tags = data.get("dist-tags", {})
-            latest = tags.get("latest") if isinstance(tags, dict) else None
+            latest = data.get("version")
             description = data.get("description")
         else:
             pubspec = (data.get("latest") or {}).get("pubspec") or {}
