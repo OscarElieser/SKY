@@ -32,6 +32,7 @@ jobs:
           node --check metaverse/static/sky-global-i18n.js
           node --check metaverse/static/creative.js
           node --check metaverse/static/hud.js
+          node --check metaverse/static/sky-flows.js
       - name: Test security, deployment and recovery controls
         run: >-
           PYTHONPATH=. pytest -q
