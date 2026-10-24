@@ -89,6 +89,8 @@ def test_static_docker_command_disables_network_and_sensitive_host_access():
     assert "--pull" in args and "never" in args
     assert "--pids-limit" in args
     assert "--memory" in args and "--cpus" in args
+    assert "/work:rw,exec,nosuid,nodev,size=128m,mode=1777" in args
+    assert "/tmp:rw,noexec,nosuid,nodev,size=32m,mode=1777" in args
     assert "-v" not in args and "--mount" not in args
     assert "python3 main.py" == args[-1].split("; ")[-1]
     assert "AWS_SECRET_ACCESS_KEY" not in " ".join(args)
