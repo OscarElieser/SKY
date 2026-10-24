@@ -606,6 +606,11 @@ app.include_router(sky_telemetria_router)
 from .asistente_api import router as sky_asistente_router
 app.include_router(sky_asistente_router)
 
+# SKY Impacto: módulos docentes, investigación y competencias en la API propia.
+# Conserva autenticación y segundo factor del núcleo existente.
+from .impacto_api import router as sky_impacto_router
+app.include_router(sky_impacto_router, dependencies=[Depends(require_key)])
+
 from .hud_api import router as sky_hud_router
 app.include_router(sky_hud_router)
 
