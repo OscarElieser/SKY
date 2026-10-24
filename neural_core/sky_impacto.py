@@ -33,6 +33,11 @@ SOURCES = {
     "europarl": ("Parlamento Europeo", "legislacion", "Europa", "https://www.europarl.europa.eu/"),
     "mit": ("MIT OpenCourseWare", "educacion", "Global", "https://ocw.mit.edu/"),
     "harvard": ("Harvard University", "investigacion", "Global", "https://www.harvard.edu/"),
+    "pndh": ("Plan Nacional de Lucha contra la Pobreza 2022-2026", "desarrollo", "Nicaragua", "https://www.pndh.gob.ni/descargas.aspx"),
+    "estrategia_educacion": ("Estrategia Nacional de Educación 2024-2026", "educacion", "Nicaragua", "https://www.mined.gob.ni/"),
+    "hackathon": ("Hackathon Nicaragua", "innovacion", "Nicaragua", "https://www.hackathonicaragua.com.ni/"),
+    "rally": ("Rally Nacional Nicaragua Innova", "innovacion", "Nicaragua", "https://apprally.nicaraguainnova.gob.ni/"),
+    "nicaraguadisena": ("Nicaragua Diseña", "cultura", "Nicaragua", "https://www.nicaraguadisena.com/"),
     "stanford": ("Stanford University", "investigacion", "Global", "https://www.stanford.edu/"),
 }
 DOMAINS = {parse.urlsplit(v[3]).hostname for v in SOURCES.values()}
@@ -45,7 +50,7 @@ DELIVERABLES = ("Árbol de problemas", "Objetivos SMART", "Hipótesis verificabl
                 "Modelo Canvas", "Matriz impacto-viabilidad", "MVP y pruebas",
                 "Presupuesto", "Pitch", "Defensa ante el jurado")
 CATEGORIES = {
-    "educacion": ("mined", "inatec", "unesco", "uis"),
+    "educacion": ("mined", "inatec", "unesco", "uis", "estrategia_educacion"),
     "turismo": ("intur", "unesco"),
     "ambiente": ("marena", "fao", "onu"),
     "economia": ("mific", "bcn", "worldbank", "cepal"),
@@ -53,10 +58,11 @@ CATEGORIES = {
     "salud": ("who", "onu"),
     "agricultura": ("fao", "marena"),
     "estadistica": ("inide", "un_data", "worldbank"),
-    "cultura": ("intur", "unesco"),
+    "cultura": ("intur", "unesco", "nicaraguadisena"),
     "legislacion": ("europarl", "onu"),
     "investigacion": ("mit", "harvard", "stanford", "unesco"),
-    "desarrollo": ("onu", "cepal", "worldbank"),
+    "desarrollo": ("onu", "cepal", "worldbank", "pndh"),
+    "innovacion": ("hackathon", "rally", "nicaraguadisena", "inatec"),
 }
 
 
