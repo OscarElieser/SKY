@@ -82,19 +82,30 @@ def _aws(body):
     cmd=_string(body,"operation",30)
     if cmd=="identity":
         args=["aws","sts","get-caller-identity","--output","json"]
-    elif cmd=="validate-template":
+    elif cmd in ("validate-template","deploy"):
         ident=_string(body,"template",90)
         if not re.fullmatch(r"[A-Za-z0-9_.-]+\.(?:json|ya?ml)",ident): raise Invalid("Plantilla inválida.")
         # Relative to the fixed repository directory, not arbitrary filesystem paths.
         folder=(_ROOT/"cloud_templates").resolve()
         target=(folder/ident).resolve()
         if not target.is_relative_to(folder) or not target.is_file(): raise Invalid("Plantilla local no encontrada.")
-        args=["aws","cloudformation","validate-template","--template-body","file://"+str(target),"--output","json"]
+        if cmd=="validate-template":
+            args=["aws","cloudformation","validate-template","--template-body","file://"+str(target),"--output","json"]
+        else:
+            _bool_yes(body)
+            if os.getenv("SKY_SKILL_ALLOW_AWS_DEPLOY")!="1":
+                raise Invalid("Despliegues desactivados por defecto.")
+            stack=_string(body,"stack",90)
+            allow={x.strip() for x in os.getenv("SKY_AWS_ALLOWED_STACKS","").split(",") if x.strip()}
+            if not re.fullmatch(r"[A-Za-z][A-Za-z0-9-]{0,89}",stack) or stack not in allow:
+                raise Invalid("Stack fuera de SKY_AWS_ALLOWED_STACKS.")
+            args=["aws","cloudformation","deploy","--template-file",str(target),"--stack-name",stack,
+                  "--no-fail-on-empty-changeset","--output","json"]
     else:
         raise Invalid("Solo se admiten identidad y validación segura de CloudFormation.")
     try:
-        out=subprocess.run(args,cwd=str(_ROOT),capture_output=True,text=True,timeout=20,check=True)
-        return {"ok":True,"data":json.loads(out.stdout[:20000]),"live_verified":True}
+        out=subprocess.run(args,cwd=str(_ROOT),capture_output=True,text=True,timeout=300 if cmd=="deploy" else 20,check=True)
+        return {"ok":True,"operation":cmd,"data":json.loads(out.stdout[:20000]) if out.stdout.strip().startswith("{") else {"message":out.stdout[:1200]},"live_verified":True}
     except (OSError,subprocess.SubprocessError,ValueError) as exc:
         raise Unavailable("AWS CLI no completó la operación.") from exc
 
