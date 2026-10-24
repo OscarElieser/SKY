@@ -207,6 +207,10 @@ def execute_next(ident: str, invoke, *, approved: bool, pin_check=None) -> dict:
             if not isinstance(response, dict):
                 response = {"ok": False, "status": "FAILED"}
             status = str(response.get("status", "")).upper()
+            # The agent's authenticated status query is itself the verified
+            # observation; unlike a launched application it has no async task.
+            if step["action"] == "status" and response.get("ok") is True and response.get("agent"):
+                status = "VERIFIED"
             if response.get("ok") is False or status in {"FAILED", "DENIED", "ERROR"}:
                 step["state"] = "FAILED"
                 plan["state"] = "FAILED"
