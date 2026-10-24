@@ -453,7 +453,7 @@
       // Ordinary recognition during playback is ignored to suppress self-echo.
       if (S.speaking || hablando) {
         if (orden !== null && /^(?:para|det[eé]nte|calla|c[aá]llate|deja de hablar|silencio)\b/i.test(orden)) {
-          callar(); kpiEvento('voz', 'interrupcion');
+          callar();
           setState('listening', 'Interrumpida por indicación del usuario.');
         }
         return;
