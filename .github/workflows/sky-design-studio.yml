@@ -105,6 +105,12 @@ jobs:
       - name: Actual Flutter widget interactions
         working-directory: templates/sky_design_flutter
         run: flutter test --reporter expanded
+      - name: Bootstrap missing Flutter web host scaffold without replacing app code
+        working-directory: templates/sky_design_flutter
+        run: |
+          cp lib/main.dart /tmp/sky_design_flutter_main_before.dart
+          flutter create --platforms=web --project-name sky_design_flutter .
+          cmp lib/main.dart /tmp/sky_design_flutter_main_before.dart
       - name: Compile Flutter app to production web assets
         working-directory: templates/sky_design_flutter
         run: |
