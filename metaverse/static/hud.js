@@ -943,6 +943,32 @@
     const call=el('button','btn','Iniciar llamada al móvil y conectar');call.type='button';
     const actionButtons=el('div','btns');actionButtons.append(send,call);
     actionSection.append(to,message,approvalRow,actionButtons);
+    // Mobile SIM handoff: OS dialer/SMS owns the final call or message.
+    const nativeActions=el('div','btns');
+    const nativeCall=el('button','btn','Abrir marcador del móvil');
+    nativeCall.type='button';
+    const nativeSMS=el('button','btn','Abrir SMS del móvil');
+    nativeSMS.type='button';
+    nativeActions.append(nativeCall,nativeSMS);actionSection.append(nativeActions);
+    actionSection.append(el('div','s',
+      'Estas opciones abren aplicaciones del teléfono; no envían ni llaman automáticamente. Podés utilizar tu SIM de Claro, Tigo u otra operadora.'));
+    async function nativeHandoff(scheme,button){
+      button.disabled=true;
+      try{
+        const check=await api('/api/sky/phone/native/validate?number='+encodeURIComponent(to.value));
+        if(!check.allowed)throw Error('Número no permitido por SKY.');
+        if(!confirm('¿Abrir la aplicación de '+(scheme==='tel'?'llamadas':'mensajes')+
+            ' del dispositivo para '+check.masked+'? Deberás confirmar allí.'))return;
+        const target=scheme+':'+check.destination;
+        const anchor=document.createElement('a');
+        anchor.href=target;anchor.rel='noopener';anchor.style.display='none';
+        root.append(anchor);anchor.click();anchor.remove();
+        status.textContent='Solicitud entregada al sistema del dispositivo; SKY no puede confirmar que se completó.';
+      }catch(e){status.textContent='No se pudo abrir la aplicación móvil: '+e.message;}
+      finally{button.disabled=false;}
+    }
+    nativeCall.addEventListener('click',()=>nativeHandoff('tel',nativeCall));
+    nativeSMS.addEventListener('click',()=>nativeHandoff('sms',nativeSMS));
     actionSection.append(el('div','s','La llamada primero suena en tu teléfono verificado; al contestar se conecta el destinatario. No usa el micrófono del navegador. Una llamada puede cobrar dos tramos.'));
     const blockSection=seccion(root,'3. Bloquear y desbloquear en SKY');
     blockSection.append(el('div','s','El bloqueo impide llamadas y SMS salientes por SKY hacia esos números; no bloquea llamadas de la SIM, Android, iOS ni de la compañía.'));
