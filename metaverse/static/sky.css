@@ -18,3 +18,12 @@
 @media (prefers-reduced-motion:reduce){
   .sky-mobile-move button{transition:none}
 }
+
+
+/* SKY classroom learning controls: integrated in the existing inspector. */
+.sky-whiteboard-editor{margin:10px 0 14px;padding:10px;border:1px solid #34516a;border-radius:10px;background:#112236}
+.sky-whiteboard-editor textarea{min-height:76px;max-height:170px}
+.sky-whiteboard-editor button,.sky-interact-button{width:100%;margin-top:7px}
+#avatar-render-status{border-left:3px solid #5ad3e6;padding:4px 7px}
+#build-report,#interaction-status{overflow-wrap:anywhere}
+@media (prefers-reduced-motion:reduce){.sky-whiteboard-editor *{scroll-behavior:auto;transition:none}}
