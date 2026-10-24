@@ -527,7 +527,7 @@
     }
     if (data.aviso) { card.appendChild(el('div', 'note', data.aviso)); setState('idle', 'Permiso desactivado');
       await speak('Esa función está desactivada en tu equipo. Te dejé cómo activarla.'); seguirConversacion(); return; }
-    confirmar(card, p.description, () => ejecutar(p, card));
+    confirmar(card, p.description, () => ejecutar({ ...p, approval_token: data.approval_token }, card));
     setState('idle', 'Esperando tu confirmación');
     if (modo === 'voz') { await speak('¿Lo hago? ' + p.description + '.'); if (S.conv || modo === 'voz') escuchar(); }
   }
@@ -546,7 +546,7 @@
   async function ejecutar(p, card) {
     setState('executing', p.description);
     try {
-      const res = await api('/api/asistente/ejecutar', { method: 'POST', body: JSON.stringify({ action: p.action, params: p.params, dispositivo: 'local' }) });
+      const res = await api('/api/asistente/ejecutar', { method: 'POST', body: JSON.stringify({ action: p.action, params: p.params, dispositivo: 'local', approval_token: p.approval_token || '' }) });
       renderResult(card, res); setState('idle', 'Listo.'); await speak(resultText(res));
     } catch (e) { renderResult(card, { ok: false, error: e.message }); setState('error', 'No se completó'); await speak('No se pudo: ' + e.message); }
     refrescarLog(); refrescarTareas(); refrescarNotas(); seguirConversacion();
@@ -557,7 +557,7 @@
     const correr = async () => {
       setState('executing', p.description);
       try {
-        const r = await api('/api/asistente/casa', { method: 'POST', body: JSON.stringify({ service: p.service, entity_ids: p.entity_ids, data: p.data || {} }) });
+        const r = await api('/api/asistente/casa', { method: 'POST', body: JSON.stringify({ service: p.service, entity_ids: p.entity_ids, data: p.data || {}, approval_token: data.approval_token || '' }) });
         renderResult(card, r); setState('idle', 'Listo.'); await speak('Listo.');
       } catch (e) { renderResult(card, { ok: false, error: e.message }); setState('error', 'Casa'); }
       refrescarCasa(); seguirConversacion();
@@ -574,7 +574,7 @@
     confirmar(card, data.mensaje, async () => {
       setState('executing', 'Enviando correo');
       try {
-        const r = await api('/api/asistente/correo', { method: 'POST', body: JSON.stringify(b) });
+        const r = await api('/api/asistente/correo', { method: 'POST', body: JSON.stringify({ ...b, approval_token: data.approval_token || '' }) });
         renderResult(card, r); setState('idle', 'Listo.'); await speak(r.message || 'Enviado.');
       } catch (e) { renderResult(card, { ok: false, error: e.message }); setState('error', 'Correo'); }
       seguirConversacion();
@@ -832,7 +832,7 @@
         const ok = el('button', 'btn primary', 'Ejecutar'), no = el('button', 'btn', 'Descartar'); ok.type = no.type = 'button';
         ok.addEventListener('click', async () => {
           const card = addCard('▸ ' + (item.description || item.action), 'desde la voz manos libres');
-          await ejecutar({ action: item.action, params: item.params || {}, description: item.description || item.action }, card);
+          await ejecutar({ action: item.action, params: item.params || {}, description: item.description || item.action, approval_token: item.approval_token }, card);
           await api('/api/asistente/voz/' + encodeURIComponent(item.id), { method: 'DELETE' }).catch(() => {}); refrescarVoz();
         });
         no.addEventListener('click', async () => { await api('/api/asistente/voz/' + encodeURIComponent(item.id), { method: 'DELETE' }).catch(() => {}); refrescarVoz(); });
@@ -852,7 +852,11 @@
       b.title = e.entity_id + ' · ' + e.state;
       b.addEventListener('click', async () => {
         const service = e.domain === 'scene' ? 'scene.turn_on' : e.domain + '.toggle';
-        try { await api('/api/asistente/casa', { method: 'POST', body: JSON.stringify({ service, entity_ids: [e.entity_id] }) }); }
+        try {
+          const op = { service, entity_ids: [e.entity_id], data: {} };
+          const prep = await api('/api/asistente/casa/preparar', { method: 'POST', body: JSON.stringify(op) });
+          await api('/api/asistente/casa', { method: 'POST', body: JSON.stringify({ ...op, approval_token: prep.approval_token }) });
+        }
         catch (err) { addMsg('sky', 'Casa: ' + err.message, 'err'); }
         refrescarCasa();
       });
