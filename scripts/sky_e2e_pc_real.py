@@ -17,7 +17,10 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
 
+# Allow direct execution as `python scripts/sky_e2e_pc_real.py` from the repo.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from neural_core.dispositivos import validate_endpoint
 
 PORT=int(os.getenv("SKY_DEVICE_PORT","8766"))
