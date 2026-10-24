@@ -33,6 +33,7 @@ def summarize_action_receipts(events: list[dict]) -> dict:
         'sent': counts['SENT'],
         'pending': counts['PENDING'],
         'running': counts['RUNNING'],
+        'dispatched': counts['DISPATCHED'],
         'needs_confirmation': counts['NEEDS_CONFIRMATION'],
         'received': counts['RECEIVED'],
         'completion_success_pct': round(100 * counts['VERIFIED'] / finished, 1) if finished else None,
