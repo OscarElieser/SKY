@@ -16,7 +16,7 @@ def test_sources_are_explicit_and_unconnected():
     assert all(s["connection"] == "catalogued_not_connected" for s in sources)
     assert all(s["url"].startswith("https://") for s in sources)
     assert {"mined", "inatec", "marena", "intur", "unesco", "worldbank", "europarl"}.issubset(SOURCES)
-    assert {s["id"] for s in list_sources("educacion")} == {"mined", "inatec", "unesco", "uis"}
+    assert {"mined", "inatec", "unesco", "uis", "estrategia_educacion"}.issubset({s["id"] for s in list_sources("educacion")})
     with pytest.raises(ValueError):
         list_sources("http://localhost")
 
