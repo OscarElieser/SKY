@@ -24,6 +24,12 @@ _CATALOG = {
               "Repositorio archivado marzo 2026; usar nuevo MCP alojado con OAuth"),
     "clickhouse": ("ClickHouse/mcp-clickhouse", "analítica", "stdio", "Usuario SQL de solo lectura"),
     "google_news": ("ChanMeng666/server-google-news", "noticias", "stdio", "SerpAPI; revisar procedencia y cuota"),
+    "context7": ("upstash/context7", "documentación actualizada", "stdio", "Node 20.18+ y API opcional"),
+    "supabase": ("supabase/mcp", "bases de datos Supabase", "remote_oauth_pending",
+                 "MCP oficial HTTP/OAuth; proyecto único y read_only=true"),
+    "postgres": ("crystaldba/postgres-mcp", "PostgreSQL", "stdio", "Modo restringido y usuario de solo lectura"),
+    "semgrep": ("semgrep/semgrep", "análisis estático de seguridad", "stdio",
+                "Usar CLI actual semgrep mcp; repositorio antiguo archivado"),
     "whatsapp": ("lharries/whatsapp-mcp", "mensajería personal", "blocked", "No autorizado: usar API oficial Meta ya integrada"),
     "python_sandbox": ("pydantic/mcp-run-python", "ejecución de código", "archived_blocked", "Archivado por riesgos de sandbox"),
 }
@@ -50,6 +56,10 @@ _SAFE_READ = {
     "tavily": {"tavily-search", "tavily-extract", "tavily-map"},
     "mem0": {"get_memory", "get_memories", "search_memories", "list_entities", "list_events"},
     "google_news": {"google_news_search"},
+    "context7": {"resolve-library-id", "query-docs"},
+    "postgres": {"list_schemas", "list_objects", "get_object_details",
+                 "explain_query", "get_top_queries", "analyze_db_health"},
+    "semgrep": {"supported_languages", "get_abstract_syntax_tree", "security_check"},
     "clickhouse": set(),  # SQL no es seguro por el nombre de la herramienta.
     "notion": set(),       # Actualizaciones de API: clasificación conservadora.
 }
@@ -62,10 +72,14 @@ _CREDENTIALS = {
     "clickhouse": {"CLICKHOUSE_HOST", "CLICKHOUSE_PORT", "CLICKHOUSE_USER",
                    "CLICKHOUSE_PASSWORD", "CLICKHOUSE_DATABASE",
                    "CLICKHOUSE_ALLOW_WRITE_ACCESS", "CLICKHOUSE_SECURE"},
+    "context7": {"CONTEXT7_API_KEY"},
+    "postgres": {"DATABASE_URI"},
+    "semgrep": {"SEMGREP_APP_TOKEN"},
     "filesystem": set(), "playwright": set(),
 }
 _EXECUTABLES = {"node", "node.exe", "github-mcp-server", "github-mcp-server.exe",
-                "docker", "docker.exe", "python", "python.exe", "uv", "uv.exe"}
+                "docker", "docker.exe", "python", "python.exe", "uv", "uv.exe",
+                "postgres-mcp", "postgres-mcp.exe", "semgrep", "semgrep.exe"}
 _CORE_ENV = ("PATH", "SystemRoot", "WINDIR", "HOME", "USERPROFILE", "TEMP", "TMP", "TMPDIR",
              "APPDATA", "LOCALAPPDATA", "SSL_CERT_FILE", "SSL_CERT_DIR")
 
@@ -128,7 +142,7 @@ def _load_config() -> dict:
         raise MCPDenied("Configuración MCP ilegible o inválida.") from exc
     if not isinstance(data, dict) or not isinstance(data.get("servers"), dict):
         raise MCPDenied("Formato de configuración MCP incorrecto.")
-    if len(data["servers"]) > 10 or any(k not in _CATALOG for k in data["servers"]):
+    if len(data["servers"]) > 14 or any(k not in _CATALOG for k in data["servers"]):
         raise MCPDenied("La configuración contiene servidores no autorizados.")
     return data
 
@@ -173,6 +187,11 @@ def _server_spec(server_id: str) -> dict:
         raise MCPDenied("Definí explícitamente los nombres de herramientas autorizadas.")
     if not isinstance(keys, list) or any(k not in _CREDENTIALS.get(server_id, set()) for k in keys):
         raise MCPDenied("Se solicitó una variable de entorno no autorizada.")
+    if server_id == "postgres":
+        if "--access-mode=restricted" not in args or any("unrestricted" in a for a in args):
+            raise MCPDenied("PostgreSQL MCP requiere --access-mode=restricted.")
+    if server_id == "semgrep" and "mcp" not in args:
+        raise MCPDenied("Usá el servidor oficial mediante semgrep mcp.")
     if server_id == "github":
         # Aplicar read-only también a nivel del servidor y evitar flags que cambien modo.
         if ("stdio" not in args or not any(a == "--read-only" for a in args)
