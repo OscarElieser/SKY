@@ -41,6 +41,11 @@ class ResearchRequest(BaseModel):
     library_search: bool=True
 
 
+class OfficialSourcesRequest(BaseModel):
+    topic: str=Field(min_length=5,max_length=240)
+    source_ids: list[str]=Field(min_length=1,max_length=4)
+
+
 class DocumentFormat(BaseModel):
     kind: str=Field(default="docx",pattern="^(docx|pdf|pptx|md)$")
 
@@ -200,6 +205,14 @@ def evidence_brief(body: ResearchRequest):
         )
     except ValueError as exc:
         raise HTTPException(422,str(exc)) from exc
+
+
+@router.post("/research/official-sources")
+def official_source_retrieval(body: OfficialSourcesRequest):
+    try:
+        return sky_evidence_lab.retrieve_official_sources(body.topic,body.source_ids)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)[:200]) from exc
 
 
 @router.get("/research/sources")
