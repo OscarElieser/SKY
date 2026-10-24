@@ -13,7 +13,8 @@ def test_29_named_skills_and_truthful_states(monkeypatch):
     assert all(not r["live_verified"] for r in rows["skills"])
     lookup = {r["id"]: r for r in rows["skills"]}
     assert lookup["notion-workspace"]["status"] == "needs_configuration"
-    assert lookup["google-workspace-connector"]["status"] == "not_implemented"
+    assert lookup["google-workspace-connector"]["status"] == "needs_configuration"
+    assert rows["adapter_count"] == 29
     assert lookup["pdf-pro"]["office_endpoint"] == "/api/office/generate"
 
 
