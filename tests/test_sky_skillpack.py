@@ -107,3 +107,25 @@ def test_api_contains_owner_protection():
     for name in ("skillpack_catalogue", "skillpack_execute"):
         assert name in funcs
         assert any("require_key" in ast.unparse(dec) for dec in funcs[name].decorator_list)
+
+
+def test_text_and_voice_reuse_explicit_safe_route(monkeypatch):
+    captured = {}
+    def run(skill, body):
+        captured.update(skill=skill, body=body)
+        return {"ok": True, "text": "Respuesta confirmada"}
+    monkeypatch.setattr(p, "execute", run)
+    assert p.interpretar("Abre Word") is None
+    response = p.interpretar("SKY, ejecuta skill humanizer: Corrige esta redacción.")
+    assert response["tipo"] == "respuesta"
+    assert response["mensaje"] == "Respuesta confirmada"
+    assert captured["skill"] == "humanizer"
+    assert captured["body"]["text"] == "Corrige esta redacción."
+    assert p.interpretar("SKY, ejecuta skill slack-communicator: envía hola")["tipo"] == "error"
+
+
+def test_existing_assistant_registers_skillpack_without_replacing_rules():
+    from pathlib import Path
+    source = Path("neural_core/sky_asistente_personal.py").read_text(encoding="utf-8")
+    assert "sky_skillpack.interpretar(texto)" in source
+    assert "sky_skills.interpretar(texto)" in source
