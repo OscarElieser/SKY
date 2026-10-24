@@ -134,6 +134,8 @@ $("start-lesson").onclick=()=>execute($("start-lesson"),async()=>{
   const result=await request("/api/sky/academy/education/sessions","POST",lessonBody());
   lessonId=result.lesson_id;
   $("export-lesson").disabled=false;
+  $("send-answer").disabled=false;
+  $("student-feedback").textContent="";
   renderStep(result.step);
   status(result.plan.material_supplied ?
     "Clase preparada. El material aportado requiere cotejo curricular.":
@@ -152,7 +154,23 @@ $("next-lesson").onclick=()=>execute($("next-lesson"),async()=>{
     return;
   }
   renderStep(res.step);
+  $("student-feedback").textContent="";
+  $("student-answer").value="";
   status("Etapa preparada. Presioná «Escuchar a SKY» para oír la explicación.");
+});
+$("send-answer").onclick=()=>execute($("send-answer"),async()=>{
+  if(!lessonId)throw new Error("Iniciá una clase primero.");
+  const answer=$("student-answer").value.trim();
+  if(answer.length<2)throw new Error("Escribí una respuesta.");
+  const feedback=await request(
+    "/api/sky/academy/education/sessions/"+encodeURIComponent(lessonId)+"/respond",
+    "POST",{answer:answer.slice(0,800)}
+  );
+  $("student-feedback").textContent=feedback.message+
+    " Tu respuesta no fue almacenada ni calificada.";
+  lessonText=feedback.voice_ready_text||lessonText;
+  $("student-answer").value="";
+  status("SKY te hizo una pregunta de reflexión. Escuchá la respuesta o avanzá cuando querás.");
 });
 $("speak-lesson").onclick=speakLesson;
 $("stop-lesson").onclick=()=>{stopVoice();status("Narración detenida por vos.");};
