@@ -52,6 +52,8 @@ def provider_ready(name: str) -> bool:
     cfg=PROVIDERS[name]
     if not cfg.env:
         return True  # Ollama puede estar apagado; se comprueba al consultar.
+    if name in ('openrouter','huggingface'):
+        return bool(os.getenv(cfg.env,'').strip() and os.getenv(cfg.model_env,'').strip())
     return bool(os.getenv(cfg.env,'').strip())
 
 def provider_summary() -> list[dict]:
