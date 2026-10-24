@@ -1,6 +1,15 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#060e1c"><title>SKY · Automatizaciones</title><link rel="stylesheet" href="/static/sky-home.css"><link rel="stylesheet" href="/static/sky-flows.css"><link rel="stylesheet" href="/static/sky-global-i18n.css"></head><body><header class="top"><a class="brand" href="/sky">✦ SKY <span class="brand-sub">IA</span></a><div class="right-top"><a href="/studio" class="back">Espacio de trabajo</a><a href="/sky" class="back">Inicio</a></div></header><main class="flow-page"><header class="page-heading"><div class="overline">SKY AUTONOMOUS WORKFLOW ENGINE · V9.4</div><h1>Tus proyectos siguen avanzando.</h1><p>Creá procesos de varias etapas, programalos y supervisá el resultado. SKY conecta proyectos y resultados de pasos anteriores, y solo ejecuta operaciones locales previamente aprobadas. Podés revisar, pausar y reanudar cada flujo.</p></header>
 <section id="gate" class="panel"><label>Clave privada del creador <input id="key" type="password" autocomplete="off" placeholder="Clave maestra local"></label><button class="primary" id="login">Entrar a mis automatizaciones</button><p id="gate-error" role="alert"></p></section>
 <div id="content" hidden>
+<section class="panel" id="supervisor-panel">
+ <div class="section-title"><h2>SKY Agent Supervisor</h2><span>Coordinación automática · aprobación controlada</span></div>
+ <p>Contale a SKY lo que necesitás. SKY divide las etapas, elige especialistas disponibles y registra un flujo de trabajo para tu autorización. Cuando falten fuentes o contenido real, te lo indicará.</p>
+ <label>Solicitud integral para SKY<textarea id="supervisor-request" rows="3" maxlength="3000" placeholder="Ej. Prepará un informe y diseñá una experiencia sobre este contenido"></textarea></label>
+ <label>Texto o datos originales (necesarios para documentos y memoria)<textarea id="supervisor-source" rows="3" maxlength="12000" placeholder="Pegá el material que SKY debe utilizar, sin inventar fuentes"></textarea></label>
+ <div class="form-grid"><label>Formato del documento<select id="supervisor-format"><option value="auto">Automático</option><option value="docx">Word</option><option value="pptx">PowerPoint</option><option value="pdf">PDF</option><option value="xlsx">Excel</option><option value="md">Markdown</option></select></label><div><button type="button" id="supervisor-analyze">Analizar y distribuir roles</button><button type="button" class="primary" id="supervisor-prepare">Preparar flujo para aprobación</button></div></div>
+ <p id="supervisor-message" role="status"></p>
+ <div id="supervisor-output" class="flow-events" aria-live="polite"></div>
+</section>
 <section class="panel" id="subagents-panel">
   <div class="section-title"><h2>SKY · Mis subagentes</h2><span>Perfiles especializados · ejecución supervisada</span></div>
   <p>Creá asistentes con una misión propia. Cada uno utiliza herramientas existentes de SKY y sus tareas requieren una aprobación individual antes de ejecutarse.</p>
