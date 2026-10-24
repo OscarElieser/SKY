@@ -186,3 +186,60 @@ def test_capabilities_do_not_overstate_smart_home_or_ble(client):
     assert not data["modes"]["infrared"]["direct_ir_emitter_implemented"]
     assert not data["modes"]["matter"]["commissioning_implemented_in_sky"]
     assert data["no_auto_commands"] and data["no_auto_pairing"]
+
+
+
+def test_ir_tv_command_is_approved_one_use_and_reports_sent_not_verified(client, monkeypatch):
+    from neural_core import sky_home_assistant as ha
+    from neural_core import sky_secure_connectivity as hub
+    device = client.post("/api/sky/device-hub/devices", headers=auth(),
+                         json=payload("home_assistant", "infrared",
+                                      name="TV principal", device_type="television")).json()
+    ident = device["id"]
+    monkeypatch.setattr(ha, "configurado", lambda: True)
+    actions = []
+    def fake_home(method, route, body=None, timeout=6):
+        actions.append((method, route, body))
+        if method == "GET":
+            return {"entity_id": "remote.sala", "state": "on"}
+        assert method == "POST"
+        return [{"entity_id": "remote.sala", "state": "on"}]
+    monkeypatch.setattr(ha, "_peticion", fake_home)
+
+    data = {"hub_id": ident, "command": "volume_up"}
+    assert client.post("/api/sky/device-hub/ir/prepare", json=data).status_code == 401
+    proposal = client.post("/api/sky/device-hub/ir/prepare", headers=auth(), json=data)
+    assert proposal.status_code == 200, proposal.text
+    info = proposal.json()
+    assert info["status"] == "NEEDS_CONFIRMATION"
+    assert info["target_name"] == "TV principal"
+    approval = info["approval_token"]
+    denied = client.post("/api/sky/device-hub/ir/execute", headers=auth(),
+                         json={**data, "command":"mute", "approval_token": approval})
+    assert denied.status_code == 403
+    assert actions == []
+    sent = client.post("/api/sky/device-hub/ir/execute", headers=auth(),
+                       json={**data, "approval_token": approval})
+    assert sent.status_code == 200, sent.text
+    assert sent.json()["status"] == "SENT"
+    assert sent.json()["verified"] is False
+    assert actions == [
+        ("GET", "/api/states/remote.sala", None),
+        ("POST", "/api/services/remote/send_command",
+         {"entity_id":"remote.sala", "device":"television", "command":"volume_up"})
+    ]
+    assert client.post("/api/sky/device-hub/ir/execute",headers=auth(),
+                       json={**data, "approval_token":approval}).status_code == 403
+    assert len(actions) == 2
+
+
+def test_ir_adapter_does_not_accept_unapproved_targets_or_arbitrary_codes(client):
+    non_tv = client.post("/api/sky/device-hub/devices",headers=auth(),
+                         json=payload("home_assistant","infrared",name="Puente IR")).json()
+    assert client.post("/api/sky/device-hub/ir/prepare",headers=auth(),
+                       json={"hub_id":non_tv["id"],"command":"power"}).status_code == 403
+    tv = client.post("/api/sky/device-hub/devices",headers=auth(),json=payload(
+        "home_assistant","infrared",name="TV privada",device_type="television"
+    )).json()
+    assert client.post("/api/sky/device-hub/ir/prepare",headers=auth(),
+                       json={"hub_id":tv["id"],"command":"factory_reset"}).status_code == 422
