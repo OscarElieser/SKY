@@ -155,10 +155,24 @@ async function connectPresence(id,generation){
       try{d=JSON.parse(e.data)}catch{return}
       if(d.type==='peers'){selfId=d.you;peers.clear();for(let peer of d.peers)peers.set(peer.id,peer)}
       else if(d.type==='join'||d.type==='move'||d.type==='customize'){
-        if(d.peer)peers.set(d.peer.id,d.peer)
+        if(d.peer){
+          const old=peers.get(d.peer.id);
+          const changed=d.type==='move' && old?.position &&
+            old.position.some((v,i)=>v!==d.peer.position?.[i]);
+          peers.set(d.peer.id,{...d.peer,_movedAt:changed?performance.now():old?._movedAt||0});
+        }
       }
       else if(d.type==='leave'){peers.delete(d.id)}
       else if(d.type==='say'){roomBubble((d.from===selfId?'Yo':'Participante')+': '+d.text)}
+      else if(d.type==='interact'&&world&&d.version>world.version){
+        const wid=world.id;
+        json('/api/worlds/'+encodeURIComponent(wid)).then(fresh=>{
+          if(world?.id===wid&&fresh.version>world.version){
+            world=fresh;renderObjects();
+          }
+        }).catch(err=>notify('Escena actualizada en otra ventana: '+err.message));
+        roomBubble(d.message||'Un objeto cambió de estado');
+      }
       const n=Math.max(0,peers.size-1);
       safeText($('peers'),(n?'Otros participantes: '+n:'Estás en tu sala privada')+' · Conexión en tiempo real');
     };
@@ -177,6 +191,39 @@ $('avatar-color').addEventListener('change',e=>{
   avatarColor=proposed.toUpperCase();
   if(socket?.readyState===WebSocket.OPEN)
     socket.send(JSON.stringify({type:'customize',color:avatarColor}));
+});
+function closestInteractiveObject(maxDistance=2.4){
+  let closest=null,near=maxDistance;
+  for(const object of world?.scene?.objects||[]){
+    if(!object.interaction)continue;
+    const dx=avatar.x-object.position[0],dz=avatar.z-object.position[2];
+    const distance=Math.hypot(dx,dz);
+    if(distance<=near){near=distance;closest=object}
+  }
+  return closest;
+}
+async function interactNearest(){
+  if(!world)return notify('Abrí un mundo primero');
+  const object=closestInteractiveObject();
+  if(!object)return notify('Acercate a una puerta, pizarra, luz o terminal');
+  const b=$('interact');
+  if(b.disabled)return;
+  b.disabled=true;
+  try{
+    const result=await jsonPost('/api/worlds/'+encodeURIComponent(world.id)+'/interact',
+       {object_id:object.id,version:world.version});
+    world=result.world;renderObjects();
+    const message=result.interaction.message;
+    safeText($('interaction-status'),message+' · '+result.interaction.description);
+    roomBubble(message);speak(message);
+  }catch(e){safeText($('interaction-status'),'No se guardó el cambio: '+e.message);notify(e.message)}
+  finally{b.disabled=false}
+}
+$('interact').addEventListener('click',interactNearest);
+window.addEventListener('keydown',e=>{
+  if(e.repeat||e.key.toLowerCase()!=='e'||e.altKey||e.ctrlKey||e.metaKey)return;
+  if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
+  e.preventDefault();interactNearest();
 });
 // -------- Motor de WebGL autocontenido --------
 const VERT=`attribute vec3 aP;attribute vec3 aN;uniform mat4 uProj,uView,uModel;varying vec3 vNormal;varying float vFog;void main(){vec4 view=uView*uModel*vec4(aP,1.0);gl_Position=uProj*view;vNormal=mat3(uModel)*aN;vFog=clamp((-view.z-4.0)/65.0,0.0,0.55);}`;
@@ -197,14 +244,46 @@ return new Float32Array(a)}
 function shader(gl,type,source){let sh=gl.createShader(type);gl.shaderSource(sh,source);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));return sh}
 function startGL(){if(view3d)return;let canvas=$('scene');let gl=canvas.getContext('webgl',{antialias:true,alpha:false,preserveDrawingBuffer:true,xrCompatible:true});if(!gl){notify('WebGL no está disponible: SKY activó el visor de reserva 3D proyectado.');startFallbackRenderer(canvas);return}let pr=gl.createProgram();gl.attachShader(pr,shader(gl,gl.VERTEX_SHADER,VERT));gl.attachShader(pr,shader(gl,gl.FRAGMENT_SHADER,FRAG));gl.linkProgram(pr);if(!gl.getProgramParameter(pr,gl.LINK_STATUS))throw Error('No se pudo iniciar WebGL');gl.useProgram(pr);gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);
 let u={proj:gl.getUniformLocation(pr,'uProj'),view:gl.getUniformLocation(pr,'uView'),model:gl.getUniformLocation(pr,'uModel'),color:gl.getUniformLocation(pr,'uColor'),sky:gl.getUniformLocation(pr,'uSky')};let pa=gl.getAttribLocation(pr,'aP'),na=gl.getAttribLocation(pr,'aN');let buffers={};for(let shape of ['box','sphere','cylinder','cone','torus']){let data=makeMesh(shape),buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);buffers[shape]={buffer,count:data.length/6}};
+let avatarAsset=null,avatarGpu=null;
+if(window.SKYAvatarGLB){
+  api('/api/metaverse/avatars/default.glb').then(r=>r.arrayBuffer()).then(bin=>{
+    const parsed=window.SKYAvatarGLB.parse(bin);
+    const gpu=parsed.meshes.map(mesh=>{
+      const vertices=gl.createBuffer(),indices=gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER,vertices);
+      gl.bufferData(gl.ARRAY_BUFFER,mesh.vertices,gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indices);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,mesh.indices,gl.STATIC_DRAW);
+      return {vertices,indices,count:mesh.indices.length};
+    });
+    avatarAsset=parsed;avatarGpu=gpu;
+    notify('Avatar GLB animado cargado ✓');
+  }).catch(err=>notify('Avatar geométrico activo: '+err.message));
+}
 function color(c){return [1,3,5].map(i=>parseInt(c.slice(i,i+2),16)/255)}
 function drawShape(kind,position,scale,shade,rot=0){let m=buffers[kind]||buffers.box;gl.bindBuffer(gl.ARRAY_BUFFER,m.buffer);gl.enableVertexAttribArray(pa);gl.enableVertexAttribArray(na);gl.vertexAttribPointer(pa,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(na,3,gl.FLOAT,false,24,12);gl.uniformMatrix4fv(u.model,false,matrix(...position,...scale,rot));gl.uniform3fv(u.color,color(shade));gl.drawArrays(gl.TRIANGLES,0,m.count)}
-function drawObject(o){const [x,y,z]=o.position,[sx,sy,sz]=o.scale;const a=o.rotation?.[1]||0;let c=o.color,k=o.kind;if(k==='tree'||k==='palm'){drawShape('cylinder',[x,y+sy*.34,z],[sx*.23,sy*.68,sz*.23],'#795139',a);drawShape(k==='palm'?'sphere':'cone',[x,y+sy*.76,z],[sx,sy*.6,sz],c,a)}else if(k==='house'){drawShape('box',[x,y+sy*.35,z],[sx,sy*.7,sz],c,a);drawShape('cone',[x,y+sy*.93,z],[sx*1.3,sy*.53,sz*1.3],'#AE6659',a)}else drawShape(k==='rock'?'sphere':k==='platform'||k==='tower'?'box':k,[x,y+(k==='torus'?0:sy*.5),z],[sx,sy,sz],c,a)}
+function drawObject(o){if(o.interaction?.type==='door'&&o.interaction.active)return;const [x,y,z]=o.position,[sx,sy,sz]=o.scale;const a=o.rotation?.[1]||0;let c=o.color,k=o.kind;if(k==='tree'||k==='palm'){drawShape('cylinder',[x,y+sy*.34,z],[sx*.23,sy*.68,sz*.23],'#795139',a);drawShape(k==='palm'?'sphere':'cone',[x,y+sy*.76,z],[sx,sy*.6,sz],c,a)}else if(k==='house'){drawShape('box',[x,y+sy*.35,z],[sx,sy*.7,sz],c,a);drawShape('cone',[x,y+sy*.93,z],[sx*1.3,sy*.53,sz*1.3],'#AE6659',a)}else drawShape(k==='rock'?'sphere':k==='platform'||k==='tower'?'box':k,[x,y+(k==='torus'?0:sy*.5),z],[sx,sy,sz],c,a)}
 function drawAvatar(position,shade,moving=false){
   // Procedural body parts are real WebGL meshes, not rigged glTF characters.
   const [x,y,z]=position;
   if(![x,y,z].every(Number.isFinite))return;
   const tint=/^#[0-9A-Fa-f]{6}$/.test(shade)?shade:'#2EC4B6';
+  if(avatarAsset&&avatarGpu){
+    const avatarMatrix=window.SKYAvatarGLB.compose([x,y,z],[0,0,0,1],[1,1,1]);
+    const parts=window.SKYAvatarGLB.pose(avatarAsset,moving?'walk':'idle',performance.now()/1000);
+    for(const part of parts){
+      const mesh=avatarGpu[part.mesh];
+      gl.bindBuffer(gl.ARRAY_BUFFER,mesh.vertices);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,mesh.indices);
+      gl.enableVertexAttribArray(pa);gl.enableVertexAttribArray(na);
+      gl.vertexAttribPointer(pa,3,gl.FLOAT,false,24,0);
+      gl.vertexAttribPointer(na,3,gl.FLOAT,false,24,12);
+      gl.uniformMatrix4fv(u.model,false,window.SKYAvatarGLB.multiply(avatarMatrix,part.matrix));
+      gl.uniform3fv(u.color,color(part.part==='skin'?'#F5C99E':part.part==='pants'?'#213A55':tint));
+      gl.drawElements(gl.TRIANGLES,mesh.count,gl.UNSIGNED_SHORT,0);
+    }
+    return;
+  }
   const stride=moving?Math.sin(performance.now()/105)*.13:0;
   drawShape('cylinder',[x,y+.94,z],[.48,.83,.34],tint);
   drawShape('sphere',[x,y+1.57,z],[.43,.43,.43],'#F5C99E');
@@ -222,7 +301,7 @@ function drawFrame(proj,view,viewport){
   for(const object of world?.scene?.objects||[])drawObject(object);
   for(const peer of peers.values()){
     if(peer.id===selfId||!peer.position)continue;
-    drawAvatar(peer.position,peer.color);
+    drawAvatar(peer.position,peer.color,performance.now()-(peer._movedAt||0)<250);
   }
   drawAvatar([avatar.x,avatar.y,avatar.z],avatarColor,performance.now()-lastWalkAt<250);
 }
@@ -264,7 +343,7 @@ function startFallbackRenderer(canvas){
       if(peer.id===selfId||!Array.isArray(peer.position))continue;
       avatars2d.push({kind:'box',position:peer.position,scale:[.55,1.7,.4],color:peer.color||'#2EC4B6'});
     }
-    for(let ob of [...(world?.scene?.objects||[]),...avatars2d])for(let obj of shapeList(ob)){
+    for(let ob of [...(world?.scene?.objects||[]),...avatars2d])for(let obj of (ob.interaction?.type==='door'&&ob.interaction.active?[]:shapeList(ob))){
       let [x,y,z]=obj.pos,[a,b,c]=obj.size,cs=obj.color;
       const corners=[];for(let j of [-.5,.5])for(let k of [-.5,.5])for(let l of [-.5,.5])corners.push([x+j*a,y+k*b,z+l*c]);
       const pts=corners.map(v=>project(v,eye,fw,right,up,focal,w,h));
