@@ -24,7 +24,7 @@ $('connect').addEventListener('click',login);$('key').addEventListener('keydown'
 async function refreshWorlds(select){let worlds=await json('/api/worlds');$('worlds').replaceChildren();for(const w of worlds)option($('worlds'),w.name,w.id);await openWorld(select||worlds[0]?.id)}
 async function openWorld(id){if(!id)return;closePresence();peers.clear();world=await json('/api/worlds/'+id);$('worlds').value=id;safeText($('world-title'),world.name);renderObjects();await connectPresence(id,presenceGeneration);notify('Mundo listo: '+world.name)}
 $('worlds').addEventListener('change',()=>openWorld($('worlds').value).catch(e=>notify(e.message)));
-function renderObjects(){if(!world)return;let objs=world.scene.objects;safeText($('object-count'),objs.length+' elementos');let sel=$('objects');sel.replaceChildren();for(const o of objs)option(sel,o.name+' · '+o.kind,o.id);if(!objs.find(o=>o.id===selectedId))selectedId=objs.find(o=>o.kind!=='platform')?.id||objs[0]?.id;sel.value=selectedId;inspect()}
+function renderObjects(){if(!world)return;let objs=world.scene.objects;safeText($('object-count'),objs.length+' elementos');let sel=$('objects');sel.replaceChildren();for(const o of objs)option(sel,o.name+' · '+o.kind,o.id);if(!objs.find(o=>o.id===selectedId))selectedId=objs.find(o=>o.kind!=='platform')?.id||objs[0]?.id;sel.value=selectedId;inspect();refreshWhiteboardEditor()}
 function inspect(){let obj=world?.scene.objects.find(o=>o.id===selectedId);if(!obj){safeText($('selection-label'),'Sin selección');return}safeText($('selection-label'),obj.name+' · '+obj.kind);$('edit-color').value=obj.color;for(let i=0;i<3;i++){$('edit-'+['x','y','z'][i]).value=obj.position[i];$('edit-'+['sx','sy','sz'][i]).value=obj.scale[i]}}
 $('objects').addEventListener('change',()=>{selectedId=$('objects').value;inspect()});
 $('apply').addEventListener('click',()=>{if(!world)return;let obj=world.scene.objects.find(o=>o.id===selectedId);if(!obj)return;let pos=['x','y','z'].map(v=>Number($('edit-'+v).value));let sc=['sx','sy','sz'].map(v=>Number($('edit-'+v).value));if(!pos.every(v=>isNumber(v)&&Math.abs(v)<=100)||!sc.every(v=>isNumber(v)&&v>=.05&&v<=100))return notify('Coordenadas o escalas inválidas');obj.position=pos;obj.scale=sc;obj.color=$('edit-color').value;notify('Pieza modificada. Presioná Guardar mundo para conservarla.')});
@@ -113,6 +113,7 @@ function moveAvatar(dx,dz){
   if(result.moved){avatar.x=result.x;avatar.z=result.z;lastWalkAt=performance.now();sendPosition()}
   safeText($('coords'),'X: '+avatar.x.toFixed(1)+' · Z: '+avatar.z.toFixed(1)+
     (result.collided?' · Obstáculo':'');
+  refreshWhiteboardEditor();
 }
 window.addEventListener('keydown',e=>{
   if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
@@ -202,6 +203,40 @@ function closestInteractiveObject(maxDistance=2.4){
   }
   return closest;
 }
+function closestWhiteboard(){
+  return (world?.scene?.objects||[])
+    .filter(o=>o.interaction?.type==='whiteboard')
+    .map(o=>({object:o,distance:Math.hypot(avatar.x-o.position[0],avatar.z-o.position[2])}))
+    .filter(item=>item.distance<=2.4)
+    .sort((a,b)=>a.distance-b.distance)[0]?.object||null;
+}
+function refreshWhiteboardEditor(){
+  const field=$('whiteboard-notes'),board=closestWhiteboard();
+  if(!board){
+    field.dataset.loadedId='';
+    $('save-whiteboard').disabled=true;
+    return;
+  }
+  $('save-whiteboard').disabled=false;
+  if(field.dataset.loadedId!==board.id){
+    field.value=board.interaction.content||'';
+    field.dataset.loadedId=board.id;
+  }
+}
+$('save-whiteboard').addEventListener('click',async()=>{
+  const board=closestWhiteboard();
+  if(!board)return notify('Acercate a la pizarra que querés editar');
+  const button=$('save-whiteboard'),content=$('whiteboard-notes').value;
+  button.disabled=true;
+  try{
+    const answer=await jsonPost('/api/worlds/'+encodeURIComponent(world.id)+'/interact',
+      {version:world.version,object_id:board.id,action:'write',content});
+    world=answer.world;renderObjects();
+    safeText($('interaction-status'),answer.interaction.message);
+    notify('Apuntes guardados en la pizarra ✓');
+  }catch(e){notify('No se guardaron los apuntes: '+e.message)}
+  finally{button.disabled=false}
+});
 async function interactNearest(){
   if(!world)return notify('Abrí un mundo primero');
   const object=closestInteractiveObject();
@@ -242,7 +277,7 @@ else if(type==='cylinder'||type==='cone'){let n=20;for(let i=0;i<n;i++){let t=i*
 else if(type==='torus'){let m=24,n=8,R=.39,r=.12;const v=(t,p)=>[(R+r*Math.cos(p))*Math.cos(t),(R+r*Math.cos(p))*Math.sin(t),r*Math.sin(p)];for(let i=0;i<m;i++)for(let j=0;j<n;j++){let t=i*2*Math.PI/m,t2=(i+1)*2*Math.PI/m,p=j*2*Math.PI/n,p2=(j+1)*2*Math.PI/n;quad(v(t,p),v(t2,p),v(t2,p2),v(t,p2))}}
 return new Float32Array(a)}
 function shader(gl,type,source){let sh=gl.createShader(type);gl.shaderSource(sh,source);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));return sh}
-function startGL(){if(view3d)return;let canvas=$('scene');let gl=canvas.getContext('webgl',{antialias:true,alpha:false,preserveDrawingBuffer:true,xrCompatible:true});if(!gl){notify('WebGL no está disponible: SKY activó el visor de reserva 3D proyectado.');startFallbackRenderer(canvas);return}let pr=gl.createProgram();gl.attachShader(pr,shader(gl,gl.VERTEX_SHADER,VERT));gl.attachShader(pr,shader(gl,gl.FRAGMENT_SHADER,FRAG));gl.linkProgram(pr);if(!gl.getProgramParameter(pr,gl.LINK_STATUS))throw Error('No se pudo iniciar WebGL');gl.useProgram(pr);gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);
+function startGL(){if(view3d)return;let canvas=$('scene');let gl=canvas.getContext('webgl',{antialias:true,alpha:false,preserveDrawingBuffer:true,xrCompatible:true});if(!gl){safeText($('avatar-render-status'),'Visor Canvas2D: avatar geométrico simplificado, sin GLB.');notify('WebGL no está disponible: SKY activó el visor de reserva 3D proyectado.');startFallbackRenderer(canvas);return}let pr=gl.createProgram();gl.attachShader(pr,shader(gl,gl.VERTEX_SHADER,VERT));gl.attachShader(pr,shader(gl,gl.FRAGMENT_SHADER,FRAG));gl.linkProgram(pr);if(!gl.getProgramParameter(pr,gl.LINK_STATUS))throw Error('No se pudo iniciar WebGL');gl.useProgram(pr);gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);
 let u={proj:gl.getUniformLocation(pr,'uProj'),view:gl.getUniformLocation(pr,'uView'),model:gl.getUniformLocation(pr,'uModel'),color:gl.getUniformLocation(pr,'uColor'),sky:gl.getUniformLocation(pr,'uSky')};let pa=gl.getAttribLocation(pr,'aP'),na=gl.getAttribLocation(pr,'aN');let buffers={};for(let shape of ['box','sphere','cylinder','cone','torus']){let data=makeMesh(shape),buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);buffers[shape]={buffer,count:data.length/6}};
 let avatarAsset=null,avatarGpu=null;
 if(window.SKYAvatarGLB){
@@ -257,8 +292,12 @@ if(window.SKYAvatarGLB){
       return {vertices,indices,count:mesh.indices.length};
     });
     avatarAsset=parsed;avatarGpu=gpu;
+    safeText($('avatar-render-status'),'Modelo GLB animado activo (animaciones por nodos).');
     notify('Avatar GLB animado cargado ✓');
-  }).catch(err=>notify('Avatar geométrico activo: '+err.message));
+  }).catch(err=>{
+    safeText($('avatar-render-status'),'Avatar geométrico alternativo: '+err.message);
+    notify('Avatar geométrico activo: '+err.message);
+  });
 }
 function color(c){return [1,3,5].map(i=>parseInt(c.slice(i,i+2),16)/255)}
 function drawShape(kind,position,scale,shade,rot=0){let m=buffers[kind]||buffers.box;gl.bindBuffer(gl.ARRAY_BUFFER,m.buffer);gl.enableVertexAttribArray(pa);gl.enableVertexAttribArray(na);gl.vertexAttribPointer(pa,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(na,3,gl.FLOAT,false,24,12);gl.uniformMatrix4fv(u.model,false,matrix(...position,...scale,rot));gl.uniform3fv(u.color,color(shade));gl.drawArrays(gl.TRIANGLES,0,m.count)}
