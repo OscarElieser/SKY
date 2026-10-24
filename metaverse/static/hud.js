@@ -480,6 +480,14 @@
       if (SI.test(t)) { addMsg('user', texto); S.pending.run(); return; }
       if (NO.test(t)) { addMsg('user', texto); S.pending.cancel(); speak('Cancelado.'); return; }
     }
+    // Voice/text may OPEN the verified communications panel; never place
+    // carrier calls, send texts or enable camera solely from voice commands.
+    const openPhone=/^(?:(?:oye|hey)\s+)?(?:sky[,.: ]+)?(?:abr[ií]|abre|abrir|mostr[aá]|mostrar)\s+(?:el\s+|m[oó]dulo\s+de\s+)?(?:tel[eé]fono|llamadas|videoconferencia)(?:\s+de\s+sky)?[.!]?$/i;
+    if(openPhone.test(String(texto).trim())){
+      addMsg('user',texto);abrirTelefono();
+      addMsg('sky','Abrí SKY Teléfono. Verificá tu número y confirmá las operaciones con los controles y el PIN.');
+      return;
+    }
     enviar(texto, origen === 'voz' ? 'voz' : 'chat');
   }
   async function enviar(texto, modo) {
