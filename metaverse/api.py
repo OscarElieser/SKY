@@ -264,6 +264,12 @@ class ObjectRequest(BaseModel):
     version:int=Field(ge=1)
     object:dict
 
+class WorldInteractionRequest(BaseModel):
+    version:int=Field(ge=1)
+    object_id:str=Field(min_length=1,max_length=64)
+    action:str=Field(default='toggle',max_length=12)
+    content:str=Field(default='',max_length=1200)
+
 class PositionMessage(BaseModel):
     type:str
     avatar:str='SKY'
@@ -292,6 +298,15 @@ def baqueano_owner_page():return FileResponse(STATIC/'baqueano-owner.html')
 
 @app.get('/world')
 def metaverse_world():return FileResponse(STATIC/'index.html')
+
+@app.get('/api/metaverse/avatars/default.glb',dependencies=[Depends(require_key)])
+def original_animated_avatar():
+    """The original self-contained animated avatar model, private and offline."""
+    from .avatar_glb import build_avatar_glb
+    return Response(content=build_avatar_glb(),media_type='model/gltf-binary',
+                    headers={'Cache-Control':'private, max-age=3600',
+                             'Content-Disposition':'inline; filename="SKY_avatar_animated.glb"'})
+
 
 @app.get('/api/health')
 def health():return {'service':'SKY Engine API','status':'ok','version':'10.4.0','private':'key required for data'}
@@ -338,6 +353,39 @@ def regenerate(wid:str,body:PromptRequest):
         return save_scene(wid,new,body.version)
     except ValueError as exc:raise HTTPException(422,str(exc))
     except RuntimeError as exc:raise HTTPException(409,str(exc))
+
+@app.post('/api/worlds/{wid}/build-campus',dependencies=[Depends(require_key)])
+def build_world_campus(wid:str,body:PromptRequest):
+    """Construct and persist editable campus geometry, never fake photorealism."""
+    if body.append:
+        raise HTTPException(422,'El constructor avanzado reconstruye el mundo; append no admitido')
+    if get_world(wid) is None:
+        raise HTTPException(404,'Mundo no existe')
+    try:
+        from .world_builder import build_campus
+        scene,plan=build_campus(body.prompt,body.seed)
+        result=save_scene(wid,scene,body.version)
+        return {'world':result,'plan':plan}
+    except ValueError as exc:raise HTTPException(422,str(exc)) from exc
+    except KeyError as exc:raise HTTPException(404,'Mundo no existe') from exc
+    except RuntimeError as exc:raise HTTPException(409,str(exc)) from exc
+
+
+@app.post('/api/worlds/{wid}/interact',dependencies=[Depends(require_key)])
+async def interact_with_world_object(wid:str,body:WorldInteractionRequest):
+    """Save real device/board/door state, broadcast only after committed storage."""
+    current=get_world(wid)
+    if current is None:raise HTTPException(404,'Mundo no existe')
+    try:
+        from .world_interactions import interact
+        changed,event=interact(current['scene'],body.object_id,body.action,body.content)
+        updated=save_scene(wid,changed,body.version)
+    except KeyError as exc:raise HTTPException(404,str(exc)) from exc
+    except ValueError as exc:raise HTTPException(422,str(exc)) from exc
+    except RuntimeError as exc:raise HTTPException(409,str(exc)) from exc
+    await _send_all(wid,{'type':'interact','version':updated['version'],**event})
+    return {'world':updated,'interaction':event}
+
 
 @app.post('/api/worlds/{wid}/objects',dependencies=[Depends(require_key)])
 def add_object(wid:str,body:ObjectRequest):
@@ -574,7 +622,7 @@ async def ws_room(socket:WebSocket,wid:str,ticket:str=''):
     await socket.accept()
     room=_connections.setdefault(wid,{})
     user=secrets.token_hex(5)
-    room[socket]={'id':user,'name':'Visitante','position':[0,0,0]}
+    room[socket]={'id':user,'name':'Visitante','position':[0,0,0],'color':'#2EC4B6'}
     try:
         await socket.send_json({'type':'peers','you':user,'peers':list(room.values())})
         await _send_all(wid,{'type':'join','peer':room[socket]})
@@ -588,6 +636,13 @@ async def ws_room(socket:WebSocket,wid:str,ticket:str=''):
                 except (ValueError,TypeError):continue
                 room[socket]['position']=[float(v) for v in xyz]
                 await _send_all(wid,{'type':'move','peer':room[socket]})
+            elif data.get('type')=='customize':
+                # Color is cosmetic, bounded and temporary; no remote scripts/assets.
+                import re
+                color=data.get('color')
+                if isinstance(color,str) and re.fullmatch(r'#[0-9A-Fa-f]{6}',color):
+                    room[socket]['color']=color.upper()
+                    await _send_all(wid,{'type':'customize','peer':room[socket]})
             elif data.get('type')=='say':
                 text=str(data.get('text','')).strip()[:280]
                 if text:await _send_all(wid,{'type':'say','from':user,'text':text})
