@@ -17,6 +17,7 @@ on:
       - "neural_core/sky_internal_roles.py"
       - "neural_core/sky_supervisor.py"
       - "neural_core/sky_advanced_planner.py"
+      - "neural_core/sky_capability_inventory.py"
       - "tests/test_sky_advanced_planner.py"
       - "tests/test_sky_supervisor.py"
       - "tests/test_sky_central_roles.py"
@@ -45,7 +46,7 @@ jobs:
       - name: Compile SKY API modules
         shell: pwsh
         run: |
-          python -m py_compile metaverse/asistente_api.py metaverse/hud_api.py agente_dispositivo.py neural_core/action_verifier.py neural_core/sky_approvals.py neural_core/sky_execution_metrics.py scripts/sky_api_smoke_windows.py
+          python -m py_compile metaverse/asistente_api.py metaverse/hud_api.py agente_dispositivo.py neural_core/action_verifier.py neural_core/sky_approvals.py neural_core/sky_execution_metrics.py neural_core/sky_advanced_planner.py neural_core/sky_capability_inventory.py scripts/sky_api_smoke_windows.py
       - name: Test action approvals, receipts and localhost API on Windows
         shell: pwsh
         run: |
