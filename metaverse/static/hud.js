@@ -1206,9 +1206,27 @@
     ['diagnostica','formativa','sumativa'].forEach(v=>{
       const o=el('option','',v);o.value=v;mode.append(o);
     });
+    // El docente puede adecuar la ponderación a su programa formativo.
+    const weightsRow=el('div','btns'),weightFields={};
+    for(const [code,title,initial] of [
+      ['conocer','Conocer (%)',30],['hacer','Hacer (%)',50],['ser','Ser/convivir (%)',20]]){
+      const label=el('label','s',title);
+      const input=el('input','hab-in');input.type='number';
+      input.min='0';input.max='100';input.step='1';input.value=String(initial);
+      input.setAttribute('aria-label','Peso de '+title);
+      label.append(input);weightsRow.append(label);weightFields[code]=input;
+    }
+    function assessmentWeights(){
+      const weights=Object.fromEntries(Object.entries(weightFields)
+        .map(([code,input])=>[code,Number(input.value)]));
+      if(Object.values(weights).some(n=>!Number.isInteger(n)||n<0||n>100) ||
+          Object.values(weights).reduce((a,b)=>a+b,0)!==100)
+        throw Error('Los pesos de conocer, hacer y ser deben ser enteros entre 0 y 100 y sumar 100%.');
+      return weights;
+    }
     const build=el('button','btn primary','Generar instrumento');build.type='button';
     const download=el('button','btn','Descargar en Word');download.type='button';
-    options.append(mode,kind,build,download);evaluation.append(options);
+    options.append(mode,kind,build,download);evaluation.append(weightsRow,options);
     const evalResult=el('div','res','');evaluation.append(evalResult);
     function settings() {
       if (topic.value.trim().length < 3) throw Error('Indicá el tema de la clase.');
@@ -1308,7 +1326,7 @@
     async function instrumentData() {
       const v=settings();return api('/api/sky/academy/education/assessments',{
         method:'POST',body:JSON.stringify({topic:v.topic,level:v.level,goal:v.goal,
-          instrument:kind.value,evaluation_type:mode.value})});
+          instrument:kind.value,evaluation_type:mode.value,weights:assessmentWeights()})});
     }
     build.addEventListener('click',async()=>{
       build.disabled=true;evalResult.replaceChildren();
@@ -1329,7 +1347,8 @@
       try{
         const v=settings();const response=await fetch('/api/sky/academy/education/assessments/document',{
           method:'POST',headers:headers(),body:JSON.stringify({topic:v.topic,level:v.level,
-           goal:v.goal,instrument:kind.value,evaluation_type:mode.value,kind:'docx'})});
+           goal:v.goal,instrument:kind.value,evaluation_type:mode.value,
+           weights:assessmentWeights(),kind:'docx'})});
         if(!response.ok)throw Error('HTTP '+response.status);
         const url=URL.createObjectURL(await response.blob());
         const link=document.createElement('a');link.href=url;link.download='SKY-Aula-Evaluacion.docx';
