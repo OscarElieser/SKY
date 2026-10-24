@@ -127,3 +127,27 @@ def test_limit_pending_delegations(client):
         assert response.status_code == 201, response.text
     assert client.post(url, headers=HEADERS,
                        json={'task': 'Planificar una sexta tarea adicional', 'params': {}}).status_code == 403
+
+
+def test_voice_and_chat_can_create_disabled_subagent(client):
+    from neural_core import sky_subagents as subs
+    cmd = 'SKY, creá un subagente llamado Investigador académico para investigar métodos de aprendizaje'
+    parsed = subs.parse_create_command(cmd)
+    assert parsed['name'] == 'Investigador académico'
+    assert parsed['role'] == 'planificador'
+    assert subs.parse_create_command('¿Podés explicarme qué son los subagentes?') is None
+
+    response = client.post('/api/asistente/mensaje', headers=HEADERS, json={'texto': cmd})
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data['proveedor'] == 'sky-subagent-manager'
+    assert data['subagent']['enabled'] is False
+    assert 'desactivado' in data['mensaje']
+
+    streamed = client.post('/api/asistente/stream', headers=HEADERS,
+                           json={'texto': 'Sky, crea un subagente llamado Redactor de informes para redactar documentos académicos', 'modo':'voz'})
+    assert streamed.status_code == 200
+    import json
+    last = json.loads(streamed.text.strip().splitlines()[-1])['final']
+    assert last['subagent']['role'] == 'documentalista'
+    assert last['subagent']['enabled'] is False
