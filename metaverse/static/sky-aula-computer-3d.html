@@ -37,6 +37,7 @@ footer{padding:10px 18px;color:#aac7d2;font-size:.8rem}
 <p>¿Cuál es la diferencia entre RAM y SSD? ¿Qué sucede si falla la fuente de alimentación?</p>
 <small>Seguridad: esta es una simulación. Nunca abras internamente una fuente de alimentación ni manipules una computadora conectada a la corriente.</small>
 </aside></main><footer>SKY IA · Visualización educativa en tu navegador. El video o modelo no reemplaza la práctica supervisada.</footer>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 <script type="module">
 const parts=[
 {id:"case",label:"Gabinete",fn:"Protege y organiza los componentes y permite circulación de aire.",rel:"Contiene los demás componentes.",warning:"Desconectá el equipo antes de abrir.",s:[3.6,2.6,1.7],p:[0,0,0],color:"#22344a"},
@@ -74,8 +75,8 @@ msg.lang="es-ES";msg.rate=.88;window.speechSynthesis.speak(msg);
 });
 $("stop").addEventListener("click",()=>{"speechSynthesis" in window&&window.speechSynthesis.cancel();});
 try{
-const THREE=await import("https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js");
-const {OrbitControls}=await import("https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js");
+const THREE=await import("three");
+const {OrbitControls}=await import("three/addons/controls/OrbitControls.js");
 const scene=new THREE.Scene();scene.background=new THREE.Color("#081726");
 const camera=new THREE.PerspectiveCamera(48,1,.1,100);camera.position.set(5,3,7);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"low-power"});
