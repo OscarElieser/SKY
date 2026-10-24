@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import agente_dispositivo as agent
+from metaverse import api as _sky_main_api  # cargar la app antes de sus routers (evita dependencia circular)
 from metaverse import asistente_api
 from neural_core import dispositivos
 from neural_core import action_verifier
