@@ -56,6 +56,13 @@ _ADAPTERS = {
     "marketing-skills": ("llm", ()),
     "ad-angle-research": ("llm", ()),
     "internal-comms": ("llm", ()),
+    "aws-workflow-deploy": ("external", ()),
+    "loki-mode": ("external", ()),
+    "supermemory": ("external", ()),
+    "google-workspace-connector": ("external", ()),
+    "slack-communicator": ("external", ()),
+    "remotion": ("external", ()),
+    "claude-d3js-skill": ("external", ()),
 }
 _OFFICE_FORMATS = {
     "pdf-pro": "pdf", "xlsx-advanced": "xlsx",
@@ -80,6 +87,9 @@ def _env(key: str) -> str:
 
 def _configured(name: str) -> bool:
     kind, required = _ADAPTERS[name]
+    if kind == "external":
+        from .sky_skillpack_extended import configured
+        return configured(name)
     if kind == "docker":
         return bool(shutil.which("docker"))
     if kind == "supabase_rest":
@@ -225,6 +235,14 @@ def execute(skill_id: str, body: dict) -> dict:
     if not isinstance(body, dict):
         raise SkillInvalid("El cuerpo debe ser un objeto JSON.")
     mode = _ADAPTERS[skill_id][0]
+    if mode == "external":
+        from .sky_skillpack_extended import execute as run_external, Invalid, Unavailable
+        try:
+            return run_external(skill_id, body)
+        except Invalid as exc:
+            raise SkillInvalid(str(exc)) from exc
+        except Unavailable as exc:
+            raise SkillUnavailable(str(exc)) from exc
     if mode == "sky_office":
         return {"ok": True, "endpoint": "/api/office/generate",
                 "kind": _OFFICE_FORMATS[skill_id],
