@@ -71,7 +71,11 @@ def test_local_planner_strips_workflow_injection_from_goal(monkeypatch):
     result = p.enrich_plan(sample_plan())
     assert result["planner_backend"] == "ollama_local"
     task = result["steps"][1]["task"]
-    assert "{{" not in task and "<" not in task
+    # The original trusted workflow reference is allowed; the untrusted
+    # model contribution must be rejected in full, not appended to the task.
+    assert "{{step.1.plan_summary}}" in task
+    assert "step.99.password" not in task and "<system>" not in task
+    assert "sudo rm -rf" not in task and "Objetivo interno:" not in task
     assert result["steps"][1]["params"] == sample_plan()["steps"][1]["params"]
 
 
