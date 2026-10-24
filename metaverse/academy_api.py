@@ -275,3 +275,114 @@ def guided_rubric(body: RubricRequest):
         return formative_review(body.objective,body.criteria,body.student_response)
     except ValueError as exc:
         raise HTTPException(422,str(exc)) from exc
+
+
+# SKY Aula se amplía aquí; no se crea otro servicio ni se reemplaza la API.
+class ClassroomSearch(BaseModel):
+    topic: str=Field(min_length=3,max_length=160)
+    level: str=Field(default="tecnico",max_length=30)
+    limit: int=Field(default=4,ge=1,le=6)
+
+class ClassroomAssessment(BaseModel):
+    topic: str=Field(min_length=3,max_length=160)
+    level: str=Field(default="tecnico")
+    goal: str=Field(min_length=3,max_length=300)
+    evaluation_type: str=Field(default="formativa")
+    instrument: str=Field(default="rubrica")
+    criteria: dict[str,str] | None=None
+
+class ClassroomAssessmentExport(ClassroomAssessment):
+    kind: str=Field(default="docx",pattern="^(docx|pdf|pptx|md)$")
+
+class ClassroomScore(BaseModel):
+    instrument: dict
+    observations: dict
+    teacher_approved: bool=False
+
+
+@router.post("/education/resources/videos")
+def aula_videos(body:ClassroomSearch):
+    from neural_core import sky_aula_multimedia as media
+    try:
+        return media.youtube(body.topic,body.level,body.limit)
+    except media.MediaInputError as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except media.MediaUnavailable as exc:
+        raise HTTPException(503,str(exc)) from exc
+
+
+@router.post("/education/resources/research")
+def aula_research(body:ClassroomSearch):
+    from neural_core import sky_aula_multimedia as media
+    try:
+        return media.bibliography(body.topic,body.limit)
+    except media.MediaInputError as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except media.MediaUnavailable as exc:
+        raise HTTPException(503,str(exc)) from exc
+
+
+@router.get("/education/visual/scenes/{scene_id}")
+def aula_scene(scene_id:str):
+    from neural_core import sky_aula_multimedia as media
+    try:
+        data=media.scene(scene_id)
+        if not data["available"]:
+            raise HTTPException(404,"No existe un modelo 3D didáctico revisado para ese tema.")
+        return data
+    except media.MediaInputError as exc:
+        raise HTTPException(422,str(exc)) from exc
+
+
+@router.get("/education/assessments/catalogue")
+def aula_assessment_catalogue():
+    from neural_core import sky_aula_assessment as assessment
+    return assessment.alternatives()
+
+
+@router.post("/education/assessments")
+def aula_assessment(body:ClassroomAssessment):
+    from neural_core import sky_aula_assessment as assessment
+    try:
+        return assessment.build(**body.model_dump())
+    except assessment.AssessmentInput as exc:
+        raise HTTPException(422,str(exc)) from exc
+
+
+@router.post("/education/assessments/review")
+def aula_assessment_review(body:ClassroomScore):
+    from neural_core import sky_aula_assessment as assessment
+    try:
+        return assessment.evaluate(body.instrument,body.observations,
+                                   teacher_approved=body.teacher_approved)
+    except assessment.AssessmentInput as exc:
+        raise HTTPException(422,str(exc)) from exc
+
+
+@router.post("/education/assessments/document")
+def aula_assessment_document(body:ClassroomAssessmentExport):
+    from neural_core import sky_aula_assessment as assessment
+    try:
+        values=body.model_dump(); kind=values.pop("kind")
+        instrument=assessment.build(**values)
+    except assessment.AssessmentInput as exc:
+        raise HTTPException(422,str(exc)) from exc
+    sections=[f"# Instrumento: {instrument['instrument']}",
+              f"**Tema:** {instrument['topic']}",
+              f"**Nivel:** {instrument['level']}",
+              f"**Objetivo:** {instrument['goal']}",
+              f"**Tipo de evaluación:** {instrument['type']}",
+              "**Estado:** Borrador para validar por el docente; no es una calificación."]
+    for dim in instrument["dimensions"]:
+        sections.append(f"## {dim['label']} — peso sugerido {dim['weight_suggested_pct']}%")
+        sections.append("**Criterio:** "+dim["criterion"])
+        if "levels" in dim:
+            sections.extend(str(x["value"])+". "+x["label"]+": "+x["descriptor"] for x in dim["levels"])
+        elif "options" in dim:
+            sections.append("Opciones: "+", ".join(dim["options"]))
+        else:
+            sections.append(dim["prompt"])
+        sections.append("Evidencia observada: __________________________________")
+    sections.append("Responsable de revisión: _____________________________")
+    return _document("\n\n".join(sections),
+                    f"SKY {instrument['instrument']} - {instrument['topic']}",kind)
