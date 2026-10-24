@@ -6,6 +6,9 @@ on:
       - 'neural_core/sky_evidence_lab.py'
       - 'neural_core/sky_innovation_lab.py'
       - 'neural_core/sky_knowledge_library.py'
+      - 'neural_core/sky_multimodal_reader.py'
+      - 'metaverse/academy_voice.py'
+      - 'metaverse/asistente_api.py'
       - 'metaverse/academy_api.py'
       - 'metaverse/api.py'
       - 'tests/test_sky_academy_innovation.py'
@@ -27,6 +30,6 @@ jobs:
       - name: Instalar dependencias existentes
         run: python -m pip install -r requirements_studio.txt -r requirements_social.txt pytest
       - name: Compilar e inspeccionar módulos
-        run: python -m py_compile metaverse/academy_api.py neural_core/sky_aula.py neural_core/sky_evidence_lab.py neural_core/sky_innovation_lab.py neural_core/sky_knowledge_library.py metaverse/api.py
+        run: python -m py_compile metaverse/academy_api.py neural_core/sky_aula.py neural_core/sky_evidence_lab.py neural_core/sky_innovation_lab.py neural_core/sky_knowledge_library.py neural_core/sky_multimodal_reader.py metaverse/academy_voice.py metaverse/asistente_api.py metaverse/api.py
       - name: Pruebas de docencia, investigacion y seguridad de la API
         run: PYTHONPATH=. pytest -q tests/test_sky_academy_innovation.py tests/test_sky_impacto.py
