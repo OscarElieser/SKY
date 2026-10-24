@@ -1,0 +1,37 @@
+name: SKY MCP Hub - protocol and security
+on:
+  pull_request:
+    paths:
+      - 'neural_core/sky_mcp_hub.py'
+      - 'metaverse/mcp_api.py'
+      - 'metaverse/api.py'
+      - 'tests/test_sky_mcp_hub.py'
+      - 'requirements_mcp_optional.txt'
+      - '.github/workflows/sky-mcp-hub-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'neural_core/sky_mcp_hub.py'
+      - 'metaverse/mcp_api.py'
+      - 'metaverse/api.py'
+      - 'tests/test_sky_mcp_hub.py'
+      - 'requirements_mcp_optional.txt'
+      - '.github/workflows/sky-mcp-hub-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sdk-and-permissions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install SKY and optional official MCP client
+        run: python -m pip install -r requirements_social.txt -r requirements_studio.txt -r requirements_mcp_optional.txt pytest
+      - name: Compile syntax without launching MCP servers
+        run: python -m py_compile neural_core/sky_mcp_hub.py metaverse/mcp_api.py metaverse/api.py tests/test_sky_mcp_hub.py
+      - name: Test MCP permissions, SDK and SKY regressions
+        run: PYTHONPATH=. python -m pytest -q tests/test_sky_mcp_hub.py tests/test_sky_core_consolidation.py tests/test_sky_verification_lab.py tests/test_sky_academy_innovation.py

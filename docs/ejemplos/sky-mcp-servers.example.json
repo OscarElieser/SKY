@@ -1,0 +1,38 @@
+{
+  "servers": {
+    "filesystem": {
+      "enabled": false,
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "C:\\SKY-MCP\\node_modules\\@modelcontextprotocol\\server-filesystem\\dist\\index.js",
+        "C:\\Users\\TU_USUARIO\\Documents\\SKY-MCP-Workspace"
+      ],
+      "env_keys": [],
+      "allowed_tools": [
+        "list_allowed_directories",
+        "list_directory",
+        "read_text_file",
+        "get_file_info"
+      ]
+    },
+    "github": {
+      "enabled": false,
+      "command": "C:\\SKY-MCP\\bin\\github-mcp-server.exe",
+      "args": [
+        "stdio",
+        "--read-only",
+        "--toolsets=repos,issues,pull_requests"
+      ],
+      "env_keys": [
+        "GITHUB_PERSONAL_ACCESS_TOKEN"
+      ],
+      "allowed_tools": [
+        "get_file_contents",
+        "search_code",
+        "search_repositories",
+        "issue_read",
+        "pull_request_read"
+      ]
+    }
+  }
+}

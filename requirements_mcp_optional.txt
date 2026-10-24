@@ -1,0 +1,3 @@
+# Instalación opcional del cliente MCP oficial v2.
+# No instalar automáticamente en el inicio de SKY.
+mcp>=2.0,<3.0
