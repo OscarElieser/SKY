@@ -53,7 +53,7 @@ def _match(normalized: str, *patterns: str) -> bool:
     return any(re.search(pattern, normalized) is not None for pattern in patterns)
 
 
-def analyze_request(request: str, source_text: str = "", document_format: str = "docx",
+def analyze_request(request: str, source_text: str = "", document_format: str = "auto",
                     project_id: str | None = None) -> dict[str, Any]:
     """Deterministic planning with real capability constraints and handoffs.
 
@@ -64,7 +64,7 @@ def analyze_request(request: str, source_text: str = "", document_format: str = 
         raise ValueError("La solicitud debe contener entre 8 y 3000 caracteres.")
     if not isinstance(source_text, str) or len(source_text) > 12000:
         raise ValueError("El texto de referencia debe ser menor o igual a 12000 caracteres.")
-    if document_format not in FORMAT_ALLOWLIST:
+    if document_format not in FORMAT_ALLOWLIST | {"auto"}:
         raise ValueError("Formato de documento no permitido.")
     if project_id is not None and (not isinstance(project_id, str) or len(project_id) > 120):
         raise ValueError("Identificador de proyecto inválido.")
@@ -72,6 +72,15 @@ def analyze_request(request: str, source_text: str = "", document_format: str = 
     original = request.strip()
     normalized = _norm(original)
     source = source_text.strip()
+    if document_format == "auto":
+        if _match(normalized, r"\b(pptx|powerpoint|presentacion|diapositivas)\b"):
+            document_format = "pptx"
+        elif _match(normalized, r"\b(excel|hoja de calculo|xlsx)\b"):
+            document_format = "xlsx"
+        elif _match(normalized, r"\bpdf\b"):
+            document_format = "pdf"
+        else:
+            document_format = "docx"
     wants_research = _match(normalized, r"\binvestig", r"\bbusca (?:en )?internet\b",
                             r"\bfuentes?\b", r"\binformacion (?:actual|verificada)\b")
     wants_document = _match(normalized, r"\b(informe|documento|word|pdf|pptx|powerpoint|presentacion|reporte|excel|hoja de calculo)\b")
@@ -179,7 +188,7 @@ def _digest(plan: dict) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def prepare(request: str, source_text: str = "", document_format: str = "docx",
+def prepare(request: str, source_text: str = "", document_format: str = "auto",
             project_id: str | None = None, request_id: str | None = None) -> dict:
     """Create persistent, UNAPPROVED workflow; optional idempotency prevents retries."""
     plan = analyze_request(request, source_text, document_format, project_id)
