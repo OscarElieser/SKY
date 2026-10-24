@@ -186,3 +186,26 @@ def test_voice_hud_and_api_have_context_barge_in_and_owner_protection():
     api=Path("metaverse/api.py").read_text(encoding="utf-8")
     assert "def sky_full_skills_audit" in api and "Depends(require_key)" in api
     assert "exigir_pin(request, \"una acción externa irreversible de SKY\")" in api
+
+
+def test_probe_real_local_document_and_preserve_proof_without_tokens(monkeypatch,tmp_path):
+    from neural_core import sky_skill_probe as probe
+    monkeypatch.setattr(probe,"_LEDGER",tmp_path/"skill_probes.json")
+    result=probe.probe("docx-coauthoring")
+    assert result["result"]=="verified"
+    assert result["artifact_bytes"]>100
+    result2=probe.read()["results"]["docx-coauthoring"]
+    assert result2["latency_ms"]>=0
+    assert "token" not in json.dumps(result2).lower()
+
+
+def test_probe_requires_real_provider_credential_and_does_not_forge_pass(monkeypatch,tmp_path):
+    from neural_core import sky_skill_probe as probe
+    monkeypatch.setattr(probe,"_LEDGER",tmp_path/"skill_probes.json")
+    monkeypatch.delenv("SKY_SLACK_BOT_TOKEN",raising=False)
+    result=probe.probe("slack-communicator")
+    assert result["result"]=="failed"
+    assert result["failure_type"]=="SkillUnavailable"
+    with pytest.raises(ValueError):
+        probe.probe("firecrawl")
+    assert probe.read()["results"]["slack-communicator"]["result"]=="failed"
