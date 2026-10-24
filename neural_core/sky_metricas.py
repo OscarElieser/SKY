@@ -106,6 +106,10 @@ def resultado_ok(res) -> tuple[bool, str]:
     estado = str(res.get('status', '')).upper()
     if res.get('ok') is False or estado in ('FAILED', 'ERROR', 'DENIED'):
         return False, str(res.get('error') or res.get('message') or estado or 'falló')
+    if estado in ('SENT', 'RUNNING', 'PENDING', 'DISPATCHED', 'UI'):
+        # The action may have been issued, but is NOT yet verified. It must
+        # not become an automatically learned success or a success KPI.
+        return False, 'Acción enviada o iniciada, aún no verificada.'
     return True, ''
 
 
