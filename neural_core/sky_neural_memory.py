@@ -132,9 +132,9 @@ def record_verified_outcome(workflow_id: str, roles: list[str], status: str,
         return False
     digest=hashlib.sha256(workflow_id.encode("utf-8")).hexdigest()
     with _LOCK, _connect() as db:
-        db.execute("INSERT OR IGNORE INTO verified_executions VALUES(?,?,?,?,?)",
+        inserted = db.execute("INSERT OR IGNORE INTO verified_executions VALUES(?,?,?,?,?)",
                    (digest,json.dumps(role_names,ensure_ascii=False),
-                    status,int(verified),int(time.time())))
+                    status,int(verified),int(time.time()))).rowcount
         db.execute("DELETE FROM verified_executions WHERE observed_at<?",
                    (int(time.time())-90*86400,))
         count=db.execute("SELECT COUNT(*) FROM verified_executions").fetchone()[0]
@@ -142,7 +142,7 @@ def record_verified_outcome(workflow_id: str, roles: list[str], status: str,
             db.execute("""DELETE FROM verified_executions WHERE workflow_digest IN
                 (SELECT workflow_digest FROM verified_executions ORDER BY observed_at ASC LIMIT ?)""",
                 (count-MAX_OBSERVATIONS,))
-        return bool(db.execute("SELECT changes()").fetchone()[0])
+        return bool(inserted)
 
 
 def execution_report() -> dict:
