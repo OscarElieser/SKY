@@ -72,3 +72,14 @@ def test_hud_loads_actual_global_locale_and_has_keyboard_entrypoint(env):
     css = client.get("/static/hud.css").text
     assert ".skip-link:focus" in css
     assert "prefers-reduced-motion:reduce" in css
+
+
+def test_selected_language_is_used_for_browser_voice_and_offline_stt():
+    hud = (Path(__file__).resolve().parents[1] / "metaverse" / "static" / "hud.js").read_text(encoding="utf-8")
+    assert "function idiomaVoz()" in hud
+    assert "rec.lang = idiomaVoz()" in hud
+    assert "sr.lang = idiomaVoz()" in hud
+    assert hud.count("fd.append('language', idiomaVoz().split('-')[0])") == 2
+    assert "window.addEventListener('sky:languagechange'" in hud
+    assert "toLocaleDateString(locale" in hud
+    assert "S.ttsLocal && idiomaVoz().split('-')[0] === 'es'" in hud
