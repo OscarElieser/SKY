@@ -332,7 +332,7 @@ def build(language: str, files: dict[str, str], *, approved: bool = False,
             return {
                 "ok": False, "language": canonical, "image_id": image_id,
                 "compile": compile_step, "run": None, "tests": None,
-                "status": "compile_failed", "code_executed": True,
+                "status": "compile_failed", "code_executed": False,
                 "offline": True, "host_execution": False,
             }
         run_command = profile.compile + "; " + profile.run if profile.run.startswith(
