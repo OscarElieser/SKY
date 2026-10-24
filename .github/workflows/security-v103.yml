@@ -45,4 +45,4 @@ jobs:
           tests/test_sky_public_secrets.py tests/test_sky_notes_local.py
           tests/test_sky_v12_unificado.py tests/test_sky_v12_1_mejoras.py tests/test_sky_v11_1_asistente.py
           tests/test_windows_desktop_control.py tests/test_sky_jarvis_fase1.py
-          tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py tests/test_sky_subagents.py tests/test_sky_central_roles.py tests/test_sky_supervisor.py tests/test_sky_advanced_planner.py tests/test_sky_neural_memory_sentinel.py tests/test_sky_multimodal_reader.py tests/test_sky_guardian.py
+          tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py tests/test_sky_subagents.py tests/test_sky_central_roles.py tests/test_sky_supervisor.py tests/test_sky_advanced_planner.py tests/test_sky_neural_memory_sentinel.py tests/test_sky_multimodal_reader.py tests/test_sky_guardian.py tests/test_sky_mobile_unlock.py
