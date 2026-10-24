@@ -806,6 +806,16 @@
   async function refrescarLog() {
     try {
       const r = await api('/api/hud/acciones'); const ul = $('log-list'); ul.textContent = '';
+      try {
+        const kpi = await api('/api/hud/kpis/ejecuciones');
+        if (kpi.available && kpi.total_actions) {
+          const summary = kpi.completion_success_pct === null ? 'sin acciones finalizadas' : (kpi.completion_success_pct + '% de éxito entre acciones finalizadas');
+          ul.appendChild(el('li', 'muted',
+            'KPIs reales: ' + kpi.verified + ' verificadas · ' + kpi.failed +
+            ' fallidas · ' + (kpi.sent + kpi.pending + kpi.running) +
+            ' aún no verificadas · ' + summary));
+        }
+      } catch { /* El historial aún puede mostrarse sin KPIs. */ }
       if (!r.acciones.length) { ul.appendChild(el('li', 'muted', 'Sin acciones todavía.')); return; }
       r.acciones.slice(0, 12).forEach(a => {
         const li = el('li'); const hora = String(a.created_at || a.timestamp || '').slice(11, 19);
