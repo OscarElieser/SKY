@@ -30,10 +30,10 @@ Voz manos libres ──┘   /api/hud/*             │   ledger verificable (/a
 |---|---|---|
 | POST | `/api/asistente/mensaje` | `{texto, historial?, proveedor?, dispositivo?, modo: "chat"\|"voz"}` |
 | POST | `/api/asistente/stream` | Igual que `/mensaje`, en NDJSON: `{"delta": "…"}` mientras el modelo habla y `{"final": {...}}` al terminar |
-| POST | `/api/asistente/ejecutar` | `{action, params, dispositivo?}`: confirmación del dueño |
+| POST | `/api/asistente/ejecutar` | `{action, params, dispositivo?, approval_token}`: requiere un token de aprobación individual, excepto la consulta `status` |
 | GET | `/api/asistente/verificar/{command_id}` | Consulta estado real del agente; `?dispositivo=local` por defecto |
-| POST | `/api/asistente/correo` | `{para, asunto, cuerpo, en_respuesta_a?}`: envío confirmado por el dueño |
-| POST | `/api/asistente/casa` | `{service, entity_ids, data?}`: confirmación para Home Assistant |
+| POST | `/api/asistente/correo` | `{para, asunto, cuerpo, en_respuesta_a?, approval_token}`: envío confirmado de borrador idéntico |
+| POST | `/api/asistente/casa` | `{service, entity_ids, data?, approval_token}`: operación doméstica autorizada |\n| POST | `/api/asistente/casa/preparar` | Prepara token de un solo uso para controles rápidos de luces, ventiladores, escenas o interruptores |
 | GET | `/api/asistente/dispositivo` | Estado y capacidades del agente |
 | GET | `/api/asistente/ayuda` | Ejemplos, capacidades, perfiles y dispositivos |
 | GET / DELETE | `/api/asistente/voz[/{id}]` | Pendientes de la voz manos libres |
@@ -70,6 +70,42 @@ La verificación por `command_id` puede recuperarse del registro local tras rein
 Estos recibos dependen de la comprobación que realmente implemente cada herramienta;
 `VERIFIED` no equivale a una inspección universal de cualquier aplicación.
 La ejecución física completa de Windows, voz y otros dispositivos requiere pruebas allí.
+
+## Confirmaciones de un solo uso (fase 2)
+
+Los resultados de `POST /api/asistente/mensaje` y `/stream` con una propuesta que
+requiere confirmación devuelven `approval_token` junto con la descripción. El HUD
+presenta la orden, sus parámetros y solicita un clic del propietario antes de enviar
+la aprobación.
+
+- `POST /api/asistente/ejecutar` requiere `approval_token` para cualquier
+  acción que no sea la consulta de estado `status`.
+- `POST /api/asistente/correo` requiere aprobación del borrador exacto:
+  destinatario, asunto, texto y referencia de respuesta.
+- `POST /api/asistente/casa` requiere aprobación de servicio, entidad y datos
+  exactos. Los botones de control rápido obtienen una aprobación desde
+  `/api/asistente/casa/preparar` (únicamente dominios permitidos de bajo riesgo).
+- `GET /api/asistente/voz` adjunta una aprobación efímera a cada propuesta
+  pendiente de voz: no ejecuta las órdenes al leerlas.
+- Los tokens se consumen **antes** de ejecutar, duran 180 segundos, no se pueden
+  reutilizar y se vinculan al dispositivo, a los parámetros y a la sesión propietaria
+  si existe, además de exigir la autenticación original de SKY.
+- La política del agente local se revisa de nuevo antes de ejecutar.
+- Este registro de aprobaciones es local al proceso: la configuración con varios
+  workers requerirá un almacenamiento compartido atómico o afinidad explícita.
+  Si se reinicia la API, las aprobaciones pendientes caducan por diseño.
+- Para operaciones realmente críticas, un clic o una aprobación por voz no equivale
+  a autenticación biométrica o MFA renovada: ese endurecimiento está pendiente.
+
+## KPIs de ejecución
+
+`GET /api/hud/kpis/ejecuciones` consulta hasta 500 transiciones recientes
+del agente e informa acciones finales verificadas/fallidas y acciones en estados
+enviado, pendiente o en progreso. La tasa de éxito se calcula **sólo sobre
+estados finales**; si no hay resultados finales devuelve `null`.
+El KPI no inventa un resultado cuando el agente está desconectado
+(`available: false`). Los valores representan una muestra del ledger, no toda
+la historia operativa del usuario.
 
 ## HUD
 
