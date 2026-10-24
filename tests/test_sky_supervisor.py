@@ -129,13 +129,15 @@ def test_idempotency_and_nonreplay_after_restart(client):
 
 def test_validation_blockers_and_no_shell(client):
     headers = {"X-SKY-KEY": KEY}
-    assert client.post("/api/sky/supervisor/prepare", headers=headers,
+    result = client.post("/api/sky/supervisor/prepare", headers=headers,
         json=body(request="Ejecutá comandos de shell y comprá productos en mi nombre",
-                  source_text="")).json()["ready_to_prepare"] is True
-    # The only executor is the plan role. It cannot run shell or make purchases.
+                  source_text="")).json()
+    assert result["ready_to_prepare"] is False
+    assert result["status"] == "needs_input"
+    assert result["workflow_id"] is None
+    assert any(item["capability"] == "system_external_effects" for item in result["blockers"])
     from neural_core import sky_workflows as wf
-    newest = wf.list_all()[0]
-    assert all(step["action"] == "plan" for step in newest["steps"])
+    assert wf.list_all() == []
     assert client.post("/api/sky/supervisor/analyze", headers=headers,
                        json=body(document_format="exe")).status_code == 422
     assert client.post("/api/sky/supervisor/prepare", headers=headers,
