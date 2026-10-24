@@ -136,10 +136,57 @@ def scene(name:str)->dict:
         "safety":"Demostración virtual. No abrir fuentes ni manipular equipo energizado.",
         "hardware_specific_model_verified":False}
 
+
+
+def practical_example(topic:str,level:str="tecnico")->dict:
+    """Examples are illustrative scenarios, not witnessed events or measured data."""
+    topic=_clean(topic)
+    name=topic.casefold()
+    cases=[
+      (r"computadora|hardware|ordenador|procesador|memoria ram",
+       "Una computadora se enciende pero tarda mucho en abrir programas.",
+       ["Distinguir almacenamiento SSD de RAM sin confundir sus funciones",
+        "Consultar uso de RAM y almacenamiento antes de concluir cuál falla",
+        "Explicar por qué el procesador necesita datos e instrucciones"],
+       "Relacioná CPU, RAM, SSD y placa madre en la escena 3D."),
+      (r"porcentaje|descuento|matem[aá]ticas",
+       "Una tienda anuncia un descuento del 15 % sobre un producto de C$ 800.",
+       ["Calcular 0,15 × 800 = C$ 120","Restar 800 − 120 = C$ 680",
+        "Comprobar que 680 + 120 = 800"],
+       "¿Cómo cambiaría el precio si el descuento fuera del 10 %?"),
+      (r"circuito|electricidad|voltaje|corriente",
+       "Una linterna funciona con una pila, un interruptor y un foco.",
+       ["Identificar fuente, conductor, control y carga",
+        "Comparar circuito cerrado con circuito abierto",
+        "Representar el flujo sin manipular redes eléctricas"],
+       "Utilizá una simulación o circuito de muy baja tensión supervisado."),
+      (r"respiraci[oó]n|pulmon|pulm[oó]n",
+       "Durante un ejercicio físico moderado aumentan las necesidades de oxígeno.",
+       ["Relacionar nariz, tráquea, bronquios y pulmones",
+        "Distinguir ventilación e intercambio gaseoso",
+        "Explicar por qué cambia la frecuencia respiratoria"],
+       "Actividad educativa, no evaluación ni recomendación médica individual."),
+      (r"contabilidad|finanzas|factura",
+       "Un emprendimiento registra una venta de C$ 1.000 al contado.",
+       ["Distinguir ingreso, cobro y documento justificativo",
+        "Identificar cuentas según el plan contable real",
+        "Comprobar sumas y conciliación"],
+       "Usar un plan de cuentas validado por el docente."),
+    ]
+    for pattern,situation,steps,question in cases:
+        if re.search(pattern,name):
+            return {"available":True,"scenario":situation,"steps":steps,
+                    "reflection":question,"illustrative_not_real_observed_case":True,
+                    "teacher_must_check_curricular_fit":True,"level":level}
+    return {"available":False,"scenario":"",
+            "steps":[],"reflection":"Solicitá al docente un caso real del entorno del estudiante.",
+            "teacher_must_supply_verified_case":True,"level":level}
+
 def teaching_support(topic:str,level:str="tecnico")->dict:
     topic=_clean(topic)
     is_pc=bool(re.search(r"\b(computadora|ordenador|computador|hardware|partes del pc)\b",topic,re.I))
     return {"topic":topic,"level":level,"source_strategy":"material_docente_y_fuentes_verificadas",
+        "example":practical_example(topic,level),
         "resource_search_available":True,"youtube_search_requires_api_key":True,
         "3d_scene":scene("computer") if is_pc else {"available":False,
                 "note":"No se ha validado un modelo tridimensional para este tema."},
