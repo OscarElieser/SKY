@@ -10,3 +10,6 @@ const skyMotion = 'normal';
 const skyFeatureOne = 'Diseño relevante';
 const skyFeatureTwo = 'Movimiento intencional';
 const skyFeatureThree = 'Experiencia accesible';
+const skyFeatureOneDetail = 'Una interfaz con identidad y jerarquía.';
+const skyFeatureTwoDetail = 'Animaciones que acompañan la navegación.';
+const skyFeatureThreeDetail = 'Contraste y controles accesibles.';
