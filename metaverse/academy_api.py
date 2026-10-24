@@ -295,6 +295,7 @@ class ClassroomAssessment(BaseModel):
     evaluation_type: str=Field(default="formativa")
     instrument: str=Field(default="rubrica")
     criteria: dict[str,str] | None=None
+    weights: dict[str,int] | None=None
 
 class ClassroomAssessmentExport(ClassroomAssessment):
     kind: str=Field(default="docx",pattern="^(docx|pdf|pptx|md)$")

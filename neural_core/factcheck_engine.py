@@ -80,16 +80,16 @@ class SkyFactCheckEngine:
                     claims.append(FactualClaim(s, "calculo", estado, "SymPy CAS Kernel", obs))
                     continue
 
-            # 2. Aserciones numéricas o porcentuales
+            # 2. Aserciones numéricas o porcentuales.
+            # IMPORTANTE: mencionar OMS, UNESCO, INIDE, NASA, etc. no demuestra
+            # que ese organismo publicó el dato. Un enlace o lista de fuentes
+            # tampoco prueba por sí solo la afirmación: hace falta cotejar
+            # evidencia concreta, fechada y atribuible al documento original.
             if cls.PATRON_PORCENTAJE.search(s) or any(c.isdigit() for c in s):
-                # Verificar si menciona fuentes explícitas conocidas
-                fuentes_conocidas = ["inide", "bcn", "oms", "who", "banco mundial", "fmi", "unesco", "nasa", "censo", "laliga", "uefa"]
-                tiene_fuente = any(f in s.lower() for f in fuentes_conocidas)
-                
-                if tiene_fuente:
-                    claims.append(FactualClaim(s, "numerica", VerificationStatus.RESPALDADA, "Fuente explícita citada", "Referenciada con organismo verificable"))
-                else:
-                    claims.append(FactualClaim(s, "numerica", VerificationStatus.NO_COMPROBADA, None, "Dato numérico sin referencia de fuente primaria verificable"))
+                claims.append(FactualClaim(
+                    s, "numerica", VerificationStatus.NO_COMPROBADA, None,
+                    "Dato numérico sin cotejo de evidencia primaria; nombrar una institución no lo verifica."
+                ))
                 continue
 
             # 3. Citas textuales
