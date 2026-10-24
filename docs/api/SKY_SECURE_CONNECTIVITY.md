@@ -24,6 +24,8 @@
 | GET | `/api/sky/device-hub/devices/{id}/probe` | Prueba de conexión autenticada, de solo lectura |
 | POST | `/api/sky/device-hub/discover/bluetooth` | Anuncios BLE temporales, sin emparejar ni guardar direcciones |
 | POST | `/api/sky/device-hub/discover/wifi` | Anuncios mDNS locales de Google Cast, AirPlay, Matter, HomeKit |
+| POST | `/api/sky/device-hub/ir/prepare` | Preparar comando IR de TV autorizado y obtener confirmación individual | 
+| POST | `/api/sky/device-hub/ir/execute` | Consumir autorización y enviar un comando IR; estado `SENT`, no `VERIFIED` |
 | POST | `/api/sky/device-hub/security/audit-plan` | Lista de revisión defensiva para sitio, teléfono, computadora o IoT |
 
 Todas requieren `X-SKY-KEY`; cuando MFA está habilitada también `X-SKY-SESSION`. Las pruebas a agentes remotos requieren su token `X-SKY-DEVICE-TOKEN` únicamente en la cabecera del pedido de comprobación, **nunca guardado en SKY Hub**.
@@ -56,7 +58,15 @@ Todas requieren `X-SKY-KEY`; cuando MFA está habilitada también `X-SKY-SESSION
 }
 ```
 
-El puente IR debe estar instalado y emparejado en Home Assistant. Esta ruta **solo comprueba** que la entidad `remote.sala` esté disponible; no transmite IR ni ejecuta controles de televisión. Para controlar comandos posteriormente, se necesitará un adaptador IR explícito que pase por la aprobación de SKY. Sin emisor físico no existe salida infrarroja.
+El puente IR debe estar instalado y emparejado en Home Assistant. La comprobación de conexión no envía IR. **SKY también puede enviar comandos básicos de TV a través de ese puente** mediante dos solicitudes: `POST /ir/prepare` y `POST /ir/execute`, consumiendo un token de un solo uso. El estado es `SENT` porque Home Assistant confirma la petición, pero no necesariamente que el televisor haya obedecido. Sin emisor físico no existe salida infrarroja.
+
+Ejemplo (sin incluir credenciales en archivos o URLs):
+
+```json
+{"hub_id":"hub_<identificador-registrado>","command":"volume_up"}
+```
+
+La primera solicitud devuelve un `approval_token`. Mostrá el televisor y la orden exacta; solo al aprobar personalmente se envía `{"hub_id":"...","command":"volume_up","approval_token":"..."}` a `/ir/execute`. Se admiten únicamente `power`, `volume_up`, `volume_down`, `mute`, `play`, `pause`, `stop`, `channel_up` y `channel_down`; no se ofrecen códigos arbitrarios, restablecimientos ni órdenes de seguridad.
 
 ### Ejemplo: celular Android por USB
 
@@ -102,7 +112,7 @@ No se instalan automáticamente. Las funciones ya existentes de SKY Home Assista
 | Cámaras | Registro SKY Guardian, ONVIF/RTSP autorizados | Streaming y autenticación ONVIF pendientes: no ver video hoy |
 | Sensores Bluetooth LE | Anuncios BLE; servicio GATT y emparejamiento aún por implementar | Solo descubrimiento opcional |
 | Sensores y automatización IoT | Matter emparejado con controlador compatible/Home Assistant | SKY NO realiza commissioning Matter por sí sola |
-| TV o aire acondicionado IR | Puente/emisor físico (p.ej. Home Assistant infrared/remote) | Solo consulta de entidad remota; emisión IR en SKY pendiente |
+| TV o aire acondicionado IR | Puente/emisor físico (p.ej. Home Assistant infrared/remote) | Consulta autenticada y envío básico de TV vía puente Home Assistant con token de aprobación; hardware real pendiente de prueba |
 
 Referencias de implementación: Bleak (https://bleak.readthedocs.io/en/stable/); Matter commissioning (https://developers.home.google.com/matter/primer/commissioning); Home Assistant REST (https://developers.home-assistant.io/docs/api/rest/); Infrared (https://www.home-assistant.io/integrations/infrared/); ONVIF (https://www.onvif.org/profiles/).
 
