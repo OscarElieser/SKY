@@ -297,6 +297,15 @@ def baqueano_owner_page():return FileResponse(STATIC/'baqueano-owner.html')
 @app.get('/world')
 def metaverse_world():return FileResponse(STATIC/'index.html')
 
+@app.get('/api/metaverse/avatars/default.glb',dependencies=[Depends(require_key)])
+def original_animated_avatar():
+    """The original self-contained animated avatar model, private and offline."""
+    from .avatar_glb import build_avatar_glb
+    return Response(content=build_avatar_glb(),media_type='model/gltf-binary',
+                    headers={'Cache-Control':'private, max-age=3600',
+                             'Content-Disposition':'inline; filename="SKY_avatar_animated.glb"'})
+
+
 @app.get('/api/health')
 def health():return {'service':'SKY Engine API','status':'ok','version':'10.4.0','private':'key required for data'}
 
