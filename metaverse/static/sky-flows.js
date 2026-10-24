@@ -47,6 +47,45 @@ async function continuity(){
  for(const item of report.deliverables.slice(-12)){root.append(elem('p',item.kind+' · '+item.label+' · '+item.status));}
  for(const flow of report.workflows.slice(0,12)){root.append(elem('p','Flujo '+flow.name+' · '+flow.status+' · '+flow.progress.done+'/'+flow.progress.total));}
 }
+// SKY Agent Supervisor: un único contacto con el propietario; distribución interna.
+function supervisorInput(){
+ const request=$('supervisor-request').value.trim();
+ if(request.length<8)throw Error('Escribí una solicitud clara de al menos 8 caracteres.');
+ return {request,source_text:$('supervisor-source').value,
+         document_format:$('supervisor-format').value,
+         project_id:$('project').value||null};
+}
+function showSupervisorPlan(result){
+ const out=$('supervisor-output');out.replaceChildren();
+ out.append(elem('p','SKY · '+result.message));
+ for(const [i,step] of (result.steps||[]).entries()){
+   out.append(elem('p',(i+1)+'. '+step.agent+' → '+step.action+' · '+step.task));
+ }
+ if(result.blockers?.length){
+   out.append(elem('p','Pendiente de resolver antes de ejecutar:'));
+   for(const blocker of result.blockers)out.append(elem('p','• '+blocker.capability+': '+blocker.reason));
+ }
+ if(result.workflow_id){
+   out.append(elem('p','Workflow: '+result.workflow_id+' · '+result.status));
+   out.append(elem('p','Abrí Seguimiento y seleccioná Revisar y autorizar para ejecutar las tareas.'));
+ }
+}
+async function runSupervisor(create){
+ const button=$(create?'supervisor-prepare':'supervisor-analyze'),msg=$('supervisor-message');
+ if(button.disabled)return; button.disabled=true;
+ try{
+   const body=supervisorInput();
+   const result=await req(create?'/api/sky/supervisor/prepare':'/api/sky/supervisor/analyze',
+                          'POST',body);
+   showSupervisorPlan(result);
+   msg.textContent=result.blockers?.length?'SKY requiere más información antes de ejecutar':
+      create?'SKY preparó el flujo. Falta la aprobación.':'Vista previa: no se ha iniciado ningún trabajo.';
+   if(create&&result.workflow_id)await refresh();
+ }catch(e){msg.textContent=e.message}
+ finally{button.disabled=false}
+}
+$('supervisor-analyze').addEventListener('click',()=>runSupervisor(false));
+$('supervisor-prepare').addEventListener('click',()=>runSupervisor(true));
 // SKY Subagent Manager — cada delegación crea un flujo SIN ejecutar.
 async function initSubagentCatalogue(){
  const catalogue=await req('/api/sky/subagents/catalogue');
