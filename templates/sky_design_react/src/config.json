@@ -1,0 +1,44 @@
+{
+  "title": "SKY Studio",
+  "subtitle": "Experiencias digitales que se sienten vivas.",
+  "eyebrow": "DISEÑO INMERSIVO · 2026",
+  "description": "Interfaces modernas para proyectos que necesitan claridad, rendimiento y una estética singular.",
+  "domain": "tecnologia",
+  "style": "aurora",
+  "layout": "editorial",
+  "primary": "#64e6cf",
+  "secondary": "#8c79ff",
+  "background": "#071119",
+  "foreground": "#edf6fa",
+  "features": [
+    {
+      "title": "Diseño relevante",
+      "detail": "Contenido, jerarquía y componentes adaptados al objetivo.",
+      "icon": "sparkles"
+    },
+    {
+      "title": "Movimiento intencional",
+      "detail": "Animaciones suaves con soporte para movimiento reducido.",
+      "icon": "activity"
+    },
+    {
+      "title": "Experiencias accesibles",
+      "detail": "Navegación semántica, contraste y controles accesibles.",
+      "icon": "shield"
+    }
+  ],
+  "metrics": [
+    {
+      "value": "01",
+      "label": "Identidad"
+    },
+    {
+      "value": "02",
+      "label": "Interacción"
+    },
+    {
+      "value": "03",
+      "label": "Experiencia"
+    }
+  ]
+}

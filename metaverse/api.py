@@ -955,6 +955,47 @@ def developer_package_lookup(registry: str, name: str):
         raise HTTPException(503, str(exc)) from exc
 
 
+@app.get('/api/developer/design/capabilities', dependencies=[Depends(require_key)])
+def developer_design_capabilities():
+    """Real local templates and explicit library manifests (no installations)."""
+    from neural_core.sky_design_studio import studio_capabilities
+    return studio_capabilities()
+
+
+@app.post('/api/developer/design/create', dependencies=[Depends(require_key)])
+def developer_design_create(body: dict):
+    """Returns all editable web/app source files; does not touch owner's files."""
+    from neural_core.sky_design_studio import create_design, DesignInvalid
+    try:
+        return create_design(body.get('title', ''), body.get('brief', ''),
+                             platform=body.get('platform', 'react'),
+                             domain=body.get('domain', ''),
+                             style=body.get('style', 'auto'),
+                             layout=body.get('layout', 'auto'))
+    except DesignInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.post('/api/developer/design/download', dependencies=[Depends(require_key)])
+def developer_design_download(body: dict):
+    """Owner-requested in-memory zip of generated files, without executing code."""
+    from neural_core.sky_design_studio import create_design, design_archive, DesignInvalid
+    try:
+        project = create_design(body.get('title', ''), body.get('brief', ''),
+                                platform=body.get('platform', 'react'),
+                                domain=body.get('domain', ''),
+                                style=body.get('style', 'auto'),
+                                layout=body.get('layout', 'auto'))
+        payload = design_archive(project)
+    except DesignInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return Response(content=payload, media_type='application/zip',
+                    headers={'Content-Disposition':
+                             f'attachment; filename="sky-design-{project["platform"]}.zip"',
+                             'Cache-Control': 'no-store',
+                             'X-Content-Type-Options': 'nosniff'})
+
+
 # ==============================================================================
 # SKY UNIVERSAL KNOWLEDGE & EDUCATION ENGINE ENDPOINTS
 # ==============================================================================

@@ -915,6 +915,81 @@
     const output=el('pre','res','Las pruebas físicas no se presumen: mirá el resultado verificable aquí.');
     output.style.whiteSpace='pre-wrap';output.style.overflowWrap='anywhere';
     area.append(lang,code,webFiles,tests,expected,actions,output);
+    /* SKY Design Studio: real package manifests and source export, never silent installs. */
+    const designArea=seccion(root,'SKY Design Studio · Sitios y apps animadas');
+    designArea.append(el('div','s','Creá una interfaz con identidad, temática relevante, iconos y transiciones. Las bibliotecas pertenecen al proyecto generado; compilar requiere el SDK y tu aprobación.'));
+    const designFields=el('div','kpi-bar');
+    const designTitle=el('input','hab-in'),designBrief=el('textarea','hab-in');
+    designTitle.type='text';designTitle.maxLength=90;designTitle.value='Mi experiencia digital';
+    designTitle.placeholder='Nombre de la web o app';
+    designBrief.rows=3;designBrief.maxLength=500;
+    designBrief.placeholder='Describí a quién va dirigida, objetivo y funciones. Ejemplo: turismo de naturaleza para familias';
+    const designPlatform=el('select','hab-in'),designStyle=el('select','hab-in'),designLayout=el('select','hab-in');
+    [['react','Web · React + Motion + Lucide + Inter'],['flutter','App · Flutter + flutter_animate']].forEach(([v,l])=>{
+      const o=el('option','',l);o.value=v;designPlatform.append(o);
+    });
+    [['auto','Estilo elegido por SKY'],['aurora','Aurora neón'],['ember','Luz cálida'],['monochrome','Minimal futurista']].forEach(([v,l])=>{
+      const o=el('option','',l);o.value=v;designStyle.append(o);
+    });
+    [['auto','Distribución personalizada'],['editorial','Editorial'],['dashboard','Dashboard'],['immersive','Inmersiva']].forEach(([v,l])=>{
+      const o=el('option','',l);o.value=v;designLayout.append(o);
+    });
+    designFields.append(designTitle,designBrief,designPlatform,designStyle,designLayout);
+    const designBtns=el('div','btns'),designCreate=el('button','btn primary','Crear diseño real');
+    const designDownload=el('button','btn','Descargar proyecto ZIP');
+    designCreate.type='button';designDownload.type='button';
+    designDownload.disabled=true;designBtns.append(designCreate,designDownload);
+    const designResult=el('pre','res','Generá el proyecto y comprobá sus dependencias. No equivale a compilarlo.');
+    designResult.style.whiteSpace='pre-wrap';designResult.style.overflowWrap='anywhere';
+    designArea.append(designFields,designBtns,designResult);
+    let currentDesign=null, currentDesignArgs=null;
+    function designPayload(){
+      return {title:designTitle.value,brief:designBrief.value,platform:designPlatform.value,
+              style:designStyle.value,layout:designLayout.value};
+    }
+    designCreate.addEventListener('click',async()=>{
+      designCreate.disabled=true;designDownload.disabled=true;
+      currentDesign=null;currentDesignArgs=null;
+      designResult.textContent='Generando archivos de diseño…';
+      try {
+        const payload=designPayload();
+        const result=await api('/api/developer/design/create',{
+          method:'POST',body:JSON.stringify(payload)});
+        currentDesign=result;currentDesignArgs=payload;
+        designResult.textContent='Plataforma: '+result.platform+
+          '\nSector identificado: '+result.domain+
+          '\nEstilo: '+result.style+' · estructura: '+result.layout+
+          '\nColores: '+JSON.stringify(result.colors)+
+          '\nArchivos editables: '+Object.keys(result.files).join(', ')+
+          '\nBibliotecas reales declaradas: '+JSON.stringify(result.libraries_declared,null,2)+
+          '\nComprobaciones necesarias:\n'+result.commands_to_test_in_separate_approved_project.join('\n')+
+          '\n\nIMPORTANTE: los archivos se generaron, pero NO se han compilado en tu equipo.';
+        designDownload.disabled=false;
+      }catch(e){designResult.textContent='Error de diseño: '+e.message;}
+      finally{designCreate.disabled=false;}
+    });
+    designDownload.addEventListener('click',async()=>{
+      if(!currentDesignArgs||!currentDesign)return;
+      designDownload.disabled=true;
+      try{
+        const r=await fetch('/api/developer/design/download',{
+          method:'POST',headers:headers(),body:JSON.stringify(currentDesignArgs)});
+        if(!r.ok){
+          let detail='Error HTTP '+r.status;
+          try{const j=await r.json();detail=j.detail||detail;}catch{/* binary or non-json */}
+          throw new Error(detail);
+        }
+        const blob=await r.blob();
+        if(blob.size<100)throw new Error('El ZIP descargado parece estar vacío.');
+        const address=URL.createObjectURL(blob);
+        const link=document.createElement('a');
+        link.href=address;link.download='sky-design-'+currentDesignArgs.platform+'.zip';
+        document.body.appendChild(link);link.click();link.remove();
+        setTimeout(()=>URL.revokeObjectURL(address),1500);
+      }catch(e){designResult.textContent+=' \nNo se pudo descargar: '+e.message;}
+      finally{designDownload.disabled=false;}
+    });
+
     /* Guided software engineering. No library/IDE is installed by browsing a catalogue. */
     const workbench=seccion(root,'Ecosistema de desarrollo · proyectos, SDK, bibliotecas y explicación');
     workbench.append(el('div','s','Explorá referencias oficiales o comprobá tu entorno; una referencia no significa que la herramienta esté instalada o que sea segura.'));
