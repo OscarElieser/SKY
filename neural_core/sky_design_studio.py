@@ -188,8 +188,7 @@ def create_design(title: str, brief: str, *, platform: str = "react",
             if files["src/App.jsx"].count(original) != 1:
                 raise DesignInvalid("No se pudo cargar el mapa de iconos de SKY.")
             files["src/App.jsx"] = files["src/App.jsx"].replace(
-                "const ICONS = ", _TABLER_MAP + "\n\nconst ICONS = ", 1
-            ).replace(original, alternative)
+                original, _TABLER_MAP + "\n\n" + alternative, 1)
         if motion == "none":
             files["src/App.jsx"] = files["src/App.jsx"].replace(
                 "const reduced = useReducedMotion()",
@@ -243,6 +242,7 @@ def create_design(title: str, brief: str, *, platform: str = "react",
                    "background": palette[2], "foreground": palette[3]},
         "files": files, "file_count": len(files),
         "libraries_declared": dependencies,
+        "libraries_installed_on_user_device": False,
         "requires_owner_installation": True,
         "generated_sources_built_now": False, "compiled_on_owner_device": False,
         "files_written_on_owner_device": False, "device_visual_test_passed": False,
@@ -266,6 +266,7 @@ def design_archive(result: dict[str, Any]) -> bytes:
             "platform": result["platform"], "domain": result["domain"],
             "style": result["style"], "colors": result["colors"],
             "libraries": result["libraries_declared"],
+            "selected_libraries": result["selected_libraries"],
             "testing": result["commands_to_test_in_separate_approved_project"],
             "generated_sources_built_now": False,
             "compiled_on_owner_device": False,
