@@ -4,6 +4,7 @@ const $=id=>document.getElementById(id);
 let secret='', world=null, selectedId=null, socket=null, selfId=null, peers=new Map(), lastMove=0;
 let presenceGeneration=0, reconnectTimer=null, reconnectAttempts=0, pendingMoveTimer=null;
 let dragging=false, downX=0, downY=0, yaw=.55, pitch=.56, distance=27, avatar={x:0,y:0,z:4};
+let avatarColor='#2EC4B6', lastWalkAt=0;
 let toastTimer=null, view3d=null, webxr=null;
 const isNumber=n=>Number.isFinite(n);
 function notify(message){const t=$('toast'); t.textContent=String(message);t.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.display='none',4000)}
@@ -31,6 +32,23 @@ async function save(){if(!world)return;let updated=await jsonPost('/api/worlds/'
 $('save').addEventListener('click',()=>save().catch(e=>notify(e.message)));
 $('create').addEventListener('click',async()=>{let name=$('world-name').value.trim()||'Mi universo SKY';let prompt=$('prompt').value.trim()||'Mundo de innovación, educación y creatividad';try{let w=await jsonPost('/api/worlds',{name,prompt,seed:Date.now()%1000000});await refreshWorlds(w.id)}catch(e){notify(e.message)}});
 $('extend').addEventListener('click',async()=>{if(!world)return;let prompt=$('prompt').value.trim();if(!prompt)return notify('Escribí qué elementos querés añadir');try{world=await jsonPost('/api/worlds/'+world.id+'/generate',{prompt,seed:Math.floor(Math.random()*100000),append:true,version:world.version});renderObjects();notify('Nuevos objetos añadidos y guardados')}catch(e){notify(e.message)}});
+$('build-campus').addEventListener('click',async()=>{
+  if(!world)return notify('Seleccioná un mundo existente');
+  const prompt=$('prompt').value.trim();
+  if(!prompt)return notify('Describí tu campus educativo');
+  if(!confirm('Esta operación reemplaza la geometría del mundo seleccionado. ¿Continuar?'))return;
+  const b=$('build-campus');b.disabled=true;
+  try{
+    const result=await jsonPost('/api/worlds/'+encodeURIComponent(world.id)+'/build-campus',
+      {prompt,seed:Date.now()%1000000,version:world.version});
+    world=result.world;renderObjects();
+    const plan=result.plan;
+    safeText($('build-report'),'Creados '+plan.geometry_objects+' objetos reales; '+plan.floors+
+      ' niveles visibles. Reconocido: '+plan.recognized.join(', ')+'. '+plan.limitations.join('. '));
+    notify('Campus construido y guardado ✓');
+  }catch(e){safeText($('build-report'),'No se modificó el mundo: '+e.message);notify(e.message)}
+  finally{b.disabled=false}
+});
 $('add').addEventListener('click',async()=>{if(!world)return;let kind=$('shape').value;try{let name=kind+' '+(world.scene.objects.length+1);world=await jsonPost('/api/worlds/'+world.id+'/objects',{version:world.version,object:{name,kind,position:[avatar.x,0,avatar.z-3],rotation:[0,0,0],scale:[1,2,1],color:'#4BAFC6'}});selectedId=world.scene.objects.at(-1).id;renderObjects();notify('Pieza añadida')}catch(e){notify(e.message)}});
 $('delete-object').addEventListener('click',()=>{if(!world||!selectedId)return;let obj=world.scene.objects.find(o=>o.id===selectedId);if(obj&&confirm('¿Eliminar la pieza «'+obj.name+'»?')){world.scene.objects=world.scene.objects.filter(o=>o.id!==selectedId);selectedId=null;renderObjects();notify('Pieza eliminada; falta guardar la escena.')}});
 $('delete-world').addEventListener('click',async()=>{if(!world||!confirm('¿Eliminar definitivamente el mundo «'+world.name+'»?'))return;try{await api('/api/worlds/'+world.id,{method:'DELETE'});closePresence();world=null;await refreshWorlds()}catch(e){notify(e.message)}});
@@ -72,10 +90,11 @@ function sendPosition(){
 }
 function moveAvatar(dx,dz){
   if(!world)return;
-  avatar.x=Math.max(-75,Math.min(75,avatar.x+dx));
-  avatar.z=Math.max(-75,Math.min(75,avatar.z+dz));
-  safeText($('coords'),'X: '+avatar.x.toFixed(1)+' · Z: '+avatar.z.toFixed(1));
-  sendPosition();
+  if(!window.SKYWorldPhysics){notify('Motor de colisiones no disponible');return}
+  const result=window.SKYWorldPhysics.resolveMovement(avatar,{x:dx,z:dz},world.scene.objects);
+  if(result.moved){avatar.x=result.x;avatar.z=result.z;lastWalkAt=performance.now();sendPosition()}
+  safeText($('coords'),'X: '+avatar.x.toFixed(1)+' · Z: '+avatar.z.toFixed(1)+
+    (result.collided?' · Obstáculo':'');
 }
 window.addEventListener('keydown',e=>{
   if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
@@ -108,14 +127,18 @@ async function connectPresence(id,generation){
     socket=connection;
     connection.onopen=()=>{
       if(generation!==presenceGeneration||socket!==connection){connection.close();return}
-      reconnectAttempts=0;sendPosition();
+      reconnectAttempts=0;
+      connection.send(JSON.stringify({type:'customize',color:avatarColor}));
+      lastMove=0;sendPosition();
     };
     connection.onmessage=e=>{
       if(generation!==presenceGeneration||socket!==connection)return;
       let d;
       try{d=JSON.parse(e.data)}catch{return}
       if(d.type==='peers'){selfId=d.you;peers.clear();for(let peer of d.peers)peers.set(peer.id,peer)}
-      else if(d.type==='join'||d.type==='move'){if(d.peer)peers.set(d.peer.id,d.peer)}
+      else if(d.type==='join'||d.type==='move'||d.type==='customize'){
+        if(d.peer)peers.set(d.peer.id,d.peer)
+      }
       else if(d.type==='leave'){peers.delete(d.id)}
       else if(d.type==='say'){roomBubble((d.from===selfId?'Yo':'Participante')+': '+d.text)}
       const n=Math.max(0,peers.size-1);
@@ -130,6 +153,13 @@ async function connectPresence(id,generation){
     if(generation===presenceGeneration){safeText($('peers'),'Sala sin conexión: '+e.message);scheduleReconnect(id,generation)}
   }
 }
+$('avatar-color').addEventListener('change',e=>{
+  const proposed=e.target.value;
+  if(!/^#[0-9a-fA-F]{6}$/.test(proposed))return;
+  avatarColor=proposed.toUpperCase();
+  if(socket?.readyState===WebSocket.OPEN)
+    socket.send(JSON.stringify({type:'customize',color:avatarColor}));
+});
 // -------- Motor de WebGL autocontenido --------
 const VERT=`attribute vec3 aP;attribute vec3 aN;uniform mat4 uProj,uView,uModel;varying vec3 vNormal;varying float vFog;void main(){vec4 view=uView*uModel*vec4(aP,1.0);gl_Position=uProj*view;vNormal=mat3(uModel)*aN;vFog=clamp((-view.z-4.0)/65.0,0.0,0.55);}`;
 const FRAG=`precision mediump float;uniform vec3 uColor;uniform vec3 uSky;varying vec3 vNormal;varying float vFog;void main(){float sun=max(dot(normalize(vNormal),normalize(vec3(0.4,1.0,0.5))),0.0);vec3 lit=uColor*(0.62+sun*0.46);gl_FragColor=vec4(mix(lit,uSky,vFog),1.0);}`;
