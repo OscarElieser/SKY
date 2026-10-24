@@ -1,0 +1,6 @@
+# SKY Connectivity — dependencias opcionales y locales
+# Solo instalar en el equipo del propietario si se desea descubrimiento
+# temporal de servicios Wi-Fi/mDNS y dispositivos Bluetooth Low Energy.
+# NO desbloquean ni controlan automáticamente equipos de terceros.
+bleak>=0.22,<4
+zeroconf>=0.136,<1
