@@ -15,7 +15,8 @@ CORE_FILE = ROOT / "knowledge" / "sky_developer_core.md"
 
 DEV_KEYWORDS = {
     # General & Desarrollo
-    "código", "codigo", "programación", "programacion", "desarrollo", "software",
+    "código", "codigo", "programación", "programacion", "programar", "programador",
+    "compilar", "compilador", "desarrollar", "desarrollo", "software",
     "script", "función", "funcion", "clase", "algoritmo", "refactor", "bug", "error",
     # Frontend & Web
     "frontend", "backend", "full stack", "fullstack", "web", "html", "css", "javascript",
