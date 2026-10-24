@@ -293,6 +293,7 @@ def formative_response(ident: str, answer: str) -> dict:
         stage_index = session["index"]
         level = session["plan"]["level"]
         topic = session["plan"]["topic"]
+        reference = session["plan"].get("_source_text", "")
         session["updated"] = time.monotonic()
     if level == "inicial":
         feedback = (
@@ -310,9 +311,17 @@ def formative_response(ident: str, answer: str) -> dict:
             "identificá su fundamento, las fuentes y una limitación del argumento. "
             "Todavía no tengo evidencia suficiente para calificar su exactitud."
         )
+    # The supplied excerpt is evidence for a guided question, not proof the
+    # answer was correct or that the source matches an official curriculum.
+    if reference and level != "inicial":
+        excerpt = " ".join(reference.split())[:190]
+        feedback += " Revisá este fragmento del material aportado: " + excerpt
+        feedback += " ¿Qué parte de tu explicación se apoya en él?"
     return {
         "central_agent":"SKY", "lesson_id":ident,
         "stage_number":stage_index+1,
+        "feedback_reference_available":bool(reference),
+        "source_verified":False,
         "voice_ready_text":feedback,
         "message":feedback,
         "response_recorded":False,
