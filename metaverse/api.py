@@ -339,6 +339,23 @@ def regenerate(wid:str,body:PromptRequest):
     except ValueError as exc:raise HTTPException(422,str(exc))
     except RuntimeError as exc:raise HTTPException(409,str(exc))
 
+@app.post('/api/worlds/{wid}/build-campus',dependencies=[Depends(require_key)])
+def build_world_campus(wid:str,body:PromptRequest):
+    """Construct and persist editable campus geometry, never fake photorealism."""
+    if body.append:
+        raise HTTPException(422,'El constructor avanzado reconstruye el mundo; append no admitido')
+    if get_world(wid) is None:
+        raise HTTPException(404,'Mundo no existe')
+    try:
+        from .world_builder import build_campus
+        scene,plan=build_campus(body.prompt,body.seed)
+        result=save_scene(wid,scene,body.version)
+        return {'world':result,'plan':plan}
+    except ValueError as exc:raise HTTPException(422,str(exc)) from exc
+    except KeyError as exc:raise HTTPException(404,'Mundo no existe') from exc
+    except RuntimeError as exc:raise HTTPException(409,str(exc)) from exc
+
+
 @app.post('/api/worlds/{wid}/objects',dependencies=[Depends(require_key)])
 def add_object(wid:str,body:ObjectRequest):
     current=get_world(wid)
