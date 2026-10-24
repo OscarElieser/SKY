@@ -21,6 +21,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 _LOCK = threading.RLock()
 MAX_DEVICES = 60
+IR_TV_COMMANDS = frozenset({"power","volume_up","volume_down","mute","play","pause","stop","channel_up","channel_down"})
 DEVICES = frozenset({"computer","laptop","phone","tablet","television","camera","iot","sensor","audio"})
 TRANSPORTS = frozenset({"wifi","bluetooth_le","infrared","usb","ethernet","matter"})
 CONNECTORS = frozenset({"sky_agent","home_assistant","adb_readonly","os_pairing_required"})
@@ -252,6 +253,47 @@ async def discover_wifi(*, owner_network_confirmed: bool, seconds: float = 3.0) 
             "connected": False, "status": "advertisements_only"}
 
 
+
+def validate_ir_command(ident: str, command: str) -> dict:
+    """Only a previously declared TV via an approved Home Assistant IR bridge."""
+    item = get(ident)
+    if item is None:
+        raise KeyError("Televisor no registrado.")
+    if not (
+        item["owner_attested"] and item["device_type"] == "television"
+        and item["transport"] == "infrared" and item["connector"] == "home_assistant"
+        and item["connection_ref"].startswith("remote.")
+    ):
+        raise PermissionError("El control IR exige un televisor y puente autorizado.")
+    if command not in IR_TV_COMMANDS:
+        raise ValueError("Comando IR no admitido por el perfil seguro de televisión.")
+    return item
+
+
+def send_ir_tv(ident: str, command: str) -> dict:
+    """Dispatch ONE whitelisted command through the owner's configured IR bridge.
+
+    A service call proves dispatch only, not that infrared physically arrived.
+    Must be called AFTER consuming an owner approval token in the API route.
+    """
+    item = validate_ir_command(ident, command)
+    from . import sky_home_assistant as ha
+    if not ha.configurado():
+        raise RuntimeError("Home Assistant no está configurado o no tiene token válido.")
+    from urllib.parse import quote
+    ref = item["connection_ref"]
+    state = ha._peticion("GET", "/api/states/" + quote(ref, safe="."), timeout=5)
+    if not isinstance(state, dict) or state.get("entity_id") != ref or state.get("state") in ("unavailable","unknown",None):
+        raise RuntimeError("El puente infrarrojo no está disponible.")
+    ha._peticion("POST", "/api/services/remote/send_command",
+                {"entity_id": ref, "device": "television", "command": command}, timeout=7)
+    return {
+        "ok": True, "status": "SENT", "verified": False,
+        "hub_id": ident, "command": command,
+        "message": "SKY envió el comando por el puente IR autorizado. El televisor aún no confirmó la acción.",
+    }
+
+
 def catalogue() -> dict:
     from . import sky_home_assistant, dispositivos
     return {
@@ -264,7 +306,7 @@ def catalogue() -> dict:
                              "discovery_only": True, "os_pairing_required": True},
             "infrared": {"requires_physical_emitter_or_bridge": True,
                           "home_assistant_bridge_supported": True,
-                          "direct_ir_emitter_implemented": False},
+                          "direct_ir_emitter_implemented": False, "authenticated_bridge_tv_commands": sorted(IR_TV_COMMANDS)},
             "matter": {"commissioning_implemented_in_sky": False,
                        "existing_home_assistant_entities_supported": True},
             "usb": {"android_readonly_adb_available": __import__("shutil").which("adb") is not None},
