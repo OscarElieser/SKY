@@ -355,7 +355,7 @@ def test_api_aprende_al_confirmar_y_al_ejecutar_solo(monkeypatch):
         llamadas.append(action)
         if action == 'status':
             return {'ok': True, 'enabled': ['volume', 'media'], 'auto_confirm': ['volume']}
-        return {'ok': True, 'status': 'SENT'}
+        return {'ok': True, 'status': 'VERIFIED'}
     monkeypatch.setattr(dispositivos, 'call_device', falso)
     # confirmación desde el HUD con la frase del cerebro
     r = client.post('/api/asistente/ejecutar', headers=h, json={'action': 'media_control', 'params': {'command': 'next'},
