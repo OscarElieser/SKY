@@ -153,3 +153,27 @@ def test_hud_docencia_and_public_3d_viewer_are_in_original_app():
     assert '"/education/resources/videos"' in routes
     assert '"/education/assessments/review"' in routes
     assert '"/education/assessments/document"' in routes
+
+
+def test_video_explanation_never_claims_to_watch_and_requires_actual_transcript():
+    transcript=("La CPU ejecuta instrucciones; la memoria RAM guarda temporalmente "
+                "datos de los programas y el SSD conserva los archivos. ")*5
+    r=media.video_guided_explanation("AbCdEFg_123","componentes de computadora",transcript)
+    assert len(r["parts"])>=1
+    assert not r["video_watched_by_sky"]
+    assert not r["automatic_captions_retrieved"]
+    assert r["parts"][0]["transcript_supplied_by_teacher"] is True
+    assert not r["parts"][0]["fact_checked_against_external_source"]
+    with pytest.raises(media.MediaInputError):
+        media.video_guided_explanation("invalid","computadora",transcript)
+    with pytest.raises(media.MediaInputError):
+        media.video_guided_explanation("AbCdEFg_123","computadora","muy corto")
+
+
+def test_aula_hud_video_guide_uses_authenticated_existing_api():
+    source=Path("metaverse/static/hud.js").read_text(encoding="utf-8")
+    assert "education/resources/video-guide" in source
+    assert "Explicar video por partes" in source
+    assert "speakPart.addEventListener" in source
+    routes=Path("metaverse/academy_api.py").read_text(encoding="utf-8")
+    assert '"/education/resources/video-guide"' in routes
