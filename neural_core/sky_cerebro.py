@@ -236,7 +236,16 @@ def convertir(nombre: str, args: dict) -> dict | None:
 
 def _mensajes(texto: str, historial: list[dict], modo: str) -> list[dict]:
     estilo = ESTILO_VOZ if modo == 'voz' else ESTILO_CHAT
-    msgs = [{'role': 'system', 'content': SISTEMA.format(estilo=estilo)}]
+    from .sky_impacto import impact_instructions
+    impacto = impact_instructions('Asistente SKY personal', texto)
+    from .sky_pro_skills import skill_instructions
+    skills = skill_instructions('Asistente SKY', texto)
+    base = SISTEMA.format(estilo=estilo)
+    if impacto:
+        base += '\n\n' + impacto
+    if skills:
+        base += '\n\n' + skills
+    msgs = [{'role': 'system', 'content': base}]
     for h in (historial or [])[-10:]:
         if isinstance(h, dict) and h.get('role') in ('user', 'assistant') and h.get('content'):
             msgs.append({'role': h['role'], 'content': str(h['content'])[:2000]})

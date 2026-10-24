@@ -17,6 +17,7 @@ def _conn():
     return c
 
 def _group(path):
+    if path.startswith('/api/impacto'):return 'Educación e Innovación'
     if path.startswith('/api/office'):return 'Office Studio'
     if path.startswith('/api/community'):return 'Comunidad'
     if path.startswith('/api/sky'):return 'Orquestador SKY'

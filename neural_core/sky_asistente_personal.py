@@ -325,7 +325,14 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
         if modo == 'voz':
             from .providers import reply, choose_provider
             nombre, _ = choose_provider(proveedor or 'auto')
-            mensajes = [{'role': 'system', 'content': SISTEMA_ASISTENTE}, *turnos, {'role': 'user', 'content': texto}]
+            from .sky_impacto import impact_instructions
+            impacto = impact_instructions('Asistente SKY personal', texto)
+            from .sky_pro_skills import skill_instructions
+            skills_voz = skill_instructions('Asistente SKY personal', texto)
+            reglas_voz = SISTEMA_ASISTENTE + ('\n\n' + impacto if impacto else '')
+            if skills_voz:
+                reglas_voz += '\n\n' + skills_voz
+            mensajes = [{'role': 'system', 'content': reglas_voz}, *turnos, {'role': 'user', 'content': texto}]
             return {'tipo': 'respuesta', 'mensaje': reply(mensajes, nombre, max_output_tokens=600), 'proveedor': nombre}
         from .assistant import responder
         respuesta, _ = responder(texto, 'Asistente SKY personal', turnos, proveedor=proveedor or 'auto')
