@@ -29,3 +29,18 @@ def _aprendizaje_y_metricas_aislados(tmp_path, monkeypatch):
         return
     monkeypatch.setattr(sky_aprendizaje, 'APRENDIDO_PATH', tmp_path / 'aprendido.json')
     monkeypatch.setattr(sky_capacidades, '_parada_path', lambda: tmp_path / 'parada.json')
+
+
+@pytest.fixture(autouse=True)
+def _sentinel_aislado(tmp_path, monkeypatch):
+    """v12.5: cada prueba empieza sin intentos fallidos acumulados ni PIN/estado de SENTINEL del dueño."""
+    try:
+        from metaverse import sentinel
+        sentinel._FALLOS.clear()
+    except Exception:
+        pass
+    try:
+        from neural_core import sentinel_identidad
+        monkeypatch.setattr(sentinel_identidad, 'ruta', lambda: tmp_path / 'sentinel.json')
+    except Exception:
+        pass
