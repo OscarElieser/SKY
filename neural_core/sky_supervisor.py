@@ -195,23 +195,31 @@ def analyze_request(request: str, source_text: str = "", document_format: str = 
     }
 
 
-def _digest(plan: dict) -> str:
-    payload = {"request": plan["request"], "steps": plan["steps"]}
+def _digest(request: str, source_text: str, document_format: str, project_id: str | None) -> str:
+    """Idempotency derives from user inputs, not nondeterministic model suggestions."""
+    payload = {"request": request.strip(),
+               "source_sha256": hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
+               "document_format": document_format, "project_id": project_id}
     encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def prepare(request: str, source_text: str = "", document_format: str = "auto",
-            project_id: str | None = None, request_id: str | None = None) -> dict:
-    """Create persistent, UNAPPROVED workflow; optional idempotency prevents retries."""
-    plan = analyze_request(request, source_text, document_format, project_id)
+            project_id: str | None = None, request_id: str | None = None,
+            planner_mode: str = "advanced") -> dict:
+    """Prepare a SKY-owned workflow. An LLM may refine only preauthorized steps."""
+    from . import sky_advanced_planner as advanced
+    plan = advanced.enrich_plan(
+        analyze_request(request, source_text, document_format, project_id),
+        mode=planner_mode, project_id=project_id,
+    )
     if plan["blockers"]:
         return {**plan, "status": "needs_input", "workflow_id": None}
     if request_id is not None and (
         not isinstance(request_id, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{8,100}", request_id)
     ):
         raise ValueError("Identificador de solicitud no válido.")
-    digest = _digest(plan)
+    digest = _digest(request, source_text, document_format, project_id)
     with connect() as con:
         con.execute("BEGIN IMMEDIATE")
         if request_id:
