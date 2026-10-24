@@ -83,7 +83,7 @@ def _configured(name: str) -> bool:
         return bool(shutil.which("docker"))
     if kind == "supabase_rest":
         # SKY también reconoce la clave ANON, siempre bajo las políticas RLS.
-        return bool(_env("SUPABASE_URL") and (_env("SUPABASE_KEY") or _env("SUPABASE_ANON_KEY")))
+        return bool(_env("SUPABASE_URL") and (_env("SUPABASE_ANON_KEY") or _env("BAQUEANO_SUPABASE_PUBLISHABLE_KEY")) and shutil.which("python"))
     if kind == "llm":
         return bool(_env("OLLAMA_URL") or any(_env(x) for x in
             ("OPENAI_API_KEY", "GEMINI_API_KEY", "ANTHROPIC_API_KEY", "GROQ_API_KEY")))
