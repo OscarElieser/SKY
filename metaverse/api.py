@@ -74,12 +74,45 @@ async def _agenda_pump():
             res=sky_rutinas.ejecutar_rutina(rutina)
             if res['mensaje']:
                 sky_rutinas.avisar(res['mensaje'],'rutina')
+                _whatsapp(rutina.get('nombre','Tarea')+': '+res['mensaje'])
+        _vigilancia()
     while True:
         try:await asyncio.to_thread(ciclo)
         except Exception:pass
         await asyncio.sleep(20)
 
+_VIGILANCIA={'kpi':0.0,'intereses':0.0,'avisados':set(),'dia':''}
+
+def _vigilancia():
+    # SKY v12.2: cada 5 min revisa sus KPIs y avisa UNA vez por día cada problema nuevo;
+    # cada hora actualiza los temas que sigue (si SKY_INTERNET no es 0).
+    import time as _t
+    from datetime import date
+    from neural_core import sky_rutinas, sky_metricas, sky_aprendizaje
+    ahora=_t.time();hoy=date.today().isoformat()
+    if _VIGILANCIA['dia']!=hoy:
+        _VIGILANCIA.update(dia=hoy,avisados=set())
+    if ahora-_VIGILANCIA['kpi']>=300:
+        _VIGILANCIA['kpi']=ahora
+        for p in sky_metricas.detectar():
+            if p['id'] not in _VIGILANCIA['avisados']:
+                _VIGILANCIA['avisados'].add(p['id'])
+                sky_rutinas.avisar('Detecté un problema: '+p['titulo']+'. '+p['sugerencia'],'kpi')
+                _whatsapp('⚠️ Detecté un problema: '+p['titulo']+'. '+p['sugerencia'])
+    if ahora-_VIGILANCIA['intereses']>=3600:
+        _VIGILANCIA['intereses']=ahora
+        for linea in sky_aprendizaje.actualizar_intereses():
+            sky_rutinas.avisar('Novedad: '+linea,'aprendizaje')
+
+def _whatsapp(texto:str):
+    # v12.3: avisos al WhatsApp del dueño (dentro de la ventana de 24 h, o con su plantilla aprobada).
+    try:
+        from neural_core import sky_whatsapp
+        sky_whatsapp.enviar_aviso(texto)
+    except Exception:pass
+
 def _avisar_fuera(texto:str):
+    _whatsapp('🔔 '+texto)
     try:
         from neural_core.sky_asistente_personal import ejecutar_local_si_autorizado
         ejecutar_local_si_autorizado({'action':'notify','params':{'title':'SKY','message':texto},'description':'Recordatorio'})
@@ -110,6 +143,10 @@ async def lifespan(app):
     creative_pump=asyncio.create_task(_creative_pump()) if os.getenv('SKY_CREATIVE_WORKER','1')=='1' else None
     if os.getenv('SKY_WORKFLOWS_ENABLED','1')=='1':
         pump=asyncio.create_task(_workflow_pump())
+    try:
+        from neural_core import sky_metricas
+        sky_metricas.registrar('servicio','inicio',True,detalle='API iniciada')
+    except Exception:pass
     agenda_pump=asyncio.create_task(_agenda_pump()) if os.getenv('SKY_AGENDA_ENABLED','1')=='1' else None
     try:
         yield
@@ -559,11 +596,23 @@ async def sky_real_activity(request:Request,call_next):
     start=time.perf_counter()
     try:
         response=await call_next(request)
-        record(request.url.path,(time.perf_counter()-start)*1000,response.status_code)
+        ms=(time.perf_counter()-start)*1000
+        record(request.url.path,ms,response.status_code)
+        _kpi_api(request,ms,response.status_code)
         return response
     except Exception:
-        record(request.url.path,(time.perf_counter()-start)*1000,500)
+        ms=(time.perf_counter()-start)*1000
+        record(request.url.path,ms,500)
+        _kpi_api(request,ms,500)
         raise
+
+def _kpi_api(request:Request,ms:float,status:int):
+    # SKY v12.2: KPIs reales por ruta (plantilla sin IDs), código y milisegundos.
+    path=request.url.path
+    if not path.startswith('/api/'):return
+    from neural_core import sky_metricas
+    ruta=getattr(request.scope.get('route'),'path',None) or sky_metricas.ruta_plantilla(path)
+    sky_metricas.registrar('api',f'{request.method} {ruta}',status<500,ms,codigo=status)
 
 # v9.3: flujos autónomos locales, privilegios exclusivos del creador.
 from .workflow_api import router as workflow_router
@@ -581,6 +630,11 @@ from .language_api import router as sky_language_router
 app.include_router(sky_language_router)
 from .security_v101 import install as install_sky_security
 install_sky_security(app)
+# SKY SENTINEL (v12.5): toda /api/* es privada salvo excepciones explícitas; falla cerrado.
+from .sentinel import install as install_sentinel
+install_sentinel(app)
+from .sentinel_api import router as sentinel_router
+app.include_router(sentinel_router)
 
 # SKY 10.2: optional creator TOTP + short-lived server-side sessions.
 from .security_api import router as sky_security_router
@@ -606,8 +660,7 @@ app.include_router(sky_telemetria_router)
 from .asistente_api import router as sky_asistente_router
 app.include_router(sky_asistente_router)
 
-# SKY Impacto: módulos docentes, investigación y competencias en la API propia.
-# Conserva autenticación y segundo factor del núcleo existente.
+# SKY Impacto, Scholar y Pro Skills — API y protección original.
 from .impacto_api import router as sky_impacto_router
 app.include_router(sky_impacto_router, dependencies=[Depends(require_key)])
 
@@ -633,9 +686,14 @@ def client_bootstrap(request: Request):
     is_local = client_ip in ('127.0.0.1', '::1', 'localhost', 'testclient', 'testserver')
     # En despliegues públicos, una conexión interna del proxy no prueba que sea el dueño.
     reveal_owner_key = is_local and os.getenv('SKY_DEPLOYMENT_MODE', 'local').strip().lower() == 'local'
+    # SENTINEL: con PIN configurado la llave nunca se entrega sin él (POST /api/sentinel/desbloquear).
+    from neural_core.sentinel_identidad import pin_configurado
+    requiere_pin = pin_configurado()
+    if requiere_pin:
+        reveal_owner_key = False
     return {
-        'superadmin': 'oscarelieser.informatica.inatec@gmail.com',
         'key': api_token() if reveal_owner_key else '',
+        'requiere_pin': requiere_pin,
         'local': is_local,
         'ollama_active': True,
         'gemini_active': bool(os.getenv('GEMINI_API_KEY')),

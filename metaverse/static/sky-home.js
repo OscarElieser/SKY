@@ -292,6 +292,15 @@ async function autoBootstrap(){
     const r=await fetch('/api/client/bootstrap');
     if(r.ok){
       const d=await r.json();
+      if(!d.key && d.requiere_pin){
+        // SKY SENTINEL: con PIN configurado la llave sólo se entrega tras el PIN (en este equipo).
+        const pin=(window.prompt('SKY está bloqueada. Ingresá tu PIN:')||'').trim();
+        if(pin){
+          const u=await fetch('/api/sentinel/desbloquear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})});
+          const j=await u.json().catch(()=>({}));
+          if(u.ok&&j.key) d.key=j.key; else alert(j.detail||'PIN incorrecto');
+        }
+      }
       if(d.key){
         ownerKey=d.key;
         mode='owner';
@@ -500,7 +509,7 @@ $('chat-form').addEventListener('submit',async e=>{
       try {
         const rVid=await fetch('/api/tools/video',{
           method:'POST',
-          headers:{'Content-Type':'application/json'},
+          headers:skyHeaders(),
           body:JSON.stringify({prompt:text,minutes:dur})
         });
         const dVid=await rVid.json();
@@ -525,7 +534,7 @@ $('chat-form').addEventListener('submit',async e=>{
       try {
         const rImg=await fetch('/api/tools/image',{
           method:'POST',
-          headers:{'Content-Type':'application/json'},
+          headers:skyHeaders(),
           body:JSON.stringify({prompt:text})
         });
         const dImg=await rImg.json();
@@ -568,7 +577,7 @@ $('chat-form').addEventListener('submit',async e=>{
         msg('SKY','🔍 Consultando búsqueda web en tiempo real...');
         const rSearch=await fetch('/api/tools/search',{
           method:'POST',
-          headers:{'Content-Type':'application/json'},
+          headers:skyHeaders(),
           body:JSON.stringify({query:text})
         });
         const dSearch=await rSearch.json();
@@ -597,7 +606,7 @@ $('chat-form').addEventListener('submit',async e=>{
       /^(mostrar|ver|consultar|leer)\s+(la\s+)?(telemetr[ií]a|sensores|lecturas?\s+de\s+sensores)$/i.test(text.trim());
     if(isExplicitTelemetry){
       try{
-        const rSens=await fetch('/api/telemetria/latest');
+        const rSens=await fetch('/api/telemetria/latest',{headers:skyHeaders()});
         const dSens=await rSens.json();
         if(dSens.lectura){
           const card=`
@@ -623,7 +632,7 @@ $('chat-form').addEventListener('submit',async e=>{
     const isWatchRealMadrid = /(mu[eé]strame\s+(?:el\s+)?partido|ver\s+(?:el\s+)?partido|partido\s+en\s+vivo|pon(?:er)?\s+(?:el\s+)?partido|ver\s+al\s+real\s+madrid|sports\s+center)/i.test(text.trim()) && /madrid|real\s+madrid|sports/i.test(text.trim());
     if(isWatchRealMadrid){
       try{
-        const rMatch = await fetch('/api/sports/madrid/match');
+        const rMatch = await fetch('/api/sports/madrid/match',{headers:skyHeaders()});
         const dMatch = await rMatch.json();
         if(dMatch.ok && dMatch.partido){
           const p = dMatch.partido;
@@ -713,7 +722,7 @@ $('chat-form').addEventListener('submit',async e=>{
       try{
         const rBg = await fetch('/api/tools/remove-bg', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: skyHeaders(),
           body: JSON.stringify({image: imgRef})
         });
         const dBg = await rBg.json();
@@ -745,7 +754,7 @@ $('chat-form').addEventListener('submit',async e=>{
       try{
         const rDl = await fetch('/api/tools/download-video', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: skyHeaders(),
           body: JSON.stringify({url: targetUrl})
         });
         const dDl = await rDl.json();
@@ -785,7 +794,7 @@ $('chat-form').addEventListener('submit',async e=>{
       try{
         const rUp = await fetch('/api/tools/upscale', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: skyHeaders(),
           body: JSON.stringify({image: imgRef, scale: scale})
         });
         const dUp = await rUp.json();
@@ -813,7 +822,7 @@ $('chat-form').addEventListener('submit',async e=>{
       try{
         const rIco = await fetch('/api/tools/icon', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: skyHeaders(),
           body: JSON.stringify({concept: text})
         });
         const dIco = await rIco.json();

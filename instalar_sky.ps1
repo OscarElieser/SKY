@@ -1,4 +1,4 @@
-# SKY IA v12.1 - Instalador unico para Windows 10/11
+# SKY IA v12.3 - Instalador unico para Windows 10/11
 # Deja listo: Python + dependencias, Ollama + modelo del cerebro, voz natural Piper,
 # escucha local (faster-whisper), manos libres (Vosk), permisos del agente y .env.
 # Uso: doble clic en INSTALAR_SKY_WINDOWS.bat (no requiere administrador).
@@ -8,7 +8,8 @@ param(
     [string]$Modelo = "",          # ej. qwen2.5:7b ; vacio = elegir segun la memoria del equipo
     [switch]$SinOllama,
     [switch]$SinVoz,
-    [switch]$Local                 # activa SKY_LOCAL_ONLY=1 (nada sale del equipo)
+    [switch]$Local,                # activa SKY_LOCAL_ONLY=1 (nada sale del equipo)
+    [switch]$Siempre               # SKY 24/7: arranca con Windows y el equipo no se suspende enchufado
 )
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
@@ -91,7 +92,7 @@ if (-not $SinOllama) {
     if ($ollama) {
         if (-not $Modelo) {
             $gb = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-            $Modelo = if ($gb -ge 14) { "qwen2.5:7b" } else { "qwen2.5:3b" }
+            $Modelo = if ($gb -ge 30) { "qwen2.5:14b" } elseif ($gb -ge 14) { "qwen2.5:7b" } else { "qwen2.5:3b" }
             Ok "Memoria: $gb GB -> modelo $Modelo"
         }
         try { Invoke-WebRequest -Uri "http://127.0.0.1:11434/api/tags" -UseBasicParsing -TimeoutSec 2 | Out-Null }
@@ -152,6 +153,18 @@ if (-not (Test-Path (Join-Path $Neuralt "device_agent_policy.json"))) {
     Ok "Perfil 'multimedia' (cambialo con SKY_INICIAR.bat -> 6)"
 } else { Ok "Se conserva tu politica de permisos" }
 if ($Local) { Set-EnvValue "SKY_LOCAL_ONLY" "1"; Ok "Modo 100 % local activado" }
+
+# ------------------------------------------------------------------ 5b. SKY siempre encendida (opcional)
+if ($Siempre) {
+    Paso "SKY 24/7 en este equipo"
+    try {
+        powercfg /change standby-timeout-ac 0 | Out-Null
+        powercfg /change hibernate-timeout-ac 0 | Out-Null
+        Ok "Enchufado, el equipo ya no se suspende (la pantalla si puede apagarse)"
+    } catch { Aviso "No pude cambiar el plan de energia: hacelo en Configuracion > Sistema > Inicio/apagado" }
+    & $venvPy iniciar_sky_autonomo.py --install-startup
+    Ok "SKY arranca sola al iniciar sesion y reinicia sus servicios si se caen"
+}
 
 # ------------------------------------------------------------------ 6. Diagnostico
 Paso "Diagnostico final"

@@ -15,6 +15,13 @@ from neural_core.academic_core import (
 )
 from metaverse.api import app
 
+
+def _llave_dueno():
+    """SENTINEL v12.5: la API es privada; las pruebas usan la llave del dueño como lo hace la interfaz."""
+    from metaverse.api import api_token
+    return api_token()
+
+
 def test_academic_core_knowledge_file():
     """Verifica que el archivo maestro académico exista con metadatos y autoría."""
     assert ACADEMIC_FILE.is_file()
@@ -52,7 +59,7 @@ def test_academic_instructions():
 
 def test_academic_api_endpoints():
     """Verifica los endpoints de la API de educación y conocimiento."""
-    client = TestClient(app)
+    client = TestClient(app, headers={'X-SKY-KEY': _llave_dueno()})
 
     # 1. Lista de motores
     r_eng = client.get("/api/academic/engines")

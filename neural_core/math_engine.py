@@ -215,8 +215,11 @@ BLOCKED_MODULES = {
 }
 BLOCKED_CALLS = {
     "open", "eval", "exec", "__import__", "breakpoint", "compile",
-    "globals", "locals", "getattr", "setattr", "delattr"
+    "globals", "locals", "getattr", "setattr", "delattr", "vars", "input", "memoryview", "type"
 }
+# Funciones de bibliotecas que evalúan texto como código o tocan el sistema.
+BLOCKED_ATTRS = {"sympify", "parse_expr", "lambdify", "system", "popen", "spawn", "exec_command", "load", "fromfile",
+                 "tofile", "save", "savetxt", "loadtxt", "genfromtxt", "ctypeslib", "f2py", "testing"}
 
 class SandboxSecurityVisitor(ast.NodeVisitor):
     def __init__(self):
@@ -225,21 +228,49 @@ class SandboxSecurityVisitor(ast.NodeVisitor):
     def visit_Import(self, node):
         for alias in node.names:
             base = alias.name.split('.')[0]
-            if base in BLOCKED_MODULES:
+            if base in BLOCKED_MODULES or base not in REPL_PERMITIDOS:
                 self.errors.append(f"Importación no autorizada en Sandbox: '{alias.name}'.")
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node):
         if node.module:
             base = node.module.split('.')[0]
-            if base in BLOCKED_MODULES:
+            if base in BLOCKED_MODULES or base not in REPL_PERMITIDOS:
                 self.errors.append(f"Importación no autorizada en Sandbox: 'from {node.module}'.")
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node):
+        # SENTINEL: sin atributos internos (().__class__.__subclasses__() permitía salir del sandbox).
+        if node.attr.startswith('_'):
+            self.errors.append(f"Acceso a atributo interno bloqueado en Sandbox: '{node.attr}'.")
+        if node.attr in BLOCKED_ATTRS:
+            self.errors.append(f"Función bloqueada por seguridad en Sandbox: '{node.attr}'.")
+        self.generic_visit(node)
+
+    def visit_Name(self, node):
+        if node.id.startswith('__') or node.id in BLOCKED_CALLS:
+            self.errors.append(f"Nombre bloqueado por seguridad en Sandbox: '{node.id}'.")
+        self.generic_visit(node)
+
+    def visit_Constant(self, node):
+        if isinstance(node.value, str) and ('__' in node.value or 'import' in node.value):
+            self.errors.append('Texto con nombres internos o importaciones bloqueado en Sandbox.')
         self.generic_visit(node)
 
     def visit_Call(self, node):
         if isinstance(node.func, ast.Name) and node.func.id in BLOCKED_CALLS:
             self.errors.append(f"Llamada bloqueada por seguridad en Sandbox: '{node.func.id}()'.")
         self.generic_visit(node)
+
+
+REPL_PERMITIDOS = {"math", "cmath", "fractions", "decimal", "statistics", "itertools", "functools", "collections",
+                   "random", "json", "re", "datetime", "sympy", "numpy", "scipy"}
+
+
+def _importar_permitido(nombre, globales=None, locales=None, desde=(), nivel=0):
+    if nivel or nombre.split('.')[0] not in REPL_PERMITIDOS:
+        raise ImportError(f"Importación no autorizada en Sandbox: '{nombre}'.")
+    return __import__(nombre, globales, locales, desde, nivel)
 
 
 def ejecutar_python_repl(codigo: str, timeout_segundos: float = 3.0) -> Dict[str, Any]:
@@ -261,7 +292,14 @@ def ejecutar_python_repl(codigo: str, timeout_segundos: float = 3.0) -> Dict[str
     except Exception as exc:
         return {"ok": False, "error": f"Error al analizar código: {str(exc)}"}
 
+    import builtins as _builtins
+    _seguros = {n: getattr(_builtins, n) for n in (
+        "abs", "all", "any", "bool", "dict", "divmod", "enumerate", "filter", "float", "format", "frozenset", "int",
+        "isinstance", "len", "list", "map", "max", "min", "pow", "print", "range", "reversed", "round", "set",
+        "slice", "sorted", "str", "sum", "tuple", "zip", "complex", "ValueError", "ZeroDivisionError", "Exception")}
+    _seguros["__import__"] = _importar_permitido
     safe_globals = {
+        "__builtins__": _seguros,
         "__name__": "__sandbox__",
         "__doc__": None,
         "math": math,

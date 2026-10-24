@@ -13,7 +13,14 @@ from neural_core.math_engine import (
 from neural_core.academic_core import academic_instructions
 from neural_core.developer_core import developer_instructions
 
-client = TestClient(app)
+
+def _llave_dueno():
+    """SENTINEL v12.5: la API es privada; las pruebas usan la llave del dueño como lo hace la interfaz."""
+    from metaverse.api import api_token
+    return api_token()
+
+
+client = TestClient(app, headers={'X-SKY-KEY': _llave_dueno()})
 
 # ==============================================================================
 # PILAR 1: CÁLCULO SIMBÓLICO DETERMINISTA (CAS - SymPy)

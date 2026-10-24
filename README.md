@@ -1,4 +1,4 @@
-# 🌌 SKY IA — Universal v12.1 | HUD · Asistente Personal
+# 🌌 SKY IA — Universal v12.5 | HUD · Asistente Personal
 
 **Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
 
@@ -27,7 +27,21 @@ Desde este panel podrás elegir fácilmente:
 
 ---
 
-## 🛰️ SKY v12.1 — HUD y Asistente Personal
+## 🛰️ SKY v12.5 — HUD y Asistente Personal
+
+- **SKY SENTINEL:** la API es privada por defecto, con PIN del dueño (la interfaz arranca bloqueada y lo crítico lo pide), modo «sólo este equipo», la voz que no confirma lo crítico, un Security Center y la parada de emergencia ampliada. Informe: [docs/seguridad/SENTINEL_FASES_1_2.md](docs/seguridad/SENTINEL_FASES_1_2.md)
+
+- **SKY Skill Builder:** "diseña una habilidad para …" → SKY la programa, la revisa, la prueba aislada y sólo la instala si la aprobás (con los permisos que elijas).
+- **Habilidades:** viajes, proyectos, casa, automonitoreo, auditoría de seguridad, música (letras) y creación de imágenes (OpenAI / Adobe Firefly) y presentaciones (Gamma) con sus APIs oficiales. Novedades: [CHANGELOG_V12_4.md](CHANGELOG_V12_4.md)
+
+- **WhatsApp:** hablale a SKY desde tu celular (API oficial de Meta), con texto o notas de voz; confirma lo sensible con un código. Guía: [docs/guias/SKY_WHATSAPP.md](docs/guias/SKY_WHATSAPP.md)
+- **Skills y tareas programadas por voz:** "todos los días a las 8 prepara las respuestas de los correos". **Perfil USER.md** que SKY lee en cada respuesta.
+- **Cerebro con herramientas también con Claude, GPT o Gemini**, y **SKY 24/7** con reinicio automático. Novedades: [CHANGELOG_V12_3.md](CHANGELOG_V12_3.md)
+
+- **Aprende sola:** las frases nuevas que salen bien se vuelven atajos instantáneos; le podés enseñar órdenes, contarle datos tuyos y corregirla. Todo se puede revisar, exportar y borrar.
+- **Se alimenta de internet:** "aprende sobre…" (Wikipedia y noticias, con fuentes) y "sigue el tema…" con novedades diarias. `SKY_INTERNET=0` lo apaga.
+- **KPIs reales:** mide cada petición, mensaje y acción; detecta problemas sola y responde "¿qué está fallando?" con evidencia. Panel de rendimiento a pedido. Novedades: [CHANGELOG_V12_2.md](CHANGELOG_V12_2.md) · Estado real: [docs/ESTADO_REAL_SKY.md](docs/ESTADO_REAL_SKY.md)
+- **Parada de emergencia** ("SKY, para todo") y niveles de riesgo 1–3 en cada acción.
 
 - **Entiende a la primera:** las órdenes conocidas se resuelven al instante, y las demás las interpreta un **cerebro local con herramientas** (Ollama), que también entiende referencias como "más fuerte" o "cerralo".
 - **Voz fluida:** empieza a hablar con la primera frase, con voz natural **Piper** local y escucha continua **"SKY…"** transcrita en tu PC.
