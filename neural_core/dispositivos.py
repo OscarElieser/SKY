@@ -85,6 +85,44 @@ def call_device(url: str, token: str, action: str='status', params: dict | None=
         raise RuntimeError('No se pudo conectar. Verificá que el agente y Tailscale estén activos.') from exc
 
 
+def verify_device_action(url: str, token: str, command_id: str, timeout: int = 7) -> dict:
+    """Consulta un recibo del agente; no equipara 'SENT' o 'PENDING' con 'VERIFIED'."""
+    if not isinstance(command_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,80}', command_id):
+        raise ValueError('Identificador de acción inválido.')
+    if not token or len(token.strip()) < 32:
+        raise ValueError('Token de dispositivo inválido o no configurado.')
+    base = validate_endpoint(url)
+    query = urllib.parse.urlencode({'command_id': command_id})
+    req = urllib.request.Request(
+        base + '/verify_action?' + query,
+        headers={'Authorization': 'Bearer ' + token.strip()},
+        method='GET',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read(131_072))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise LookupError('La acción no está en el registro actual del agente.') from exc
+        raise RuntimeError(f'El agente respondió HTTP {exc.code} durante la verificación.') from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise RuntimeError('No se pudo consultar la verificación del agente.') from exc
+    except (ValueError, TypeError) as exc:
+        raise RuntimeError('El agente devolvió una respuesta de verificación inválida.') from exc
+
+    record = data.get('record') if isinstance(data, dict) else None
+    allowed = {'RECEIVED', 'RUNNING', 'SENT', 'PENDING', 'VERIFIED', 'FAILED', 'NEEDS_CONFIRMATION'}
+    if not isinstance(record, dict) or record.get('command_id') != command_id or record.get('status') not in allowed:
+        raise RuntimeError('El agente devolvió un registro de acción inconsistente.')
+    return {
+        'ok': True,
+        'command_id': command_id,
+        'status': record['status'],
+        'verified': record['status'] == 'VERIFIED',
+        'record': record,
+    }
+
+
 DEVICE_PLATFORMS = {
     'windows': {
         'name': 'Windows 10/11',
