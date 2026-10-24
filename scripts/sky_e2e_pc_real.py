@@ -79,7 +79,11 @@ def run(args):
     # Create a real file using the existing SKY Office engine; never overwrite.
     from neural_core.sky_office import create_document
     unique=secrets.token_hex(7)
-    folder=Path.home()/".neuralt"/"e2e"
+    from neural_core.windows_controller import resolve_windows_special_folder
+    docs=resolve_windows_special_folder("documentos")
+    if docs is None:
+        raise RuntimeError("No se encontró la carpeta Documentos autorizada en Windows.")
+    folder=docs/"SKY_E2E"
     folder.mkdir(mode=0o700,parents=True,exist_ok=True)
     spec={"kind":"docx","title":"SKY E2E "+unique,
           "content":"Prueba local autorizada para verificar generación de Word en SKY."}
