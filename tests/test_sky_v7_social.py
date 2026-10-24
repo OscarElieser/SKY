@@ -7,6 +7,7 @@ def client(tmp_path,monkeypatch):
     monkeypatch.setenv('SKY_COMMUNITY_DB',str(tmp_path/'community.sqlite3'))
     monkeypatch.setenv('SKY_METAVERSE_DB',str(tmp_path/'worlds.sqlite3'))
     monkeypatch.setenv('SKY_API_KEY','my-personal-secret-to-sky-system-must-be-long')
+    monkeypatch.setenv('SKY_COMUNIDAD_PUBLICA','1')   # SENTINEL: la comunidad sólo se abre si el dueño lo decide
     from metaverse.api import app
     with TestClient(app) as c:yield c
 

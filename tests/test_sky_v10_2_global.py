@@ -76,6 +76,7 @@ def test_owner_second_factor_blocks_all_private_routes(env,monkeypatch):
 def test_distinct_community_user_language_preferences(env,monkeypatch):
     c,tmp=env
     monkeypatch.setenv('SKY_COMMUNITY_DB',str(tmp/'global_users.db'))
+    monkeypatch.setenv('SKY_COMUNIDAD_PUBLICA','1')   # SENTINEL: comunidad abierta sólo por decisión del dueño
     from metaverse import community_store as store
     invite1=store.issue_invite();invite2=store.issue_invite()
     users=[]

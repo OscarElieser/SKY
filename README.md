@@ -1,4 +1,4 @@
-# 🌌 SKY IA — Universal v12.4 | HUD · Asistente Personal
+# 🌌 SKY IA — Universal v12.5 | HUD · Asistente Personal
 
 **Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
 
@@ -27,7 +27,9 @@ Desde este panel podrás elegir fácilmente:
 
 ---
 
-## 🛰️ SKY v12.4 — HUD y Asistente Personal
+## 🛰️ SKY v12.5 — HUD y Asistente Personal
+
+- **SKY SENTINEL:** la API es privada por defecto, con PIN del dueño (la interfaz arranca bloqueada y lo crítico lo pide), modo «sólo este equipo», la voz que no confirma lo crítico, un Security Center y la parada de emergencia ampliada. Informe: [docs/seguridad/SENTINEL_FASES_1_2.md](docs/seguridad/SENTINEL_FASES_1_2.md)
 
 - **SKY Skill Builder:** "diseña una habilidad para …" → SKY la programa, la revisa, la prueba aislada y sólo la instala si la aprobás (con los permisos que elijas).
 - **Habilidades:** viajes, proyectos, casa, automonitoreo, auditoría de seguridad, música (letras) y creación de imágenes (OpenAI / Adobe Firefly) y presentaciones (Gamma) con sus APIs oficiales. Novedades: [CHANGELOG_V12_4.md](CHANGELOG_V12_4.md)

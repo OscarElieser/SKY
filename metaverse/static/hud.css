@@ -217,3 +217,10 @@ button.chip.on{color:var(--amber);border-color:rgba(255,176,32,.6)}
 .kpi-prob details{margin-top:6px}.kpi-prob summary{cursor:pointer;color:var(--cyan2);font-size:12px}
 .kpi-prob pre{max-height:300px;overflow:auto;background:rgba(0,0,0,.4);padding:8px;font-size:11px;white-space:pre-wrap}
 .sky-img{display:block;max-width:100%;max-height:420px;margin-top:6px;border:1px solid var(--line2)}
+
+/* SKY SENTINEL */
+.pin-fondo{position:fixed;inset:0;z-index:9999;background:rgba(1,4,8,.82);display:flex;align-items:center;justify-content:center;padding:16px}
+.pin-caja{width:min(360px,100%);border:1px solid var(--cyan);background:var(--bg1);padding:18px;display:flex;flex-direction:column;gap:10px;box-shadow:0 0 30px rgba(0,229,255,.25)}
+.pin-caja b{letter-spacing:.2em;color:var(--cyan)}
+.pin-caja .hab-in{font-size:22px;letter-spacing:.4em;text-align:center}
+.btn.peligro{border-color:var(--red);color:var(--red)}

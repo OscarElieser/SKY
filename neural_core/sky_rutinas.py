@@ -275,6 +275,12 @@ def rutinas_programadas(ahora: datetime | None = None) -> list[dict]:
     """Rutinas cuya hora llegó hoy y todavía no corrieron (marca la ejecución)."""
     ahora = ahora or datetime.now()
     salida = []
+    try:
+        from .sky_capacidades import parada_activa
+        if parada_activa():
+            return []   # SENTINEL: con la parada de emergencia activa no corre ninguna automatización
+    except Exception:
+        return []
     with _LOCK:
         data = agenda()
         for r in data['rutinas']:

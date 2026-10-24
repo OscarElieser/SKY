@@ -29,7 +29,7 @@ from neural_core import dispositivos
 from neural_core.sky_asistente_personal import token_agente_local, url_agente_local
 
 router = APIRouter(prefix='/api/hud', dependencies=[Depends(require_key)])
-VERSION_SKY = '12.4.0'
+VERSION_SKY = '12.5.0'
 
 
 def _credenciales() -> tuple[str, str]:
@@ -253,8 +253,10 @@ def kpi_evento(body: EventoKPI):
 
 
 @router.get('/memoria')
-def memoria_exportar():
-    """Exporta todo lo que SKY recuerda y aprendió (para revisarlo o guardarlo)."""
+def memoria_exportar(request: Request):
+    """Exporta todo lo que SKY recuerda y aprendió (para revisarlo o guardarlo). Exportar datos privados pide PIN."""
+    from .sentinel import exigir_pin
+    exigir_pin(request, 'exportar tu memoria')
     from neural_core import sky_aprendizaje
     return sky_aprendizaje.exportar()
 
@@ -385,8 +387,10 @@ def borradores_editar(item_id: str, body: Cuerpo):
 
 
 @router.post('/borradores/{item_id}/enviar')
-def borradores_enviar(item_id: str):
-    """Este clic ES la confirmación del dueño (nivel 3)."""
+def borradores_enviar(item_id: str, request: Request):
+    """Este clic ES la confirmación del dueño (nivel 3), con su PIN si lo configuró."""
+    from .sentinel import exigir_pin
+    exigir_pin(request, 'enviar un correo')
     from neural_core import sky_borradores, sky_metricas
     try:
         res = sky_borradores.enviar(item_id)
@@ -500,8 +504,10 @@ class Aprobacion(BaseModel):
 
 
 @router.post('/builder/{sid}/aprobar')
-def builder_aprobar(sid: str, body: Aprobacion):
-    """Este clic del dueño ES la aprobación (nivel 3): instala esa versión con esos permisos."""
+def builder_aprobar(sid: str, body: Aprobacion, request: Request):
+    """Este clic del dueño ES la aprobación (nivel 3): instala esa versión con esos permisos (con PIN si existe)."""
+    from .sentinel import exigir_pin
+    exigir_pin(request, 'instalar una habilidad')
     from neural_core import sky_skill_builder
     try:
         return sky_skill_builder.aprobar(sid, body.version, body.permisos)

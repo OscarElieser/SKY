@@ -1,4 +1,4 @@
-# SKY IA v12.3 — Inicio
+# SKY IA v12.5 — Inicio
 
 ## 1. Instalar (una sola vez)
 
@@ -41,7 +41,15 @@ Ejemplos:
 - **Perfil:** "muéstrame mi perfil" (escribí quién sos, tus herramientas y suscripciones)
 - **Emergencia:** "SKY, para todo" detiene toda acción al instante; para reanudar tocá **Reanudar** en la tarjeta.
 
-## 4. Permisos
+## 4. Seguridad (SKY SENTINEL): que sólo vos la uses
+
+1. Decile a SKY «mostrame tu estado de seguridad» y tocá **Configurar PIN**: desde ahí SKY arranca bloqueada y pide tu PIN, y lo pide de nuevo para lo crítico (enviar correos, aprobar habilidades, exportar tu memoria, cerraduras, reanudar tras una emergencia).
+2. Si no usás SKY desde el celular: «bloqueá el acceso desde otros dispositivos».
+3. «SKY, para todo» detiene todo al instante. «bloquéate» vuelve a pedir el PIN.
+
+Informe y detalles: `docs/seguridad/SENTINEL_FASES_1_2.md`.
+
+## 4b. Permisos
 
 | Perfil | Qué hace | Sin pedir clic |
 |---|---|---|
