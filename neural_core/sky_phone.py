@@ -200,6 +200,24 @@ def _check_destination(state: dict, number: str):
     return dest
 
 
+def native_destination(number: str) -> dict:
+    """Validate a voluntary native dialer/SMS handoff with SKY's block list.
+
+    The OS prompts the user; SKY cannot claim that any call/SMS was completed.
+    Native dialer can use any SIM/carrier, independently of Twilio provider.
+    """
+    dest=normalize(number)
+    with LOCK:
+        state=_load()
+        if dest in state.get("blocked",[]):
+            raise PhoneInvalid("Número bloqueado dentro de SKY.")
+    return {"allowed":True,"destination":dest,"masked":_mask(dest),
+            "call_completed":False,"message_sent":False,
+            "native_os_user_action_required":True,
+            "carrier_sim_owned_by_user":True,
+            "sky_bypass_of_native_phone_controls":False}
+
+
 def readiness() -> dict:
     with LOCK:
         state = _load()
@@ -420,6 +438,7 @@ def capabilities()->dict:
             "voice":"Twilio callback to verified owner's handset then target; not browser softphone",
             "video":"Jitsi iframe/WebRTC after explicit click",
             "phone_number":"E.164 global format, carrier-independent, Twilio coverage varies",
+            "native_dialer_sms":"optional tel:/sms: handoff on mobile, user confirms in OS",
             "verification":"Twilio Verify SMS OTP",
             "blocked_numbers":"enforced in SKY, not system-wide",
             "inbound":"not implemented",
