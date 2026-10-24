@@ -430,7 +430,12 @@
   function recibir(texto, origen) {
     if (S.pending && origen === 'voz') {
       const t = texto.trim().toLowerCase();
-      if (SI.test(t)) { addMsg('user', texto); S.pending.run(); return; }
+      if (SI.test(t)) {
+        addMsg('user', texto);
+        if (S.pending.voiceAllowed) S.pending.run();
+        else speak('Por seguridad, confirmá la acción con el botón Ejecutar.');
+        return;
+      }
       if (NO.test(t)) { addMsg('user', texto); S.pending.cancel(); speak('Cancelado.'); return; }
     }
     enviar(texto, origen === 'voz' ? 'voz' : 'chat');
@@ -535,16 +540,18 @@
     }
     if (data.aviso) { card.appendChild(el('div', 'note', data.aviso)); setState('idle', 'Permiso desactivado');
       await speak('Esa función está desactivada en tu equipo. Te dejé cómo activarla.'); seguirConversacion(); return; }
-    confirmar(card, p.description, () => ejecutar({ ...p, approval_token: data.approval_token }, card));
+    confirmar(card, p.description, () => ejecutar({ ...p, approval_token: data.approval_token }, card),
+      ['media_control', 'media_key', 'volume', 'play_media', 'open_url', 'launch_app', 'notify'].includes(p.action));
     setState('idle', 'Esperando tu confirmación');
     if (modo === 'voz') { await speak('¿Lo hago? ' + p.description + '.'); if (S.conv || modo === 'voz') escuchar(); }
   }
-  function confirmar(card, desc, run) {
+  function confirmar(card, desc, run, voiceAllowed = false) {
     const btns = el('div', 'btns');
     const si = el('button', 'btn primary', 'Ejecutar'); si.type = 'button';
     const no = el('button', 'btn', 'Cancelar'); no.type = 'button';
     btns.append(si, no); card.appendChild(btns); scroll();
     const pend = {
+      voiceAllowed,
       run: () => { btns.remove(); S.pending = null; run(); },
       cancel: () => { btns.remove(); S.pending = null; card.appendChild(el('div', 's', 'Cancelado.')); setState('idle', 'Listo.'); },
     };
