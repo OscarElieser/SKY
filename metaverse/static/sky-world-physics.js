@@ -12,6 +12,7 @@
 
   function finite(value) { return typeof value === 'number' && Number.isFinite(value); }
   function solid(object) {
+    if (object?.interaction?.type === 'door' && object.interaction.active) return false;
     if (!object || !['box', 'house', 'tower', 'cylinder', 'cone',
       'tree', 'palm', 'rock'].includes(object.kind)) return false;
     const p = object.position, s = object.scale;
