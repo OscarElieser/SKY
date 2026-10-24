@@ -133,6 +133,59 @@ def internal_role_preview(body: InternalRolePlan):
         raise HTTPException(422, str(exc)[:240]) from exc
 
 
+from neural_core import sky_supervisor as supervisor
+
+
+class SupervisorRequest(BaseModel):
+    request: str = Field(min_length=8, max_length=3000)
+    source_text: str = Field(default='', max_length=12000)
+    document_format: str = Field(default='docx', max_length=12)
+    project_id: str | None = Field(default=None, max_length=120)
+    request_id: str | None = Field(default=None, max_length=100)
+
+
+@router.get('/supervisor/catalogue')
+def supervisor_catalogue():
+    return supervisor.catalogue()
+
+
+@router.post('/supervisor/analyze')
+def supervisor_analyze(body: SupervisorRequest):
+    """SKY divides work; preview never creates jobs or executes tools."""
+    try:
+        return supervisor.analyze_request(body.request, body.source_text,
+                                           body.document_format, body.project_id)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)[:250]) from exc
+
+
+@router.post('/supervisor/prepare', status_code=201)
+def supervisor_prepare(body: SupervisorRequest):
+    """Automatically creates a workflow, held for owner review and approval."""
+    try:
+        result = supervisor.prepare(body.request, body.source_text, body.document_format,
+                                    body.project_id, body.request_id)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)[:250]) from exc
+    except KeyError as exc:
+        raise HTTPException(404, 'Proyecto indicado no encontrado.') from exc
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)[:240]) from exc
+    if result.get('status') == 'needs_input':
+        return result
+    return result
+
+
+@router.get('/supervisor/jobs/{workflow_id}')
+def supervisor_job(workflow_id: str):
+    try:
+        return supervisor.get_job(workflow_id)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)[:160]) from exc
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)[:180]) from exc
+
+
 @router.get('/workflows/catalogue')
 def catalogue():
     return {'agents':wf.ROLE_ACTION,'actions':list(wf.SAFE_ACTIONS),
