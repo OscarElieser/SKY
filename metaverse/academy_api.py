@@ -232,3 +232,46 @@ def official_source_retrieval(body: OfficialSourcesRequest):
 @router.get("/research/sources")
 def source_catalogue():
     return sky_evidence_lab.catalogue()
+
+
+# SKY Investigadora: bibliografía de fuentes reales, no referencias inventadas.
+class BibliographyRequest(BaseModel):
+    query: str=Field(min_length=5,max_length=240)
+    provider: str=Field(default="openalex",pattern="^(openalex|crossref)$")
+    limit: int=Field(default=6,ge=1,le=12)
+
+
+class RubricRequest(BaseModel):
+    objective: str=Field(min_length=5,max_length=300)
+    criteria: list[str]=Field(min_length=1,max_length=6)
+    student_response: str=Field(min_length=2,max_length=800)
+
+
+@router.post("/research/live-papers")
+def live_bibliography(body: BibliographyRequest):
+    from neural_core.sky_scholarly import search_papers
+    from neural_core import sky_metricas
+    import time
+    tic=time.perf_counter()
+    try:
+        result=search_papers(body.query,provider=body.provider,limit=body.limit)
+        sky_metricas.registrar("servicio","bibliography_lookup",True,(time.perf_counter()-tic)*1000)
+        return {
+            **result,
+            "results_observed":len(result.get("items",[])),
+            "metadata_only":True,
+            "content_or_peer_review_verified":False,
+            "generated_citations_without_metadata":False,
+        }
+    except (ValueError,RuntimeError,OSError) as exc:
+        sky_metricas.registrar("servicio","bibliography_lookup",False,(time.perf_counter()-tic)*1000)
+        raise HTTPException(502,"No se pudo consultar la fuente académica: "+str(exc)[:140]) from exc
+
+
+@router.post("/education/formative-rubric")
+def guided_rubric(body: RubricRequest):
+    from neural_core.sky_verification_lab import formative_review
+    try:
+        return formative_review(body.objective,body.criteria,body.student_response)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
