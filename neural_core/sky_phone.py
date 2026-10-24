@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
 import json
 import time
 import os
@@ -312,10 +313,21 @@ def revoke_owner(*,approved:bool)->dict:
     return {"revoked":True,"phone_owner_verified":False}
 
 
+def _private_block_id(state:dict,number:str)->str:
+    salt=state.get("block_salt","")
+    if not isinstance(salt,str) or not re.fullmatch(r"[a-f0-9]{32}",salt):
+        raise PhoneUnavailable("Identificador privado de bloqueos no inicializado.")
+    return hmac.new(bytes.fromhex(salt),number.encode(),hashlib.sha256).hexdigest()[:16]
+
+
 def blocked_list()->dict:
     with LOCK:
-        numbers = sorted(set(_load().get("blocked",[])))
-        return {"numbers":[{"id":hashlib.sha256(n.encode()).hexdigest()[:16],
+        state=_load()
+        numbers=sorted(set(state.get("blocked",[])))
+        if numbers and not state.get("block_salt"):
+            state["block_salt"]=secrets.token_hex(16)
+            _save(state)
+        return {"numbers":[{"id":_private_block_id(state,n),
                             "masked":_mask(n)} for n in numbers],
                 "total":len(numbers),
                 "scope":"sky_only_not_carrier_or_operating_system"}
@@ -329,6 +341,8 @@ def set_block(number: str, *, blocked:bool, approved:bool)->dict:
         if number==data.get("verified_phone"):
             raise PhoneInvalid("No podés bloquear el número propietario verificado.")
         numbers=set(data.get("blocked",[]))
+        if blocked and not data.get("block_salt"):
+            data["block_salt"]=secrets.token_hex(16)
         if blocked:numbers.add(number)
         else:numbers.discard(number)
         if len(numbers)>300:raise PhoneInvalid("Máximo de números bloqueados alcanzado.")
@@ -344,7 +358,10 @@ def unblock_by_id(identifier:str,*,approved:bool)->dict:
         raise PhoneInvalid("Identificador de bloqueo inválido.")
     with LOCK:
         state=_load(); numbers=set(state.get("blocked",[]))
-        matched=[n for n in numbers if hashlib.sha256(n.encode()).hexdigest()[:16]==identifier]
+        if numbers and not state.get("block_salt"):
+            state["block_salt"]=secrets.token_hex(16)
+            _save(state)
+        matched=[n for n in numbers if hmac.compare_digest(_private_block_id(state,n),identifier)]
         if len(matched)!=1:raise PhoneInvalid("Número bloqueado no encontrado.")
         number=matched[0];numbers.remove(number)
         state["blocked"]=sorted(numbers);_save(state)
