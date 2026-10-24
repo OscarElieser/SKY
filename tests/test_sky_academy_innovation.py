@@ -248,3 +248,91 @@ def test_real_lesson_export_and_invalid_levels(client):
     invalid_project=client.post("/api/sky/academy/innovation/project",
                         headers=auth(),json=project(event="fake-competition"))
     assert invalid_project.status_code==422
+
+
+
+def test_official_research_can_fetch_only_whitelisted_sources_and_retain_timestamp(client,monkeypatch):
+    import urllib.request
+    from email.message import Message
+
+    hits=[]
+    class WebResponse:
+        status=200
+        def __init__(self):
+            self.headers=Message()
+            self.headers["Content-Type"]="text/html; charset=utf-8"
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+        def read(self,limit=250001):
+            assert limit<=250001
+            return b"<html><body><h1>Educacion inicial</h1><p>El aprendizaje promueve experiencias.</p></body></html>"
+
+    class FakeOpener:
+        def open(self,request,timeout=8):
+            hits.append((request.full_url,timeout))
+            return WebResponse()
+    monkeypatch.setattr(urllib.request,"build_opener",lambda *handlers: FakeOpener())
+    req={
+        "topic":"aprendizaje en educación inicial",
+        "source_ids":["mined_meidi"],
+    }
+    actual=client.post("/api/sky/academy/research/official-sources",
+                       headers=auth(),json=req)
+    assert actual.status_code==200,actual.text
+    value=actual.json()
+    assert value["pages_retrieved"]==1
+    assert not value["all_claims_verified"]
+    assert not value["research_completed"]
+    assert len(hits)==1 and "mined.gob.ni" in hits[0][0]
+    source=value["sources"][0]
+    assert source["status"]=="official_page_retrieved_not_independently_verified"
+    assert source["retrieved_at"]
+    assert source["retrieved_sha256"]
+    assert source["topic_match"]
+    assert source["site_publication_date_verified"] is False
+    assert source["text_instructions_executed"] is False
+
+
+def test_unapproved_official_source_is_rejected_before_any_network(client,monkeypatch):
+    import urllib.request
+    def unreachable(*args,**kwargs):
+        raise AssertionError("Network must not be touched for invalid source IDs")
+    monkeypatch.setattr(urllib.request,"build_opener",unreachable)
+    response=client.post("/api/sky/academy/research/official-sources",
+                        headers=auth(),json={
+                            "topic":"investigación sobre transporte público",
+                            "source_ids":["https://evil.example/"],
+                        })
+    assert response.status_code==422
+
+
+def test_unavailable_official_source_never_yields_fake_evidence(client,monkeypatch):
+    import urllib.request
+    class Fail:
+        def open(self,req,timeout):
+            raise OSError("Sin acceso")
+    monkeypatch.setattr(urllib.request,"build_opener",lambda *a: Fail())
+    result=client.post("/api/sky/academy/research/official-sources",
+                       headers=auth(),json={
+                           "topic":"innovación educación nicaragüense",
+                           "source_ids":["inatec_portal"]
+                       })
+    assert result.status_code==200,result.text
+    assert result.json()["pages_retrieved"]==0
+    assert result.json()["sources"][0]["status"]=="unavailable_or_unsupported"
+    assert result.json()["sources"][0]["topic_excerpts"]==[]
+
+
+@pytest.mark.parametrize("level,voice_command",[
+    ("tecnico","SKY, impartí una clase de seguridad ocupacional para nivel técnico"),
+    ("universitario","SKY, impartí una clase de probabilidad para universitario"),
+    ("doctorado","SKY, impartí una clase de metodología para doctorado"),
+])
+def test_owner_can_start_other_levels_by_voice(client,level,voice_command):
+    response=client.post("/api/asistente/mensaje",headers=auth(),
+                         json={"texto":voice_command,"modo":"voz"})
+    assert response.status_code==200,response.text
+    data=response.json()
+    assert data["proveedor"]=="sky-aula"
+    assert data["academy"]["plan"]["level"]==level
+    assert data["lesson_id"].startswith("lesson_")
