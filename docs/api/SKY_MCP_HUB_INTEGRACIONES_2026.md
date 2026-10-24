@@ -18,10 +18,14 @@
 | [Mem0 MCP](https://github.com/mem0ai/mem0-mcp) | Proyecto archivado 24/03/2026 | No instalar legado; servicio oficial remoto `https://mcp.mem0.ai/mcp` requiere OAuth (etapa futura) |
 | [ClickHouse](https://github.com/ClickHouse/mcp-clickhouse) | MCP SQL | Adaptador stdio, cuenta SQL de lectura y escritura bloqueada |
 | [Google News](https://github.com/ChanMeng666/server-google-news) | MCP noticias | Adaptador stdio; API SerpAPI y verificación |
+| [Context7](https://github.com/upstash/context7) | MCP documentación | Adaptador stdio; consulta de APIs actuales, necesita instalación Node |
+| [Supabase MCP oficial](https://github.com/supabase/mcp) | MCP HTTP/OAuth | Catalogado; conexión remota pendiente, preferir proyecto único y `read_only=true` |
+| [Postgres MCP Pro](https://github.com/crystaldba/postgres-mcp) | MCP PostgreSQL | Adaptador stdio: `--access-mode=restricted` y cuenta SQL de lectura |
+| [Semgrep Guardian](https://github.com/semgrep/semgrep/tree/develop/cli/src/semgrep/mcp) | MCP de análisis de seguridad | Adaptador stdio mediante `semgrep mcp`; no usar el repositorio MCP archivado |
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [Cursor](https://www.cursor.com/), [Windsurf](https://windsurf.com/), [Cline](https://cline.bot/), [Continue](https://docs.continue.dev/) | Herramientas/IDE clientes y agentes | Referencias, no servidores a copiar dentro de SKY |
 | [LibreChat](https://github.com/danny-avila/LibreChat), [Chainlit](https://github.com/Chainlit/chainlit), [Cherry Studio](https://github.com/CherryHQ/cherry-studio), [NextChat](https://github.com/ChatGPTNextWeb/NextChat) | Aplicaciones o frameworks de chat | Referencias de experiencia de usuario, no reemplazo de SKY HUD |
 
-El enlace abreviado al video/tutorial «7 MCP» no permitió confirmar su contenido, así que no se deducen funciones adicionales.
+El enlace abreviado no abrió, pero se identificó el [artículo original de Fazt sobre MCP para programar](https://fazt.dev/contenido/mcp-que-mejoran-ia-para-programar). Incluye Context7, Supabase, PostgreSQL y Semgrep, entre otros; se registraron en SKY sin fingir cuentas conectadas.
 
 ## Modelo de permisos
 
