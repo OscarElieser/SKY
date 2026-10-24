@@ -18,6 +18,15 @@ _ROOT = Path(__file__).resolve().parent.parent / "templates"
 _ALLOWED = {"react": "sky_design_react", "flutter": "sky_design_flutter"}
 _LAYOUTS = ("editorial", "dashboard", "immersive")
 _STYLES = ("aurora", "ember", "monochrome")
+_REACT_FONTS = {"inter": ("@fontsource/inter", "Inter"), "manrope": ("@fontsource/manrope", "Manrope"), "poppins": ("@fontsource/poppins", "Poppins")}
+_REACT_ICONS = ("lucide", "tabler")
+_MOTIONS = ("normal", "none")
+_TABLER_MAP = """import {
+  IconSparkles, IconShieldCheck, IconCompass, IconStack2, IconActivity
+} from '@tabler/icons-react'"""
+_TABLER_FEATURE_ICONS = ("IconSparkles", "IconShieldCheck", "IconCompass", "IconStack2", "IconActivity")
+_FONT_VERSION = "5.3.0"
+_TABLER_VERSION = "3.49.0"
 _THEMES = (
     ("#64e6cf", "#8c79ff", "#071119", "#edf6fa"),
     ("#fd946d", "#b678ff", "#170d15", "#fff5ef"),
@@ -123,7 +132,8 @@ def _dart_literal(value: str) -> str:
 
 def create_design(title: str, brief: str, *, platform: str = "react",
                   domain: str = "", style: str = "auto",
-                  layout: str = "auto") -> dict[str, Any]:
+                  layout: str = "auto", icon_pack: str = "lucide",
+                  font_family: str = "inter", motion: str = "normal") -> dict[str, Any]:
     """Create a multi-file React/Flutter source tree without filesystem writes."""
     title = _clean(title, "Título", 90)
     brief = _clean(brief, "Descripción", 500)
@@ -133,6 +143,10 @@ def create_design(title: str, brief: str, *, platform: str = "react",
         raise DesignInvalid("Plataforma: react o flutter.")
     if style not in {*_STYLES, "auto"} or layout not in {*_LAYOUTS, "auto"}:
         raise DesignInvalid("Estilo o distribución no admitida.")
+    if icon_pack not in _REACT_ICONS or font_family not in _REACT_FONTS or motion not in _MOTIONS:
+        raise DesignInvalid("Biblioteca, tipografía o animación no admitida.")
+    if platform == "flutter" and (icon_pack != "lucide" or font_family != "inter"):
+        raise DesignInvalid("Estos paquetes de iconos/tipografías son para React. Flutter usa Material Icons y tipografía del sistema.")
     subject = _domain(brief, domain)
     digest = hashlib.sha256((title + "\x1e" + brief + "\x1e" + subject).encode("utf-8")).digest()
     palette = _THEMES[digest[0] % len(_THEMES)]
@@ -143,6 +157,7 @@ def create_design(title: str, brief: str, *, platform: str = "react",
     if platform == "react":
         cfg = json.loads(files["src/config.json"])
         cfg.update({
+            "icon_pack": icon_pack, "font_family": font_family, "motion": motion,
             "title": title, "subtitle": content["subtitle"],
             "description": brief, "eyebrow": content["eyebrow"],
             "domain": subject, "style": chosen_style, "layout": chosen_layout,
@@ -152,8 +167,44 @@ def create_design(title: str, brief: str, *, platform: str = "react",
                          for name, detail, icon in content["features"]],
         })
         files["src/config.json"] = json.dumps(cfg, ensure_ascii=False, indent=2) + "\n"
+        # Every optional library is imported by components and must resolve in a real build.
+        manifest = json.loads(files["package.json"])
+        dependencies = manifest["dependencies"]
+        font_package, font_css_family = _REACT_FONTS[font_family]
+        if font_family != "inter":
+            dependencies.pop("@fontsource/inter", None)
+            dependencies[font_package] = _FONT_VERSION
+            for weight in ("400", "500", "600", "700"):
+                files["src/main.jsx"] = files["src/main.jsx"].replace(
+                    f"@fontsource/inter/{weight}.css",
+                    f"{font_package}/{weight}.css")
+            files["src/style.css"] = files["src/style.css"].replace(
+                "font-family:Inter,system-ui",
+                f"font-family:{font_css_family},system-ui", 1)
+        if icon_pack == "tabler":
+            dependencies["@tabler/icons-react"] = _TABLER_VERSION
+            original = "const ICONS = { sparkles: Sparkles, shield: ShieldCheck, compass: Compass, layers: Layers3, activity: Activity }"
+            alternative = "const ICONS = { sparkles: IconSparkles, shield: IconShieldCheck, compass: IconCompass, layers: IconStack2, activity: IconActivity }"
+            if files["src/App.jsx"].count(original) != 1:
+                raise DesignInvalid("No se pudo cargar el mapa de iconos de SKY.")
+            files["src/App.jsx"] = files["src/App.jsx"].replace(
+                "const ICONS = ", _TABLER_MAP + "\n\nconst ICONS = ", 1
+            ).replace(original, alternative)
+        if motion == "none":
+            files["src/App.jsx"] = files["src/App.jsx"].replace(
+                "const reduced = useReducedMotion()",
+                "const reduced = useReducedMotion() || config.motion === 'none'", 1)
+            files["src/style.css"] += (
+                "\n.site[data-motion='none'] *,"
+                ".site[data-motion='none'] *::before,"
+                ".site[data-motion='none'] *::after {"
+                "animation:none!important;transition:none!important}\n"
+            )
+            files["src/App.jsx"] = files["src/App.jsx"].replace(
+                'data-style={config.style} data-layout={config.layout}',
+                'data-style={config.style} data-layout={config.layout} data-motion={config.motion}')
+        files["package.json"] = json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
         # Title is inserted exclusively via JSON at runtime, not into HTML markup.
-        dependencies = json.loads(files["package.json"])["dependencies"]
         next_steps = [
             "npm install --ignore-scripts --no-audit --no-fund",
             "npm run build",
@@ -172,6 +223,7 @@ def create_design(title: str, brief: str, *, platform: str = "react",
             "skyColorSecondary": "0xFF" + palette[1][1:].upper(),
             "skyStyle": _dart_literal(chosen_style),
             "skyLayout": _dart_literal(chosen_layout),
+            "skyMotion": _dart_literal(motion),
         }
         for name, value in replacements.items():
             pattern = rf"(?m)^(const {re.escape(name)}\s*=\s*)(?:'[^'\n]*'|0x[0-9A-Fa-f]{{8}});$"
@@ -184,6 +236,9 @@ def create_design(title: str, brief: str, *, platform: str = "react",
     return {
         "ok": True, "platform": platform, "domain": subject,
         "style": chosen_style, "layout": chosen_layout,
+        "selected_libraries": {"icon_pack": "Material Icons" if platform == "flutter" else icon_pack,
+                               "font_family": "system" if platform == "flutter" else font_family,
+                               "motion": motion},
         "colors": {"primary": palette[0], "secondary": palette[1],
                    "background": palette[2], "foreground": palette[3]},
         "files": files, "file_count": len(files),
@@ -222,6 +277,9 @@ def studio_capabilities() -> dict[str, Any]:
     return {
         "ok": True, "platforms": ["react", "flutter"],
         "styles": list(_STYLES), "layouts": list(_LAYOUTS),
+        "react_icon_packs": list(_REACT_ICONS),
+        "react_font_families": list(_REACT_FONTS),
+        "motion_modes": list(_MOTIONS),
         "domains": list(_DOMAINS),
         "react_libraries": {
             "animation": "motion", "icons": "lucide-react",
