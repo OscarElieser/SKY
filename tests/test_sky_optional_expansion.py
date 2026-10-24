@@ -172,3 +172,16 @@ def test_registered_capabilities_and_private_endpoint_guards():
     assert api.count('dependencies=[Depends(require_key)]')>=6
     src=Path("neural_core/sky_asistente_personal.py").read_text(encoding="utf-8")
     assert "sky_research_commands.interpretar(texto)" in src
+
+
+def test_local_only_blocks_external_research_and_remote_automation(monkeypatch):
+    monkeypatch.setenv("SKY_LOCAL_ONLY","1")
+    with pytest.raises(research.ResearchConnectorError):
+        research._get("api.semanticscholar.org","/graph/v1/paper/search",{"query":"x"})
+    monkeypatch.setenv("SKY_N8N_URL","https://sky-n8n.example.org")
+    monkeypatch.setenv("SKY_N8N_ALLOWED_HOSTS","sky-n8n.example.org")
+    with pytest.raises(bridge.N8NInvalid):
+        bridge._base()
+    monkeypatch.setenv("SKY_N8N_URL","http://127.0.0.1:5678")
+    monkeypatch.setenv("SKY_N8N_ALLOW_LOCAL","1")
+    assert bridge._base()=="http://127.0.0.1:5678"
