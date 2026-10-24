@@ -36,3 +36,11 @@ test('legacy decorative and distant objects keep roads passable', () => {
   const s=physics.resolveMovement({x:0,z:0},{x:0,z:-.85},[ground,decoration]);
   assert.equal(s.z,-.85);
 });
+
+test('interactive doors block while closed and allow entry when opened', () => {
+  const door={kind:'box',position:[0,0,0],rotation:[0,0,0],scale:[1.8,2.2,.15],
+              interaction:{type:'door',active:false,description:'Puerta'}};
+  assert.equal(physics.isBlocked(0,0,[door]),true);
+  const open={...door,interaction:{...door.interaction,active:true}};
+  assert.equal(physics.isBlocked(0,0,[open]),false);
+});
