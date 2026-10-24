@@ -237,6 +237,7 @@ def stage_output(plan: dict, index: int) -> dict:
         "visual_3d":plan.get("multimedia",{}).get("3d_scene",{"available":False}) if ident in ("explicacion","demostracion") else {"available":False},
         "supporting_video_requires_explicit_search":True,
         "evaluation_dimensions":["conocer","hacer","ser"],
+        "real_life_case":plan.get("multimedia",{}).get("example",{"available":False}) if ident in ("demostracion","practica") else {"available":False},
     }
 
 
