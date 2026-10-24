@@ -149,3 +149,35 @@ def test_browser_assets_and_commands_are_actually_wired(env):
     assert "SKYAvatarGLB.pose(" in script
     assert "closestInteractiveObject(" in script
     assert "/interact" in script
+
+
+def test_teacher_writes_and_reloads_real_whiteboard_notes(env):
+    client,_=env
+    w=client.post("/api/worlds",headers=H,
+        json={"name":"Clase técnica SKY","prompt":"Aula","seed":9}).json()
+    wid=w["id"]
+    campus=client.post(f"/api/worlds/{wid}/build-campus",headers=H,
+        json={"prompt":PROMPT,"seed":9,"version":1}).json()["world"]
+    board=next(o for o in campus["scene"]["objects"]
+               if o.get("interaction",{}).get("type")=="whiteboard")
+    url=f"/api/worlds/{wid}/interact"
+    payload={"version":2,"object_id":board["id"],"action":"write",
+             "content":"CPU: ejecuta instrucciones. RAM: almacena datos temporales."}
+    assert client.post(url,json=payload).status_code==401
+    response=client.post(url,headers=H,json=payload)
+    assert response.status_code==200,response.text
+    assert response.json()["interaction"]["content"]==payload["content"]
+    reloaded=client.get(f"/api/worlds/{wid}",headers=H).json()
+    stored=next(o for o in reloaded["scene"]["objects"] if o["id"]==board["id"])
+    assert stored["interaction"]["content"]==payload["content"]
+    assert stored["interaction"]["active"] is True
+    assert reloaded["version"]==3
+    assert client.post(url,headers=H,json=payload).status_code==409
+    bad=client.post(url,headers=H,json={"version":3,"object_id":board["id"],
+                                       "action":"write","content":"x"*1300})
+    assert bad.status_code==422
+    terminal=next(o for o in reloaded["scene"]["objects"]
+                  if o.get("interaction",{}).get("type")=="terminal")
+    assert client.post(url,headers=H,json={"version":3,"object_id":terminal["id"],
+        "action":"write","content":"No permitido"}).status_code==422
+    assert client.get(f"/api/worlds/{wid}",headers=H).json()["version"]==3
