@@ -11,8 +11,6 @@ on:
       - 'docker/sky-typescript/**'
       - 'docker/sky-web/**'
       - 'tests/test_sky_web_live.py'
-      - 'docker/sky-web/**'
-      - 'tests/test_sky_web_live.py'
       - '.github/workflows/sky-developer-docker.yml'
   push:
     branches: [main]
@@ -23,6 +21,8 @@ on:
       - 'tests/test_sky_docker_builder.py'
       - 'tests/test_sky_docker_live.py'
       - 'docker/sky-typescript/**'
+      - 'docker/sky-web/**'
+      - 'tests/test_sky_web_live.py'
       - '.github/workflows/sky-developer-docker.yml'
   workflow_dispatch:
 
