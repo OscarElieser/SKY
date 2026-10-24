@@ -54,6 +54,13 @@ def validate_object(raw:dict[str,Any])->dict[str,Any]:
             raise ValueError('Descripción de interacción demasiado larga')
         result['interaction']={'type':category,'active':interaction.get('active', False),
                                'description':label}
+        if category == 'whiteboard':
+            content = interaction.get('content', '')
+            if not isinstance(content, str) or len(content)>1200:
+                raise ValueError('Contenido de pizarra inválido (máximo 1200 caracteres)')
+            result['interaction']['content'] = content
+        elif 'content' in interaction:
+            raise ValueError('Solo las pizarras admiten contenido editable')
     return result
 
 def object3d(name, kind, x,y,z,sx,sy,sz,color,rot_y=0.0):
