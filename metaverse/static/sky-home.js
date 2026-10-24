@@ -413,6 +413,12 @@ function renderAttachedChips(){
   });
 }
 
+const skyEscapeHtml=(value)=>String(value??'').replace(/[&<>"']/g,
+  c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const skyCanIndex=(name)=>/\.(pdf|docx|pptx|xlsx|txt|md|csv|tsv|json|xml|yaml|yml|py|js|ts|dart|html|css|sql)$/i.test(name);
+const skySafePreviewUrl=(url)=>typeof url==='string'&&
+  /^\/api\/media\/uploads\/[a-f0-9]{32}\.(png|jpg|jpeg|webp|mp4|mov|mkv|webm|mp3|wav|m4a|flac|ogg)\?expires=\d+&sig=[a-f0-9]{64}$/.test(url)
+  ?skyEscapeHtml(url):'';
 const attachInput=$('attach-input');
 const btnAttach=$('btn-attach');
 if(btnAttach&&attachInput){
@@ -423,8 +429,13 @@ if(btnAttach&&attachInput){
     for(const file of files){
       const formData=new FormData();
       formData.append('file',file);
+      const remember=Boolean($('remember-documents')?.checked&&skyCanIndex(file.name));
+      if(remember){
+        formData.append('remember_document','true');
+        formData.append('owner_attested','true');
+      }
       try{
-        msg('SKY',`📥 Analizando e indexando ${file.name}...`);
+        msg('SKY',`📥 Analizando ${file.name}${remember?' y guardando con autorización':''}...`);
         const r=await fetch('/api/chat/upload',{
           method:'POST',
           headers:ownerKey?{'X-SKY-KEY':ownerKey,...(window.SKYOwnerAuth?window.SKYOwnerAuth.headers():{})}:{},
@@ -443,15 +454,17 @@ if(btnAttach&&attachInput){
           renderAttachedChips();
 
           let mediaPreview='';
-          if(d.media_type==='video'&&d.media_url){
-            mediaPreview=`<div style="margin-top:8px;"><video controls src="${d.media_url}" style="max-width:100%; max-height:220px; border-radius:10px;"></video></div>`;
-          }else if(d.media_type==='audio'&&d.media_url){
-            mediaPreview=`<div style="margin-top:8px;"><audio controls src="${d.media_url}" style="width:100%;"></audio></div>`;
-          }else if(d.media_type==='image'&&d.media_url){
-            mediaPreview=`<div style="margin-top:8px;"><img src="${d.media_url}" style="max-width:100%; max-height:200px; border-radius:10px;" /></div>`;
+          const safeUrl=skySafePreviewUrl(d.media_url);
+          if(d.media_type==='video'&&safeUrl){
+            mediaPreview=`<div style="margin-top:8px;"><video controls src="${safeUrl}" style="max-width:100%; max-height:220px; border-radius:10px;"></video></div>`;
+          }else if(d.media_type==='audio'&&safeUrl){
+            mediaPreview=`<div style="margin-top:8px;"><audio controls src="${safeUrl}" style="width:100%;"></audio></div>`;
+          }else if(d.media_type==='image'&&safeUrl){
+            mediaPreview=`<div style="margin-top:8px;"><img src="${safeUrl}" style="max-width:100%; max-height:200px; border-radius:10px;" /></div>`;
           }
 
-          msg('SKY',`✅ Archivo <strong>${d.filename}</strong> asimilado en la base de conocimiento de SKY.<br>📁 Tipo: ${d.media_type.toUpperCase()} · Tamaño: ${(d.size_bytes/1024).toFixed(1)} KB.${mediaPreview}<br>Memoria neural actualizada. Podés hacerme cualquier pregunta o pedirme que trabaje con él.`,true);
+          const memoryStatus=d.doc_id ? 'Guardado en la biblioteca cifrada con tu autorización. Podés decir «SKY, buscá en mis documentos sobre…».' : 'Leído para esta conversación; no se guardó como memoria permanente.';
+          msg('SKY',`✅ Archivo <strong>${skyEscapeHtml(d.filename)}</strong> analizado.<br>📁 Tipo: ${skyEscapeHtml(d.media_type.toUpperCase())} · Tamaño: ${(d.size_bytes/1024).toFixed(1)} KB.${mediaPreview}<br>${memoryStatus}`,true);
           updateEvolutionStats();
         }else{
           msg('SKY',`⚠️ Error al procesar ${file.name}: `+(d.detail||'no procesable'));
