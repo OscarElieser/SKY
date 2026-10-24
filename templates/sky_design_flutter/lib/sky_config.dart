@@ -6,6 +6,7 @@ const skyColorPrimary = 0xFF64E6CF;
 const skyColorSecondary = 0xFF8C79FF;
 const skyStyle = 'aurora';
 const skyLayout = 'editorial';
+const skyMotion = 'normal';
 const skyFeatureOne = 'Diseño relevante';
 const skyFeatureTwo = 'Movimiento intencional';
 const skyFeatureThree = 'Experiencia accesible';
