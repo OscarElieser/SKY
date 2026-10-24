@@ -187,3 +187,31 @@ def test_llamacpp_engine_refuses_remote_host(monkeypatch):
     assert p.local_available() is False
     result = p.enrich_plan(sample_plan())
     assert result["planner_backend"] == "deterministic"
+
+
+def test_inventory_does_not_install_or_grant_permissions(monkeypatch):
+    from neural_core import sky_capability_inventory as registry
+    from neural_core import sky_advanced_planner as p
+    monkeypatch.setattr(p, "local_available", lambda: False)
+    report = registry.inventory()
+    assert report["owner"] == "SKY CORE"
+    assert report["scope"] == "local_device_only"
+    assert report["total_probes"] == len(report["tools"])
+    assert report["missing_count"] + report["detected_count"] == len(report["tools"])
+    assert all(not tool["automatic_installation"] for tool in report["tools"])
+    assert all(not tool["permissions_granted"] for tool in report["tools"])
+
+
+def test_inventory_route_requires_owner(client_like_store, monkeypatch):
+    from neural_core import sky_capability_inventory as registry
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("SKY_API_KEY", "sky-planner-inventory-owner-key-2026")
+    monkeypatch.setattr(registry, "inventory", lambda: {"owner":"SKY CORE", "tools":[]})
+    from metaverse.api import app
+    with TestClient(app) as client:
+        assert client.get("/api/sky/capabilities/local").status_code == 401
+        resp = client.get("/api/sky/capabilities/local", headers={
+            "X-SKY-KEY": "sky-planner-inventory-owner-key-2026"
+        })
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["owner"] == "SKY CORE"
