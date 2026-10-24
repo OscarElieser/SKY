@@ -172,6 +172,44 @@ def snapshot(ident: str) -> dict:
                 "complete_verified": plan["state"] == "VERIFIED"}
 
 
+
+def export_verified_replay(ident: str) -> dict:
+    """Export a narrowly replayable, physically verified routine for SKY learning.
+
+    Exporting *never* executes any action. Text, URLs, paths and browser
+    contents are excluded from procedural memory, even if the cycle succeeded.
+    """
+    from .windows_controller import AUTHORIZED_APPS
+    with _LOCK:
+        plan = _get(ident)
+        if plan["state"] != "VERIFIED" or not plan["steps"]:
+            raise CycleConflict("Solo se pueden recordar ciclos terminados y verificados.")
+        if any(step["state"] != "VERIFIED" or step["attempts"] != 1
+               for step in plan["steps"]):
+            raise CycleConflict("Todos los pasos deben estar verificados y ejecutados una vez.")
+        allowed = {"status", "launch_app"}
+        if any(step["action"] not in allowed for step in plan["steps"]):
+            raise CycleConflict("El procedimiento incluye acciones que no es seguro memorizar.")
+        steps = []
+        for step in plan["steps"]:
+            if step["action"] == "status":
+                # A read-only probe with no user-supplied arguments.
+                if step["params"]:
+                    raise CycleConflict("Consulta de estado no segura para reutilizar.")
+                steps.append({"action": "status", "params": {}, "label": "Comprobar estado del agente"})
+            elif step["action"] == "launch_app":
+                app = step["params"].get("app")
+                if app not in AUTHORIZED_APPS or set(step["params"]) != {"app"}:
+                    raise CycleConflict("Aplicación no registrada para un procedimiento.")
+                # A VERIFIED app launch must have been checked by the agent.
+                if not step.get("command_id"):
+                    raise CycleConflict("Falta evidencia del agente para aprender la aplicación.")
+                steps.append({"action": "launch_app", "params": {"app": app},
+                              "label": "Abrir " + AUTHORIZED_APPS[app]["desc"][:65]})
+        return {"steps": copy.deepcopy(steps), "device": plan["dispositivo"],
+                "verified": True, "total": len(steps)}
+
+
 def cancel(ident: str) -> dict:
     with _LOCK:
         plan = _get(ident)
