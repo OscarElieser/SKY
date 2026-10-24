@@ -39,7 +39,7 @@ def test_new_and_existing_routes_require_owner(client, route):
 
 
 def test_core_routers_are_not_registered_twice(client):
-    routes = [r.path for r in client.app.routes]
+    routes = [r.path for r in client.app.routes if isinstance(getattr(r, "path", None), str)]
     for item in ("/api/sky/device-hub/capabilities", "/api/sky/guardian/capabilities",
                  "/api/sky/mobile-unlock/capabilities", "/api/sky/academy/capabilities"):
         assert routes.count(item) == 1
