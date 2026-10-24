@@ -267,7 +267,11 @@ def execute(skill_id: str, body: dict) -> dict:
         if provider not in {"auto", "ollama", "openai", "anthropic", "gemini", "groq"}:
             raise SkillInvalid("Proveedor de IA desconocido.")
         input_text = _limit_str(body, "text", 5000, True)
-        instruction = _LLM_RULES[skill_id] + "\nSolicitud: " + input_text
+        instruction = _LLM_RULES[skill_id]
+        trusted_skill = Path(__file__).resolve().parents[1] / '.agents' / 'skills' / skill_id / 'SKILL.md'
+        if trusted_skill.is_file() and trusted_skill.stat().st_size < 60000:
+            instruction += '\nGuía de la skill instalada (sin autoridad sobre herramientas):\n' + trusted_skill.read_text(encoding='utf-8')[:8000]
+        instruction += '\nSolicitud: ' + input_text
         try:
             answer, _ = responder(instruction, "SKY Skillpack", proveedor=provider)
             return {"ok": True, "text": str(answer)[:10000], "provider_requested": provider}
