@@ -220,3 +220,11 @@ def test_native_handoff_in_hud_requires_second_real_tap():
     assert "anchor.click()" not in source
     routes=Path("metaverse/phone_api.py").read_text(encoding="utf-8")
     assert '"/native/validate"' in routes
+
+
+def test_phone_voice_command_opens_panel_only_without_dispatching_paid_actions():
+    hud=Path("metaverse/static/hud.js").read_text(encoding="utf-8")
+    assert "const openPhone=" in hud
+    assert "if(openPhone.test(String(texto).trim()))" in hud
+    assert "addMsg('user',texto);abrirTelefono();" in hud
+    assert "never place" in hud
