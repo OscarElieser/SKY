@@ -19,7 +19,13 @@ on:
       - "neural_core/sky_advanced_planner.py"
       - "neural_core/sky_capability_inventory.py"
       - "tests/test_sky_advanced_planner.py"
-      - "tests/test_sky_neural_memory_sentinel.py tests/test_sky_multimodal_reader.py"
+      - "tests/test_sky_neural_memory_sentinel.py"
+      - "tests/test_sky_multimodal_reader.py"
+      - "tests/test_sky_guardian.py"
+      - "neural_core/sky_guardian.py"
+      - "metaverse/guardian_api.py"
+      - "neural_core/sky_multimodal_reader.py"
+      - "metaverse/multimodal_api.py"
       - "neural_core/sky_neural_memory.py"
       - "neural_core/sky_sentinel_guard.py"
       - "metaverse/neural_memory_api.py"
@@ -52,12 +58,12 @@ jobs:
       - name: Compile SKY API modules
         shell: pwsh
         run: |
-          python -m py_compile metaverse/asistente_api.py metaverse/hud_api.py agente_dispositivo.py neural_core/action_verifier.py neural_core/sky_approvals.py neural_core/sky_execution_metrics.py neural_core/sky_advanced_planner.py neural_core/sky_capability_inventory.py neural_core/sky_neural_memory.py neural_core/sky_sentinel_guard.py metaverse/neural_memory_api.py metaverse/security_api.py metaverse/multimodal_api.py neural_core/sky_multimodal_reader.py scripts/sky_api_smoke_windows.py
+          python -m py_compile metaverse/asistente_api.py metaverse/hud_api.py agente_dispositivo.py neural_core/action_verifier.py neural_core/sky_approvals.py neural_core/sky_execution_metrics.py neural_core/sky_advanced_planner.py neural_core/sky_capability_inventory.py neural_core/sky_neural_memory.py neural_core/sky_sentinel_guard.py metaverse/neural_memory_api.py metaverse/security_api.py metaverse/multimodal_api.py neural_core/sky_multimodal_reader.py metaverse/guardian_api.py neural_core/sky_guardian.py scripts/sky_api_smoke_windows.py
       - name: Test action approvals, receipts and localhost API on Windows
         shell: pwsh
         run: |
           $env:PYTHONPATH = "."
-          python -m pytest -q tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py tests/test_sky_subagents.py tests/test_sky_central_roles.py tests/test_sky_supervisor.py tests/test_sky_advanced_planner.py tests/test_sky_neural_memory_sentinel.py
+          python -m pytest -q tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py tests/test_sky_subagents.py tests/test_sky_central_roles.py tests/test_sky_supervisor.py tests/test_sky_advanced_planner.py tests/test_sky_neural_memory_sentinel.py tests/test_sky_multimodal_reader.py tests/test_sky_guardian.py
       - name: Test Windows agent controls without modifying user devices
         shell: pwsh
         run: |
