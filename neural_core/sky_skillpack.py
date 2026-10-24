@@ -149,8 +149,11 @@ def _request(method: str, url: str, *, token: str, headers: dict | None = None,
         if isinstance(data, dict):
             if data.get("ok") is False or data.get("errors"):
                 raise SkillUnavailable("La API comunicó un error o permisos insuficientes.")
-        return {"ok": True, "provider_http_status": r.status_code,
-                "data": json.loads(json.dumps(data, ensure_ascii=False)[:14000])}
+        serialized = json.dumps(data, ensure_ascii=False)
+        if len(serialized) > 14000:
+            return {"ok": True, "provider_http_status": r.status_code,
+                    "data_excerpt": serialized[:14000], "truncated": True}
+        return {"ok": True, "provider_http_status": r.status_code, "data": data}
     except (httpx.HTTPError, ValueError) as exc:
         raise SkillUnavailable("Conexión o respuesta del proveedor no disponible.") from exc
 
