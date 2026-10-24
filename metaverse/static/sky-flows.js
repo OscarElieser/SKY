@@ -58,6 +58,14 @@ function supervisorInput(){
 function showSupervisorPlan(result){
  const out=$('supervisor-output');out.replaceChildren();
  out.append(elem('p','SKY · '+result.message));
+ const engine=result.planner_backend==='ollama_local'?'Modelo Ollama local':
+              result.planner_backend==='llamacpp_local'?'Modelo llama.cpp local':'Planificador seguro sin modelo';
+ out.append(elem('p','Motor: '+engine+' · Roles ejecutores: '+(result.assigned_roles||[]).join(', ')));
+ if(result.degraded_reason)out.append(elem('p','Diagnóstico: '+result.degraded_reason));
+ if(result.advisory_roles?.length)out.append(elem('p','Especialidades consultivas: '+
+   result.advisory_roles.map(x=>x.title).join(', ')));
+ if(result.quality_checks?.length)out.append(elem('p','Controles de calidad propuestos: '+
+   result.quality_checks.join(' · ')));
  for(const [i,step] of (result.steps||[]).entries()){
    out.append(elem('p',(i+1)+'. '+step.agent+' → '+step.action+' · '+step.task));
  }
