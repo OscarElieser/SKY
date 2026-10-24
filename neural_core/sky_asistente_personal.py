@@ -293,6 +293,11 @@ def reglas(texto: str) -> dict | None:
     paquete = sky_skillpack.interpretar(texto)
     if paquete:
         return paquete
+    # Investigaciones externas solo bajo petición explícita y de lectura.
+    from . import sky_research_commands
+    research = sky_research_commands.interpretar(texto)
+    if research:
+        return research
     from . import sky_skills, sky_perfil
     try:
         from . import sky_habilidades
