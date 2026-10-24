@@ -14,6 +14,16 @@
 - Límites: 60 perfiles, 5 flujos activos/pendientes por subagente, 30 delegaciones cada 24 horas.
 - Desactivar bloquea **nuevas delegaciones**. No cancela automáticamente flujos ya aprobados; el propietario los cancela en Seguimiento para evitar pérdidas de trabajo.
 
+## Creación por voz o chat
+
+SKY también reconoce órdenes explícitas autenticadas mediante las rutas existentes `POST /api/asistente/mensaje` y `POST /api/asistente/stream`:
+
+> «SKY, creá un subagente llamado Investigador académico para investigar métodos de aprendizaje.»
+
+Esto crea **solamente el perfil desactivado** y devuelve el nombre, su especialidad asignada y el acceso a Automatizaciones para activarlo. La especialidad se infiere de palabras clave; si no hay coincidencia se aplica el rol `planificador`. No significa acceso libre a internet ni ejecución autónoma de herramientas.
+
+El reconocimiento de comandos está limitado a la frase explícita del propietario autenticado. No se habilitan comandos desde documentos, sitios web ni resultados de modelos externos.
+
 ## Endpoints, todos con `X-SKY-KEY` y MFA cuando esté habilitado
 
 | Método | Ruta | Función |
