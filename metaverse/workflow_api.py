@@ -108,6 +108,31 @@ def delegate_subagent(ident: str, body: SubagentDelegate):
         raise HTTPException(409, str(exc)) from exc
 
 
+from neural_core import sky_internal_roles as internal_roles
+
+
+class InternalRolePlan(BaseModel):
+    name: str = Field(min_length=3, max_length=120)
+    steps: list[Step] = Field(min_length=1, max_length=8)
+    project_id: str | None = None
+
+
+@router.get('/internal-roles')
+def internal_role_catalogue():
+    """Los seis roles son internos; únicamente SKY atiende al propietario."""
+    return internal_roles.catalogue()
+
+
+@router.post('/internal-roles/preview')
+def internal_role_preview(body: InternalRolePlan):
+    """Validación de un plan multirol. No crea ni ejecuta flujos."""
+    try:
+        return internal_roles.plan_internal_steps(
+            body.name, [step.model_dump() for step in body.steps], body.project_id)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(422, str(exc)[:240]) from exc
+
+
 @router.get('/workflows/catalogue')
 def catalogue():
     return {'agents':wf.ROLE_ACTION,'actions':list(wf.SAFE_ACTIONS),
