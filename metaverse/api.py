@@ -1054,8 +1054,14 @@ def skillpack_catalogue():
 
 
 @app.post('/api/skillpack/execute/{skill_id}', dependencies=[Depends(require_key)])
-def skillpack_execute(skill_id: str, body: dict):
+def skillpack_execute(skill_id: str, body: dict, request: Request):
     from neural_core.sky_skillpack import execute, SkillInvalid, SkillUnavailable
+    # Cloud deployment and external posting require the owner's additional PIN
+    # even when a caller already supplied a valid SKY API key.
+    if (skill_id=="aws-workflow-deploy" and body.get("operation")=="deploy") or (
+        skill_id=="slack-communicator" and body.get("operation")=="send"):
+        from .sentinel import exigir_pin
+        exigir_pin(request, "una acción externa irreversible de SKY")
     try:
         return execute(skill_id, body)
     except SkillInvalid as exc:
