@@ -200,3 +200,23 @@ def test_existing_private_api_and_hud_are_extended_not_replaced():
     assert "recipient_consented:true" in hud
     assert "SKY Aula existente" in hud
     assert "abrirAula()" in hud
+
+
+def test_native_sim_handoff_requires_user_os_action_and_respects_sky_blocks():
+    x=phone.native_destination("+50577776666")
+    assert x["allowed"] and x["destination"]=="+50577776666"
+    assert x["native_os_user_action_required"] is True
+    assert not x["call_completed"] and not x["message_sent"]
+    phone.set_block("+50577776666",blocked=True,approved=True)
+    with pytest.raises(phone.PhoneInvalid):
+        phone.native_destination("+50577776666")
+
+
+def test_native_handoff_in_hud_requires_second_real_tap():
+    source=Path("metaverse/static/hud.js").read_text(encoding="utf-8")
+    assert "Abrir marcador del móvil" in source and "Abrir SMS del móvil" in source
+    assert "sky/phone/native/validate?number=" in source
+    assert "Continuar en la aplicación del móvil" in source
+    assert "anchor.click()" not in source
+    routes=Path("metaverse/phone_api.py").read_text(encoding="utf-8")
+    assert '"/native/validate"' in routes
