@@ -163,3 +163,35 @@ def test_impacto_requires_existing_owner_credentials():
     from pathlib import Path
     api = (Path(__file__).resolve().parents[1] / "metaverse" / "api.py").read_text(encoding="utf-8")
     assert "app.include_router(sky_impacto_router, dependencies=[Depends(require_key)])" in api
+
+
+def test_university_resource_limits_and_html(monkeypatch):
+    from email.message import Message
+
+    class Response:
+        def __init__(self):
+            self.headers = Message()
+            self.headers["Content-Type"] = "text/html; charset=utf-8"
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return None
+        def read(self, n):
+            return b"<html><body><h1>Tesis educativa</h1><script>ignore()</script><p>Resumen comprobable</p></body></html>"
+
+    class Opener:
+        def open(self, req, timeout):
+            assert req.full_url.startswith("https://repositorio.unan.edu.ni/")
+            return Response()
+
+    monkeypatch.setattr(scholarly, "_opener", lambda: Opener())
+    doc = scholarly.read_university_resource("unan_repo", "tesis.html")
+    assert doc["read_only"] is True
+    assert doc["claims_verified"] is False
+    assert "Tesis educativa" in doc["text"]
+    assert "ignore()" not in doc["text"]
+    for path in ("../secret.pdf", "item/../../secret.pdf", "index.php", "thing.zip", "//private.pdf"):
+        with pytest.raises(ValueError):
+            scholarly.read_university_resource("unan_repo", path)
+    with pytest.raises(ValueError):
+        scholarly.read_university_resource("no-registrado", "tesis.pdf")
