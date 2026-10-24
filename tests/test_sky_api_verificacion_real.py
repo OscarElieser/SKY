@@ -37,6 +37,18 @@ def test_agent_ledger_distingue_entregado_de_verificado(tmp_path, monkeypatch, r
         assert historial[-1]['status'] != 'VERIFIED'
 
 
+def test_recibo_persiste_tras_reinicio(tmp_path):
+    ledger = tmp_path / 'acciones.jsonl'
+    primero = action_verifier.ActionVerifier(ledger)
+    rec = primero.start_action('media_key', 'next_track')
+    primero.mark_dispatched(rec.command_id, 'SENT', {'status': 'SENT'})
+    segundo = action_verifier.ActionVerifier(ledger)
+    recuperado = segundo.get_action(rec.command_id)
+    assert recuperado is not None
+    assert recuperado.status == 'SENT'
+    assert recuperado.result['status'] == 'SENT'
+
+
 def test_agent_http_verification_read_only(tmp_path, monkeypatch):
     verifier = action_verifier.ActionVerifier(tmp_path / 'ledger.jsonl')
     monkeypatch.setattr(agent, 'verificador_acciones', verifier)
