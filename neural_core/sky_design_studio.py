@@ -123,7 +123,7 @@ def _dart_literal(value: str) -> str:
 
 def create_design(title: str, brief: str, *, platform: str = "react",
                   domain: str = "", style: str = "auto",
-                  layout: str = "auto") -> dict[str, Any]:
+                  layout: str = "auto", design_plan: dict[str, Any] | None = None) -> dict[str, Any]:
     """Create a multi-file React/Flutter source tree without filesystem writes."""
     title = _clean(title, "Título", 90)
     brief = _clean(brief, "Descripción", 500)
@@ -138,13 +138,26 @@ def create_design(title: str, brief: str, *, platform: str = "react",
     palette = _THEMES[digest[0] % len(_THEMES)]
     chosen_style = _STYLES[digest[1] % len(_STYLES)] if style == "auto" else style
     chosen_layout = _LAYOUTS[digest[2] % len(_LAYOUTS)] if layout == "auto" else layout
-    content = _DOMAINS[subject]
+    content = _DOMAINS[subject].copy()
+    if design_plan is not None:
+        # Always validate client-supplied or LLM-produced tokens; no raw code.
+        from .sky_design_ai import _validate_plan
+        plan = _validate_plan(json.dumps(design_plan, ensure_ascii=False))
+        content.update({
+            "subtitle": plan["subtitle"], "description": plan["description"],
+            "eyebrow": plan["eyebrow"],
+            "features": [(f["title"], f["detail"], f["icon"]) for f in plan["features"]],
+        })
+        chosen_style = plan["style"] if style == "auto" else style
+        chosen_layout = plan["layout"] if layout == "auto" else layout
+        palette = _THEMES[plan["palette_index"]]
     files = _file_set(platform)
     if platform == "react":
         cfg = json.loads(files["src/config.json"])
         cfg.update({
             "title": title, "subtitle": content["subtitle"],
-            "description": brief, "eyebrow": content["eyebrow"],
+            "description": content["description"] if design_plan is not None else brief,
+            "eyebrow": content["eyebrow"],
             "domain": subject, "style": chosen_style, "layout": chosen_layout,
             "primary": palette[0], "secondary": palette[1],
             "background": palette[2], "foreground": palette[3],
@@ -164,10 +177,13 @@ def create_design(title: str, brief: str, *, platform: str = "react",
         replacements = {
             "skyTitle": _dart_literal(title),
             "skySubtitle": _dart_literal(content["subtitle"]),
-            "skyDescription": _dart_literal(brief),
+            "skyDescription": _dart_literal(content["description"] if design_plan is not None else brief),
             "skyFeatureOne": _dart_literal(content["features"][0][0]),
             "skyFeatureTwo": _dart_literal(content["features"][1][0]),
             "skyFeatureThree": _dart_literal(content["features"][2][0]),
+            "skyFeatureOneDetail": _dart_literal(content["features"][0][1]),
+            "skyFeatureTwoDetail": _dart_literal(content["features"][1][1]),
+            "skyFeatureThreeDetail": _dart_literal(content["features"][2][1]),
             "skyColorPrimary": "0xFF" + palette[0][1:].upper(),
             "skyColorSecondary": "0xFF" + palette[1][1:].upper(),
             "skyStyle": _dart_literal(chosen_style),
@@ -188,6 +204,7 @@ def create_design(title: str, brief: str, *, platform: str = "react",
                    "background": palette[2], "foreground": palette[3]},
         "files": files, "file_count": len(files),
         "libraries_declared": dependencies,
+        "ai_edited_tokens": design_plan is not None,
         "requires_owner_installation": True,
         "generated_sources_built_now": False, "compiled_on_owner_device": False,
         "files_written_on_owner_device": False, "device_visual_test_passed": False,
