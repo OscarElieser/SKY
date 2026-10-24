@@ -123,8 +123,16 @@ def _ask_local(request: str, actions: list[str], roles: list[dict]) -> dict:
         "Responde en JSON con order, goals, quality_checks y summary. "
         "Objetivos concisos en español y hasta cinco comprobaciones."
     )
+    # SKY learns only from verified outcome counters. Do not send private
+    # memory, document contents or login information to the planner.
+    try:
+        from . import sky_neural_memory
+        role_feedback = sky_neural_memory.planning_feedback(list(wf.ROLE_ACTION))
+    except (OSError, ValueError):
+        role_feedback = {"role_history": {}}
     data = {"request": request[:3000], "acciones": actions,
-            "expertos_consultivos": [r["id"] for r in roles][:5]}
+            "expertos_consultivos": [r["id"] for r in roles][:5],
+            "evidencia_operativa": role_feedback["role_history"]}
     msgs = [{"role": "system", "content": prompt},
             {"role": "user", "content": json.dumps(data, ensure_ascii=False)}]
     if backend == "llamacpp":
