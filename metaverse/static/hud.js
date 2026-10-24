@@ -964,15 +964,17 @@
       const csp='<meta http-equiv="Content-Security-Policy" content="default-src &apos;none&apos;; img-src data:; script-src &apos;unsafe-inline&apos;; style-src &apos;unsafe-inline&apos;; connect-src &apos;none&apos;; form-action &apos;none&apos;; base-uri &apos;none&apos;">';
       const pageCSS=lang.value==='Web'?cssEditor.value:'';
       const pageJS=lang.value==='Web'?jsEditor.value:'';
-      const inlineStyle='<style>'+pageCSS.replace(/<\\/style/gi,'<\\/style')+'</style>';
-      const inlineScript='<script>'+pageJS.replace(/<\\/script/gi,'<\\/script')+'<\\/script>';
-      const markup=rootHTML.replace(/<head(?:\\s[^>]*)?>/i,match=>match+csp+inlineStyle);
-      const documentText=markup===rootHTML?csp+inlineStyle+rootHTML:markup;
+      const inlineStyle='<style>'+pageCSS.replace(/<\/style/gi,'<\\/style')+'</style>';
+      const inlineScript='<script>'+pageJS.replace(/<\/script/gi,'<\\/script')+'</script>';
+      const withHead=rootHTML.replace(/<head(?:\s[^>]*)?>/i,match=>match+csp+inlineStyle);
+      const secured=withHead===rootHTML?csp+inlineStyle+rootHTML:withHead;
+      const documentText=lang.value==='Web'
+        ?secured.replace(/<\/body\s*>/i,inlineScript+'</body>'):secured;
       const sandbox=el('iframe');
       sandbox.setAttribute('sandbox','allow-scripts');
       sandbox.setAttribute('referrerpolicy','no-referrer');
       sandbox.style.width='100%';sandbox.style.height='420px';sandbox.style.border='0';
-      sandbox.srcdoc=documentText+(lang.value==='Web'?inlineScript:'');
+      sandbox.srcdoc=documentText;
       const panel=el('div','kpi');
       panel.append(el('div','s','Vista preliminar sin conexión y con origen aislado; no equivale a prueba en navegador real.'),sandbox);
       abrirVentana('sky-web-preview','SKY · Vista previa HTML5/CSS3',panel,{w:960,h:620});
