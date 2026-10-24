@@ -69,7 +69,7 @@ class _SkyHomeState extends State<SkyHome> {
     final minimal = skyStyle == 'monochrome';
     final wide = width >= 760;
     final primary = const Color(skyColorPrimary);
-    final reduced = MediaQuery.disableAnimationsOf(context);
+    final reduced = MediaQuery.disableAnimationsOf(context) || skyMotion == 'none';
     final visible = features.where((item) => (item.$2 + ' ' + item.$3)
         .toLowerCase().contains(query.toLowerCase())).toList();
 
