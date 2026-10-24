@@ -215,3 +215,18 @@ def test_inventory_route_requires_owner(client_like_store, monkeypatch):
         })
         assert resp.status_code == 200, resp.text
         assert resp.json()["owner"] == "SKY CORE"
+
+
+def test_local_model_can_enrich_general_single_role_plan(monkeypatch):
+    from neural_core import sky_advanced_planner as p, sky_supervisor as sup
+    monkeypatch.setattr(p, "local_available", lambda: True)
+    monkeypatch.setattr(p, "_ask_local", lambda request, actions, roles: {
+        "order": [], "goals": {}, "quality_checks": ["Comprobar hitos"],
+        "summary": "Plan general de trabajo",
+    })
+    proposal = sup.analyze_request("Organizar mis proyectos y actividades semanales")
+    assert len(proposal["steps"]) == 1
+    result = p.enrich_plan(proposal)
+    assert result["planner_backend"] == "ollama_local"
+    assert result["planning_summary"] == "Plan general de trabajo"
+    assert result["steps"] == proposal["steps"]
