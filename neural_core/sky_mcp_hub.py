@@ -145,10 +145,22 @@ def _server_spec(server_id: str) -> dict:
     args = config.get("args")
     tools = config.get("allowed_tools")
     keys = config.get("env_keys", [])
-    if (not isinstance(command, str) or not Path(command).is_absolute()
-            or Path(command).name.lower() not in _EXECUTABLES
-            or not Path(command).is_file() or Path(command).is_symlink()):
-        raise MCPDenied("El ejecutable MCP debe ser un programa permitido, instalado y con ruta absoluta.")
+    # Python/Node de instalaciones legítimas suelen ser symlinks. Aceptar SOLO
+    # symlinks hacia un binario real con nombre también permitido, no comandos
+    # de shell o ejecutables disfrazados.
+    if not isinstance(command, str) or not Path(command).is_absolute():
+        raise MCPDenied("El ejecutable MCP necesita una ruta absoluta.")
+    exe = Path(command)
+    try:
+        resolved = exe.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise MCPDenied("El ejecutable MCP no existe.")
+    name = exe.name.lower()
+    target_name = resolved.name.lower()
+    valid_target = (target_name in _EXECUTABLES or
+                    re.fullmatch(r"python3(?:\.\d{1,2})?", target_name) is not None)
+    if name not in _EXECUTABLES or not resolved.is_file() or not valid_target:
+        raise MCPDenied("El ejecutable MCP debe ser un programa permitido e instalado.")
     if not isinstance(args, list) or len(args) > 20 or any(
             not isinstance(a, str) or len(a) > 500 or any(c in a for c in "\x00\r\n")
             for a in args):
