@@ -30,6 +30,8 @@ Se integra en la API y HUD existentes. Este módulo NO sustituye SKY CORE, Docen
 
 **Los 53 lenguajes/formalismos del catálogo SKY no se declaran compilados**: estos 11 son perfiles de ejecución disponibles cuando su imagen está realmente instalada. TypeScript exige una imagen personalizada construida explícitamente.
 
+**No descargués todas las imágenes si no las necesitás:** algunas pesan cientos de MB o varios GB. Comprobá el espacio disponible, elegí los lenguajes que usarás y prepará sus imágenes individualmente.
+
 Comandos de instalación voluntaria en PowerShell:
 
 ~~~powershell
