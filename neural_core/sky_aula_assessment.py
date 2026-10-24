@@ -32,7 +32,8 @@ def _text(value,maximum=200):
     return " ".join(value.split())
 
 def build(topic:str,level:str,goal:str,*,evaluation_type:str="formativa",
-          instrument:str="rubrica",criteria:dict|None=None)->dict:
+          instrument:str="rubrica",criteria:dict|None=None,
+          weights:dict[str,int]|None=None)->dict:
     from .sky_aula import LEVELS as EDUCATION_LEVELS
     topic=_text(topic,160)
     goal=_text(goal,300)
@@ -49,7 +50,14 @@ def build(topic:str,level:str,goal:str,*,evaluation_type:str="formativa",
         raise AssessmentInput("Indicá un criterio de conocer, hacer y ser/convivir.")
     clean={k:_text(v,220) for k,v in criteria.items()}
     # Weightings are suggestions only: only the teacher can approve final grades.
-    weighted={"conocer":30,"hacer":50,"ser":20}
+    if weights is None:
+        weighted={"conocer":30,"hacer":50,"ser":20}
+    else:
+        if (not isinstance(weights,dict) or set(weights)!=set(DIMENSIONS)
+                or any(type(v) is not int or v<0 or v>100 for v in weights.values())
+                or sum(weights.values())!=100):
+            raise AssessmentInput("Los tres pesos deben ser enteros entre 0 y 100, y sumar 100.")
+        weighted={key:weights[key] for key in DIMENSIONS}
     out={"topic":topic,"level":level,"goal":goal,"type":evaluation_type,
          "instrument":instrument,"curriculum_verified":False,
          "teacher_must_approve_before_grading":True,
@@ -92,8 +100,8 @@ def evaluate(instrument:dict,observations:dict,*,teacher_approved:bool=False)->d
             raise AssessmentInput("Nivel de desempeño inválido.")
         evidence=_text(o.get("evidence",""),500)
         weight=row.get("weight_suggested_pct")
-        if type(weight) is not int or weight not in (20,30,50):
-            raise AssessmentInput("Pesos de evaluación inválidos.")
+        if type(weight) is not int or not 0 <= weight <= 100:
+            raise AssessmentInput("Peso de evaluación inválido.")
         grade+=(o["level"]/4)*weight
         result.append({"dimension":key,"observed_level":o["level"],"evidence":evidence,
                        "suggested_weight_pct":weight})
