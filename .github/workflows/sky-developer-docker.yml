@@ -11,6 +11,7 @@ on:
       - 'docker/sky-typescript/**'
       - 'docker/sky-web/**'
       - 'tests/test_sky_web_live.py'
+      - 'tests/test_sky_web_profiles.py'
       - '.github/workflows/sky-developer-docker.yml'
   push:
     branches: [main]
@@ -23,6 +24,7 @@ on:
       - 'docker/sky-typescript/**'
       - 'docker/sky-web/**'
       - 'tests/test_sky_web_live.py'
+      - 'tests/test_sky_web_profiles.py'
       - '.github/workflows/sky-developer-docker.yml'
   workflow_dispatch:
 
@@ -46,7 +48,7 @@ jobs:
           node --check metaverse/static/hud.js
           node --check docker/sky-web/smoke.cjs
       - name: Verify fail-closed and prior programming interfaces
-        run: PYTHONPATH=. python -m pytest -q tests/test_sky_docker_builder.py tests/test_sky_programming_capabilities.py tests/test_developer_core.py
+        run: PYTHONPATH=. python -m pytest -q tests/test_sky_docker_builder.py tests/test_sky_programming_capabilities.py tests/test_sky_web_profiles.py tests/test_developer_core.py
 
   real-offline-python-node:
     runs-on: ubuntu-latest
