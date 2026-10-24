@@ -78,6 +78,37 @@ def youtube(topic:str,level:str="tecnico",limit:int=4)->dict:
             "message":"Resultados buscados en YouTube; SKY aún no ha visto el video ni comprobado su contenido.",
             "student_data_transmitted":False}
 
+
+def video_guided_explanation(video_id:str,topic:str,transcript:str)->dict:
+    """Explain a teacher-provided transcript step by step.
+
+    YouTube public search does NOT provide the video's transcript. The owner
+    supplies text obtained with the appropriate rights; SKY never pretends to
+    have watched or transcribed arbitrary videos.
+    """
+    topic=_clean(topic)
+    if not isinstance(video_id,str) or not re.fullmatch(r"[A-Za-z0-9_-]{11}",video_id):
+        raise MediaInputError("Identificador de video inválido.")
+    if not isinstance(transcript,str) or not 100<=len(transcript.strip())<=15000:
+        raise MediaInputError("Aportá una transcripción de 100 a 15.000 caracteres.")
+    content=" ".join(transcript.split())
+    sections=[]
+    # Bound each phase for voice synthesis and a learner-friendly pause.
+    for i in range(0,len(content),650):
+        if len(sections)>=24:break
+        excerpt=content[i:i+650]
+        sections.append({"number":len(sections)+1,
+            "source_excerpt":excerpt,
+            "voice_ready_text":"Revisemos el fragmento "+str(len(sections)+1)+" del texto aportado. "+excerpt,
+            "question":"¿Cómo se relaciona este fragmento con "+topic+"? ¿Qué ejemplo podrías dar?",
+            "transcript_supplied_by_teacher":True,
+            "fact_checked_against_external_source":False})
+    return {"video_id":video_id,"topic":topic,"parts":sections,
+            "video_watched_by_sky":False,"automatic_captions_retrieved":False,
+            "study_guide_based_on_teacher_material":True,
+            "warning":"No se han visto escenas ni comprobado afirmaciones; cotejá este texto con el video original.",
+            "personal_data_recorded":False}
+
 def bibliography(topic:str,limit:int=5)->dict:
     topic=_clean(topic,200)
     if type(limit) is not int or not 1<=limit<=8:
