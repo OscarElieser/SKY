@@ -587,6 +587,8 @@ from .security_api import router as sky_security_router
 app.include_router(sky_security_router)
 from .neural_memory_api import router as neural_memory_router
 app.include_router(neural_memory_router)
+from .multimodal_api import router as sky_multimodal_router
+app.include_router(sky_multimodal_router)
 
 # SKY v10.2: private subtitle and multilingual narration tools.
 from .global_media_api import router as sky_global_media_router
