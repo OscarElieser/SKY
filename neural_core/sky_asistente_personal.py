@@ -287,6 +287,12 @@ def reglas(texto: str) -> dict | None:
     rutina = sky_rutinas.rutina_por_frase(texto)
     if rutina:
         return resolver_especial({'tipo': 'rutina', 'rutina': rutina})
+    # Skillpack externo: voz y texto comparten la misma ruta segura,
+    # sólo para órdenes explícitas y sin efectos externos.
+    from . import sky_skillpack
+    paquete = sky_skillpack.interpretar(texto)
+    if paquete:
+        return paquete
     from . import sky_skills, sky_perfil
     try:
         from . import sky_habilidades
