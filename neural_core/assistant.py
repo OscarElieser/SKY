@@ -112,6 +112,12 @@ Metadatos de fuentes externas traídos bajo petición (podrían estar incompleto
     if impact_core:
         reglas = impact_core + "\n\n" + reglas
 
+    # SKY Pro Skills: estilo humano, diseño Impeccable y disciplinas profesionales.
+    from neural_core.sky_pro_skills import skill_instructions
+    professional_skills = skill_instructions(area, pregunta)
+    if professional_skills:
+        reglas = professional_skills + "\n\n" + reglas
+
     from neural_core.sky_sports_madridista import instrucciones_madridista
     sports_core = instrucciones_madridista(area, pregunta)
     if sports_core:
