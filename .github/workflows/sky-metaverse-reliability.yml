@@ -6,12 +6,18 @@ on:
       - 'metaverse/static/sky3d.js'
       - 'metaverse/static/sky-world-physics.js'
       - 'metaverse/world_builder.py'
+      - 'metaverse/avatar_glb.py'
+      - 'metaverse/world_interactions.py'
+      - 'metaverse/engine.py'
+      - 'metaverse/static/sky-avatar-glb.js'
       - 'metaverse/api.py'
       - 'metaverse/static/index.html'
       - 'metaverse/static/sky.css'
       - 'tests/test_sky_metaverse_reliability.py'
       - 'tests/test_sky_world_builder.py'
       - 'tests/test_sky_world_physics.cjs'
+      - 'tests/test_sky_metaverse_interactive.py'
+      - 'tests/test_sky_avatar_glb.cjs'
       - '.github/workflows/sky-metaverse-reliability.yml'
   push:
     branches: [main]
@@ -19,12 +25,18 @@ on:
       - 'metaverse/static/sky3d.js'
       - 'metaverse/static/sky-world-physics.js'
       - 'metaverse/world_builder.py'
+      - 'metaverse/avatar_glb.py'
+      - 'metaverse/world_interactions.py'
+      - 'metaverse/engine.py'
+      - 'metaverse/static/sky-avatar-glb.js'
       - 'metaverse/api.py'
       - 'metaverse/static/index.html'
       - 'metaverse/static/sky.css'
       - 'tests/test_sky_metaverse_reliability.py'
       - 'tests/test_sky_world_builder.py'
       - 'tests/test_sky_world_physics.cjs'
+      - 'tests/test_sky_metaverse_interactive.py'
+      - 'tests/test_sky_avatar_glb.cjs'
       - '.github/workflows/sky-metaverse-reliability.yml'
   workflow_dispatch:
 
@@ -49,8 +61,13 @@ jobs:
         run: |
           node --check metaverse/static/sky3d.js
           node --check metaverse/static/sky-world-physics.js
-          python -m py_compile metaverse/world_builder.py metaverse/api.py
+          node --check metaverse/static/sky-avatar-glb.js
+          python -m py_compile metaverse/world_builder.py metaverse/api.py metaverse/avatar_glb.py metaverse/world_interactions.py metaverse/engine.py
       - name: Exercise real collision rules in Node
         run: node --test tests/test_sky_world_physics.cjs
-      - name: Test real API, SQLite, GLB, builder, WebSocket and avatars
-        run: PYTHONPATH=. python -m pytest -q tests/test_sky_metaverse_reliability.py tests/test_sky_world_builder.py
+      - name: Produce real GLB and exercise node animations in Node
+        run: |
+          python -c "from pathlib import Path; from metaverse.avatar_glb import build_avatar_glb; Path('/tmp/sky-avatar-ci.glb').write_bytes(build_avatar_glb())"
+          node --test tests/test_sky_avatar_glb.cjs
+      - name: Test API, SQLite, animated GLB, room interactions, WebSocket and avatars
+        run: PYTHONPATH=. python -m pytest -q tests/test_sky_metaverse_reliability.py tests/test_sky_world_builder.py tests/test_sky_metaverse_interactive.py
