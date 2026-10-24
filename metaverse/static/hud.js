@@ -948,6 +948,35 @@
     const computer3d=el('button','btn','Explorar computadora 3D');computer3d.type='button';
     resourceActions.append(videos,research,computer3d);resources.append(resourceActions);
     const results=el('div','res','');resources.append(results);
+    const guideForm=el('div','res','');
+    const guideId=el('input','hab-in');guideId.type='text';guideId.maxLength=11;
+    guideId.placeholder='ID del video seleccionado';guideId.setAttribute('aria-label','Identificador YouTube');
+    const transcript=el('textarea','hab-in');transcript.rows=3;transcript.maxLength=15000;
+    transcript.placeholder='Texto o transcripción aportado por el docente (100–15.000 caracteres)';
+    transcript.setAttribute('aria-label','Transcripción para explicación del video');
+    const prepareGuide=el('button','btn','Explicar video por partes');prepareGuide.type='button';
+    guideForm.append(el('div','s','Para explicar el contenido del video, aportá su transcripción o notas verificadas. SKY no inventa haber visto sus escenas.'),
+      guideId,transcript,prepareGuide);
+    resources.append(guideForm);
+    const guideResult=el('div','res','');resources.append(guideResult);
+    prepareGuide.addEventListener('click',async()=>{
+      prepareGuide.disabled=true;guideResult.replaceChildren();
+      try{
+        const data=await api('/api/sky/academy/education/resources/video-guide',{
+          method:'POST',body:JSON.stringify({
+            topic:settings().topic,video_id:guideId.value.trim(),transcript:transcript.value})});
+        guideResult.append(el('div','s',data.warning));
+        for(const part of data.parts){
+          const paragraph=el('p','',part.voice_ready_text);
+          guideResult.append(paragraph,el('div','s',part.question));
+          const speakPart=el('button','btn','SKY explica parte '+part.number);
+          speakPart.type='button';
+          speakPart.addEventListener('click',()=>speak(part.voice_ready_text));
+          guideResult.append(speakPart);
+        }
+      }catch(e){guideResult.textContent='Guía no disponible: '+e.message;}
+      finally{prepareGuide.disabled=false;}
+    });
     const evaluation=seccion(root,'Evaluación · conocer / hacer / ser y convivir');
     const options=el('div','btns'),kind=el('select','hab-in'),mode=el('select','hab-in');
     ['rubrica','lista_cotejo','guia_observacion','ticket_salida','estudio_caso',
@@ -1027,6 +1056,7 @@
             const row=el('p','');row.append(link);results.append(row);
             const watch=el('button','btn','Ver video autorizado');
             watch.addEventListener('click',()=>{
+              guideId.value=v.id;
               const video=document.createElement('iframe');
               video.title='YouTube educativo: '+v.title;
               video.src=v.embed_url;video.loading='lazy';video.allow='encrypted-media; picture-in-picture';
