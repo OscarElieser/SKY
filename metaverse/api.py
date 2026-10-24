@@ -1062,3 +1062,20 @@ def skillpack_execute(skill_id: str, body: dict):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except SkillUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+# Unified proof-based catalogues. Reuses the existing private FastAPI and
+# SENTINEL authentication; does not introduce another server or exposed port.
+@app.get("/api/sky/skills/audit", dependencies=[Depends(require_key)])
+def sky_full_skills_audit():
+    from neural_core.sky_skills_audit import audit
+    return audit()
+
+
+@app.get("/api/sky/quality/operational", dependencies=[Depends(require_key)])
+def sky_quality_operational(period: str = "hoy"):
+    from neural_core.sky_operational_quality import report
+    try:
+        return report(period)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
