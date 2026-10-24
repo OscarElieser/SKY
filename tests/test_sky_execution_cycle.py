@@ -167,3 +167,19 @@ def test_agent_marks_dispatched_separately_from_verified():
     assert "verificador_acciones.mark_dispatched" in a
     win=Path("neural_core/windows_controller.py").read_text(encoding="utf-8")
     assert win.count("verificador_acciones.mark_dispatched(rec.command_id, result") >= 2
+
+
+def test_status_never_echoes_private_command_payload():
+    plan = cycle.create([{"action":"type_text", "params":{"text":"password=private-secret"},
+                          "label":"Type password=private-secret"}])
+    body = json.dumps(plan)
+    assert "private-secret" not in body
+    assert "Escribir texto autorizado" in body
+
+
+def test_metrics_do_not_mark_sent_as_verified_success():
+    from neural_core.sky_metricas import resultado_ok
+    assert resultado_ok({"ok": True, "status": "VERIFIED"})[0] is True
+    assert resultado_ok({"ok": True, "status": "SENT"})[0] is False
+    assert resultado_ok({"ok": True, "status": "RUNNING"})[0] is False
+    assert resultado_ok({"ok": False, "status": "FAILED"})[0] is False
