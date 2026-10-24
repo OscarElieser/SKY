@@ -667,6 +667,20 @@ app.include_router(sky_impacto_router, dependencies=[Depends(require_key)])
 # SKY Aula: módulo aislado, comparte la autenticación principal.
 from .academy_api import router as sky_academy_router
 app.include_router(sky_academy_router)
+# SKY Core / Guardian / Knowledge: reutilizan las mismas credenciales y MFA.
+from .neural_memory_api import router as sky_neural_memory_router
+app.include_router(sky_neural_memory_router)
+from .multimodal_api import router as sky_multimodal_router
+app.include_router(sky_multimodal_router)
+from .guardian_api import router as sky_guardian_router
+app.include_router(sky_guardian_router)
+from .mobile_unlock_api import router as sky_mobile_unlock_router
+app.include_router(sky_mobile_unlock_router)
+from .device_hub_api import router as sky_device_hub_router
+app.include_router(sky_device_hub_router)
+from .knowledge_api import router as sky_knowledge_router
+app.include_router(sky_knowledge_router)
+
 
 from .hud_api import router as sky_hud_router
 app.include_router(sky_hud_router)

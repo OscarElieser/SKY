@@ -1,0 +1,31 @@
+name: SKY Core Guardian - module checks
+on:
+  pull_request:
+    paths:
+      - 'metaverse/*_api.py'
+      - 'neural_core/sky_*.py'
+      - 'metaverse/api.py'
+      - 'tests/test_sky_core_consolidation.py'
+      - '.github/workflows/sky-core-consolidation.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  core-consolidation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install project test requirements
+        run: python -m pip install -r requirements_social.txt -r requirements_studio.txt pytest
+      - name: Compile core modules
+        run: |
+          python -m py_compile metaverse/api.py metaverse/neural_memory_api.py metaverse/multimodal_api.py metaverse/guardian_api.py metaverse/mobile_unlock_api.py metaverse/device_hub_api.py metaverse/knowledge_api.py
+          python -m py_compile neural_core/sky_advanced_planner.py neural_core/sky_approvals.py neural_core/sky_capability_inventory.py neural_core/sky_execution_metrics.py neural_core/sky_guardian.py neural_core/sky_internal_roles.py neural_core/sky_mobile_unlock.py neural_core/sky_neural_memory.py neural_core/sky_secure_connectivity.py neural_core/sky_sentinel_guard.py neural_core/sky_subagents.py neural_core/sky_supervisor.py
+      - name: Verify module authorization and discovery
+        run: PYTHONPATH=. pytest -q tests/test_sky_core_consolidation.py
