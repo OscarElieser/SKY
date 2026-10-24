@@ -1,0 +1,66 @@
+name: SKY Developer Docker real compilation
+
+on:
+  pull_request:
+    paths:
+      - 'neural_core/sky_docker_builder.py'
+      - 'metaverse/api.py'
+      - 'metaverse/static/hud.js'
+      - 'tests/test_sky_docker_builder.py'
+      - 'tests/test_sky_docker_live.py'
+      - 'docker/sky-typescript/**'
+      - '.github/workflows/sky-developer-docker.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'neural_core/sky_docker_builder.py'
+      - 'metaverse/api.py'
+      - 'metaverse/static/hud.js'
+      - 'tests/test_sky_docker_builder.py'
+      - 'tests/test_sky_docker_live.py'
+      - 'docker/sky-typescript/**'
+      - '.github/workflows/sky-developer-docker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  authorization-and-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install SKY test dependencies
+        run: python -m pip install -r requirements_social.txt -r requirements_studio.txt pytest
+      - name: Verify Python syntax and JavaScript HUD
+        run: |
+          python -m py_compile neural_core/sky_docker_builder.py metaverse/api.py tests/test_sky_docker_builder.py tests/test_sky_docker_live.py
+          node --check metaverse/static/hud.js
+      - name: Verify fail-closed and prior programming interfaces
+        run: PYTHONPATH=. python -m pytest -q tests/test_sky_docker_builder.py tests/test_sky_programming_capabilities.py tests/test_developer_core.py
+
+  real-offline-python-node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test framework
+        run: python -m pip install 'pytest>=8,<10'
+      - name: Explicitly pre-pull exact Docker profile tags for this CI session
+        run: |
+          docker pull python:3.12-alpine
+          docker pull node:22-alpine
+          docker image inspect python:3.12-alpine node:22-alpine >/dev/null
+      - name: Execute actual offline compilation, execution, and tests inside Docker
+        env:
+          SKY_CODE_RUNNER_ENABLED: '1'
+          SKY_CODE_RUNNER_CONTAINER_ACK: '1'
+          SKY_LIVE_DOCKER_TEST: '1'
+        run: PYTHONPATH=. python -m pytest -q tests/test_sky_docker_live.py
