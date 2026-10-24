@@ -71,6 +71,9 @@
    <label style="max-width:160px">Velocidad de voz<select id="voice-speed"><option value=".8">Lenta</option><option value="1" selected>Normal</option><option value="1.15">Rápida</option></select></label>
   </div>
   <div id="lesson-output" role="status" aria-live="polite">Iniciá una clase para que SKY explique una etapa a la vez.</div>
+  <label style="margin-top:14px">Respuesta a la pregunta de SKY (no se guarda ni se califica automáticamente)<textarea id="student-answer" maxlength="800" placeholder="Explicá tu idea para que SKY te dé una pregunta de reflexión"></textarea></label>
+  <div class="actions"><button id="send-answer" disabled>Conversar con SKY</button></div>
+  <div id="student-feedback" role="status" aria-live="polite" class="small"></div>
   <p class="note">La voz utiliza el sintetizador del navegador si está disponible; la privacidad y el funcionamiento sin conexión dependen de las voces instaladas en Windows o el navegador. No ingresés datos personales de estudiantes.</p>
  </section>
  <section id="innovation" class="hidden" role="tabpanel" aria-labelledby="tab-innovation">
