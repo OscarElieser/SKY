@@ -255,11 +255,11 @@ def execute(skill_id: str, body: dict) -> dict:
         except (OSError, subprocess.SubprocessError) as exc:
             raise SkillUnavailable("Docker no responde en este equipo.") from exc
     if mode == "supabase_rest":
-        from .sky_supabase import fetch_table
         table = _limit_str(body, "table", 70, True)
         allow = set(x.strip() for x in _env("SKY_SKILL_SUPABASE_ALLOWED_TABLES").split(",") if x.strip())
         if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]{0,60}", table) or table not in allow:
             raise SkillInvalid("Tabla no autorizada; usá SKY_SKILL_SUPABASE_ALLOWED_TABLES.")
+        from .sky_supabase import fetch_table
         return {"ok": True, "rows": fetch_table(table, limit=20)}
     if mode == "llm":
         from .assistant import responder
