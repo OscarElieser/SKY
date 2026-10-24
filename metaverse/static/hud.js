@@ -896,23 +896,46 @@
     const area=seccion(root,'Código fuente y pruebas');
     const lang=el('select','hab-in'),code=el('textarea','hab-in');
     const tests=el('textarea','hab-in'),expected=el('input','hab-in');
+    const webFiles=el('div','kpi'),cssEditor=el('textarea','hab-in'),jsEditor=el('textarea','hab-in');
+    cssEditor.rows=7;cssEditor.spellcheck=false;cssEditor.placeholder='styles.css · CSS3 responsivo';
+    jsEditor.rows=7;jsEditor.spellcheck=false;jsEditor.placeholder='app.js · JavaScript del navegador';
+    webFiles.append(el('div','s','CSS3 · styles.css'),cssEditor,
+                    el('div','s','JavaScript · app.js'),jsEditor);
+    webFiles.hidden=true;
     code.rows=12;code.spellcheck=false;code.placeholder='Escribí el código del archivo principal…';
     tests.rows=4;tests.spellcheck=false;
     tests.placeholder='Pruebas opcionales (Python unittest o JavaScript node --test)';
     expected.type='text';expected.placeholder='Salida esperada (opcional, sin distinguir espacios extremos)';
     const actions=el('div','btns');
     const check=el('button','btn','Verificar compiladores');
-    const run=el('button','btn primary','Compilar y ejecutar');
+    const run=el('button','btn primary','Validar / compilar / ejecutar');
+    const preview=el('button','btn','Vista previa web');preview.type='button';
     check.type='button';run.type='button';
-    actions.append(check,run);
+    actions.append(check,preview,run);
     const output=el('pre','res','Las pruebas físicas no se presumen: mirá el resultado verificable aquí.');
     output.style.whiteSpace='pre-wrap';output.style.overflowWrap='anywhere';
-    area.append(lang,code,tests,expected,actions,output);
+    area.append(lang,code,webFiles,tests,expected,actions,output);
+    function syncLanguage(){
+      const web=lang.value==='Web';
+      webFiles.hidden=!web;preview.hidden=!web && lang.value!=='HTML';
+      tests.hidden=web || lang.value==='HTML' || lang.value==='CSS';
+      if(web){
+        code.placeholder='index.html · HTML5 con <link href="styles.css"> y <script src="app.js">';
+        tests.value='';
+      }else if(lang.value==='HTML')code.placeholder='index.html · HTML5 semántico, accesible y responsivo';
+      else if(lang.value==='CSS')code.placeholder='styles.css · CSS3';
+      else code.placeholder='Código principal del lenguaje seleccionado';
+    }
+    lang.addEventListener('change',syncLanguage);
     const profiles=new Map();
     function selection(){
       const p=profiles.get(lang.value);
       if(!p)throw Error('Elegí un lenguaje compatible.');
       const files={[p.main_file]:code.value};
+      if(lang.value==='Web'){
+        files['styles.css']=cssEditor.value;
+        files['app.js']=jsEditor.value;
+      }
       if(tests.value.trim()){
         if(lang.value==='Python')files['tests/test_main.py']=tests.value;
         else if(lang.value==='JavaScript')files['tests/main.test.js']=tests.value;
@@ -929,11 +952,31 @@
           const opt=el('option','',p.language+' · '+p.main_file);
           opt.value=p.language;lang.append(opt);
         }
+        syncLanguage();
         state.textContent=d.enabled
           ? 'Ejecución disponible; se exigirá PIN y confirmación.'
           : 'El ejecutor está desactivado. Activá SKY_CODE_RUNNER_ENABLED y SKY_CODE_RUNNER_CONTAINER_ACK en el equipo propietario.';
       }catch(e){state.textContent='No se pudo cargar el catálogo: '+e.message;}
     }
+    preview.addEventListener('click',()=>{
+      if(!confirm('¿Querés previsualizar HTML, CSS y JavaScript dentro de un iframe aislado? No es una prueba de seguridad ni compatibilidad entre navegadores.'))return;
+      const rootHTML=code.value||'<!doctype html><html><head><title>SKY</title></head><body></body></html>';
+      const csp='<meta http-equiv="Content-Security-Policy" content="default-src &apos;none&apos;; img-src data:; script-src &apos;unsafe-inline&apos;; style-src &apos;unsafe-inline&apos;; connect-src &apos;none&apos;; form-action &apos;none&apos;; base-uri &apos;none&apos;">';
+      const pageCSS=lang.value==='Web'?cssEditor.value:'';
+      const pageJS=lang.value==='Web'?jsEditor.value:'';
+      const inlineStyle='<style>'+pageCSS.replace(/<\\/style/gi,'<\\/style')+'</style>';
+      const inlineScript='<script>'+pageJS.replace(/<\\/script/gi,'<\\/script')+'<\\/script>';
+      const markup=rootHTML.replace(/<head(?:\\s[^>]*)?>/i,match=>match+csp+inlineStyle);
+      const documentText=markup===rootHTML?csp+inlineStyle+rootHTML:markup;
+      const sandbox=el('iframe');
+      sandbox.setAttribute('sandbox','allow-scripts');
+      sandbox.setAttribute('referrerpolicy','no-referrer');
+      sandbox.style.width='100%';sandbox.style.height='420px';sandbox.style.border='0';
+      sandbox.srcdoc=documentText+(lang.value==='Web'?inlineScript:'');
+      const panel=el('div','kpi');
+      panel.append(el('div','s','Vista preliminar sin conexión y con origen aislado; no equivale a prueba en navegador real.'),sandbox);
+      abrirVentana('sky-web-preview','SKY · Vista previa HTML5/CSS3',panel,{w:960,h:620});
+    });
     check.addEventListener('click',async()=>{
       check.disabled=true;
       try{
