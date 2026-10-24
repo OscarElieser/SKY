@@ -35,6 +35,10 @@ class ProjectRequest(BaseModel):
     pitch_minutes: int=Field(default=3,ge=1,le=5)
 
 
+class StudentResponse(BaseModel):
+    answer: str=Field(min_length=2,max_length=800)
+
+
 class ResearchRequest(BaseModel):
     topic: str=Field(min_length=5,max_length=240)
     domain: str=Field(min_length=3,max_length=35)
@@ -129,6 +133,16 @@ def next_lesson(lesson_id: str):
         return sky_aula.next_stage(lesson_id)
     except KeyError as exc:
         raise HTTPException(404,str(exc)) from exc
+
+
+@router.post("/education/sessions/{lesson_id}/respond")
+def student_response(lesson_id: str, body: StudentResponse):
+    try:
+        return sky_aula.formative_response(lesson_id,body.answer)
+    except KeyError as exc:
+        raise HTTPException(404,str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
 
 
 @router.delete("/education/sessions/{lesson_id}")
