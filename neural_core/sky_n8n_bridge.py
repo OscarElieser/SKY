@@ -28,6 +28,8 @@ def _base()->str:
     allow={h.strip().lower() for h in os.getenv("SKY_N8N_ALLOWED_HOSTS","").split(",") if h.strip()}
     is_local=(parts.scheme=="http" and host=="127.0.0.1" and parts.port==5678
               and os.getenv("SKY_N8N_ALLOW_LOCAL")=="1")
+    if not is_local and os.getenv("SKY_LOCAL_ONLY","").strip().lower() in ("1","true","yes","si","sí"):
+        raise N8NInvalid("SKY_LOCAL_ONLY bloquea las instancias n8n externas.")
     if not is_local:
         if parts.scheme!="https" or host not in allow or not host or parts.port not in (None,443):
             raise N8NInvalid("Solo HTTPS y hosts expresamente permitidos; localhost requiere autorización separada.")
