@@ -41,7 +41,10 @@ class Mensaje(BaseModel):
     historial: list[Turno] = Field(default_factory=list, max_length=24)
     proveedor: str = Field(default='auto', max_length=20)
     dispositivo: str = Field(default=LOCAL, max_length=80)
-    modo: str = Field(default='chat', pattern='^(chat|voz)
+    modo: str = Field(default='chat', pattern='^(chat|voz)$')
+    source_text: str = Field(default='', max_length=12000)
+    document_format: str = Field(default='auto', max_length=12)
+
 
 class OrdenCasa(BaseModel):
     approval_token: str = Field(default='', max_length=100)
