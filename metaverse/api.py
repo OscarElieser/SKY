@@ -267,6 +267,8 @@ class ObjectRequest(BaseModel):
 class WorldInteractionRequest(BaseModel):
     version:int=Field(ge=1)
     object_id:str=Field(min_length=1,max_length=64)
+    action:str=Field(default='toggle',max_length=12)
+    content:str=Field(default='',max_length=1200)
 
 class PositionMessage(BaseModel):
     type:str
@@ -375,8 +377,8 @@ async def interact_with_world_object(wid:str,body:WorldInteractionRequest):
     current=get_world(wid)
     if current is None:raise HTTPException(404,'Mundo no existe')
     try:
-        from .world_interactions import toggle
-        changed,event=toggle(current['scene'],body.object_id)
+        from .world_interactions import interact
+        changed,event=interact(current['scene'],body.object_id,body.action,body.content)
         updated=save_scene(wid,changed,body.version)
     except KeyError as exc:raise HTTPException(404,str(exc)) from exc
     except ValueError as exc:raise HTTPException(422,str(exc)) from exc
