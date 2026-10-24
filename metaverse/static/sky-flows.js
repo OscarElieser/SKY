@@ -47,9 +47,90 @@ async function continuity(){
  for(const item of report.deliverables.slice(-12)){root.append(elem('p',item.kind+' · '+item.label+' · '+item.status));}
  for(const flow of report.workflows.slice(0,12)){root.append(elem('p','Flujo '+flow.name+' · '+flow.status+' · '+flow.progress.done+'/'+flow.progress.total));}
 }
+// SKY Subagent Manager — cada delegación crea un flujo SIN ejecutar.
+async function initSubagentCatalogue(){
+ const catalogue=await req('/api/sky/subagents/catalogue');
+ const select=$('sub-role');select.replaceChildren(new Option('Seleccioná especialidad',''));
+ for(const role of catalogue.roles)select.append(new Option(role.role+' — '+role.description,role.role));
+}
+function subagentParams(agent,task,content,kind){
+ if(agent.role==='creador_3d')return {name:task.slice(0,60),prompt:task};
+ if(agent.role==='diseñador')return {title:task.slice(0,90)};
+ if(agent.role==='documentalista')return {document:{kind,title:task.slice(0,120),content}};
+ if(agent.role==='memoria')return {label:task.slice(0,80),content};
+ return {};
+}
+async function refreshSubagents(){
+ const list=await req('/api/sky/subagents');const root=$('subagent-list');
+ root.replaceChildren();
+ if(!list.length){root.append(elem('p','Aún no hay subagentes creados.'));return;}
+ for(const agent of list){
+  const card=elem('article',undefined,'workflow-card');
+  const head=elem('div',undefined,'workflow-title');
+  head.append(elem('h3',agent.name),elem('span',agent.enabled?'Activado':'Desactivado','flow-status'));
+  card.append(head);
+  card.append(elem('p',agent.mission));
+  card.append(elem('p','Especialidad: '+agent.role+' · Permiso único: '+agent.action));
+  const controls=elem('div',undefined,'workflow-buttons');
+  const toggle=elem('button',agent.enabled?'Desactivar':'Activar');
+  toggle.addEventListener('click',async()=>{
+    try{
+      if(agent.enabled&&!confirm('¿Desactivar '+agent.name+'? Los flujos ya autorizados deben cancelarse por separado.'))return;
+      await req('/api/sky/subagents/'+encodeURIComponent(agent.id)+'/'+(agent.enabled?'disable':'enable'),'POST',{});
+      await refreshSubagents();
+    }catch(e){subMsg(e.message,true)}
+  });
+  controls.append(toggle);
+  const historyButton=elem('button','Ver delegaciones');
+  historyButton.addEventListener('click',async()=>{
+    try{const jobs=await req('/api/sky/subagents/'+encodeURIComponent(agent.id)+'/delegations');
+      const text=jobs.length?jobs.map(x=>x.created_at+' · '+x.workflow_status+' · '+x.workflow_id).join('\n'):'Sin delegaciones';
+      const report=card.querySelector('.flow-events')||elem('div',undefined,'flow-events');
+      report.textContent=text;card.append(report);
+    }catch(e){subMsg(e.message,true)}
+  });
+  controls.append(historyButton);card.append(controls);
+  if(agent.enabled){
+    const task=elem('textarea');task.rows=2;task.maxLength=3000;task.placeholder='Tarea concreta que debe preparar el subagente';
+    const taskLabel=elem('label','Nueva tarea delegada');taskLabel.append(task);card.append(taskLabel);
+    let content=null,kind=null;
+    if(['documentalista','memoria'].includes(agent.role)){
+      content=elem('textarea');content.rows=3;content.placeholder='Contenido real que debe utilizar. No basta con una instrucción genérica.';
+      const clabel=elem('label','Contenido');clabel.append(content);card.append(clabel);
+    }
+    if(agent.role==='documentalista'){
+      kind=elem('select');kind.append(new Option('Word (DOCX)','docx'),new Option('PDF','pdf'),new Option('Markdown','md'));
+      const klabel=elem('label','Formato');klabel.append(kind);card.append(klabel);
+    }
+    const delegate=elem('button','Delegar para aprobación');
+    delegate.addEventListener('click',async()=>{
+      try{
+        const instruction=task.value.trim();
+        if(instruction.length<6)throw Error('Escribí una tarea concreta de al menos 6 caracteres.');
+        if(content&&!content.value.trim())throw Error('Esta especialidad necesita contenido real.');
+        const params=subagentParams(agent,instruction,content?.value||'',kind?.value||'docx');
+        const result=await req('/api/sky/subagents/'+encodeURIComponent(agent.id)+'/delegate','POST',
+          {task:instruction,params,project_id:$('project').value||null});
+        subMsg('Tarea creada en '+result.workflow_id+'. Revisala y aprobala en Seguimiento.');
+        task.value='';await refresh();await refreshSubagents();
+      }catch(e){subMsg(e.message,true)}
+    });
+    card.append(delegate);
+  }
+  root.append(card);
+ }
+}
+function subMsg(text,err=false){const e=$('sub-message');e.textContent=text;e.style.color=err?'#ffaca7':'#85e8d5';}
+async function createSubagent(){
+ const name=$('sub-name').value.trim(),mission=$('sub-mission').value.trim(),role=$('sub-role').value;
+ const created=await req('/api/sky/subagents','POST',{name,mission,role});
+ subMsg('Subagente '+created.name+' creado; activalo cuando estés listo. No tiene permisos nuevos.');
+ $('sub-name').value='';$('sub-mission').value='';await refreshSubagents();
+}
+$('sub-create').addEventListener('click',()=>createSubagent().catch(e=>subMsg(e.message,true)));
 $('continuity-refresh').addEventListener('click',()=>continuity().catch(e=>msg(e.message,true)));
 $('login').addEventListener('click',async()=>{key=$('key').value.trim();await window.SKYOwnerAuth.begin(key);try{const val=await req('/api/sky/workflows/status');$('gate').hidden=true;$('content').hidden=false;$('key').value='';$('engine-state').textContent=val.engine+' · '+val.persistence;
- const projects=await req('/api/sky/projects');for(const p of projects)$('project').append(new Option(p.title,p.id));await refresh();if(!$('steps').children.length)newStep();}
+ const projects=await req('/api/sky/projects');for(const p of projects)$('project').append(new Option(p.title,p.id));await refresh();await initSubagentCatalogue();await refreshSubagents();if(!$('steps').children.length)newStep();}
  catch(e){key='';$('gate-error').textContent='Clave incorrecta o servidor no disponible.'}});
 $('key').addEventListener('keydown',e=>{if(e.key==='Enter')$('login').click()});$('add-step').addEventListener('click',newStep);$('create').addEventListener('click',()=>create().catch(e=>msg(e.message,true)));$('refresh').addEventListener('click',()=>refresh().catch(e=>msg(e.message,true)));
 })();
