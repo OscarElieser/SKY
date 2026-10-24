@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 
 from .api import require_key
 from neural_core import dispositivos, voz_inbox
-from neural_core import sky_subagents
+from neural_core import sky_subagents, sky_internal_roles
 from neural_core.sky_approvals import approvals
 from neural_core import sky_capacidades as caps
 from neural_core.sky_asistente_personal import AYUDA, atender, token_agente_local, url_agente_local
@@ -198,13 +198,24 @@ def _crear_subagente_si_pedido(texto: str) -> dict | None:
             'subagent': sub}
 
 
+def _centrar_en_sky(resultado: dict) -> dict:
+    """La conversación siempre pertenece a SKY, no al motor o subagente interno."""
+    if not isinstance(resultado, dict):
+        return resultado
+    respuesta = dict(resultado)
+    respuesta['atendido_por'] = 'SKY'
+    # Metadato de diagnóstico; NO representa ejecución automática del rol.
+    respuesta['rol_interno_sugerido'] = sky_internal_roles.route_result(respuesta)
+    return respuesta
+
+
 @router.post('/mensaje')
 def mensaje(body: Mensaje, request: Request):
     creado = _crear_subagente_si_pedido(body.texto)
     if creado:
-        return creado
+        return _centrar_en_sky(creado)
     resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
-    return _completar(resultado, body.dispositivo, request)
+    return _centrar_en_sky(_completar(resultado, body.dispositivo, request))
 
 
 @router.post('/stream')
@@ -221,11 +232,11 @@ def mensaje_stream(body: Mensaje, request: Request):
         texto = body.texto.strip()
         creado = _crear_subagente_si_pedido(texto)
         if creado:
-            yield linea({'final': creado})
+            yield linea({'final': _centrar_en_sky(creado)})
             return
         r = asis.reglas(texto) if texto else None
         if r or not texto or not asis.usar_cerebro(body.proveedor):
-            yield linea({'final': _completar(r or asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request)})
+            yield linea({'final': _centrar_en_sky(_completar(r or asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request))})
             return
         from neural_core import sky_cerebro
         completo = ''
@@ -234,16 +245,16 @@ def mensaje_stream(body: Mensaje, request: Request):
                 completo += valor
                 yield linea({'delta': valor})
             elif evento == 'herramienta':
-                yield linea({'final': _completar(asis.resolver_especial(valor), body.dispositivo, request)})
+                yield linea({'final': _centrar_en_sky(_completar(asis.resolver_especial(valor), body.dispositivo, request))})
                 return
             elif evento == 'fin':
-                yield linea({'final': {'tipo': 'respuesta', 'mensaje': valor, 'proveedor': 'ollama', 'transmitido': True}})
+                yield linea({'final': _centrar_en_sky({'tipo': 'respuesta', 'mensaje': valor, 'proveedor': 'ollama', 'transmitido': True})})
                 return
             elif evento == 'error':
                 if completo:
-                    yield linea({'final': {'tipo': 'respuesta', 'mensaje': completo, 'proveedor': 'ollama', 'transmitido': True}})
+                    yield linea({'final': _centrar_en_sky({'tipo': 'respuesta', 'mensaje': completo, 'proveedor': 'ollama', 'transmitido': True})})
                 else:
-                    yield linea({'final': _completar(asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request)})
+                    yield linea({'final': _centrar_en_sky(_completar(asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request))})
                 return
     return StreamingResponse(eventos(), media_type='application/x-ndjson', headers={'Cache-Control': 'no-store'})
 
