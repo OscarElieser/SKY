@@ -54,7 +54,25 @@ $('delete-object').addEventListener('click',()=>{if(!world||!selectedId)return;l
 $('delete-world').addEventListener('click',async()=>{if(!world||!confirm('¿Eliminar definitivamente el mundo «'+world.name+'»?'))return;try{await api('/api/worlds/'+world.id,{method:'DELETE'});closePresence();world=null;await refreshWorlds()}catch(e){notify(e.message)}});
 $('download').addEventListener('click',async()=>{if(!world)return;try{let res=await api('/api/worlds/'+world.id+'/export.glb');let blob=await res.blob();let url=URL.createObjectURL(blob);let a=document.createElement('a');a.href=url;a.download='SKY_'+world.name.replace(/[^a-z0-9-]/ig,'_').slice(0,35)+'.glb';a.click();setTimeout(()=>URL.revokeObjectURL(url),4000);notify('Archivo GLB exportado para Blender')}catch(e){notify(e.message)}});
 $('screenshot').addEventListener('click',()=>{if(!view3d)return;view3d.canvas.toBlob(blob=>{if(!blob)return;let a=document.createElement('a');let u=URL.createObjectURL(blob);a.href=u;a.download='SKY_metaverso.png';a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)},'image/png')});
-$('chat-form').addEventListener('submit',async e=>{e.preventDefault();let message=$('message').value.trim();if(!message)return;$('message').value='';chatBubble(message,'user');let m=message.match(/(?:sky[, :]*\s*)?(?:cre[aá]|crea|genera|construye)\s+(?:un |una |el |la )?(bosque|playa|ciudad|selva|planeta|galaxia|laboratorio|mundo)(.*)/i);if(m&&world){$('prompt').value=message;try{world=await jsonPost('/api/worlds/'+world.id+'/generate',{prompt:message,seed:Date.now()%999999,append:false,version:world.version});renderObjects();chatBubble('Mundo creado. Podés editar cada elemento, recorrerlo y exportarlo a GLB.')}catch(err){chatBubble('No se pudo generar: '+err.message)}return}try{let data=await jsonPost('/api/chat',{message,provider:$('provider').value,area:'Asistente universal'});chatBubble(data.answer);speak(data.answer)}catch(e){chatBubble('SKY: '+e.message)}});
+$('chat-form').addEventListener('submit',async e=>{e.preventDefault();let message=$('message').value.trim();if(!message)return;$('message').value='';chatBubble(message,'user');
+  const normalized=message.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  if(world && /\b(crea(?:me)?|genera|construye|disena)\b/.test(normalized) &&
+    /\b(centro educativo|campus|colegio|escuela|universidad|instituto|laboratorio|aula|politecnico)\b/.test(normalized)){
+    $('prompt').value=message;
+    if(!confirm('SKY reemplazará las piezas del mundo actual con geometría educativa editable. ¿Continuar?')){
+      chatBubble('Construcción cancelada, el mundo no cambió.');return;
+    }
+    try{
+      const built=await jsonPost('/api/worlds/'+encodeURIComponent(world.id)+'/build-campus',
+        {prompt:message,seed:Date.now()%1000000,version:world.version});
+      world=built.world;renderObjects();
+      const description='Campus 3D guardado: '+built.plan.geometry_objects+' piezas geométricas, '+
+        built.plan.floors+' niveles. '+built.plan.limitations.join('. ');
+      safeText($('build-report'),description);chatBubble(description);speak(description);
+    }catch(err){chatBubble('No se modificó el mundo: '+err.message)}
+    return;
+  }
+  let m=message.match(/(?:sky[, :]*\s*)?(?:cre[aá]|crea|genera|construye)\s+(?:un |una |el |la )?(bosque|playa|ciudad|selva|planeta|galaxia|laboratorio|mundo)(.*)/i);if(m&&world){$('prompt').value=message;try{world=await jsonPost('/api/worlds/'+world.id+'/generate',{prompt:message,seed:Date.now()%999999,append:false,version:world.version});renderObjects();chatBubble('Mundo creado. Podés editar cada elemento, recorrerlo y exportarlo a GLB.')}catch(err){chatBubble('No se pudo generar: '+err.message)}return}try{let data=await jsonPost('/api/chat',{message,provider:$('provider').value,area:'Asistente universal'});chatBubble(data.answer);speak(data.answer)}catch(e){chatBubble('SKY: '+e.message)}});
 function speak(text){if(!window.speechSynthesis||!$('mic').dataset.speak)return;window.speechSynthesis.cancel();let utter=new SpeechSynthesisUtterance(text.slice(0,900));utter.lang=window.SKYGlobalI18N?.locale()||'es-NI';utter.rate=1;window.speechSynthesis.speak(utter)}
 $('mic').addEventListener('click',()=>{const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Recognition)return notify('Este navegador no dispone de dictado de voz Web Speech. Podés usar SKY manos libres desde Python.');let sr=new Recognition();sr.lang=window.SKYGlobalI18N?.locale()||'es-NI';sr.interimResults=false;sr.onresult=e=>{$('message').value=e.results[0][0].transcript;$('message').focus()};sr.onerror=()=>notify('No se pudo reconocer la voz');sr.start();notify('SKY está escuchando...')});
 $('world-chat-form').addEventListener('submit',e=>{e.preventDefault();let msg=$('world-msg').value.trim();if(!msg||!socket||socket.readyState!==WebSocket.OPEN)return;socket.send(JSON.stringify({type:'say',text:msg}));$('world-msg').value=''});
