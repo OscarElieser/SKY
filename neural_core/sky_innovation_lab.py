@@ -138,6 +138,9 @@ def build_project(name: str, challenge: str, category: str, event: str="general"
         "Impacto: [sin puntuación hasta tener datos]; Viabilidad: [sin puntuación hasta evaluar recursos].",
         "## Canvas preliminar (no validado)",
         *[f"- **{key}:** {value}" for key,value in canvas.items()],
+        "## Evidencia aportada por el equipo (no verificada)",
+        evidence_text or "[No se aportaron datos, entrevistas ni documentos específicos.]",
+        "Cualquier afirmación incluida aquí debe comprobarse antes de publicar.",
         "## Prototipo y pruebas",
         "MVP: [describir pantallas o prototipo real]. Pruebas: [plan de usuarios, consentimiento, criterios y resultados].",
         "## Guion de pitch (borrador)",
@@ -159,6 +162,7 @@ def build_project(name: str, challenge: str, category: str, event: str="general"
         "smart_goals_verified":False,
         "impact_scored":False,"viability_scored":False,
         "pitch_minutes":minutes,"pitch_sections":pitch_sections,
+        "pitch_duration_tested":False,"rehearsal_required":True,
         "tasks":[{"deliverable":d,"status":"template_or_pending_validation"}
                  for d in DELIVERABLES],
         "research":brief,
