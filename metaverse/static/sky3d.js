@@ -33,7 +33,7 @@ $('create').addEventListener('click',async()=>{let name=$('world-name').value.tr
 $('extend').addEventListener('click',async()=>{if(!world)return;let prompt=$('prompt').value.trim();if(!prompt)return notify('Escribí qué elementos querés añadir');try{world=await jsonPost('/api/worlds/'+world.id+'/generate',{prompt,seed:Math.floor(Math.random()*100000),append:true,version:world.version});renderObjects();notify('Nuevos objetos añadidos y guardados')}catch(e){notify(e.message)}});
 $('add').addEventListener('click',async()=>{if(!world)return;let kind=$('shape').value;try{let name=kind+' '+(world.scene.objects.length+1);world=await jsonPost('/api/worlds/'+world.id+'/objects',{version:world.version,object:{name,kind,position:[avatar.x,0,avatar.z-3],rotation:[0,0,0],scale:[1,2,1],color:'#4BAFC6'}});selectedId=world.scene.objects.at(-1).id;renderObjects();notify('Pieza añadida')}catch(e){notify(e.message)}});
 $('delete-object').addEventListener('click',()=>{if(!world||!selectedId)return;let obj=world.scene.objects.find(o=>o.id===selectedId);if(obj&&confirm('¿Eliminar la pieza «'+obj.name+'»?')){world.scene.objects=world.scene.objects.filter(o=>o.id!==selectedId);selectedId=null;renderObjects();notify('Pieza eliminada; falta guardar la escena.')}});
-$('delete-world').addEventListener('click',async()=>{if(!world||!confirm('¿Eliminar definitivamente el mundo «'+world.name+'»?'))return;try{await api('/api/worlds/'+world.id,{method:'DELETE'});world=null;await refreshWorlds()}catch(e){notify(e.message)}});
+$('delete-world').addEventListener('click',async()=>{if(!world||!confirm('¿Eliminar definitivamente el mundo «'+world.name+'»?'))return;try{await api('/api/worlds/'+world.id,{method:'DELETE'});closePresence();world=null;await refreshWorlds()}catch(e){notify(e.message)}});
 $('download').addEventListener('click',async()=>{if(!world)return;try{let res=await api('/api/worlds/'+world.id+'/export.glb');let blob=await res.blob();let url=URL.createObjectURL(blob);let a=document.createElement('a');a.href=url;a.download='SKY_'+world.name.replace(/[^a-z0-9-]/ig,'_').slice(0,35)+'.glb';a.click();setTimeout(()=>URL.revokeObjectURL(url),4000);notify('Archivo GLB exportado para Blender')}catch(e){notify(e.message)}});
 $('screenshot').addEventListener('click',()=>{if(!view3d)return;view3d.canvas.toBlob(blob=>{if(!blob)return;let a=document.createElement('a');let u=URL.createObjectURL(blob);a.href=u;a.download='SKY_metaverso.png';a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)},'image/png')});
 $('chat-form').addEventListener('submit',async e=>{e.preventDefault();let message=$('message').value.trim();if(!message)return;$('message').value='';chatBubble(message,'user');let m=message.match(/(?:sky[, :]*\s*)?(?:cre[aá]|crea|genera|construye)\s+(?:un |una |el |la )?(bosque|playa|ciudad|selva|planeta|galaxia|laboratorio|mundo)(.*)/i);if(m&&world){$('prompt').value=message;try{world=await jsonPost('/api/worlds/'+world.id+'/generate',{prompt:message,seed:Date.now()%999999,append:false,version:world.version});renderObjects();chatBubble('Mundo creado. Podés editar cada elemento, recorrerlo y exportarlo a GLB.')}catch(err){chatBubble('No se pudo generar: '+err.message)}return}try{let data=await jsonPost('/api/chat',{message,provider:$('provider').value,area:'Asistente universal'});chatBubble(data.answer);speak(data.answer)}catch(e){chatBubble('SKY: '+e.message)}});
@@ -93,12 +93,13 @@ document.querySelectorAll('[data-sky-move]').forEach(button=>{
   });
 });
 window.addEventListener('online',()=>{
-  if(!world||!secret||socket?.readyState===WebSocket.OPEN)return;
+  if(!world||!secret||socket?.readyState===WebSocket.OPEN||socket?.readyState===WebSocket.CONNECTING)return;
   clearTimeout(reconnectTimer);reconnectTimer=null;reconnectAttempts=0;
   connectPresence(world.id,presenceGeneration);
 });
 async function connectPresence(id,generation){
   if(generation!==presenceGeneration||!world||world.id!==id||!secret)return;
+  if(socket && (socket.readyState===WebSocket.OPEN||socket.readyState===WebSocket.CONNECTING))return;
   try{
     const {ticket}=await jsonPost('/api/ws-ticket',{});
     if(generation!==presenceGeneration||world?.id!==id)return;
