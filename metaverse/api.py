@@ -1226,6 +1226,35 @@ def sky_extension_catalogue(category: str = ""):
         raise HTTPException(422,str(exc)) from exc
 
 
+class SKYExtensionInvoke(BaseModel):
+    action: str = Field(min_length=2,max_length=20)
+    arguments: dict = Field(default_factory=dict)
+    approved: bool = False
+
+
+@app.get("/api/sky/extensions/actions",dependencies=[Depends(require_key)])
+def sky_extension_tool_actions():
+    from neural_core.sky_extension_hub import callable_tools
+    return {"tools":callable_tools(),"auto_execute":False}
+
+
+@app.post("/api/sky/extensions/{extension_id}/invoke",dependencies=[Depends(require_key)])
+def sky_extension_invoke(extension_id:str,body:SKYExtensionInvoke,request:Request):
+    from neural_core.sky_extension_hub import invoke,ExtensionInvalid,ExtensionUnavailable
+    from .sentinel import exigir_pin
+    if body.approved is not True:
+        raise HTTPException(422,"Necesito tu aprobación expresa.")
+    # Chargeable models, web extraction and Wolfram require the owner PIN.
+    if extension_id in {"openrouter","huggingface","firecrawl","wolfram"}:
+        exigir_pin(request,"usar un proveedor externo con posible consumo")
+    try:
+        return invoke(extension_id,action=body.action,payload=body.arguments,approved=True)
+    except ExtensionInvalid as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except ExtensionUnavailable as exc:
+        raise HTTPException(503,str(exc)) from exc
+
+
 @app.get("/api/sky/extensions/{extension_id}",dependencies=[Depends(require_key)])
 def sky_extension_details(extension_id: str):
     from neural_core.sky_extension_hub import extension
