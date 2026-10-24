@@ -86,16 +86,18 @@ pruebas. Preservar la API SKY y el exportador GLB.
 La ruta privada `POST /api/worlds/{wid}/build-campus` recibe
 `{"prompt":"Centro educativo de tres plantas con laboratorio de informática, aula interactiva y videoconferencias","seed":42,"version":1}`.
 Genera **objetos reales en el formato existente** (edificios, plantas exteriores,
-ventanas, salones como volúmenes, árboles, bancos y caminos), validados mediante
+ventanas, aulas abiertas con paredes, mesas, terminales, pizarras,
+puertas, luces, árboles, bancos y caminos), validados mediante
 el motor SKY y persistidos en la base SQLite actual. Devuelve `world` y `plan`
 con elementos reconocidos y límites explícitos.
 
 - En `/world`, el botón **Construir campus avanzado** utiliza la misma ruta.
   También acepta instrucciones de creación de campus en el chat del metaverso
   —incluido texto dictado— siempre con confirmación antes de sustituir geometría.
-- El constructor **no** crea muebles internos, aulas equipadas, estudiantes,
-  escaleras utilizables ni clases animadas. El número de plantas es una
-  representación geométrica externa.
+- El constructor sí crea mobiliario y equipamiento **geométrico funcional** en
+  salas abiertas, con colisiones y estados; no crea ordenadores con un sistema
+  operativo virtual, estudiantes, interiores fotorrealistas cerrados, escaleras
+  transitables ni clases animadas. Los niveles principales son externos.
 - Solicitudes fuera de los escenarios educativos reconocidos devuelven HTTP 422
   sin sobrescribir el mundo. Conflictos de versión dan HTTP 409; el generador
   original sigue disponible.
@@ -116,20 +118,45 @@ autoritaria de posiciones en un servidor multijugador público.
 
 ### Avatares de escena
 
-Los usuarios conectados ven un avatar geométrico en WebGL con cuerpo, cabeza,
-brazos y piernas, además de una representación simplificada en Canvas2D.
+Los usuarios conectados ven un avatar original en formato glTF 2.0 GLB animado
+mediante nodos y fotogramas (caminar), renderizado dentro del WebGL ya existente.
+Si falla la lectura del GLB o no hay WebGL, permanece el avatar geométrico
+previo y su representación simplificada en Canvas2D.
 El propietario puede elegir un color; el servidor WebSocket valida que sea
 un RGB hexadecimal, lo comparte en su sala y no lo guarda fuera de la sesión.
-La caminata local muestra una animación procedural de piernas.
+La caminata local y la de otros participantes cambian al clip GLB de caminar;
+la animación es por rotación de nodos, no deformación esquelética.
 
-No se afirma soporte de esqueletos, capturas de movimiento, rostros realistas,
-persistencia de apariencias por cuenta ni rigging glTF; son trabajo posterior.
+No se afirma soporte de importación libre de GLB, skins, esqueletos externos,
+capturas de movimiento, rostros realistas o persistencia de apariencias por
+cuenta. `sky-avatar-glb.js` los rechaza explícitamente para no fingir
+compatibilidad. El modelo original lo genera el servidor en
+`GET /api/metaverse/avatars/default.glb` (autenticado), sin CDN.
+
+### Interacciones reales del aula
+
+`POST /api/worlds/{wid}/interact` usa la autenticación existente y control
+de versión; solo permite `toggle` o `write`. Una puerta abierta no se dibuja
+como bloque y deja de colisionar; cerrada sí bloquea el paso. Las luces,
+terminales y pizarras tienen estado persistente en la escena y eventos de
+WebSocket cuando se confirma la escritura. `write` permite editar hasta
+1200 caracteres de apuntes en una pizarra cercana, guardarlos en SQLite y
+recuperarlos tras recargar el mundo. La interfaz escribe mediante
+`textContent`, sin ejecutar scripts del usuario.
+
+Las pantallas y computadoras son objetos educativos con estado visible; no
+abren un sistema operativo real, ejecutan software ni celebran
+videoconferencias automáticamente. SKY puede informar el estado verdadero de
+cada una. Se mantiene el límite actual de 180 objetos por escena.
 
 ### Verificación técnica adicional
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q tests/test_sky_world_builder.py tests/test_sky_metaverse_reliability.py
+.\.venv\Scripts\python.exe -m pytest -q tests/test_sky_world_builder.py tests/test_sky_metaverse_reliability.py tests/test_sky_metaverse_interactive.py
 node --test tests/test_sky_world_physics.cjs
+.\.venv\Scripts\python.exe -c "from pathlib import Path; from metaverse.avatar_glb import build_avatar_glb; Path('sky-avatar-test.glb').write_bytes(build_avatar_glb())"
+$env:SKY_AVATAR_GLB_TEST_FILE = 'sky-avatar-test.glb'
+node --test tests/test_sky_avatar_glb.cjs
 node --check metaverse/static/sky3d.js
 ```
 
