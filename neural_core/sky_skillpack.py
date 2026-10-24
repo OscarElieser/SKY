@@ -310,7 +310,7 @@ def interpretar(texto: str) -> dict | None:
     if not isinstance(texto, str) or len(texto) > 6000:
         return None
     normalized = texto.casefold().strip()
-    if re.search(r"\\b(?:que|qué|mostrar|muestra|listar|lista)\\b.*\\bskills externas\\b", normalized):
+    if re.search(r"\b(?:que|qué|mostrar|muestra|listar|lista)\b.*\bskills externas\b", normalized):
         summary = catalogue()
         ready = [x["id"] for x in summary["skills"] if x["status"] in
                  {"adapter_ready_unverified", "available_via_office_api"}]
@@ -318,7 +318,7 @@ def interpretar(texto: str) -> dict | None:
                 "mensaje": "Tengo " + str(len(ready)) +
                            " adaptadores locales preparados, pero la ejecución externa exige configuración y prueba. " +
                            ", ".join(ready[:12]) + "."}
-    match = re.search(r"\\b(?:ejecuta|utiliza|usa)\\s+(?:la\\s+)?skill\\s+([a-z0-9-]{3,80})\\s*:\\s*(.+)$",
+    match = re.search(r"\b(?:ejecuta|utiliza|usa)\s+(?:la\s+)?skill\s+([a-z0-9-]{3,80})\s*:\s*(.+)$",
                       normalized, flags=re.DOTALL)
     if not match:
         return None
