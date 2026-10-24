@@ -213,7 +213,8 @@ def read_university_resource(source_id: str, path: str) -> dict:
         raise ValueError("Repositorio universitario no registrado.")
     if not isinstance(path, str) or not 1 <= len(path) <= 180:
         raise ValueError("Ruta inválida.")
-    path = path.lstrip("/")
+    if path.startswith("/"):
+        raise ValueError("No se permiten rutas absolutas.")
     parts = path.split("/")
     if any(s in ("", ".", "..") for s in parts) or not all(
             re.fullmatch(r"[A-Za-z0-9_.-]+", segment) for segment in parts):
