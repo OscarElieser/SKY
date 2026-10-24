@@ -14,7 +14,9 @@ contact scraping, number porting or phone OS permission escalation.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
+import time
 import os
 import re
 import secrets
@@ -224,7 +226,7 @@ def begin_verify(number: str, *, approved: bool) -> dict:
         raise PhoneUnavailable("Twilio no confirmó el envío del código.")
     with LOCK:
         state = _load()
-        state["pending"] = {"phone":number, "created_at":__import__("time").time(), "attempts":0}
+        state["pending"] = {"phone":number, "created_at":time.time(), "attempts":0}
         _save(state)
     return {"status":"otp_requested","phone_masked":_mask(number),
             "verified":False,"cost_possible":True,"code_not_stored":True}
@@ -238,7 +240,6 @@ def finish_verify(number: str, code: str) -> dict:
     with LOCK:
         state=_load()
         pending=state.get("pending") or {}
-        import time
         if pending.get("phone")!=number or time.time()-float(pending.get("created_at",0))>600:
             raise PhoneInvalid("La verificación ha expirado. Solicitá un código nuevo.")
         if int(pending.get("attempts",0))>=5:
@@ -276,7 +277,7 @@ def revoke_owner(*,approved:bool)->dict:
 def blocked_list()->dict:
     with LOCK:
         numbers = sorted(set(_load().get("blocked",[])))
-        return {"numbers":[{"id":secrets.token_hex(0) + __import__("hashlib").sha256(n.encode()).hexdigest()[:16],
+        return {"numbers":[{"id":hashlib.sha256(n.encode()).hexdigest()[:16],
                             "masked":_mask(n)} for n in numbers],
                 "total":len(numbers),
                 "scope":"sky_only_not_carrier_or_operating_system"}
@@ -303,7 +304,6 @@ def unblock_by_id(identifier:str,*,approved:bool)->dict:
     if approved is not True:raise PhoneInvalid("Se requiere confirmación.")
     if not isinstance(identifier,str) or not re.fullmatch(r"[a-f0-9]{16}",identifier):
         raise PhoneInvalid("Identificador de bloqueo inválido.")
-    import hashlib
     with LOCK:
         state=_load(); numbers=set(state.get("blocked",[]))
         matched=[n for n in numbers if hashlib.sha256(n.encode()).hexdigest()[:16]==identifier]
@@ -383,6 +383,8 @@ def _video_host() -> str:
 def meeting(*,approved:bool)->dict:
     if approved is not True:raise PhoneInvalid("Debés autorizar la videoconferencia.")
     _require()
+    with LOCK:
+        _verified(_load())
     host=_video_host()
     room="SKY-" + secrets.token_urlsafe(24).replace("_","").replace("-","")
     url="https://"+host+"/"+room
