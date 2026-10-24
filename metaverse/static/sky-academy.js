@@ -160,6 +160,31 @@ $("export-lesson").onclick=()=>execute($("export-lesson"),async()=>{
   await download("docx","/api/sky/academy/education/lesson/document",lessonBody());
 });
 
+$("project-verify-sources").onclick=()=>execute($("project-verify-sources"),async()=>{
+  const selected=Array.from($("project-sources").selectedOptions).map(o=>o.value);
+  if(selected.length<1||selected.length>4){
+    throw new Error("Seleccioná entre una y cuatro fuentes oficiales.");
+  }
+  const topic=$("project-problem").value.trim();
+  if(topic.length<5)throw new Error("Escribí el problema que querés investigar.");
+  const result=await request("/api/sky/academy/research/official-sources","POST",{
+    topic:topic.slice(0,240),source_ids:selected,
+  });
+  let out="SKY recuperó "+result.pages_retrieved+" de "+result.sources.length+
+    " páginas oficiales.\n\n";
+  for(const item of result.sources){
+    out+=item.label+"\n"+item.url+"\nEstado: "+item.status+"\n";
+    if(item.retrieved_at)out+="Fecha de consulta: "+item.retrieved_at+"\n";
+    if(item.topic_excerpts?.length){
+      out+="Extractos relacionados:\n"+item.topic_excerpts.join("\n\n")+"\n";
+    }else out+="Sin extractos relevantes recuperados.\n";
+    out+="\n";
+  }
+  out+="Las afirmaciones requieren verificación cruzada y revisión de fecha de publicación.";
+  $("research-output").textContent=out;
+  status("Consulta completada cuando hay fuentes recuperadas; no equivale a investigación científica final.");
+});
+
 $("build-project").onclick=()=>execute($("build-project"),async()=>{
   const body=projectBody();
   const result=await request("/api/sky/academy/innovation/project","POST",body);
