@@ -1200,3 +1200,94 @@ def sky_n8n_dispatch(body:SKYWorkflowDispatch,request:Request):
         raise HTTPException(422,str(exc)) from exc
     except N8NUnavailable as exc:
         raise HTTPException(503,str(exc)) from exc
+
+
+# SKY Extension Hub / Experience Learning — use existing SKY API, owner key
+# and SENTINEL MFA. No package installation, shell access, auto-run or new ports.
+class SKYExperienceCapture(BaseModel):
+    cycle_id: str = Field(min_length=20,max_length=60)
+    name: str = Field(min_length=3,max_length=60)
+    approved: bool = False
+
+class SKYExperiencePlan(BaseModel):
+    device: str = Field(default="local",min_length=1,max_length=80)
+    origin: str = Field(default="chat",pattern="^(chat|voz)$")
+
+class SKYExperienceDelete(BaseModel):
+    approved: bool = False
+
+
+@app.get("/api/sky/extensions",dependencies=[Depends(require_key)])
+def sky_extension_catalogue(category: str = ""):
+    from neural_core.sky_extension_hub import catalogue
+    try:
+        return catalogue(category)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
+
+
+@app.get("/api/sky/extensions/{extension_id}",dependencies=[Depends(require_key)])
+def sky_extension_details(extension_id: str):
+    from neural_core.sky_extension_hub import extension
+    try:
+        item=extension(extension_id)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
+    if not item:
+        raise HTTPException(404,"Extensión desconocida.")
+    return item
+
+
+@app.get("/api/sky/learning/capabilities",dependencies=[Depends(require_key)])
+def sky_learning_capabilities():
+    from neural_core.sky_extension_hub import learning_architecture
+    return learning_architecture()
+
+
+@app.get("/api/sky/learning/procedures",dependencies=[Depends(require_key)])
+def sky_learning_procedures():
+    from neural_core.sky_experience_learning import list_procedures
+    return list_procedures()
+
+
+@app.post("/api/sky/learning/capture",dependencies=[Depends(require_key)])
+def sky_learning_capture(body:SKYExperienceCapture,request:Request):
+    from .sentinel import exigir_pin
+    from neural_core.sky_experience_learning import capture_verified,LearningInvalid,LearningUnavailable
+    if body.approved is not True:
+        raise HTTPException(422,"Debés aprobar expresamente el procedimiento.")
+    exigir_pin(request,"guardar un procedimiento verificado de SKY")
+    try:
+        return capture_verified(body.cycle_id,body.name,approved=True)
+    except LearningInvalid as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except LearningUnavailable as exc:
+        raise HTTPException(503,str(exc)) from exc
+
+
+@app.post("/api/sky/learning/procedures/{procedure_id}/plan",dependencies=[Depends(require_key)])
+def sky_learning_plan(procedure_id:str,body:SKYExperiencePlan):
+    from neural_core.sky_experience_learning import plan_replay,LearningInvalid,LearningUnavailable
+    try:
+        plan=plan_replay(procedure_id,device=body.device,origin=body.origin)
+        return {"tipo":"ciclo","ciclo":plan,"requires_confirmation_each_step":True,
+                "message":"Procedimiento recuperado: SKY todavía no ejecutó ninguna acción."}
+    except LearningInvalid as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except LearningUnavailable as exc:
+        raise HTTPException(409,str(exc)) from exc
+
+
+@app.delete("/api/sky/learning/procedures/{procedure_id}",dependencies=[Depends(require_key)])
+def sky_learning_delete(procedure_id:str,body:SKYExperienceDelete,request:Request):
+    from .sentinel import exigir_pin
+    from neural_core.sky_experience_learning import delete,LearningInvalid,LearningUnavailable
+    if body.approved is not True:
+        raise HTTPException(422,"Confirmá que querés eliminar el procedimiento.")
+    exigir_pin(request,"eliminar un procedimiento de SKY")
+    try:
+        return {"deleted":delete(procedure_id,approved=True)}
+    except LearningInvalid as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except LearningUnavailable as exc:
+        raise HTTPException(503,str(exc)) from exc
