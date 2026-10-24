@@ -57,7 +57,9 @@ jobs:
         run: |
           docker pull python:3.12-alpine
           docker pull node:22-alpine
-          docker image inspect python:3.12-alpine node:22-alpine >/dev/null
+          docker pull gcc:14-bookworm
+          docker build -t sky-typescript:5.7.3 docker/sky-typescript
+          docker image inspect python:3.12-alpine node:22-alpine gcc:14-bookworm sky-typescript:5.7.3 >/dev/null
       - name: Execute actual offline compilation, execution, and tests inside Docker
         env:
           SKY_CODE_RUNNER_ENABLED: '1'
