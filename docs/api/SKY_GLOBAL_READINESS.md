@@ -20,6 +20,20 @@ propietario de SKY.
 7. El mismo DIAG muestra fallos medidos y límites sin inventar que una auditoría
    jurídica, un despliegue internacional o una prueba de lector de pantalla ocurrió.
 
+## Voz y reloj según el idioma seleccionado
+
+El HUD ahora utiliza el idioma activo para `SpeechRecognition` del navegador,
+la preferencia de `speechSynthesis` y el parámetro de idioma de
+`faster-whisper` local, tanto en dictado como en escucha continua. El reloj
+también cambia su formato de inmediato. El modelo de voz **Piper configurado
+en español** no se impone a textos en otros idiomas: se intenta la voz del
+sistema disponible para ese idioma.
+
+Estas conexiones son reales, pero para obtener audio y transcripción correctos
+el equipo debe tener voces, modelo multilingüe y soporte de navegador. La
+selección de idioma **no garantiza por sí sola** pronunciación o reconocimiento
+correctos. Esta limitación se conserva como `unverified` en el diagnóstico global.
+
 ## Ejecución local
 
 ```powershell
