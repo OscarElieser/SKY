@@ -281,6 +281,48 @@ def current(ident: str) -> dict:
                 "step":stage_output(session["plan"],session["index"])}
 
 
+def formative_response(ident: str, answer: str) -> dict:
+    """Socratic follow-up without persisting the student's answer or grading it."""
+    if not isinstance(answer, str) or not 2 <= len(answer.strip()) <= 800:
+        raise ValueError("La respuesta debe contener de 2 a 800 caracteres.")
+    with _LOCK:
+        _prune()
+        session = _SESSIONS.get(ident)
+        if not session:
+            raise KeyError("Clase no encontrada o expirada.")
+        stage_index = session["index"]
+        level = session["plan"]["level"]
+        topic = session["plan"]["topic"]
+        session["updated"] = time.monotonic()
+    if level == "inicial":
+        feedback = (
+            "¡Gracias por participar! Mostrame con un dibujo, un gesto o un ejemplo "
+            f"qué pensás sobre {topic}. Una persona adulta puede ayudarte."
+        )
+    elif level in ("primaria", "secundaria", "tecnico"):
+        feedback = (
+            "Gracias por compartir tu idea. Vamos a revisarla paso a paso: "
+            "¿qué dato del material la respalda y cómo podríamos comprobarla?"
+        )
+    else:
+        feedback = (
+            "Gracias por tu planteamiento. Para evaluarlo académicamente, "
+            "identificá su fundamento, las fuentes y una limitación del argumento. "
+            "Todavía no tengo evidencia suficiente para calificar su exactitud."
+        )
+    return {
+        "central_agent":"SKY", "lesson_id":ident,
+        "stage_number":stage_index+1,
+        "voice_ready_text":feedback,
+        "message":feedback,
+        "response_recorded":False,
+        "student_personal_data_saved":False,
+        "correctness_graded":False,
+        "next_stage_requires_owner_action":True,
+        "reason":"La evaluación factual requiere respuesta de referencia o rúbrica validada.",
+    }
+
+
 def end(ident: str) -> bool:
     with _LOCK:
         return _SESSIONS.pop(ident,None) is not None
