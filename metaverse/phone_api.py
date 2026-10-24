@@ -96,6 +96,11 @@ def verify_revoke(body:Consent,request:Request):
     return _return(phone.revoke_owner,approved=True)
 
 
+@router.get("/native/validate")
+def validate_mobile_target(number: str):
+    return _return(phone.native_destination, number)
+
+
 @router.get("/blocked")
 def blocked():
     return _return(phone.blocked_list)
