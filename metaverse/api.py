@@ -1100,3 +1100,103 @@ def sky_skill_live_probe(skill_id: str):
         return probe(skill_id)
     except ValueError as exc:
         raise HTTPException(422,str(exc)) from exc
+
+
+# Expansión opcional de SKY: sin crear una API nueva ni habilitar proveedores
+# externos de forma automática. Todo utiliza la autenticación SKY existente.
+class SKYResearchLookup(BaseModel):
+    query: str = Field(min_length=3,max_length=220)
+    limit: int = Field(default=5,ge=1,le=10)
+
+class SKYZoteroLookup(BaseModel):
+    query: str = Field(default="",max_length=160)
+    limit: int = Field(default=10,ge=1,le=30)
+
+class SKYWolframLookup(BaseModel):
+    question: str = Field(min_length=3,max_length=180)
+    units: str = Field(default="metric",pattern="^(metric|imperial)$")
+
+class SKYWorkflowDispatch(BaseModel):
+    alias: str = Field(min_length=2,max_length=50,pattern="^[a-z][a-z0-9_-]+$")
+    approved: bool = False
+
+
+@app.get("/api/sky/expansion/readiness",dependencies=[Depends(require_key)])
+def sky_expansion_readiness():
+    from neural_core.sky_research_connectors import readiness as research_status
+    from neural_core.sky_n8n_bridge import readiness as n8n_status
+    from neural_core.providers import provider_summary
+    return {"ok":True,"research":research_status(),"n8n":n8n_status(),
+            "models":[x for x in provider_summary() if x["id"] in ("openrouter","huggingface","ollama")],
+            "external_live_verified":False,
+            "existing_skills_and_api_preserved":True}
+
+
+@app.post("/api/sky/expansion/research/semantic-scholar",dependencies=[Depends(require_key)])
+def sky_semantic_scholar(body:SKYResearchLookup):
+    from neural_core.sky_research_connectors import semantic_scholar,ResearchInputError,ResearchConnectorError
+    try:
+        return semantic_scholar(body.query,body.limit)
+    except ResearchInputError as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except ResearchConnectorError as exc:
+        raise HTTPException(502,str(exc)) from exc
+
+
+@app.post("/api/sky/expansion/research/zotero",dependencies=[Depends(require_key)])
+def sky_zotero_lookup(body:SKYZoteroLookup):
+    from neural_core.sky_research_connectors import zotero_items,ResearchInputError,ResearchConnectorError
+    try:
+        return zotero_items(body.query,body.limit)
+    except ResearchInputError as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except ResearchConnectorError as exc:
+        raise HTTPException(503,str(exc)) from exc
+
+
+@app.post("/api/sky/expansion/research/wolfram",dependencies=[Depends(require_key)])
+def sky_wolfram_lookup(body:SKYWolframLookup):
+    from neural_core.sky_research_connectors import wolfram_short_answer,ResearchInputError,ResearchConnectorError
+    try:
+        return wolfram_short_answer(body.question,body.units)
+    except ResearchInputError as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except ResearchConnectorError as exc:
+        raise HTTPException(503,str(exc)) from exc
+
+
+@app.get("/api/sky/expansion/n8n/workflows",dependencies=[Depends(require_key)])
+def sky_n8n_workflows():
+    from neural_core.sky_n8n_bridge import list_workflows,N8NInvalid,N8NUnavailable
+    try:
+        return list_workflows()
+    except N8NInvalid as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except N8NUnavailable as exc:
+        raise HTTPException(503,str(exc)) from exc
+
+
+@app.get("/api/sky/expansion/n8n/executions",dependencies=[Depends(require_key)])
+def sky_n8n_executions():
+    from neural_core.sky_n8n_bridge import recent_executions,N8NInvalid,N8NUnavailable
+    try:
+        return recent_executions()
+    except N8NInvalid as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except N8NUnavailable as exc:
+        raise HTTPException(503,str(exc)) from exc
+
+
+@app.post("/api/sky/expansion/n8n/dispatch",dependencies=[Depends(require_key)])
+def sky_n8n_dispatch(body:SKYWorkflowDispatch,request:Request):
+    from neural_core.sky_n8n_bridge import dispatch_webhook,N8NInvalid,N8NUnavailable
+    from .sentinel import exigir_pin
+    if body.approved is not True:
+        raise HTTPException(422,"Se requiere aprobación explícita del propietario.")
+    exigir_pin(request,"ejecución de automatización externa n8n")
+    try:
+        return dispatch_webhook(body.alias,approved=True)
+    except N8NInvalid as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except N8NUnavailable as exc:
+        raise HTTPException(503,str(exc)) from exc

@@ -30,6 +30,9 @@ PROVIDERS = {
     'groq': Provider('groq','Groq (Llama)','GROQ_API_KEY','GROQ_MODEL','llama-3.3-70b-versatile',True),
     'deepseek': Provider('deepseek','DeepSeek','DEEPSEEK_API_KEY','DEEPSEEK_MODEL','deepseek-chat',True),
     'ollama': Provider('ollama','Ollama local','','OLLAMA_MODEL','llama3.2',False),
+    # Opt-in only: never silently send a prompt or incur usage on these new providers.
+    'openrouter': Provider('openrouter','OpenRouter','OPENROUTER_API_KEY','OPENROUTER_MODEL','',True),
+    'huggingface': Provider('huggingface','Hugging Face Inference','HF_TOKEN','HF_MODEL','',True),
 }
 AUTO_ORDER = ('gemini','openai','anthropic','mistral','groq','deepseek','ollama')
 # Criterio simple y transparente: no es ranking de calidad ni estimación de costos.
@@ -49,6 +52,8 @@ def provider_ready(name: str) -> bool:
     cfg=PROVIDERS[name]
     if not cfg.env:
         return True  # Ollama puede estar apagado; se comprueba al consultar.
+    if name in ('openrouter','huggingface'):
+        return bool(os.getenv(cfg.env,'').strip() and os.getenv(cfg.model_env,'').strip())
     return bool(os.getenv(cfg.env,'').strip())
 
 def provider_summary() -> list[dict]:
@@ -105,6 +110,8 @@ def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_
     if provider=='auto': provider,chosen=choose_provider('auto')
     else: provider,chosen=choose_provider(provider)
     model=(model or chosen).strip()
+    if provider in ('openrouter','huggingface') and not model:
+        raise ProviderError('Debés configurar el modelo exacto del proveedor; SKY no adivina modelos ni cuotas.')
     if not model or len(model)>150: raise ValueError('Identificador de modelo inválido.')
     if max_output_tokens<1 or max_output_tokens>8192: raise ValueError('Límite de salida inválido.')
     system,turns=_messages(mensajes)
@@ -137,6 +144,21 @@ def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_
             resp=client.chat.complete(model=model,messages=messages,max_tokens=max_output_tokens,temperature=0.2)
             parts=resp.choices[0].message.content
             return _result(parts if isinstance(parts,str) else ''.join(str(p.get('text','')) if isinstance(p,dict) else str(getattr(p,'text','')) for p in parts),provider)
+        if provider in ('openrouter','huggingface'):
+            # OpenAI-compatible chat endpoints; model must be configured explicitly
+            # to avoid guessing availability, cost or changing data residency.
+            if not model:
+                raise ProviderError('Configurá OPENROUTER_MODEL o HF_MODEL antes de utilizar el proveedor.')
+            base={'openrouter':'https://openrouter.ai/api/v1',
+                  'huggingface':'https://router.huggingface.co/v1'}[provider]
+            client=_openai_sdk(os.environ[PROVIDERS[provider].env],base)
+            try:
+                resp=client.chat.completions.create(
+                    model=model,messages=[{'role':'system','content':system},*turns],
+                    max_tokens=max_output_tokens,temperature=0.2,stream=False)
+                choice=resp.choices[0].message.content if resp.choices else None
+                return _result(choice,provider)
+            finally: client.close()
         if provider in ('groq','deepseek'):
             base={'groq':'https://api.groq.com/openai/v1',
                   'deepseek':'https://api.deepseek.com'}[provider]
