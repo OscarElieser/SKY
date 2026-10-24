@@ -270,6 +270,13 @@ def reglas(texto: str) -> dict | None:
     if stop:
         return stop
     try:
+        from . import sentinel_estado
+        seg = sentinel_estado.interpretar(texto)   # SENTINEL: consultas y restricciones de seguridad
+    except Exception as exc:
+        seg = {'tipo': 'error', 'mensaje': 'No pude consultar la seguridad: ' + str(exc)[:120]}
+    if seg:
+        return seg
+    try:
         from .sky_agent import interpret_local_command
         local = interpret_local_command(texto)
         if local:

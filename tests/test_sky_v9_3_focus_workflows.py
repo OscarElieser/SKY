@@ -145,8 +145,9 @@ def test_review_on_ambiguous_side_effect(fx):
     assert c.post('/api/sky/workflows/'+g['id']+'/retry',headers=HEADERS,json={'acknowledge_partial_effects':True}).status_code==200
 
 
-def test_no_unauthorized_community_access_even_if_logged_in(fx):
+def test_no_unauthorized_community_access_even_if_logged_in(fx, monkeypatch):
     c,_=fx
+    monkeypatch.setenv('SKY_COMUNIDAD_PUBLICA','1')   # SENTINEL: comunidad abierta sólo por decisión del dueño
     invite=c.post('/api/community/admin/invites',headers=HEADERS,json={'hours':48}).json()['invite_code']
     reg=c.post('/api/community/register',json={'username':'testvisitor93','password':'a-strong-password-12345','display_name':'Visitante','invite':invite})
     assert reg.status_code==201,reg.text

@@ -630,6 +630,11 @@ from .language_api import router as sky_language_router
 app.include_router(sky_language_router)
 from .security_v101 import install as install_sky_security
 install_sky_security(app)
+# SKY SENTINEL (v12.5): toda /api/* es privada salvo excepciones explícitas; falla cerrado.
+from .sentinel import install as install_sentinel
+install_sentinel(app)
+from .sentinel_api import router as sentinel_router
+app.include_router(sentinel_router)
 
 # SKY 10.2: optional creator TOTP + short-lived server-side sessions.
 from .security_api import router as sky_security_router
@@ -677,9 +682,14 @@ def client_bootstrap(request: Request):
     is_local = client_ip in ('127.0.0.1', '::1', 'localhost', 'testclient', 'testserver')
     # En despliegues públicos, una conexión interna del proxy no prueba que sea el dueño.
     reveal_owner_key = is_local and os.getenv('SKY_DEPLOYMENT_MODE', 'local').strip().lower() == 'local'
+    # SENTINEL: con PIN configurado la llave nunca se entrega sin él (POST /api/sentinel/desbloquear).
+    from neural_core.sentinel_identidad import pin_configurado
+    requiere_pin = pin_configurado()
+    if requiere_pin:
+        reveal_owner_key = False
     return {
-        'superadmin': 'oscarelieser.informatica.inatec@gmail.com',
         'key': api_token() if reveal_owner_key else '',
+        'requiere_pin': requiere_pin,
         'local': is_local,
         'ollama_active': True,
         'gemini_active': bool(os.getenv('GEMINI_API_KEY')),

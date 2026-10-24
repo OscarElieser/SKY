@@ -417,6 +417,10 @@ def instaladas() -> list[tuple[dict, dict]]:
 
 def ejecutar_si_coincide(texto: str) -> dict | None:
     t = _norm(texto)
+    from .sky_capacidades import parada_activa
+    if parada_activa() and any(t == d or t.startswith(d + ' ') for m, _ in instaladas() for d in m['disparadores']):
+        return {'tipo': 'respuesta', 'proveedor': 'sky-sentinel',
+                'mensaje': 'SKY está en parada de emergencia: las habilidades instaladas están suspendidas.'}
     for m, info in instaladas():
         disp = next((d for d in m['disparadores'] if t == d or t.startswith(d + ' ')), None)
         if not disp:

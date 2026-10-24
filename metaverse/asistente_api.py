@@ -273,8 +273,10 @@ class Correo(BaseModel):
 
 
 @router.post('/correo')
-def enviar_correo(body: Correo):
+def enviar_correo(body: Correo, request: Request):
     """Envío confirmado por el dueño (un correo enviado no se puede deshacer)."""
+    from .sentinel import exigir_pin
+    exigir_pin(request, 'enviar un correo')
     from neural_core import sky_correo
     if caps.parada_activa():
         raise HTTPException(409, 'SKY está en parada de emergencia: levantala antes de enviar.')
@@ -292,7 +294,10 @@ def enviar_correo(body: Correo):
 
 @router.post('/ejecutar')
 def ejecutar(body: Ejecucion, request: Request):
-    """Confirmación explícita del dueño desde el panel."""
+    """Confirmación explícita del dueño desde el panel. Nivel 3: además, su PIN (si lo configuró)."""
+    if caps.nivel_riesgo(body.action, body.params) >= 3:
+        from .sentinel import exigir_pin
+        exigir_pin(request, 'una acción de alto riesgo')
     params = dict(body.params)
     if body.action in ('note_create', 'note_append', 'note_trash'):
         params['confirmed'] = True   # este clic ES la confirmación individual que exigen las notas
@@ -322,16 +327,21 @@ def emergencia_activar():
 
 
 @router.delete('/emergencia')
-def emergencia_levantar():
-    """Sólo el dueño, con su llave: vuelve a permitir acciones según su política."""
+def emergencia_levantar(request: Request):
+    """Sólo el dueño, con su llave (y su PIN si lo configuró): vuelve a permitir acciones según su política."""
+    from .sentinel import exigir_pin
+    exigir_pin(request, 'levantar la parada de emergencia')
     from neural_core import sky_metricas
     sky_metricas.registrar('servicio', 'reanudar', True, detalle='parada levantada por el dueño')
     return {'levantada': caps.levantar_parada()}
 
 
 @router.post('/casa')
-def ejecutar_casa(body: OrdenCasa):
+def ejecutar_casa(body: OrdenCasa, request: Request):
     """Confirmación del dueño para Home Assistant (luces, escenas, clima, cortinas, cerraduras)."""
+    if any(str(e).split('.')[0] in ('lock', 'cover', 'alarm_control_panel') for e in body.entity_ids):
+        from .sentinel import exigir_pin
+        exigir_pin(request, 'cerraduras, cortinas o alarmas')
     try:
         res = _casa(body.service, body.entity_ids, body.data)
         if body.frase:

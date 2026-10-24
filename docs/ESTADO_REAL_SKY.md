@@ -1,4 +1,4 @@
-# SKY: estado real de cada capacidad (v12.4)
+# SKY: estado real de cada capacidad (v12.5)
 
 Formato del prompt maestro §20. Cada capacidad tiene uno de estos estados:
 
@@ -65,7 +65,11 @@ Ninguna capacidad marcada «sin validación completa» debe presentarse como fun
 | Servicio | Arranque con Windows, sin suspensión, reinicio automático de servicios caídos | Implementada sin validación completa en Windows |
 | Seguridad | Niveles de riesgo 1–3; el nivel 3 siempre se confirma | Implementada y probada |
 | Seguridad | Parada de emergencia (voz o HUD); reanudar sólo con clic | Implementada y probada |
-| Seguridad | Control de velocidad (rate limit) por ruta | Pendiente |
+| Seguridad | API privada por defecto (todas las rutas `/api/*`), falla cerrado, 429 ante fuerza bruta | Implementada y probada (SENTINEL) |
+| Seguridad | PIN del dueño: interfaz bloqueada y operaciones críticas | Implementada y probada (SENTINEL) |
+| Seguridad | Modo «sólo este equipo», Security Center y órdenes de seguridad por voz | Implementada y probada (SENTINEL) |
+| Seguridad | Passkeys (WebAuthn), biometría, cifrado en reposo de la memoria | Pendiente (SENTINEL fases 4 y 5) |
+| Seguridad | Límite de velocidad general por IP (90 por minuto) | Implementada (ya existía; con Redis en modo público) |
 | Multidispositivo | Agentes remotos emparejados vía Tailscale con token por dispositivo | Implementada sin validación completa |
 | Multidispositivo | App móvil nativa y sincronización de memoria | Pendiente |
 | Evolución | Proponer habilidades nuevas, probarlas aisladas y versionarlas (§4) | Implementada y probada con el Skill Builder; SKY **no** modifica su núcleo ni sus controles |
