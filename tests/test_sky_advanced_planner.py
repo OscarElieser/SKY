@@ -169,7 +169,7 @@ def test_llamacpp_engine_uses_only_loopback_api(monkeypatch):
         assert payload["stream"] is False
         expected = '{"order":["document","experience"],"goals":{},"quality_checks":[],"summary":"Listo"}'
         return FakeResponse(__import__("json").dumps(
-            {"choices":[{"message":{"content":expected}}]
+            {"choices":[{"message":{"content":expected}}]}
         ).encode("utf-8"))
 
     monkeypatch.setattr(p, "_open", fake_open)
