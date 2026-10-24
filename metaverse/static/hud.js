@@ -915,6 +915,149 @@
     const output=el('pre','res','Las pruebas físicas no se presumen: mirá el resultado verificable aquí.');
     output.style.whiteSpace='pre-wrap';output.style.overflowWrap='anywhere';
     area.append(lang,code,webFiles,tests,expected,actions,output);
+    /* Guided software engineering. No library/IDE is installed by browsing a catalogue. */
+    const workbench=seccion(root,'Ecosistema de desarrollo · proyectos, SDK, bibliotecas y explicación');
+    workbench.append(el('div','s','Explorá referencias oficiales o comprobá tu entorno; una referencia no significa que la herramienta esté instalada o que sea segura.'));
+    const browseRow=el('div','btns');
+    const cat=el('select','hab-in');
+    [['frameworks','Frameworks'],['databases','Bases de datos'],['ides','IDE / editores'],
+     ['icons','Bibliotecas de iconos'],['fonts','Tipografías'],['languages','Lenguajes']].forEach(
+       ([value,label])=>{const opt=el('option','',label);opt.value=value;cat.append(opt);});
+    const searchTech=el('input','hab-in');searchTech.placeholder='Buscar tecnología por nombre';searchTech.maxLength=100;
+    const browse=el('button','btn','Buscar catálogo');
+    const readiness=el('button','btn','Revisar SDK / IDE');
+    const starter=el('button','btn','Crear base HTML5/CSS3/JS');
+    [browse,readiness,starter].forEach(b=>{b.type='button';});
+    browseRow.append(cat,searchTech,browse,readiness,starter);
+    const techResult=el('pre','res','Catálogo consultable sin instalaciones ni cambios en tu equipo.');
+    techResult.style.whiteSpace='pre-wrap';techResult.style.overflowWrap='anywhere';
+    workbench.append(browseRow,techResult);
+    browse.addEventListener('click',async()=>{
+      browse.disabled=true;
+      try{
+        const path='/api/developer/workbench/catalogue?category='+encodeURIComponent(cat.value)
+                   +'&query='+encodeURIComponent(searchTech.value)+'&limit=70';
+        const d=await api(path);
+        techResult.textContent=(d.items||[]).map(x=>x.name+' · '+(x.official_docs||'sin enlace oficial')+
+          '\n  Estado: '+x.status+' · perfil Docker: '+(x.docker_profile_defined?'definido':'sin perfil')).join('\n\n')
+          || 'No se encontraron referencias con ese nombre.';
+        techResult.textContent+='\n\nNota: este resultado NO acredita instalación ni pruebas.';
+      }catch(e){techResult.textContent='Error de catálogo: '+e.message;}
+      finally{browse.disabled=false;}
+    });
+    readiness.addEventListener('click',async()=>{
+      readiness.disabled=true;
+      try{
+        const d=await api('/api/developer/workbench/readiness');
+        techResult.textContent='Entorno: '+d.host_platform+'\n'+
+          (d.tools||[]).map(x=>x.tool+' → '+x.state).join('\n')+
+          '\n\nLas herramientas fuera del PATH pueden existir, pero no están verificadas.';
+      }catch(e){techResult.textContent='Error SDK: '+e.message;}
+      finally{readiness.disabled=false;}
+    });
+    starter.addEventListener('click',async()=>{
+      starter.disabled=true;
+      try{
+        const d=await api('/api/developer/workbench/starter/web',{
+          method:'POST',body:JSON.stringify({title:'Mi proyecto SKY',subtitle:'Sitio web interactivo creado con SKY'})});
+        if(!profiles.has('Web'))throw Error('El perfil Web no se cargó.');
+        lang.value='Web';syncLanguage();
+        code.value=d.files['index.html'];
+        cssEditor.value=d.files['styles.css'];jsEditor.value=d.files['app.js'];
+        techResult.textContent='Plantilla cargada en los tres editores. Aún NO fue compilada ni comprobada. Ejecutá la validación con tu PIN.';
+      }catch(e){techResult.textContent='Error plantilla: '+e.message;}
+      finally{starter.disabled=false;}
+    });
+    const packageArea=el('details');
+    packageArea.append(el('summary','','Buscar paquetes reales · npm / PyPI / pub.dev (opcional)'));
+    const packageRow=el('div','btns'),registry=el('select','hab-in'),pkgName=el('input','hab-in');
+    [['npm','npm · JavaScript / iconos'],['pypi','PyPI · Python'],['pub','pub.dev · Flutter/Dart']].forEach(
+      ([v,label])=>{const opt=el('option','',label);opt.value=v;registry.append(opt);});
+    pkgName.placeholder='Ej. lucide-react, fastapi, google_fonts';pkgName.maxLength=110;
+    const lookup=el('button','btn','Verificar metadatos');lookup.type='button';
+    const pkgOutput=el('pre','res','Consulta pública y voluntaria, sin instalar paquetes.');
+    pkgOutput.style.whiteSpace='pre-wrap';
+    packageRow.append(registry,pkgName,lookup);packageArea.append(packageRow,pkgOutput);
+    workbench.append(packageArea);
+    lookup.addEventListener('click',async()=>{
+      lookup.disabled=true;
+      try{
+        if(!confirm('¿Querés consultar el nombre del paquete en su registro público oficial? No se instalará.'))return;
+        const d=await api('/api/developer/workbench/packages/lookup?registry='+
+          encodeURIComponent(registry.value)+'&name='+encodeURIComponent(pkgName.value));
+        pkgOutput.textContent='Paquete: '+d.package+'\nVersión reportada: '+d.latest_reported+
+          '\nDescripción: '+d.description+'\nFuente: '+d.source_url+
+          '\nLicencia verificada: NO · vulnerabilidades auditadas: NO · instalado: NO';
+      }catch(e){pkgOutput.textContent='No verificado: '+e.message;}
+      finally{lookup.disabled=false;}
+    });
+    const guideArea=el('details');
+    guideArea.append(el('summary','','Explicar cada línea de código · sin modificar el original'));
+    const explainRow=el('div','btns'),fileFocus=el('select','hab-in');
+    const explain=el('button','btn','Explicar siguientes 80 líneas');explain.type='button';
+    const lesson=el('pre','res','Explicación estructural orientativa, no sustituye pruebas ni una auditoría.');
+    lesson.style.whiteSpace='pre-wrap';lesson.style.overflowWrap='anywhere';
+    explainRow.append(fileFocus,explain);
+    guideArea.append(explainRow,lesson);workbench.append(guideArea);
+    let guideCursor=1;
+    function guideChoice(){
+      const choices=lang.value==='Web'
+        ?[['HTML','index.html'],['CSS','styles.css'],['JavaScript','app.js']]
+        :[[lang.value,profiles.get(lang.value)?.main_file||'Código']];
+      fileFocus.replaceChildren();
+      choices.forEach(([language,label])=>{
+        const opt=el('option','',label);opt.value=language;fileFocus.append(opt);
+      });
+      guideCursor=1;
+    }
+    fileFocus.addEventListener('change',()=>{guideCursor=1;lesson.textContent='Listo para explicar desde la primera línea.';});
+    explain.addEventListener('click',async()=>{
+      explain.disabled=true;
+      try{
+        const selected=fileFocus.value;
+        const source=lang.value==='Web'&&selected==='CSS'?cssEditor.value:
+          lang.value==='Web'&&selected==='JavaScript'?jsEditor.value:code.value;
+        const d=await api('/api/developer/workbench/explain',{
+          method:'POST',body:JSON.stringify({
+            language:selected,source,start_line:guideCursor,max_lines:80})});
+        const lines=(d.annotations||[]).map(x=>'L'+x.line+'  '+x.code+
+          '\n    ↳ '+x.explanation_es).join('\n');
+        lesson.textContent=(guideCursor===1?'':lesson.textContent+'\n')+lines+
+          (d.has_more?'\n\nContinuá para explicar desde la línea '+d.next_start_line:
+            '\n\nExplicación completa en el rango solicitado. Diagnóstico sintáctico: '+
+            (d.syntax_checked?(d.syntax_valid?'válido':'inválido'):'no ejecutado'));
+        guideCursor=d.next_start_line||1;
+      }catch(e){lesson.textContent='Error de explicación: '+e.message;guideCursor=1;}
+      finally{explain.disabled=false;}
+    });
+    const inspectArea=el('details');
+    inspectArea.append(el('summary','','Inspeccionar proyecto / dependencias · Flutter, Unity, Android, etc.'));
+    inspectArea.append(el('div','s','Analizá los archivos del editor actual o pegá un JSON de rutas→contenido. No ingresés .env, claves, contraseñas ni información privada.'));
+    const projectMap=el('textarea','hab-in');
+    projectMap.rows=5;projectMap.spellcheck=false;
+    projectMap.placeholder='Opcional: {"package.json":"{\"dependencies\":{\"react\":\"^19\"}}"}';
+    const inspectBtn=el('button','btn','Analizar proyecto sin ejecutar');inspectBtn.type='button';
+    const inspectResult=el('pre','res','Inspección estática: no instala dependencias ni abre archivos de la computadora.');
+    inspectResult.style.whiteSpace='pre-wrap';inspectResult.style.overflowWrap='anywhere';
+    inspectArea.append(projectMap,inspectBtn,inspectResult);workbench.append(inspectArea);
+    inspectBtn.addEventListener('click',async()=>{
+      inspectBtn.disabled=true;
+      try{
+        const files=projectMap.value.trim()?JSON.parse(projectMap.value):selection();
+        const d=await api('/api/developer/workbench/inspect',{
+          method:'POST',body:JSON.stringify({files})});
+        inspectResult.textContent='Lenguajes: '+JSON.stringify(d.language_files)+
+          '\nFrameworks: '+d.frameworks_detected.join(', ')+
+          '\nBases de datos: '+d.databases_detected.join(', ')+
+          '\nIDE: '+d.ide_project_hints.join(', ')+
+          '\nDependencias detectadas: '+d.dependency_count+
+          '\nRecomendaciones:\n'+d.recommended_validation.join('\n')+
+          '\nAdvertencias:\n'+d.warnings.join('\n')+
+          '\n\nInstalación/compilación/pruebas: NO ejecutadas.';
+      }catch(e){inspectResult.textContent='No se pudo inspeccionar: '+e.message;}
+      finally{inspectBtn.disabled=false;}
+    });
+
     function syncLanguage(){
       const web=lang.value==='Web';
       webFiles.hidden=!web;preview.hidden=!web && lang.value!=='HTML';
@@ -926,7 +1069,7 @@
       else if(lang.value==='CSS')code.placeholder='styles.css · CSS3';
       else code.placeholder='Código principal del lenguaje seleccionado';
     }
-    lang.addEventListener('change',syncLanguage);
+    lang.addEventListener('change',()=>{syncLanguage();guideChoice();});
     const profiles=new Map();
     function selection(){
       const p=profiles.get(lang.value);
@@ -952,7 +1095,7 @@
           const opt=el('option','',p.language+' · '+p.main_file);
           opt.value=p.language;lang.append(opt);
         }
-        syncLanguage();
+        syncLanguage();guideChoice();
         state.textContent=d.enabled
           ? 'Ejecución disponible; se exigirá PIN y confirmación.'
           : 'El ejecutor está desactivado. Activá SKY_CODE_RUNNER_ENABLED y SKY_CODE_RUNNER_CONTAINER_ACK en el equipo propietario.';
