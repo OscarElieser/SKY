@@ -139,8 +139,7 @@ from neural_core import sky_advanced_planner as advanced_planner
 
 class SupervisorRequest(BaseModel):
     request: str = Field(min_length=8, max_length=3000)
-    planner_mode: str = Field(default='advanced', pattern='^(advanced|deterministic)
-    source_text: str = Field(default='', max_length=12000)
+    planner_mode: str = Field(default='advanced', pattern='^(advanced|deterministic)    source_text: str = Field(default='', max_length=12000)
     document_format: str = Field(default='auto', max_length=12)
     project_id: str | None = Field(default=None, max_length=120)
     request_id: str | None = Field(default=None, max_length=100)
@@ -286,17 +285,28 @@ def baqueano_owner():
     request_id: str | None = Field(default=None, max_length=100)
 
 
+from neural_core import sky_capability_inventory as local_tools
+
+
+@router.get('/capabilities/local')
+def local_capabilities():
+    """Inventario local; no instala herramientas ni cambia sus permisos."""
+    return local_tools.inventory()
+
+
 @router.get('/supervisor/catalogue')
 def supervisor_catalogue():
-    return supervisor.catalogue()
+    return {**supervisor.catalogue(), 'advanced_planner': advanced_planner.catalogue()}
 
 
 @router.post('/supervisor/analyze')
 def supervisor_analyze(body: SupervisorRequest):
     """SKY divides work; preview never creates jobs or executes tools."""
     try:
-        return supervisor.analyze_request(body.request, body.source_text,
-                                           body.document_format, body.project_id)
+        return advanced_planner.enrich_plan(
+            supervisor.analyze_request(body.request, body.source_text,
+                                       body.document_format, body.project_id),
+            mode=body.planner_mode, project_id=body.project_id)
     except ValueError as exc:
         raise HTTPException(422, str(exc)[:250]) from exc
 
@@ -306,7 +316,7 @@ def supervisor_prepare(body: SupervisorRequest):
     """Automatically creates a workflow, held for owner review and approval."""
     try:
         result = supervisor.prepare(body.request, body.source_text, body.document_format,
-                                    body.project_id, body.request_id)
+                                    body.project_id, body.request_id, body.planner_mode)
     except ValueError as exc:
         raise HTTPException(422, str(exc)[:250]) from exc
     except KeyError as exc:
