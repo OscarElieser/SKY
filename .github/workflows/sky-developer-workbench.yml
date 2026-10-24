@@ -1,0 +1,43 @@
+name: SKY Developer Workbench — frameworks, packages, education
+
+on:
+  pull_request:
+    paths:
+      - neural_core/sky_developer_workbench.py
+      - metaverse/api.py
+      - metaverse/static/hud.js
+      - tests/test_sky_developer_workbench.py
+      - tests/test_sky_web_live.py
+      - .github/workflows/sky-developer-workbench.yml
+  push:
+    branches: [main]
+    paths:
+      - neural_core/sky_developer_workbench.py
+      - metaverse/api.py
+      - metaverse/static/hud.js
+      - tests/test_sky_developer_workbench.py
+      - tests/test_sky_web_live.py
+      - .github/workflows/sky-developer-workbench.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  code-and-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing SKY test dependencies
+        run: python -m pip install -r requirements_social.txt -r requirements_studio.txt pytest
+      - name: Compile SKY API/workbench Python and lint HUD JS
+        run: |
+          python -m py_compile neural_core/sky_developer_workbench.py metaverse/api.py tests/test_sky_developer_workbench.py
+          node --check metaverse/static/hud.js
+      - name: Run real authenticated API and project-analysis regression tests
+        run: |
+          PYTHONPATH=. python -m pytest -q tests/test_sky_developer_workbench.py tests/test_developer_core.py tests/test_sky_programming_capabilities.py tests/test_sky_web_profiles.py
