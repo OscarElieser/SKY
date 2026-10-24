@@ -223,6 +223,10 @@ def mensaje(body: Mensaje, request: Request):
     academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
     if academy is not None:
         return _medir_turno(academy, inicio)
+    from neural_core import sky_experience_learning as learning
+    learned=learning.interpretar(body.texto,device=body.dispositivo,modo=body.modo)
+    if learned is not None:
+        return _medir_turno(learned, inicio)
     from neural_core import sky_execution_cycle as ciclo
     if ciclo.is_sequence(body.texto):
         try:
@@ -253,6 +257,11 @@ def mensaje_stream(body: Mensaje, request: Request):
         academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
         if academy is not None:
             yield final(academy)
+            return
+        from neural_core import sky_experience_learning as learning
+        learned=learning.interpretar(body.texto,device=body.dispositivo,modo=body.modo)
+        if learned is not None:
+            yield final(learned)
             return
         from neural_core import sky_execution_cycle as ciclo
         if ciclo.is_sequence(body.texto):
