@@ -350,5 +350,5 @@ def test_api_agenda_avisos_diagnostico_y_tts(monkeypatch):
     assert client.get('/api/hud/avisos', headers=h).json()['avisos'][0]['texto'] == 'hola'
     assert 'resumen' in client.get('/api/hud/diagnostico', headers=h).json()
     assert client.post('/api/hud/tts', headers=h, json={'texto': 'hola'}).status_code == 503
-    assert client.post('/api/asistente/correo', headers=h, json={'para': 'ana@x.com', 'cuerpo': 'hola'}).status_code == 502
+    assert client.post('/api/asistente/correo', headers=h, json={'para': 'ana@x.com', 'cuerpo': 'hola'}).status_code == 403
     assert client.get('/api/hud/avisos').status_code == 401
