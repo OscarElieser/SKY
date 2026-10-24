@@ -127,8 +127,7 @@ def test_home_assistant_probes_only_exact_authorized_entity(client, monkeypatch)
     )).status_code == 422
 
 
-@pytest.mark.asyncio
-async def test_ble_discovery_does_not_expose_mac_or_pair(monkeypatch):
+def test_ble_discovery_does_not_expose_mac_or_pair(monkeypatch):
     import sys
     from neural_core import sky_secure_connectivity as hub
     class Device:
@@ -141,7 +140,7 @@ async def test_ble_discovery_does_not_expose_mac_or_pair(monkeypatch):
             return [Device("Mi altavoz", "AA:BB:CC:DD:EE:FF"),
                     Device(None, "00:11:22:33:44:55")]
     monkeypatch.setitem(sys.modules, "bleak", types.SimpleNamespace(BleakScanner=Scanner))
-    result = await hub.discover_ble(owner_network_confirmed=True, seconds=2)
+    result = asyncio.run(hub.discover_ble(owner_network_confirmed=True, seconds=2))
     assert result["detected"] == 1
     assert result["devices"] == [{"advertised_name":"Mi altavoz",
                                   "paired":False,"control_available":False}]
@@ -149,8 +148,7 @@ async def test_ble_discovery_does_not_expose_mac_or_pair(monkeypatch):
     assert result["commands_sent"] == 0
 
 
-@pytest.mark.asyncio
-async def test_wifi_discovery_opt_in_is_advertisements_only(monkeypatch):
+def test_wifi_discovery_opt_in_is_advertisements_only(monkeypatch):
     from neural_core import sky_secure_connectivity as hub
     monkeypatch.setattr(hub.importlib.util, "find_spec",
                         lambda name: object() if name == "zeroconf" else None)
@@ -160,8 +158,8 @@ async def test_wifi_discovery_opt_in_is_advertisements_only(monkeypatch):
          "connected":False}
     ])
     with pytest.raises(PermissionError):
-        await hub.discover_wifi(owner_network_confirmed=False, seconds=2)
-    value = await hub.discover_wifi(owner_network_confirmed=True, seconds=2)
+        asyncio.run(hub.discover_wifi(owner_network_confirmed=False, seconds=2))
+    value = asyncio.run(hub.discover_wifi(owner_network_confirmed=True, seconds=2))
     assert value["detected"] == 1
     assert not value["connected"]
     assert value["status"] == "advertisements_only"
