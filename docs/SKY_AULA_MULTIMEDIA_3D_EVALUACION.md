@@ -31,6 +31,8 @@ SKY_YOUTUBE_API_KEY=tu_clave_local
 
 Sin clave, SKY entrega **enlace de búsqueda** y declara `searched_live=false`, no resultados inventados. `SKY_LOCAL_ONLY=1` bloquea la búsqueda remota. Un video encontrado no implica que SKY haya visto o analizado sus escenas; la selección de contenido requiere revisión del docente y notas/guiones autorizados. El video integrado usa el reproductor de YouTube sin cookies ampliadas y necesita una acción del usuario.
 
+Para que SKY pueda **explicar un video por partes sin inventar su contenido**, agregamos `POST /api/sky/academy/education/resources/video-guide` con ID de video y transcripción o notas que aporta el docente. La API divide el material en fragmentos narrables con preguntas de comprensión, marcando siempre que el texto no fue contrastado automáticamente con el audiovisual. El HUD ofrece un campo de transcripción y la función «Explicar video por partes» usando la voz de SKY. No se descargan ni generan subtítulos de videos de terceros sin autorización.
+
 También se agregó `POST /api/sky/academy/education/resources/research` que reutiliza `sky_scholarly.search_papers` para recuperar metadatos OpenAlex, sin atribuir evidencia del texto completo o revisión por pares.
 
 ## Computadora 3D
