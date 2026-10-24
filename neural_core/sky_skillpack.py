@@ -83,7 +83,7 @@ def _configured(name: str) -> bool:
         return bool(shutil.which("docker"))
     if kind == "supabase_rest":
         # SKY también reconoce la clave ANON, siempre bajo las políticas RLS.
-        return bool(_env("SUPABASE_URL") and (_env("SUPABASE_ANON_KEY") or _env("BAQUEANO_SUPABASE_PUBLISHABLE_KEY")) and shutil.which("python"))
+        return bool(_env("SUPABASE_URL") and (_env("SUPABASE_ANON_KEY") or _env("BAQUEANO_SUPABASE_PUBLISHABLE_KEY")))
     if kind == "llm":
         return bool(_env("OLLAMA_URL") or any(_env(x) for x in
             ("OPENAI_API_KEY", "GEMINI_API_KEY", "ANTHROPIC_API_KEY", "GROQ_API_KEY")))
@@ -299,3 +299,46 @@ def execute(skill_id: str, body: dict) -> dict:
         return _request("POST", "https://api.firecrawl.dev/v2/scrape",
                         token=_env("FIRECRAWL_API_KEY"), payload={"url": target, "formats": ["markdown"]})
     raise SkillUnavailable("Operación no disponible.")
+
+
+def interpretar(texto: str) -> dict | None:
+    """Acceso por VOZ y TEXTO al mismo ejecutor; limitado a operaciones sin efectos.
+
+    La orden debe nombrar explícitamente la skill para no interceptar
+    conversaciones normales. Servicios privados requieren la API autenticada.
+    """
+    if not isinstance(texto, str) or len(texto) > 6000:
+        return None
+    normalized = texto.casefold().strip()
+    if re.search(r"\\b(?:que|qué|mostrar|muestra|listar|lista)\\b.*\\bskills externas\\b", normalized):
+        summary = catalogue()
+        ready = [x["id"] for x in summary["skills"] if x["status"] in
+                 {"adapter_ready_unverified", "available_via_office_api"}]
+        return {"tipo": "respuesta", "proveedor": "sky-skillpack",
+                "mensaje": "Tengo " + str(len(ready)) +
+                           " adaptadores locales preparados, pero la ejecución externa exige configuración y prueba. " +
+                           ", ".join(ready[:12]) + "."}
+    match = re.search(r"\\b(?:ejecuta|utiliza|usa)\\s+(?:la\\s+)?skill\\s+([a-z0-9-]{3,80})\\s*:\\s*(.+)$",
+                      normalized, flags=re.DOTALL)
+    if not match:
+        return None
+    skill = match.group(1)
+    prompt = texto[-len(match.group(2)):].strip()
+    safe = {"scientific-researcher": "query", "github-connector": "repository",
+            "seo-audit": "html", "humanizer": "text", "copywriting-pro": "text",
+            "marketing-skills": "text", "ad-angle-research": "text", "internal-comms": "text"}
+    if skill not in safe:
+        return {"tipo": "error", "proveedor": "sky-skillpack",
+                "mensaje": "Esta operación requiere usar el endpoint privado del Skillpack y sus permisos."}
+    try:
+        result = execute(skill, {safe[skill]: prompt})
+        if result.get("ok") is False:
+            return {"tipo": "error", "proveedor": "sky-skillpack",
+                    "mensaje": "El proveedor no confirmó una ejecución correcta."}
+        if isinstance(result.get("text"), str):
+            msg = result["text"][:6000]
+        else:
+            msg = json.dumps(result, ensure_ascii=False)[:6000]
+        return {"tipo": "respuesta", "proveedor": "sky-skillpack", "mensaje": msg}
+    except (SkillInvalid, SkillUnavailable, RuntimeError, ValueError) as exc:
+        return {"tipo": "error", "proveedor": "sky-skillpack", "mensaje": str(exc)[:240]}
