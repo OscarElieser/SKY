@@ -1054,11 +1054,49 @@ def skillpack_catalogue():
 
 
 @app.post('/api/skillpack/execute/{skill_id}', dependencies=[Depends(require_key)])
-def skillpack_execute(skill_id: str, body: dict):
+def skillpack_execute(skill_id: str, body: dict, request: Request):
     from neural_core.sky_skillpack import execute, SkillInvalid, SkillUnavailable
+    # Cloud deployment and external posting require the owner's additional PIN
+    # even when a caller already supplied a valid SKY API key.
+    if (skill_id=="aws-workflow-deploy" and body.get("operation")=="deploy") or (
+        skill_id=="slack-communicator" and body.get("operation")=="send"):
+        from .sentinel import exigir_pin
+        exigir_pin(request, "una acción externa irreversible de SKY")
     try:
         return execute(skill_id, body)
     except SkillInvalid as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except SkillUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+# Unified proof-based catalogues. Reuses the existing private FastAPI and
+# SENTINEL authentication; does not introduce another server or exposed port.
+@app.get("/api/sky/skills/audit", dependencies=[Depends(require_key)])
+def sky_full_skills_audit():
+    from neural_core.sky_skills_audit import audit
+    return audit()
+
+
+@app.get("/api/sky/quality/operational", dependencies=[Depends(require_key)])
+def sky_quality_operational(period: str = "hoy"):
+    from neural_core.sky_operational_quality import report
+    try:
+        return report(period)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.get("/api/sky/skills/live-results", dependencies=[Depends(require_key)])
+def sky_skill_live_results():
+    from neural_core.sky_skill_probe import read
+    return read()
+
+
+@app.post("/api/sky/skills/probe/{skill_id}", dependencies=[Depends(require_key)])
+def sky_skill_live_probe(skill_id: str):
+    from neural_core.sky_skill_probe import probe
+    try:
+        return probe(skill_id)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc

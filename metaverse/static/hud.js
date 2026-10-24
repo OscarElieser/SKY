@@ -447,12 +447,23 @@
     if (!SR) throw new Error('el navegador no tiene reconocimiento de voz; instalá faster-whisper');
     const sr = new SR(); W.sr = sr; sr.lang = 'es-419'; sr.continuous = true; sr.interimResults = false;
     sr.onresult = (ev) => {
-      if (S.speaking || hablando || S.listening) return;
       const txt = ev.results[ev.results.length - 1][0].transcript;
       const orden = ordenDespertador(txt);
-      if (orden === null) return;
+      // Barge-in: only explicit SKY interrupt commands can stop speech.
+      // Ordinary recognition during playback is ignored to suppress self-echo.
+      if (S.speaking || hablando) {
+        if (orden !== null && /^(?:para|det[eé]nte|calla|c[aá]llate|deja de hablar|silencio)\b/i.test(orden)) {
+          callar();
+          setState('listening', 'Interrumpida por indicación del usuario.');
+        }
+        return;
+      }
+      if (S.listening) return;
+      if (orden === null && !S.conv) return;
+      const efectivo = orden !== null ? orden : txt.trim();
+      if (!efectivo) return;
       $('transcript').textContent = '“' + txt.trim() + '”';
-      if (orden) recibir(orden, 'voz'); else speak('¿Sí?').then(() => { try { sr.stop(); } catch { /* */ } escuchar(); });
+      recibir(efectivo, 'voz');
     };
     sr.onend = () => { if (W.on && W.sr === sr && !S.listening) setTimeout(() => { try { sr.start(); } catch { /* */ } }, 400); };
     sr.onerror = () => { /* se reinicia en onend */ };

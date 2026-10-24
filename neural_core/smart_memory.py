@@ -47,9 +47,15 @@ class SmartMemoryManager:
                 self._entries = {}
 
     def _guardar(self):
-        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+        self.storage_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         data = [asdict(entry) for entry in self._entries.values()]
-        self.storage_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        temp = self.storage_path.with_suffix(self.storage_path.suffix + ".tmp")
+        temp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        try: temp.chmod(0o600)
+        except OSError: pass
+        temp.replace(self.storage_path)
+        try: self.storage_path.chmod(0o600)
+        except OSError: pass
 
     def guardar_memoria(
         self,
