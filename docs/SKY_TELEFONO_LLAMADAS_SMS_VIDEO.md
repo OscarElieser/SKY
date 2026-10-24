@@ -9,6 +9,14 @@ SENTINEL, voz y demás servicios.
 - `neural_core/sky_phone.py`: validación de números internacionales E.164,
   verificación del número propietario por SMS con Twilio Verify,
   SMS salientes mediante Programmable Messaging y llamadas mediante Twilio Voice.
+- **Sin Twilio, el HUD también puede abrir el marcador y la aplicación de
+  SMS del teléfono** mediante `tel:`/`sms:` en Android/iOS compatibles.
+  La consulta `GET /api/sky/phone/native/validate?number=...` verifica que
+  el destino no esté bloqueado en SKY, y el usuario debe tocar un segundo
+  enlace para transferir la acción al sistema del móvil. La SIM y la aplicación
+  nativa realizan y cobran la llamada/SMS conforme al plan del usuario.
+  SKY no tiene acceso a la red SIM, ni afirma haber completado el envío.
+  Esta opción no requiere Twilio pero sí la sesión autenticada de SKY.
 - **Una llamada telefónica no sale del micrófono del HUD**. Twilio llama
   PRIMERO al número personal previamente verificado; al contestar conecta
   al destinatario. Son dos tramos de telefonía convencional y pueden generar
@@ -97,7 +105,7 @@ que uses realmente, y habilitar mitigaciones contra SMS pumping/toll fraud.
 1. Abrí SKY → **Módulos → Teléfono**.
 2. Introducí tu propio número E.164, por ejemplo `+505XXXXXXXX`.
 3. Solicitá código de verificación y autorizá mediante PIN. Completá el OTP.
-4. Escribí el destino (con código de país). Confirmá permiso del destinatario.
+4. Escribí el destino (con código de país). Confirmá permiso del destinatario. Si preferís usar la SIM propia, pulsá «Abrir marcador del móvil» o «Abrir SMS del móvil» y después tocá el enlace de confirmación del sistema.
 5. Seleccioná **Enviar SMS** o **Iniciar llamada**. La interfaz vuelve a pedir
    confirmación; el backend exige PIN y permisos.
 6. Para bloquear, ingresá el número y pulsá **Bloquear**. Para desbloquear,
@@ -115,6 +123,7 @@ que uses realmente, y habilitar mitigaciones contra SMS pumping/toll fraud.
 - `GET /api/sky/phone/capabilities`, `GET /api/sky/phone/status`
 - `POST /api/sky/phone/verify/start`, `POST /api/sky/phone/verify/check`
 - `POST /api/sky/phone/verify/revoke`
+- `GET /api/sky/phone/native/validate` (solo lectura antes de abrir marcador/SMS de la SIM)
 - `GET /api/sky/phone/blocked`, `POST /api/sky/phone/blocked`
 - `DELETE /api/sky/phone/blocked/{block_id}`
 - `POST /api/sky/phone/sms`, `POST /api/sky/phone/voice/callback`
