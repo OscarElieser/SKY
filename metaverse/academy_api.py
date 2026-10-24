@@ -283,6 +283,11 @@ class ClassroomSearch(BaseModel):
     level: str=Field(default="tecnico",max_length=30)
     limit: int=Field(default=4,ge=1,le=6)
 
+class ClassroomVideoGuide(BaseModel):
+    topic: str=Field(min_length=3,max_length=160)
+    video_id: str=Field(min_length=11,max_length=11,pattern="^[A-Za-z0-9_-]{11}$")
+    transcript: str=Field(min_length=100,max_length=15000)
+
 class ClassroomAssessment(BaseModel):
     topic: str=Field(min_length=3,max_length=160)
     level: str=Field(default="tecnico")
@@ -309,6 +314,15 @@ def aula_videos(body:ClassroomSearch):
         raise HTTPException(422,str(exc)) from exc
     except media.MediaUnavailable as exc:
         raise HTTPException(503,str(exc)) from exc
+
+
+@router.post("/education/resources/video-guide")
+def aula_video_guide(body:ClassroomVideoGuide):
+    from neural_core import sky_aula_multimedia as media
+    try:
+        return media.video_guided_explanation(body.video_id,body.topic,body.transcript)
+    except media.MediaInputError as exc:
+        raise HTTPException(422,str(exc)) from exc
 
 
 @router.post("/education/resources/research")
