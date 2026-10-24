@@ -139,7 +139,11 @@ def ingest(name: str, raw: bytes, *, owner_attested: bool,
         raise ValueError("No se extrajo texto legible; no se indexará contenido inexistente.")
     key = _key()
     cipher = Fernet(key)
-    content_hash = hashlib.sha256(raw).hexdigest()
+    content_hash = hmac.new(
+        base64.urlsafe_b64decode(key),
+        b"sky-private-knowledge-file-v1:" + raw,
+        hashlib.sha256,
+    ).hexdigest()
     chunks = _split(text)
     with _MUTEX, _conn() as db:
         existing = db.execute(
