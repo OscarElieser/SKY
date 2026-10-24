@@ -344,6 +344,19 @@ class Handler(BaseHTTPRequestHandler):
             rec = verificador_acciones.get_action(cid)
             if not rec:
                 return self.reply(404, {'ok': False, 'error': f'Acción {cid} no encontrada.'})
+            # Read-only physical recheck for a previously dispatched app launch.
+            # Never claim that RUNNING is VERIFIED without observed evidence.
+            if rec.status == 'DISPATCHED' and rec.action == 'launch_app' and rec.target in AUTHORIZED_APPS:
+                from neural_core.windows_controller import verify_window_or_process
+                details = AUTHORIZED_APPS[rec.target]
+                observation = verify_window_or_process(
+                    details.get('window_titles', [rec.target]),
+                    pid=rec.result.get('pid'), timeout_secs=1.0)
+                if observation.get('verified'):
+                    verificador_acciones.mark_verified(
+                        cid, {'app': rec.target, 'status': 'VERIFIED',
+                              'hwnd': observation.get('hwnd'),
+                              'pid': rec.result.get('pid')}, rec.execution_time_ms)
             return self.reply(200, {'ok': True, 'record': rec.to_dict()})
         if split.path == '/actions_history':
             return self.reply(200, {'ok': True, 'actions': verificador_acciones.get_recent_actions(limit=30)})
