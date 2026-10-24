@@ -1085,3 +1085,18 @@ def sky_quality_operational(period: str = "hoy"):
         return report(period)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+@app.get("/api/sky/skills/live-results", dependencies=[Depends(require_key)])
+def sky_skill_live_results():
+    from neural_core.sky_skill_probe import read
+    return read()
+
+
+@app.post("/api/sky/skills/probe/{skill_id}", dependencies=[Depends(require_key)])
+def sky_skill_live_probe(skill_id: str):
+    from neural_core.sky_skill_probe import probe
+    try:
+        return probe(skill_id)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
