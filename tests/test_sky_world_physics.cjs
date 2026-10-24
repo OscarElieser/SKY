@@ -26,7 +26,7 @@ test('bounds, rotated walls and malformed input fail predictably', () => {
   assert.equal(physics.isBlocked(18,0,[]),true);
   assert.equal(physics.isBlocked(Number.NaN,0,[]),true);
   const rotated={kind:'box',position:[0,0,0],rotation:[0,Math.PI/4,0],scale:[5,2,.4]};
-  assert.equal(physics.isBlocked(1,1,[rotated]),true);
+  assert.equal(physics.isBlocked(1,-1,[rotated]),true);
   assert.throws(()=>physics.resolveMovement({x:0,z:0},{x:NaN,z:0},[]),TypeError);
 });
 
