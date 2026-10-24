@@ -197,7 +197,7 @@ def _ejecutar(action: str, params: dict, politica: dict) -> dict:
     if action == 'open_url':
         url = caps.validar_url_https(params.get('url', ''))
         opened = webbrowser.open(url, new=2)
-        return {'ok': bool(opened), 'status': 'VERIFIED' if opened else 'FAILED', 'message': 'Página abierta en el navegador.'}
+        return {'ok': bool(opened), 'status': 'SENT' if opened else 'FAILED', 'message': 'Se solicitó abrir la página; la carga del navegador no está verificada.'}
     if action == 'media_key':
         send_media_key(str(params.get('key')))
         return {'ok': True, 'status': 'SENT', 'message': f'Tecla multimedia {params.get("key")} enviada.'}
