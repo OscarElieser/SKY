@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'neural_core/sky_design_studio.py'
+      - 'neural_core/sky_design_ai.py'
+      - 'tests/test_sky_design_ai.py'
       - 'templates/sky_design_react/**'
       - 'templates/sky_design_flutter/**'
       - 'metaverse/api.py'
@@ -14,6 +16,8 @@ on:
     branches: [main]
     paths:
       - 'neural_core/sky_design_studio.py'
+      - 'neural_core/sky_design_ai.py'
+      - 'tests/test_sky_design_ai.py'
       - 'templates/sky_design_react/**'
       - 'templates/sky_design_flutter/**'
       - 'metaverse/api.py'
@@ -41,9 +45,9 @@ jobs:
         run: python -m pip install -r requirements_social.txt -r requirements_studio.txt pytest
       - name: Syntax checks and authenticated design API regression
         run: |
-          python -m py_compile neural_core/sky_design_studio.py metaverse/api.py tests/test_sky_design_studio.py
+          python -m py_compile neural_core/sky_design_studio.py neural_core/sky_design_ai.py metaverse/api.py tests/test_sky_design_studio.py tests/test_sky_design_ai.py
           node --check metaverse/static/hud.js
-          PYTHONPATH=. python -m pytest -q tests/test_sky_design_studio.py tests/test_sky_developer_workbench.py
+          PYTHONPATH=. python -m pytest -q tests/test_sky_design_studio.py tests/test_sky_design_ai.py tests/test_sky_developer_workbench.py
 
   react-real-production-build:
     runs-on: ubuntu-latest
