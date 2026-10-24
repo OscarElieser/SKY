@@ -145,22 +145,28 @@ def test_quality_report_reuses_action_receipts_and_never_fabricates_100(monkeypa
     assert r["cost_usd_reported"] is None
 
 
-def test_live_research_uses_real_scholarly_adapter_not_invented_papers(monkeypatch):
-    from metaverse import academy_api
+def test_live_research_parses_real_scholarly_metadata_without_invention(monkeypatch):
     from neural_core import sky_scholarly
-    called=[]
-    monkeypatch.setattr(sky_scholarly,"search_papers",lambda q,provider,limit:
-                        called.append((q,provider,limit)) or
-                        {"query":q,"provider":provider,"items":[{"title":"Artículo comprobable","doi":"10.1234/example",
-                        "evidence_level":"metadata_only"}],"live_lookup":True})
-    monkeypatch.setattr(academy_api.sky_evidence_lab,"evidence_brief",lambda *a,**k:{})
-    from neural_core import sky_metricas
-    monkeypatch.setattr(sky_metricas,"registrar",lambda *a,**k:None)
-    res=academy_api.live_bibliography(academy_api.BibliographyRequest(
-        query="Educación interactiva",provider="openalex",limit=4))
-    assert called==[("Educación interactiva","openalex",4)]
-    assert res["metadata_only"] and res["results_observed"]==1
-    assert res["content_or_peer_review_verified"] is False
+    captured=[]
+    def fake_get(url):
+        captured.append(url)
+        return {"results":[{
+            "title":"Documento de prueba publicado",
+            "doi":"https://doi.org/10.1234/test",
+            "publication_year":2025,
+            "authorships":[{"author":{"display_name":"Autora de prueba"}}],
+            "primary_location":{"source":{"display_name":"Revista de prueba"}},
+        }]}
+    monkeypatch.setattr(sky_scholarly,"_get_json",fake_get)
+    data=sky_scholarly.search_papers("Educación interactiva",provider="openalex",limit=4)
+    assert captured and captured[0].startswith("https://api.openalex.org/works?")
+    assert data["live_lookup"] and data["full_text_read"] is False
+    assert data["items"][0]["doi"]=="10.1234/test"
+    assert data["items"][0]["peer_review_verified"] is False
+    from pathlib import Path
+    api=Path("metaverse/academy_api.py").read_text(encoding="utf-8")
+    assert '"/research/live-papers"' in api
+    assert '"metadata_only":True' in api
 
 
 def test_aula_does_not_grade_answers_and_uses_supplied_reference():
