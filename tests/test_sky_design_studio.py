@@ -52,6 +52,9 @@ def test_flutter_template_has_real_animated_sdk_dependency():
     assert "flutter pub get" in d["commands_to_test_in_separate_approved_project"]
     assert d["compiled_on_owner_device"] is False
     assert d["files"]["lib/sky_config.dart"].count("skyColorPrimary") == 1
+    assert "skyStyle" in d["files"]["lib/sky_config.dart"]
+    assert "skyLayout" in d["files"]["lib/sky_config.dart"]
+    assert "skyLayout" in d["files"]["lib/main.dart"]
 
 
 def test_determinism_and_brand_variation():
