@@ -2,12 +2,13 @@
 'use strict';
 const $=id=>document.getElementById(id);
 let secret='', world=null, selectedId=null, socket=null, selfId=null, peers=new Map(), lastMove=0;
+let presenceGeneration=0, reconnectTimer=null, reconnectAttempts=0, pendingMoveTimer=null;
 let dragging=false, downX=0, downY=0, yaw=.55, pitch=.56, distance=27, avatar={x:0,y:0,z:4};
 let toastTimer=null, view3d=null, webxr=null;
 const isNumber=n=>Number.isFinite(n);
 function notify(message){const t=$('toast'); t.textContent=String(message);t.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.display='none',4000)}
 async function api(path,opts={}){
-  let res=await fetch(path,{...opts,headers:{'X-SKY-KEY':secret,...opts.headers}});
+  let res=await fetch(path,{...opts,headers:{'X-SKY-KEY':secret,...(window.SKYOwnerAuth?.headers()||{}),...opts.headers}});
   if(!res.ok){let msg='Error '+res.status;try{let j=await res.json();msg=typeof j.detail==='string'?j.detail:JSON.stringify(j.detail||j)}catch{}throw Error(msg)}
   return res;
 }
@@ -17,10 +18,10 @@ function safeText(el,value){el.textContent=String(value)}
 function chatBubble(txt,role='bot'){let node=document.createElement('div');node.className='chat '+(role==='user'?'me':'bot');node.textContent=txt;$('chat-log').append(node);$('chat-log').scrollTop=$('chat-log').scrollHeight}
 function roomBubble(txt){let node=document.createElement('div');node.textContent=txt;$('world-feed').append(node);$('world-feed').scrollTop=$('world-feed').scrollHeight}
 function option(el,text,value){let op=document.createElement('option');op.textContent=text;op.value=value;el.append(op)}
-async function login(){secret=$('key').value.trim();try{await json('/api/capabilities');$('login').classList.add('hidden');$('app').classList.remove('hidden');startGL();await refreshWorlds();notify('SKY Engine conectado. Bienvenido a tu universo.')}catch(e){$('login-error').textContent='No fue posible conectar: '+e.message;secret=''}}
-$('connect').addEventListener('click',login);$('key').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('logout').addEventListener('click',()=>{if(socket)socket.close();secret='';world=null;$('key').value='';$('app').classList.add('hidden');$('login').classList.remove('hidden')});
+async function login(){secret=$('key').value.trim();try{if(window.SKYOwnerAuth)await window.SKYOwnerAuth.begin(secret);await json('/api/capabilities');$('login').classList.add('hidden');$('app').classList.remove('hidden');startGL();await refreshWorlds();notify('SKY Engine conectado. Bienvenido a tu universo.')}catch(e){$('login-error').textContent='No fue posible conectar: '+e.message;secret=''}}
+$('connect').addEventListener('click',login);$('key').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('logout').addEventListener('click',async()=>{closePresence();if(window.SKYOwnerAuth)await window.SKYOwnerAuth.logout(secret);secret='';world=null;$('key').value='';$('app').classList.add('hidden');$('login').classList.remove('hidden')});
 async function refreshWorlds(select){let worlds=await json('/api/worlds');$('worlds').replaceChildren();for(const w of worlds)option($('worlds'),w.name,w.id);await openWorld(select||worlds[0]?.id)}
-async function openWorld(id){if(!id)return;if(socket)socket.close();peers.clear();world=await json('/api/worlds/'+id);$('worlds').value=id;safeText($('world-title'),world.name);renderObjects();await connectPresence(id);notify('Mundo listo: '+world.name)}
+async function openWorld(id){if(!id)return;closePresence();peers.clear();world=await json('/api/worlds/'+id);$('worlds').value=id;safeText($('world-title'),world.name);renderObjects();await connectPresence(id,presenceGeneration);notify('Mundo listo: '+world.name)}
 $('worlds').addEventListener('change',()=>openWorld($('worlds').value).catch(e=>notify(e.message)));
 function renderObjects(){if(!world)return;let objs=world.scene.objects;safeText($('object-count'),objs.length+' elementos');let sel=$('objects');sel.replaceChildren();for(const o of objs)option(sel,o.name+' · '+o.kind,o.id);if(!objs.find(o=>o.id===selectedId))selectedId=objs.find(o=>o.kind!=='platform')?.id||objs[0]?.id;sel.value=selectedId;inspect()}
 function inspect(){let obj=world?.scene.objects.find(o=>o.id===selectedId);if(!obj){safeText($('selection-label'),'Sin selección');return}safeText($('selection-label'),obj.name+' · '+obj.kind);$('edit-color').value=obj.color;for(let i=0;i<3;i++){$('edit-'+['x','y','z'][i]).value=obj.position[i];$('edit-'+['sx','sy','sz'][i]).value=obj.scale[i]}}
@@ -39,7 +40,95 @@ $('chat-form').addEventListener('submit',async e=>{e.preventDefault();let messag
 function speak(text){if(!window.speechSynthesis||!$('mic').dataset.speak)return;window.speechSynthesis.cancel();let utter=new SpeechSynthesisUtterance(text.slice(0,900));utter.lang=window.SKYGlobalI18N?.locale()||'es-NI';utter.rate=1;window.speechSynthesis.speak(utter)}
 $('mic').addEventListener('click',()=>{const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Recognition)return notify('Este navegador no dispone de dictado de voz Web Speech. Podés usar SKY manos libres desde Python.');let sr=new Recognition();sr.lang=window.SKYGlobalI18N?.locale()||'es-NI';sr.interimResults=false;sr.onresult=e=>{$('message').value=e.results[0][0].transcript;$('message').focus()};sr.onerror=()=>notify('No se pudo reconocer la voz');sr.start();notify('SKY está escuchando...')});
 $('world-chat-form').addEventListener('submit',e=>{e.preventDefault();let msg=$('world-msg').value.trim();if(!msg||!socket||socket.readyState!==WebSocket.OPEN)return;socket.send(JSON.stringify({type:'say',text:msg}));$('world-msg').value=''});
-async function connectPresence(id){try{let {ticket}=await jsonPost('/api/ws-ticket',{});let proto=location.protocol==='https:'?'wss:':'ws:';socket=new WebSocket(proto+'//'+location.host+'/api/ws/'+id+'?ticket='+encodeURIComponent(ticket));socket.onmessage=e=>{let d=JSON.parse(e.data);if(d.type==='peers'){selfId=d.you;peers.clear();for(let peer of d.peers)peers.set(peer.id,peer)}else if(d.type==='join'||d.type==='move'){peers.set(d.peer.id,d.peer)}else if(d.type==='leave'){peers.delete(d.id)}else if(d.type==='say'){roomBubble((d.from===selfId?'Yo':'Participante')+': '+d.text)}let n=Math.max(0,peers.size-1);safeText($('peers'),(n?'Otros participantes: '+n:'Estás en tu sala privada')+' · Conexión en tiempo real')};socket.onclose=()=>safeText($('peers'),'Conexión en tiempo real cerrada')}catch(e){safeText($('peers'),'Sala sin conexión: '+e.message)}}
+// Presence is per-world and per-login. Never reuse a ticket after disconnect.
+function closePresence(){
+  presenceGeneration++;
+  clearTimeout(reconnectTimer);clearTimeout(pendingMoveTimer);
+  reconnectTimer=null;pendingMoveTimer=null;reconnectAttempts=0;
+  const previous=socket;socket=null;selfId=null;peers.clear();
+  if(previous)previous.close();
+}
+function scheduleReconnect(id,generation){
+  if(generation!==presenceGeneration||!world||world.id!==id||!secret)return;
+  if(reconnectAttempts>=8){
+    safeText($('peers'),'Sala desconectada. Revisá tu conexión y volvé a abrir el mundo.');
+    return;
+  }
+  clearTimeout(reconnectTimer);
+  const delay=Math.min(15000,900*2**Math.min(reconnectAttempts++,4));
+  safeText($('peers'),'Conexión interrumpida. Reintentando sala privada…');
+  reconnectTimer=setTimeout(()=>connectPresence(id,generation),delay);
+}
+function sendPosition(){
+  if(!socket||socket.readyState!==WebSocket.OPEN)return;
+  const now=Date.now();
+  if(now-lastMove<100){
+    clearTimeout(pendingMoveTimer);
+    pendingMoveTimer=setTimeout(sendPosition,100-(now-lastMove));
+    return;
+  }
+  lastMove=now;
+  socket.send(JSON.stringify({type:'move',position:[avatar.x,avatar.y,avatar.z]}));
+}
+function moveAvatar(dx,dz){
+  if(!world)return;
+  avatar.x=Math.max(-75,Math.min(75,avatar.x+dx));
+  avatar.z=Math.max(-75,Math.min(75,avatar.z+dz));
+  safeText($('coords'),'X: '+avatar.x.toFixed(1)+' · Z: '+avatar.z.toFixed(1));
+  sendPosition();
+}
+window.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
+  const key=e.key.toLowerCase();
+  const dz=(key==='w'||key==='arrowup')?-.85:(key==='s'||key==='arrowdown')?.85:0;
+  const dx=(key==='a'||key==='arrowleft')?-.85:(key==='d'||key==='arrowright')?.85:0;
+  if(!dx&&!dz)return;
+  moveAvatar(dx,dz);e.preventDefault();
+});
+document.querySelectorAll('[data-sky-move]').forEach(button=>{
+  button.addEventListener('click',()=>{
+    const direction=button.dataset.skyMove;
+    const vectors={north:[0,-.85],south:[0,.85],west:[-.85,0],east:[.85,0]};
+    if(vectors[direction])moveAvatar(...vectors[direction]);
+  });
+});
+window.addEventListener('online',()=>{
+  if(!world||!secret||socket?.readyState===WebSocket.OPEN)return;
+  clearTimeout(reconnectTimer);reconnectTimer=null;reconnectAttempts=0;
+  connectPresence(world.id,presenceGeneration);
+});
+async function connectPresence(id,generation){
+  if(generation!==presenceGeneration||!world||world.id!==id||!secret)return;
+  try{
+    const {ticket}=await jsonPost('/api/ws-ticket',{});
+    if(generation!==presenceGeneration||world?.id!==id)return;
+    const proto=location.protocol==='https:'?'wss:':'ws:';
+    const connection=new WebSocket(proto+'//'+location.host+'/api/ws/'+encodeURIComponent(id)+'?ticket='+encodeURIComponent(ticket));
+    socket=connection;
+    connection.onopen=()=>{
+      if(generation!==presenceGeneration||socket!==connection){connection.close();return}
+      reconnectAttempts=0;sendPosition();
+    };
+    connection.onmessage=e=>{
+      if(generation!==presenceGeneration||socket!==connection)return;
+      let d;
+      try{d=JSON.parse(e.data)}catch{return}
+      if(d.type==='peers'){selfId=d.you;peers.clear();for(let peer of d.peers)peers.set(peer.id,peer)}
+      else if(d.type==='join'||d.type==='move'){if(d.peer)peers.set(d.peer.id,d.peer)}
+      else if(d.type==='leave'){peers.delete(d.id)}
+      else if(d.type==='say'){roomBubble((d.from===selfId?'Yo':'Participante')+': '+d.text)}
+      const n=Math.max(0,peers.size-1);
+      safeText($('peers'),(n?'Otros participantes: '+n:'Estás en tu sala privada')+' · Conexión en tiempo real');
+    };
+    connection.onclose=()=>{
+      if(generation!==presenceGeneration||socket!==connection)return;
+      socket=null;selfId=null;peers.clear();scheduleReconnect(id,generation);
+    };
+    connection.onerror=()=>connection.close();
+  }catch(e){
+    if(generation===presenceGeneration){safeText($('peers'),'Sala sin conexión: '+e.message);scheduleReconnect(id,generation)}
+  }
+}
 // -------- Motor de WebGL autocontenido --------
 const VERT=`attribute vec3 aP;attribute vec3 aN;uniform mat4 uProj,uView,uModel;varying vec3 vNormal;varying float vFog;void main(){vec4 view=uView*uModel*vec4(aP,1.0);gl_Position=uProj*view;vNormal=mat3(uModel)*aN;vFog=clamp((-view.z-4.0)/65.0,0.0,0.55);}`;
 const FRAG=`precision mediump float;uniform vec3 uColor;uniform vec3 uSky;varying vec3 vNormal;varying float vFog;void main(){float sun=max(dot(normalize(vNormal),normalize(vec3(0.4,1.0,0.5))),0.0);vec3 lit=uColor*(0.62+sun*0.46);gl_FragColor=vec4(mix(lit,uSky,vFog),1.0);}`;
@@ -66,7 +155,7 @@ function drawFrame(proj,view,viewport){gl.viewport(...viewport);gl.uniformMatrix
 function render(){if(!webxr){let dpr=Math.min(devicePixelRatio||1,2);let w=Math.max(1,Math.floor(canvas.clientWidth*dpr)),h=Math.max(1,Math.floor(canvas.clientHeight*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}let target=[avatar.x,2,avatar.z-2];let eye=[target[0]+Math.cos(pitch)*Math.sin(yaw)*distance,target[1]+Math.sin(pitch)*distance,target[2]+Math.cos(pitch)*Math.cos(yaw)*distance];drawFrame(perspective(.9,w/h,.1,300),lookAt(eye,target),[0,0,w,h]);}requestAnimationFrame(render)}
 view3d={canvas,gl,drawFrame};requestAnimationFrame(render);
 canvas.addEventListener('pointerdown',e=>{dragging=true;downX=e.clientX;downY=e.clientY;canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!dragging)return;yaw-=(e.clientX-downX)*.008;pitch=Math.min(1.45,Math.max(.05,pitch+(e.clientY-downY)*.008));downX=e.clientX;downY=e.clientY});canvas.addEventListener('pointerup',()=>dragging=false);canvas.addEventListener('pointercancel',()=>dragging=false);canvas.addEventListener('wheel',e=>{distance=Math.max(4,Math.min(80,distance*(e.deltaY>0?1.12:.89)));e.preventDefault()},{passive:false});
-window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;let key=e.key.toLowerCase();let d=key==='w'||key==='arrowup'?-1:key==='s'||key==='arrowdown'?1:0;let a=key==='a'||key==='arrowleft'?-1:key==='d'||key==='arrowright'?1:0;if(!d&&!a)return;avatar.x=Math.max(-75,Math.min(75,avatar.x+a*.85));avatar.z=Math.max(-75,Math.min(75,avatar.z+d*.85));safeText($('coords'),'X: '+avatar.x.toFixed(1)+' · Z: '+avatar.z.toFixed(1));if(socket?.readyState===1&&Date.now()-lastMove>90){socket.send(JSON.stringify({type:'move',position:[avatar.x,avatar.y,avatar.z]}));lastMove=Date.now()}e.preventDefault()});
+// Keyboard and on-screen movement are shared with the Canvas2D fallback.
 }
 $('vr').addEventListener('click',async()=>{if(!view3d||!navigator.xr)return notify('WebXR no está disponible. Necesitás un visor VR compatible y HTTPS.');try{if(webxr){await webxr.end();return}if(!await navigator.xr.isSessionSupported('immersive-vr'))return notify('Este equipo no permite sesiones VR.');let gl=view3d.gl;await gl.makeXRCompatible();let session=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor']});webxr=session;let layer=new XRWebGLLayer(session,gl);session.updateRenderState({baseLayer:layer});let ref=await session.requestReferenceSpace('local-floor').catch(()=>session.requestReferenceSpace('local'));session.addEventListener('end',()=>{webxr=null;gl.bindFramebuffer(gl.FRAMEBUFFER,null);notify('Modo VR finalizado')});function frame(t,f){if(!webxr)return;session.requestAnimationFrame(frame);let pose=f.getViewerPose(ref);if(!pose)return;gl.bindFramebuffer(gl.FRAMEBUFFER,layer.framebuffer);for(let v of pose.views){let vp=layer.getViewport(v);view3d.drawFrame(v.projectionMatrix,v.transform.inverse.matrix,[vp.x,vp.y,vp.width,vp.height])}}session.requestAnimationFrame(frame);notify('SKY VR activado')}catch(e){notify('No fue posible iniciar VR: '+e.message)}});
 // Reconstrucción local 2.5D desde cámara/foto: archivo generado sin subir a servicios externos.
