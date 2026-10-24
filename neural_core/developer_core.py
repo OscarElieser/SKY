@@ -48,7 +48,11 @@ def load_master_prompt() -> str:
 def is_developer_task(area: str, prompt: str = "") -> bool:
     """Detecta si la consulta corresponde a ingeniería de software o desarrollo."""
     combined = f"{area} {prompt}".casefold()
-    return any(kw in combined for kw in DEV_KEYWORDS)
+    from .sky_programming_capabilities import detect_languages
+    return any(kw in combined for kw in DEV_KEYWORDS) or any(
+        name not in {"C", "R", "Go", "Java", "SQL", "CSS", "JSON", "XML", "YAML", "TOML"}
+        for name in detect_languages(combined)
+    )
 
 def extract_thematic_section(full_text: str, section_number: int) -> str:
     """Extrae una sección específica del prompt maestro por número de sección."""
@@ -155,10 +159,8 @@ def analyze_tech_stack(text: str) -> Dict[str, Any]:
     """Identifica automáticamente tecnologías, frameworks y tipo de tarea en el texto."""
     t = text.casefold()
     
-    languages = []
-    for lang in ["python", "typescript", "javascript", "dart", "kotlin", "swift", "rust", "go", "c++", "c#", "php", "sql"]:
-        if re.search(rf"\b{re.escape(lang)}\b", t):
-            languages.append(lang.capitalize())
+    from .sky_programming_capabilities import detect_languages
+    languages = detect_languages(text)
 
     frameworks = []
     for fw in ["flutter", "fastapi", "react", "next.js", "django", "express", "supabase", "docker", "vue", "tailwind", "redis", "postgresql"]:
