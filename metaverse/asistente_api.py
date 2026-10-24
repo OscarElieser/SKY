@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from .api import require_key
 from neural_core import dispositivos, voz_inbox
+from neural_core import sky_subagents
 from neural_core.sky_approvals import approvals
 from neural_core import sky_capacidades as caps
 from neural_core.sky_asistente_personal import AYUDA, atender, token_agente_local, url_agente_local
@@ -182,8 +183,26 @@ def _completar(resultado: dict, dispositivo: str, request: Request) -> dict:
     return resultado
 
 
+def _crear_subagente_si_pedido(texto: str) -> dict | None:
+    cmd = sky_subagents.parse_create_command(texto)
+    if not cmd:
+        return None
+    try:
+        sub = sky_subagents.create(**cmd)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)[:200]) from exc
+    return {'tipo': 'respuesta', 'proveedor': 'sky-subagent-manager',
+            'mensaje': (f'Creé el perfil «{sub["name"]}», desactivado y sin permisos nuevos. '
+                        f'Especialidad: {sub["role"]}. Para delegarle tareas, '
+                        'activá el subagente en Automatizaciones y aprobá cada flujo.'),
+            'subagent': sub}
+
+
 @router.post('/mensaje')
 def mensaje(body: Mensaje, request: Request):
+    creado = _crear_subagente_si_pedido(body.texto)
+    if creado:
+        return creado
     resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
     return _completar(resultado, body.dispositivo, request)
 
@@ -200,6 +219,10 @@ def mensaje_stream(body: Mensaje, request: Request):
         def linea(obj):
             return json.dumps(obj, ensure_ascii=False) + '\n'
         texto = body.texto.strip()
+        creado = _crear_subagente_si_pedido(texto)
+        if creado:
+            yield linea({'final': creado})
+            return
         r = asis.reglas(texto) if texto else None
         if r or not texto or not asis.usar_cerebro(body.proveedor):
             yield linea({'final': _completar(r or asis.atender(texto, historial, body.proveedor, body.modo), body.dispositivo, request)})
