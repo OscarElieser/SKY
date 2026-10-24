@@ -135,7 +135,7 @@ def lesson(topic: str, level: str, duration_minutes: int = 45,
         "speech_engine_status":"client_must_verify_available_speech_synthesis",
         "child_data_collected":False,
         "multimedia": multimedia.teaching_support(topic,level),
-        "assessment_available": assessment.alternatives()["types"],
+        "assessment_available": list(assessment.TYPES),
         "evidence_gaps":([
             "Falta contenido didáctico respaldado por fuentes y el programa oficial."
         ] if not has_material else [
