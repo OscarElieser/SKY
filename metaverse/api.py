@@ -671,6 +671,10 @@ app.include_router(sky_academy_router)
 # SKY Verification Lab — solo lectura, usa la misma API y el control del propietario.
 from .verification_api import router as sky_verification_router
 app.include_router(sky_verification_router)
+
+# MCP oficial opcional: reutiliza el dueño/SENTINEL; desactivado por defecto.
+from .mcp_api import router as sky_mcp_router
+app.include_router(sky_mcp_router)
 # SKY Core / Guardian / Knowledge: reutilizan las mismas credenciales y MFA.
 from .neural_memory_api import router as sky_neural_memory_router
 app.include_router(sky_neural_memory_router)
