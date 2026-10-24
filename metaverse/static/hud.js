@@ -934,7 +934,26 @@
     [['auto','Distribución personalizada'],['editorial','Editorial'],['dashboard','Dashboard'],['immersive','Inmersiva']].forEach(([v,l])=>{
       const o=el('option','',l);o.value=v;designLayout.append(o);
     });
-    designFields.append(designTitle,designBrief,designPlatform,designStyle,designLayout);
+    const iconPack=el('select','hab-in'), fontPack=el('select','hab-in'), motionMode=el('select','hab-in');
+    [['lucide','Iconos · Lucide SVG'],['tabler','Iconos · Tabler SVG']].forEach(([v,l])=>{
+      const o=el('option','',l);o.value=v;iconPack.append(o);
+    });
+    [['inter','Tipografía · Inter'],['manrope','Tipografía · Manrope'],
+     ['poppins','Tipografía · Poppins']].forEach(([v,l])=>{
+      const o=el('option','',l);o.value=v;fontPack.append(o);
+    });
+    [['normal','Animaciones fluidas'],['none','Sin animación (accesibilidad)']].forEach(([v,l])=>{
+      const o=el('option','',l);o.value=v;motionMode.append(o);
+    });
+    function updateDesignLibraryChoices(){
+      const flutter=designPlatform.value==='flutter';
+      iconPack.disabled=flutter;fontPack.disabled=flutter;
+      if(flutter){iconPack.value='lucide';fontPack.value='inter';}
+    }
+    designPlatform.addEventListener('change',updateDesignLibraryChoices);
+    updateDesignLibraryChoices();
+    designFields.append(designTitle,designBrief,designPlatform,designStyle,designLayout,
+                        iconPack,fontPack,motionMode);
     const designBtns=el('div','btns'),designCreate=el('button','btn primary','Crear diseño real');
     const designDownload=el('button','btn','Descargar proyecto ZIP');
     designCreate.type='button';designDownload.type='button';
@@ -945,7 +964,8 @@
     let currentDesign=null, currentDesignArgs=null;
     function designPayload(){
       return {title:designTitle.value,brief:designBrief.value,platform:designPlatform.value,
-              style:designStyle.value,layout:designLayout.value};
+              style:designStyle.value,layout:designLayout.value,
+              icon_pack:iconPack.value,font_family:fontPack.value,motion:motionMode.value};
     }
     designCreate.addEventListener('click',async()=>{
       designCreate.disabled=true;designDownload.disabled=true;
@@ -961,6 +981,7 @@
           '\nEstilo: '+result.style+' · estructura: '+result.layout+
           '\nColores: '+JSON.stringify(result.colors)+
           '\nArchivos editables: '+Object.keys(result.files).join(', ')+
+          '\nPaquetes de diseño elegidos: '+JSON.stringify(result.selected_libraries)+
           '\nBibliotecas reales declaradas: '+JSON.stringify(result.libraries_declared,null,2)+
           '\nComprobaciones necesarias:\n'+result.commands_to_test_in_separate_approved_project.join('\n')+
           '\n\nIMPORTANTE: los archivos se generaron, pero NO se han compilado en tu equipo.';
