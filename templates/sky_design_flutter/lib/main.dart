@@ -31,7 +31,14 @@ class SkyHome extends StatefulWidget {
 }
 
 class _SkyHomeState extends State<SkyHome> {
+  final ScrollController _scroll = ScrollController();
   String query = '';
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
   final features = const [
     (Icons.auto_awesome, skyFeatureOne, 'Una interfaz con identidad y jerarquía.'),
     (Icons.animation, skyFeatureTwo, 'Animaciones que acompañan la navegación.'),
@@ -96,6 +103,7 @@ class _SkyHomeState extends State<SkyHome> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1060),
               child: ListView(
+                controller: _scroll,
                 padding: EdgeInsets.symmetric(
                   horizontal: wide ? 35 : 20, vertical: 26),
                 children: [
@@ -118,8 +126,14 @@ class _SkyHomeState extends State<SkyHome> {
                       icon: const Icon(Icons.arrow_outward),
                       label: const Text('Comenzar')),
                     OutlinedButton.icon(
-                      onPressed: () => Scrollable.ensureVisible(
-                        context, duration: const Duration(milliseconds: 400)),
+                      onPressed: () {
+                        if (!_scroll.hasClients) return;
+                        _scroll.animateTo(
+                          _scroll.position.maxScrollExtent,
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeOutCubic,
+                        );
+                      },
                       icon: const Icon(Icons.explore_outlined),
                       label: const Text('Explorar')),
                   ]), 150),
