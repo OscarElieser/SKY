@@ -31,6 +31,14 @@ def _token() -> str:
     value = os.getenv("SKY_API_KEY", "").strip()
     if value:
         return value
+    # Configuración privada habitual: leer sin imprimir ni exportar la clave.
+    try:
+        from dotenv import dotenv_values
+        value = str(dotenv_values(ROOT / ".env").get("SKY_API_KEY") or "").strip()
+        if value:
+            return value
+    except ImportError:
+        pass
     path = ROOT / "local_data" / "sky_api_token.txt"
     try:
         return path.read_text(encoding="utf-8").strip()
