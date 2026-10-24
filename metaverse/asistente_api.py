@@ -42,6 +42,8 @@ class Mensaje(BaseModel):
     proveedor: str = Field(default='auto', max_length=20)
     dispositivo: str = Field(default=LOCAL, max_length=80)
     modo: str = Field(default='chat', pattern='^(chat|voz)$')
+    lesson_id: str = Field(default='', max_length=80)
+    source_text: str = Field(default='', max_length=12000)
 
 
 class OrdenCasa(BaseModel):
@@ -217,6 +219,10 @@ def _completar(resultado: dict, dispositivo: str, request: Request) -> dict:
 @router.post('/mensaje')
 def mensaje(body: Mensaje, request: Request):
     inicio = time.perf_counter()
+    from .academy_voice import class_command
+    academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
+    if academy is not None:
+        return _medir_turno(academy, inicio)
     resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
     return _medir_turno(_completar(resultado, body.dispositivo, request), inicio)
 
@@ -235,6 +241,11 @@ def mensaje_stream(body: Mensaje, request: Request):
             return json.dumps(obj, ensure_ascii=False) + '\n'
         def final(resultado):
             return linea({'final': _medir_turno(resultado, inicio)})
+        from .academy_voice import class_command
+        academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
+        if academy is not None:
+            yield final(academy)
+            return
         original = body.texto.strip()
         texto = asis.preparar(original) if original else original
         r = asis.reglas(texto) if texto else None

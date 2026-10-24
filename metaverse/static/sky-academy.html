@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SKY Aula e Innovación · SKY CORE</title>
+  <style>
+    :root{color-scheme:dark;--sky:#7ad9f7;--bg:#08121e;--panel:#122434;--line:#274052;--muted:#a3becb;--white:#f4f8ff}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#0f3550,#08121e 68%);color:var(--white);font:15px system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.55}
+    header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:18px clamp(16px,4vw,42px);gap:16px}
+    header a{color:var(--sky);text-decoration:none;font-weight:700}
+    main{max-width:1060px;margin:auto;padding:32px 18px 70px}
+    h1{font-size:clamp(26px,4vw,40px);letter-spacing:-.045em;margin:0}
+    h2{font-size:21px;margin:0 0 9px}p{color:var(--muted);margin:8px 0 18px}
+    .badge{font-size:12px;color:var(--sky);text-transform:uppercase;letter-spacing:.13em}
+    .tabs{display:flex;gap:8px;margin:22px 0;flex-wrap:wrap}.tabs button{margin:0}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    @media(max-width:640px){.grid{grid-template-columns:1fr}}
+    section{background:var(--panel);border:1px solid var(--line);border-radius:17px;padding:22px;margin:18px 0}
+    label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted)}
+    input,textarea,select{width:100%;background:#071a29;border:1px solid #38546b;border-radius:9px;padding:11px;color:var(--white);font:inherit}
+    textarea{min-height:95px;resize:vertical}
+    button{background:#18455e;color:#fff;border:1px solid #4185a5;border-radius:9px;padding:10px 15px;cursor:pointer;font-weight:600}
+    button:hover{background:#216282}button:disabled{opacity:.45;cursor:not-allowed}
+    button.primary{background:#137398;border-color:#38bce5}
+    .actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:16px}
+    .hidden{display:none}
+    pre{white-space:pre-wrap;word-break:break-word;background:#071b2a;border:1px solid #2c465c;border-radius:9px;padding:16px;max-height:450px;overflow:auto}
+    #lesson-output,#project-output{white-space:pre-wrap;background:#081d2b;border:1px solid var(--line);padding:17px;border-radius:10px;margin-top:16px}
+    #status{color:#9adff0;min-height:25px}
+    .note{background:#0e2939;border-left:3px solid #50a6ca;padding:12px 15px;font-size:13px}
+    .small{font-size:12px}.footer{border-top:1px solid var(--line);margin-top:24px;padding-top:20px}
+  </style>
+  <script defer src="/static/sky-academy.js"></script>
+</head>
+<body>
+<header><a href="/sky">✦ SKY CORE</a><strong>SKY Aula · Innovación</strong><a href="/">Volver al núcleo</a></header>
+<main>
+ <div class="badge">SKY · Enseña, investiga y crea</div>
+ <h1>Un solo asistente. Aprendizaje y proyectos reales.</h1>
+ <p>Prepará clases paso a paso con narración opcional y borradores de propuestas para rally, hackathon e INNOVATEC. Datos sin verificar siempre se marcan como tales.</p>
+ <section aria-label="Acceso privado">
+  <h2>Sesión de propietario</h2>
+  <div class="grid">
+   <label>Clave privada SKY (solo en memoria de esta pestaña)<input id="sky-key" type="password" autocomplete="off" placeholder="X-SKY-KEY"></label>
+   <label>Sesión de segundo factor (solo si está habilitada)<input id="sky-session" type="password" autocomplete="off" placeholder="X-SKY-SESSION"></label>
+  </div>
+  <p class="small">Estos valores no se guardan en el navegador ni se envían a terceros; únicamente autentican tus solicitudes al servidor SKY.</p>
+ </section>
+ <div class="tabs" role="tablist" aria-label="Herramientas SKY">
+  <button id="tab-aula" aria-selected="true" role="tab">SKY Docente</button>
+  <button id="tab-innovation" aria-selected="false" role="tab">SKY Innovación</button>
+ </div>
+ <section id="aula" role="tabpanel" aria-labelledby="tab-aula">
+  <h2>Clase interactiva con SKY</h2>
+  <div class="grid">
+   <label>Tema<input id="lesson-topic" maxlength="160" placeholder="Ej. Números naturales: antecesor y sucesor"></label>
+   <label>Nivel educativo<select id="lesson-level">
+    <option value="inicial">Educación inicial (MEIDI)</option>
+    <option value="primaria">Primaria</option><option value="secundaria">Secundaria/media</option>
+    <option value="tecnico">Técnico/profesional</option><option value="universitario">Universidad</option>
+    <option value="maestria">Maestría</option><option value="doctorado">Doctorado</option>
+   </select></label>
+   <label>Grado/curso<input id="lesson-grade" maxlength="55" placeholder="Ej. tercer nivel, quinto grado, posgrado"></label>
+   <label>Duración (minutos)<input id="lesson-duration" type="number" min="15" max="180" value="45"></label>
+  </div>
+  <label>Aprendizaje esperado (opcional)<input id="lesson-goal" maxlength="250" placeholder="Usá la competencia curricular del curso si la conocés"></label>
+  <label>Texto de estudio (opcional, no se verifica automáticamente)<textarea id="lesson-material" maxlength="12000" placeholder="Pegá información de un documento contrastado para que SKY explique ese contenido"></textarea></label>
+  <div class="actions">
+   <button id="start-lesson" class="primary">Iniciar clase</button><button id="next-lesson" disabled>Siguiente momento</button>
+   <button id="speak-lesson" disabled>Escuchar a SKY</button><button id="stop-lesson">Silenciar</button>
+   <button id="export-lesson" disabled>Descargar clase Word</button>
+   <label style="max-width:160px">Velocidad de voz<select id="voice-speed"><option value=".8">Lenta</option><option value="1" selected>Normal</option><option value="1.15">Rápida</option></select></label>
+  </div>
+  <div id="lesson-output" role="status" aria-live="polite">Iniciá una clase para que SKY explique una etapa a la vez.</div>
+  <label style="margin-top:14px">Respuesta a la pregunta de SKY (no se guarda ni se califica automáticamente)<textarea id="student-answer" maxlength="800" placeholder="Explicá tu idea para que SKY te dé una pregunta de reflexión"></textarea></label>
+  <div class="actions"><button id="send-answer" disabled>Conversar con SKY</button></div>
+  <div id="student-feedback" role="status" aria-live="polite" class="small"></div>
+  <p class="note">La voz utiliza el sintetizador del navegador si está disponible; la privacidad y el funcionamiento sin conexión dependen de las voces instaladas en Windows o el navegador. No ingresés datos personales de estudiantes.</p>
+ </section>
+ <section id="innovation" class="hidden" role="tabpanel" aria-labelledby="tab-innovation">
+  <h2>Laboratorio de proyectos</h2>
+  <div class="grid">
+   <label>Nombre del proyecto<input id="project-name" maxlength="110" placeholder="Nombre de la solución"></label>
+   <label>Evento o metodología<select id="project-event">
+    <option value="hackathon_nicaragua">Hackathon Nicaragua</option>
+    <option value="rally_nacional">Rally Nacional Nicaragua Innova</option>
+    <option value="rally_latinoamericano">Rally Latinoamericano de Innovación</option>
+    <option value="innovatec">INNOVATEC</option>
+    <option value="hackathon">Otro hackathon</option>
+    <option value="emprendimiento">Emprendimiento</option>
+    <option value="investigacion">Investigación aplicada</option>
+    <option value="general">Proyecto general</option>
+   </select></label>
+   <label>Área<select id="project-area">
+    <option value="educacion">Educación</option><option value="salud">Salud</option>
+    <option value="medicina">Medicina</option><option value="transporte">Transporte</option>
+    <option value="social">Desarrollo social</option><option value="ambiental">Ambiente</option>
+    <option value="cultural">Cultura</option><option value="agropecuario">Agropecuario</option>
+    <option value="turismo">Turismo</option><option value="energia">Energía</option>
+    <option value="industria">Industria</option><option value="economia">Economía</option>
+    <option value="tecnologia">Tecnología</option><option value="vivienda">Vivienda</option>
+    <option value="gestion_publica">Gestión pública</option><option value="innovacion">Innovación</option>
+    <option value="investigacion">Investigación</option><option value="tecnico">Formación técnica</option>
+   </select></label>
+   <label>Duración del pitch<select id="project-pitch"><option value="1">1 min</option><option value="2">2 min</option>
+    <option value="3" selected>3 min</option><option value="4">4 min</option><option value="5">5 min</option></select></label>
+  </div>
+  <label>Problema por resolver<textarea id="project-problem" maxlength="1000" placeholder="Explicá la necesidad, el territorio y a quién afecta; no inventés estadísticas"></textarea></label>
+  <label>Solución propuesta<textarea id="project-solution" maxlength="1100" placeholder="Hipótesis o idea inicial (sin afirmar que ya funciona)"></textarea></label>
+  <label>Beneficiarios (opcional)<input id="project-beneficiaries" maxlength="300" placeholder="Grupo objetivo por validar"></label>
+  <label>Evidencias aportadas (opcional, aún por verificar)<textarea id="project-evidence" maxlength="3500" placeholder="Investigación, entrevistas autorizadas, referencias y fechas de fuentes"></textarea></label>
+  <div class="actions">
+   <button class="primary" id="build-project">Construir propuesta</button>
+   <button id="export-project-word" disabled>Word</button>
+   <button id="export-project-pdf" disabled>PDF</button>
+   <button id="export-project-slides" disabled>PowerPoint</button>
+  </div>
+  <div class="grid" style="margin-top:17px">
+   <label>Investigación en fuentes oficiales (elegí hasta cuatro)
+    <select id="project-sources" multiple size="5">
+     <option value="mined_meidi">MINED — Educación Inicial / MEIDI</option>
+     <option value="mined_primaria">MINED — Educación Primaria</option>
+     <option value="mined_secundaria">MINED — Educación Secundaria</option>
+     <option value="inatec_hackathon">INATEC — Plataforma Hackathon</option>
+     <option value="inatec_portal">Tecnológico Nacional</option>
+     <option value="unesco_education_ai">UNESCO — IA y educación</option>
+     <option value="who_health_ai">OMS — Ética de IA para la salud</option>
+    </select>
+   </label>
+   <div><p>SKY consultará únicamente estos portales oficiales, sin confundir extractos recuperados con hechos contrastados.</p>
+    <button id="project-verify-sources" type="button">Consultar fuentes oficiales</button>
+   </div>
+  </div>
+  <div id="research-output" role="status" aria-live="polite" style="white-space:pre-wrap;margin-top:12px;"></div>
+  <div id="project-output" role="status" aria-live="polite">Definí el problema y SKY preparará el árbol de problemas, Canvas, validaciones y pitch.</div>
+  <p class="note">Los resultados y cifras se muestran como hipótesis hasta que adjuntés evidencia comprobable. Esta herramienta no inventa estudios, beneficiarios ni presupuestos.</p>
+ </section>
+ <p id="status" role="status" aria-live="polite"></p>
+ <p class="footer small">SKY CORE es responsable del contenido. Revisión docente y verificación de fuentes obligatorias para materiales oficiales, educación infantil, salud e investigación avanzada.</p>
+</main></body></html>
