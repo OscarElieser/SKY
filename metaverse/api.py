@@ -976,6 +976,43 @@ def developer_design_create(body: dict):
         raise HTTPException(422, str(exc)) from exc
 
 
+@app.post('/api/developer/design/ai/create', dependencies=[Depends(require_key)])
+def developer_design_ai_create(body: dict):
+    """SKY's real selected LLM plans a design; requires explicit privacy consent."""
+    from neural_core.sky_design_ai import compose_plan
+    from neural_core.sky_design_studio import create_design, DesignInvalid
+    from neural_core.providers import ProviderError
+    if body.get('approved') is not True:
+        raise HTTPException(403, 'Confirmá explícitamente el uso del proveedor IA.')
+    try:
+        plan = compose_plan(
+            title=body.get('title', ''), brief=body.get('brief', ''),
+            provider=body.get('provider', 'ollama'),
+            allow_cloud=body.get('allow_cloud') is True,
+        )
+        project = create_design(
+            body.get('title', ''), body.get('brief', ''),
+            platform=body.get('platform', 'react'),
+            domain=body.get('domain', ''),
+            style=body.get('style', 'auto'),
+            layout=body.get('layout', 'auto'),
+            design_plan=plan,
+        )
+        project['design_plan'] = {key:plan[key] for key in (
+            'subtitle','description','eyebrow','features','style','layout','palette_index')}
+        project['model_used'] = plan['model_used']
+        project['provider_used'] = plan['provider_used']
+        project['cloud_used'] = plan['cloud_used']
+        project['ai_generation_verified'] = True
+        return project
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except DesignInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ProviderError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
 @app.post('/api/developer/design/download', dependencies=[Depends(require_key)])
 def developer_design_download(body: dict):
     """Owner-requested in-memory zip of generated files, without executing code."""
@@ -985,7 +1022,8 @@ def developer_design_download(body: dict):
                                 platform=body.get('platform', 'react'),
                                 domain=body.get('domain', ''),
                                 style=body.get('style', 'auto'),
-                                layout=body.get('layout', 'auto'))
+                                layout=body.get('layout', 'auto'),
+                                design_plan=body.get('design_plan'))
         payload = design_archive(project)
     except DesignInvalid as exc:
         raise HTTPException(422, str(exc)) from exc
