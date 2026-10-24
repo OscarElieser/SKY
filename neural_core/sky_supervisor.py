@@ -119,6 +119,16 @@ def analyze_request(request: str, source_text: str = "", document_format: str = 
             "capability": "memory",
             "reason": "Para guardar memoria hace falta el contenido explícito a conservar.",
         })
+    if _match(normalized,
+              r"\\b(?:shell|powershell|cmd|terminal|comando(?:s)? de sistema)\\b",
+              r"\\b(?:borra|elimina|destruye|formatea|wipe)\\b",
+              r"\\b(?:paga|comprar|compra|transfiere dinero|transferir dinero)\\b",
+              r"\\b(?:publica|publicar|despliega|deploy)\\b"):
+        blockers.append({
+            "capability": "system_external_effects",
+            "reason": ("Este supervisor no autoriza pagos, borrados, terminales ni "
+                       "publicaciones. SKY necesita una herramienta específica y autorización."),
+        })
 
     steps: list[dict] = [{
         "agent": "planificador",
@@ -137,19 +147,22 @@ def analyze_request(request: str, source_text: str = "", document_format: str = 
         steps.append({
             "agent": "documentalista",
             "action": "document",
-            "task": f"Generar documento {document_format.upper()} con contenido aportado por el propietario: {title}"[:3000],
+            "task": (f"Generar documento {document_format.upper()} con contenido aportado por el propietario: {title}. "
+                     "Usar estructura planificada en {{step.1.plan_summary}}")[:3000],
             "params": {"document": spec},
         })
     if wants_design:
         steps.append({
             "agent": "diseñador", "action": "experience",
-            "task": f"Preparar experiencia visual solicitada por el propietario: {original}"[:3000],
+            "task": (f"Preparar experiencia visual solicitada por el propietario: {original}. "
+                     "Tomar como contexto {{step.1.plan_summary}}")[:3000],
             "params": {"title": original[:90]},
         })
     if wants_world:
         steps.append({
             "agent": "creador_3d", "action": "world",
-            "task": f"Preparar mundo 3D solicitado por el propietario: {original}"[:3000],
+            "task": (f"Preparar mundo 3D solicitado por el propietario: {original}. "
+                     "Tomar como contexto {{step.1.plan_summary}}")[:3000],
             "params": {"name": original[:60], "prompt": original[:950]},
         })
     if wants_memory and source:
