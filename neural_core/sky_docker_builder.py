@@ -154,6 +154,11 @@ def _source_archive(language: str, files: Mapping[str, str]) -> tuple[bytes, boo
             raise RunnerInvalid("Las pruebas deben estar en tests/archivo.")
         if not name.endswith(profile.suffixes):
             raise RunnerInvalid(f"Extensión no admitida para {language}: {name}")
+        if parts[0] == "tests":
+            if language == "Python" and not re.fullmatch(r"test_[a-zA-Z0-9_-]+\.py", parts[1]):
+                raise RunnerInvalid("Las pruebas Python deben llamarse tests/test_*.py.")
+            if language == "JavaScript" and not re.fullmatch(r"[a-zA-Z0-9_-]+\.test\.js", parts[1]):
+                raise RunnerInvalid("Las pruebas JavaScript deben llamarse tests/*.test.js.")
         try:
             raw = value.encode("utf-8")
         except UnicodeEncodeError as exc:
@@ -205,25 +210,67 @@ def _execute(docker: str, image_id: str, archive: bytes, command: str,
     name = "sky-dev-" + secrets.token_hex(8)
     started = time.monotonic()
     try:
-        result = subprocess.run(
+        # Consume stdout/stderr incrementally. communicate(capture_output=True)
+        # can exhaust host RAM when untrusted code prints unbounded output.
+        proc = subprocess.Popen(
             _docker_args(docker, image_id, name, command),
-            input=archive, capture_output=True, timeout=timeout, env=env, check=False
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=env,
         )
+        captured = {"stdout": bytearray(), "stderr": bytearray()}
+        lengths = {"stdout": 0, "stderr": 0}
+
+        def drain(which: str, pipe) -> None:
+            while True:
+                chunk = pipe.read(8192)
+                if not chunk:
+                    break
+                lengths[which] += len(chunk)
+                remaining = _MAX_OUTPUT_BYTES - len(captured[which])
+                if remaining > 0:
+                    captured[which].extend(chunk[:remaining])
+
+        def feed() -> None:
+            try:
+                if proc.stdin:
+                    proc.stdin.write(archive)
+                    proc.stdin.flush()
+            except (BrokenPipeError, OSError, ValueError):
+                pass
+            finally:
+                if proc.stdin:
+                    try:
+                        proc.stdin.close()
+                    except OSError:
+                        pass
+
+        reader_out = threading.Thread(target=drain, args=("stdout", proc.stdout), daemon=True)
+        reader_err = threading.Thread(target=drain, args=("stderr", proc.stderr), daemon=True)
+        writer = threading.Thread(target=feed, daemon=True)
+        reader_out.start()
+        reader_err.start()
+        writer.start()
+        expired = False
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            expired = True
+            proc.kill()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                pass
+        for thread in (writer, reader_out, reader_err):
+            thread.join(timeout=2)
         return {
-            "verified": result.returncode == 0,
-            "exit_code": result.returncode,
-            "stdout": result.stdout[:_MAX_OUTPUT_BYTES].decode("utf-8", "replace"),
-            "stderr": result.stderr[:_MAX_OUTPUT_BYTES].decode("utf-8", "replace"),
+            "verified": (not expired and proc.returncode == 0),
+            "exit_code": None if expired else proc.returncode,
+            "stdout": captured["stdout"].decode("utf-8", "replace"),
+            "stderr": captured["stderr"].decode("utf-8", "replace"),
             "duration_ms": round((time.monotonic() - started) * 1000),
-            "timed_out": False,
-            "output_truncated": len(result.stdout) > _MAX_OUTPUT_BYTES or
-                                len(result.stderr) > _MAX_OUTPUT_BYTES,
-        }
-    except subprocess.TimeoutExpired as exc:
-        return {
-            "verified": False, "exit_code": None, "stdout": "", "stderr": "",
-            "duration_ms": round((time.monotonic() - started) * 1000),
-            "timed_out": True, "output_truncated": False,
+            "timed_out": expired,
+            "output_truncated": any(lengths[k] > _MAX_OUTPUT_BYTES
+                                    for k in ("stdout", "stderr")),
         }
     except OSError as exc:
         raise RunnerUnavailable("No se pudo iniciar Docker CLI.") from exc
