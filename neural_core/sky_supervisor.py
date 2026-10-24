@@ -120,10 +120,10 @@ def analyze_request(request: str, source_text: str = "", document_format: str = 
             "reason": "Para guardar memoria hace falta el contenido explícito a conservar.",
         })
     if _match(normalized,
-              r"\b(?:shell|powershell|cmd|terminal|comando(?:s)? de sistema)\\b",
-              r"\b(?:borra|elimina|destruye|formatea|wipe)\\b",
-              r"\b(?:paga|comprar|compra|transfiere dinero|transferir dinero)\\b",
-              r"\b(?:publica|publicar|despliega|deploy)\\b"):
+              r"\b(?:shell|powershell|cmd|terminal|comando(?:s)? de sistema)\b",
+              r"\b(?:borra|elimina|destruye|formatea|wipe)\b",
+              r"\b(?:paga|comprar|compra|transfiere dinero|transferir dinero)\b",
+              r"\b(?:publica|publicar|despliega|deploy)\b"):
         blockers.append({
             "capability": "system_external_effects",
             "reason": ("Este supervisor no autoriza pagos, borrados, terminales ni "
