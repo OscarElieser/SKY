@@ -882,10 +882,90 @@
     dock();
   }
 
+  /* ------------------------------------------------------------------ SKY Developer: ejecución opt-in */
+  const DEV = {root: null};
+  function abrirProgramacion(){
+    if(!DEV.root || !ventanas.has('programacion')) DEV.root=el('div','kpi');
+    abrirVentana('programacion','SKY Developer · Compilación verificada',DEV.root,{w:940,h:720});
+    if(DEV.root.dataset.ready==='1')return;
+    DEV.root.dataset.ready='1';
+    const root=DEV.root;
+    const intro=seccion(root,'Crear, compilar y probar código');
+    intro.append(el('div','s','SKY ejecuta únicamente en contenedores Docker locales previamente descargados, sin red ni carpetas personales. Requiere activación del dueño, PIN y aprobación para cada ejecución.'));
+    const state=el('div','res','Consultando ejecutores…');intro.append(state);
+    const area=seccion(root,'Código fuente y pruebas');
+    const lang=el('select','hab-in'),code=el('textarea','hab-in');
+    const tests=el('textarea','hab-in'),expected=el('input','hab-in');
+    code.rows=12;code.spellcheck=false;code.placeholder='Escribí el código del archivo principal…';
+    tests.rows=4;tests.spellcheck=false;
+    tests.placeholder='Pruebas opcionales (Python unittest o JavaScript node --test)';
+    expected.type='text';expected.placeholder='Salida esperada (opcional, sin distinguir espacios extremos)';
+    const actions=el('div','btns');
+    const check=el('button','btn','Verificar compiladores');
+    const run=el('button','btn primary','Compilar y ejecutar');
+    check.type='button';run.type='button';
+    actions.append(check,run);
+    const output=el('pre','res','Las pruebas físicas no se presumen: mirá el resultado verificable aquí.');
+    output.style.whiteSpace='pre-wrap';output.style.overflowWrap='anywhere';
+    area.append(lang,code,tests,expected,actions,output);
+    const profiles=new Map();
+    function selection(){
+      const p=profiles.get(lang.value);
+      if(!p)throw Error('Elegí un lenguaje compatible.');
+      const files={[p.main_file]:code.value};
+      if(tests.value.trim()){
+        if(lang.value==='Python')files['tests/test_main.py']=tests.value;
+        else if(lang.value==='JavaScript')files['tests/main.test.js']=tests.value;
+        else throw Error('Este lenguaje no dispone aún de pruebas separadas en el ejecutor.');
+      }
+      return files;
+    }
+    async function load(){
+      try{
+        const d=await api('/api/developer/build/capabilities');
+        lang.replaceChildren();
+        for(const p of d.supported||[]){
+          profiles.set(p.language,p);
+          const opt=el('option','',p.language+' · '+p.main_file);
+          opt.value=p.language;lang.append(opt);
+        }
+        state.textContent=d.enabled
+          ? 'Ejecución disponible; se exigirá PIN y confirmación.'
+          : 'El ejecutor está desactivado. Activá SKY_CODE_RUNNER_ENABLED y SKY_CODE_RUNNER_CONTAINER_ACK en el equipo propietario.';
+      }catch(e){state.textContent='No se pudo cargar el catálogo: '+e.message;}
+    }
+    check.addEventListener('click',async()=>{
+      check.disabled=true;
+      try{
+        const d=await api('/api/developer/toolchains?language='+encodeURIComponent(lang.value));
+        output.textContent=JSON.stringify(d.checks||[],null,2)+
+          '\nNota: compilador detectado ≠ código compilado.';
+      }catch(e){output.textContent='Error: '+e.message;}
+      finally{check.disabled=false;}
+    });
+    run.addEventListener('click',async()=>{
+      if(!confirm('¿Autorizás ejecutar este código en el contenedor Docker aislado del equipo propietario?'))return;
+      run.disabled=true;output.textContent='Compilando y verificando resultado…';
+      try{
+        const payload={language:lang.value,files:selection(),approved:true};
+        if(expected.value.trim())payload.expected_stdout=expected.value.trim();
+        const d=await api('/api/developer/build/execute',{
+          method:'POST',body:JSON.stringify(payload)});
+        output.textContent='ESTADO: '+d.status+'\nImagen local: '+d.image_id+
+          '\nCOMPILACIÓN:\n'+JSON.stringify(d.compile,null,2)+
+          '\nEJECUCIÓN:\n'+JSON.stringify(d.run,null,2)+
+          '\nPRUEBAS:\n'+JSON.stringify(d.tests,null,2);
+      }catch(e){output.textContent='No se pudo ejecutar: '+e.message;}
+      finally{run.disabled=false;}
+    });
+    load();
+  }
+
   /* ------------------------------------------------------------------ módulos */
   const MODULOS = [
     { id: 'clasico', t: 'Clásico', d: 'Chat multi-IA, adjuntos, imágenes y búsqueda', url: '/sky' },
     { id: 'aula', t: 'Docencia', d: 'Clases con voz, videos, 3D y evaluación por tres saberes', accion: () => abrirAula() },
+    { id: 'programacion', t: 'Programación', d: 'Compilar y probar código en Docker aislado, con tu autorización', accion: () => abrirProgramacion() },
     { id: 'telefono', t: 'Teléfono', d: 'Verificar número, SMS, llamadas y video autorizados', accion: () => abrirTelefono() },
     { id: 'creative', t: 'Creative', d: 'Video, animación y edición por capas', url: '/creative' },
     { id: 'office', t: 'Office', d: 'Word, Excel, PowerPoint y PDF', url: '/office' },
