@@ -960,10 +960,10 @@
         if(!confirm('¿Abrir la aplicación de '+(scheme==='tel'?'llamadas':'mensajes')+
             ' del dispositivo para '+check.masked+'? Deberás confirmar allí.'))return;
         const target=scheme+':'+check.destination;
-        const anchor=document.createElement('a');
-        anchor.href=target;anchor.rel='noopener';anchor.style.display='none';
-        root.append(anchor);anchor.click();anchor.remove();
-        status.textContent='Solicitud entregada al sistema del dispositivo; SKY no puede confirmar que se completó.';
+        const anchor=el('a','btn','Continuar en la aplicación del móvil');
+        anchor.href=target;anchor.rel='noopener';
+        status.replaceChildren(document.createTextNode('SKY verificó el número. Tocá este enlace para continuar en tu teléfono: '),anchor);
+        status.append(document.createTextNode(' · El sistema del móvil te pedirá confirmar la acción.'));
       }catch(e){status.textContent='No se pudo abrir la aplicación móvil: '+e.message;}
       finally{button.disabled=false;}
     }
