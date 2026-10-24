@@ -302,7 +302,10 @@ def resolve_windows_special_folder(folder_name: str) -> Optional[Path]:
 def verify_window_or_process(keywords: List[str], pid: Optional[int] = None, timeout_secs: float = 2.0) -> Dict[str, Any]:
     """Verifica si la ventana o el proceso está físicamente visible y activo."""
     if platform.system().lower() != 'windows':
-        return {'verified': True, 'method': 'non_windows'}
+        # No usar un resultado simulado como evidencia física. En Linux y
+        # macOS se necesita un verificador de proceso/ventana específico.
+        return {'verified': False, 'method': 'unsupported_platform',
+                'error': 'Verificación física de ventana no disponible en este sistema operativo.'}
 
     start_t = time.time()
     kw_lower = [k.lower() for k in keywords if k]

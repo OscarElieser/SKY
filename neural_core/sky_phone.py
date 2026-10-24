@@ -455,7 +455,7 @@ def capabilities()->dict:
             "voice":"Twilio callback to verified owner's handset then target; not browser softphone",
             "video":"Jitsi iframe/WebRTC after explicit click",
             "phone_number":"E.164 global format, carrier-independent, Twilio coverage varies",
-            "native_dialer_sms":"native handoff helper available; HUD integration pending",
+            "native_dialer_sms":"validated native tel:/sms: handoff; explicit user tap required in HUD",
             "verification":"Twilio Verify SMS OTP",
             "blocked_numbers":"enforced in SKY, not system-wide",
             "inbound":"not implemented",

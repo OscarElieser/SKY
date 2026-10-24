@@ -177,3 +177,29 @@ def test_aula_hud_video_guide_uses_authenticated_existing_api():
     assert "speakPart.addEventListener" in source
     routes=Path("metaverse/academy_api.py").read_text(encoding="utf-8")
     assert '"/education/resources/video-guide"' in routes
+
+
+def test_docente_puede_ajustar_pesos_tres_saberes_y_conserva_aprobacion():
+    weights={"conocer":20,"hacer":60,"ser":20}
+    rubric=assess.build("electricidad","tecnico","Aplicar normas de seguridad",
+                        weights=weights)
+    assert rubric["weights_suggested_pct"]==weights
+    observations={key:{"level":4,"evidence":"Evidencia revisada y firmada por el docente"}
+                  for key in weights}
+    with pytest.raises(assess.AssessmentInput):
+        assess.evaluate(rubric,observations,teacher_approved=False)
+    output=assess.evaluate(rubric,observations,teacher_approved=True)
+    assert output["score_pct"]==100
+    assert output["official_grade"] is False
+
+
+@pytest.mark.parametrize("weights",[
+    {"conocer":30,"hacer":20,"ser":20},
+    {"conocer":10,"hacer":30,"ser":60.0},
+    {"conocer":True,"hacer":50,"ser":49},
+    {"conocer":-10,"hacer":80,"ser":30},
+    {"conocer":50,"hacer":50},
+])
+def test_pesos_curriculares_invalidos_se_rechazan(weights):
+    with pytest.raises(assess.AssessmentInput):
+        assess.build("electricidad","tecnico","Medir competencias",weights=weights)
