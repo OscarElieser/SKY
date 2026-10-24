@@ -69,7 +69,18 @@ jobs:
           from pathlib import Path
           from neural_core.sky_design_studio import create_design
           folder=Path(os.environ["SKY_TEST_DIR"])
-          result=create_design("Diseño Turismo SKY", "Turismo comunitario con rutas de naturaleza", platform="react")
+          plan={
+              "subtitle":"El turismo se descubre en comunidad",
+              "description":"Explorá rutas responsables y negocios locales.",
+              "eyebrow":"EXPERIENCIAS · NICARAGUA",
+              "features":[
+                  {"title":"Rutas locales","detail":"Conectá con lugares cercanos.","icon":"compass"},
+                  {"title":"Gente de acá","detail":"Emprendimientos auténticos.","icon":"layers"},
+                  {"title":"Seguridad clara","detail":"Información verificable.","icon":"shield"},
+              ],"style":"aurora","layout":"immersive","palette_index":1,
+          }
+          result=create_design("Diseño Turismo SKY", "Turismo comunitario con rutas de naturaleza",
+                               platform="react",design_plan=plan)
           for name,code in result["files"].items():
               output=folder / name
               output.parent.mkdir(parents=True, exist_ok=True)
@@ -100,6 +111,27 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Generate AI-directed Flutter config with bounded design plan
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          from pathlib import Path
+          from neural_core.sky_design_studio import create_design
+          plan={
+              "subtitle":"El aprendizaje avanza con tus ideas",
+              "description":"Aprendizaje visual e interactivo en comunidad.",
+              "eyebrow":"EDUCACIÓN · TECNOLOGÍA",
+              "features":[
+                  {"title":"Explorar","detail":"Descubrí contenidos y recursos.","icon":"sparkles"},
+                  {"title":"Practicar","detail":"Actividades con seguimiento.","icon":"activity"},
+                  {"title":"Acceso universal","detail":"Lectura y accesibilidad.","icon":"shield"},
+              ],"style":"monochrome","layout":"dashboard","palette_index":2,
+          }
+          result=create_design("SKY Studio","Educación interactiva",
+                               platform="flutter",design_plan=plan)
+          Path("templates/sky_design_flutter/lib/sky_config.dart").write_text(
+              result["files"]["lib/sky_config.dart"],encoding="utf-8")
+          assert result["ai_edited_tokens"] is True
+          PY
       - name: Fetch Flutter Animate from pub.dev
         working-directory: templates/sky_design_flutter
         run: flutter pub get
