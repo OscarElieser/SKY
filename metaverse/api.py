@@ -591,7 +591,7 @@ async def ws_room(socket:WebSocket,wid:str,ticket:str=''):
     await socket.accept()
     room=_connections.setdefault(wid,{})
     user=secrets.token_hex(5)
-    room[socket]={'id':user,'name':'Visitante','position':[0,0,0]}
+    room[socket]={'id':user,'name':'Visitante','position':[0,0,0],'color':'#2EC4B6'}
     try:
         await socket.send_json({'type':'peers','you':user,'peers':list(room.values())})
         await _send_all(wid,{'type':'join','peer':room[socket]})
@@ -605,6 +605,13 @@ async def ws_room(socket:WebSocket,wid:str,ticket:str=''):
                 except (ValueError,TypeError):continue
                 room[socket]['position']=[float(v) for v in xyz]
                 await _send_all(wid,{'type':'move','peer':room[socket]})
+            elif data.get('type')=='customize':
+                # Color is cosmetic, bounded and temporary; no remote scripts/assets.
+                import re
+                color=data.get('color')
+                if isinstance(color,str) and re.fullmatch(r'#[0-9A-Fa-f]{6}',color):
+                    room[socket]['color']=color.upper()
+                    await _send_all(wid,{'type':'customize','peer':room[socket]})
             elif data.get('type')=='say':
                 text=str(data.get('text','')).strip()[:280]
                 if text:await _send_all(wid,{'type':'say','from':user,'text':text})
