@@ -56,6 +56,10 @@ Los dos proveedores de modelos nuevos se eligen **explícitamente** como
 a `AUTO_ORDER`. `SKY_LOCAL_ONLY=1` bloquea ambos. El nombre del modelo
 se obtiene de la variable del propietario; no se inventan modelos ni precios.
 
+`SKY_LOCAL_ONLY=1` también bloquea las nuevas consultas externas a Semantic
+Scholar, Zotero y Wolfram, así como n8n remoto. Solo permanece permitido el
+n8n localhost activado expresamente por el propietario.
+
 ## n8n — sin control paralelo de SKY
 
 Por defecto, solo lectura:
