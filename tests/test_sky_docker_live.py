@@ -77,3 +77,45 @@ def test_javascript_expected_output_wrong_is_failure():
     assert result["run"]["verified"] is True
     assert result["run"]["expected_stdout_matched"] is False
     assert result["ok"] is False
+
+
+def test_c_real_compilation_and_execution():
+    result = runner.build(
+        "C",
+        {"main.c": '#include <stdio.h>\nint main(void){printf("42\\n");return 0;}\n'},
+        approved=True, expected_stdout="42", timeout_seconds=22,
+    )
+    assert result["ok"] is True, result
+    assert result["compile"]["verified"] is True
+    assert result["run"]["verified"] is True
+
+
+def test_cpp_real_compilation_and_execution():
+    result = runner.build(
+        "C++",
+        {"main.cpp": '#include <iostream>\nint main(){std::cout << 6*7 << "\\n";return 0;}\n'},
+        approved=True, expected_stdout="42", timeout_seconds=22,
+    )
+    assert result["ok"] is True, result
+    assert result["compile"]["verified"] is True
+    assert result["run"]["verified"] is True
+
+
+def test_typescript_real_compile_transpile_and_execute_offline():
+    result = runner.build(
+        "TypeScript",
+        {"main.ts": "const resultado: number = 6 * 7;\nconsole.log(resultado);\n"},
+        approved=True, expected_stdout="42", timeout_seconds=22,
+    )
+    assert result["ok"] is True, result
+    assert result["compile"]["verified"] is True
+    assert result["run"]["verified"] is True
+
+
+def test_c_compilation_error_does_not_run():
+    result = runner.build(
+        "C", {"main.c": "int main( { syntax error }\n"}, approved=True,
+    )
+    assert result["ok"] is False
+    assert result["status"] == "compile_failed"
+    assert result["run"] is None
