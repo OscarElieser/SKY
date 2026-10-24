@@ -85,6 +85,7 @@ def classify(text: str) -> str:
     t = _unaccent(text)
     words = {
         "educacion": ("escuela", "docente", "clase", "aprendizaje", "educacion"),
+        "innovacion": ("hackathon", "rally", "innovatec", "concurso tecnologico", "innovacion"),
         "turismo": ("turismo", "destino", "visitante", "ruta turistica"),
         "ambiente": ("ambiental", "contaminacion", "residuo", "clima", "reciclaje"),
         "transporte": ("transporte", "trafico", "movilidad", "buses"),
@@ -189,6 +190,10 @@ def lesson_plan(topic: str, level: str = "", minutes: int = 45,
         level = _unaccent(_clean(level, 40))
     else:
         level = detect_level(topic)
+    aliases = {"preescolar": "inicial", "media": "secundaria", "media superior": "secundaria",
+               "formacion profesional": "tecnico", "tecnica": "tecnico",
+               "universitario": "universidad", "maestria": "posgrado", "doctorado": "posgrado"}
+    level = aliases.get(level, level)
     allowed = {"inicial", "primaria", "secundaria", "tecnico", "universidad", "posgrado", "general"}
     if level not in allowed:
         raise ValueError("Nivel educativo no válido.")
