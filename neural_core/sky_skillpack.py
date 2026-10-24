@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
@@ -103,7 +104,9 @@ def catalogue() -> dict:
                 status = "adapter_ready_unverified"
             if mode == "llm" and not available:
                 status = "needs_ai_provider"
+            vendor_file = Path(__file__).resolve().parents[1] / ".agents" / "skills" / key / "SKILL.md"
             rows.append({"id": key, "group": group, "adapter": mode, "status": status,
+                         "skill_md_installed": vendor_file.is_file(),
                          "configured": available, "live_verified": False,
                          "office_endpoint": "/api/office/generate" if mode == "sky_office" else None})
         else:
