@@ -174,8 +174,10 @@ def _ask_local(request: str, actions: list[str], roles: list[dict]) -> dict:
 def _clean_text(text: str, maximum: int = MAX_GOAL_CHARS) -> str:
     if not isinstance(text, str):
         return ""
-    # The LLM cannot insert workflow variable references or system directives
-    # into a task executed later by a specialist.
+    # Do not pass prompt-injection attempts from an untrusted planner to
+    # specialists. Existing trusted workflow tokens are preserved separately.
+    if re.search(r"\{\{|\}\}|<\s*(?:system|assistant|developer)\b|\bsudo\s+rm\b|(?:ignor[aáe]|ignore)\s+(?:las?\s+)?(?:reglas|instrucciones|rules|instructions)", text, flags=re.I):
+        return ""
     value = re.sub(r"[\x00-\x1f{}<>]", " ", text)
     value = " ".join(value.split())[:maximum]
     return value

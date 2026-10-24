@@ -232,6 +232,10 @@ def sky_home():
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
+@app.get('/aula')
+def sky_aula_page():
+    return FileResponse(STATIC/'sky-academy.html',headers={'Cache-Control':'no-store'})
+
 @app.get('/flows')
 def workflows_page():return FileResponse(STATIC/'flows.html')
 
@@ -635,6 +639,8 @@ from .device_hub_api import router as sky_device_hub_router
 app.include_router(sky_device_hub_router)
 from .knowledge_api import router as sky_knowledge_router
 app.include_router(sky_knowledge_router)
+from .academy_api import router as sky_academy_router
+app.include_router(sky_academy_router)
 
 # SKY v10.2: private subtitle and multilingual narration tools.
 from .global_media_api import router as sky_global_media_router

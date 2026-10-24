@@ -3,7 +3,7 @@
   'use strict';
   const $ = (id) => document.getElementById(id);
   const S = {
-    key: '', historial: [], voz: true, conv: false, rate: 1,
+    key: '', historial: [], lessonId: '', voz: true, conv: false, rate: 1,
     listening: false, speaking: false, pending: null, lastSky: '',
     level: 0, pulse: 0, sttLocal: false, ytApi: false, analyser: null, freq: null,
     stream: null, recorder: null, recognition: null,
@@ -448,7 +448,7 @@
     if (modo === 'voz' && window.ReadableStream) { await enviarStream(texto); return; }
     try {
       const data = await api('/api/asistente/mensaje', { method: 'POST', body: JSON.stringify({
-        texto, historial: S.historial.slice(-12), modo, dispositivo: 'local' }) });
+        texto, historial: S.historial.slice(-12), modo, dispositivo: 'local', lesson_id: S.lessonId }) });
       S.historial.push({ role: 'user', content: texto });
       await responder(data, modo);
     } catch (e) {
@@ -459,7 +459,7 @@
     let r;
     try {
       r = await fetch('/api/asistente/stream', { method: 'POST', headers: headers(), body: JSON.stringify({
-        texto, historial: S.historial.slice(-12), modo: 'voz', dispositivo: 'local' }) });
+        texto, historial: S.historial.slice(-12), modo: 'voz', dispositivo: 'local', lesson_id: S.lessonId }) });
       if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
     } catch (e) { addMsg('sky', 'No pude contactar a SKY: ' + e.message, 'err'); setState('error', 'Sin conexión'); return; }
     S.historial.push({ role: 'user', content: texto });
@@ -485,6 +485,7 @@
           soltarFrases(false);
         }
         if (ev.final) {
+          if (ev.final.lesson_id) S.lessonId = ev.final.lesson_id;
           if (vivo) vivo.classList.remove('live');
           if (ev.final.transmitido) {
             soltarFrases(true);
@@ -513,6 +514,7 @@
     if (S.conv && !S.listening && !S.pending) setTimeout(() => { if (S.conv && !S.speaking && !S.listening) escuchar(); }, 350);
   }
   async function responder(data, modo) {
+    if (data.lesson_id) S.lessonId = data.lesson_id;
     if (data.tipo === 'respuesta' || data.tipo === 'local') {
       if (Array.isArray(data.correos) && data.correos.length) {
         const c = addCard('Correos nuevos (' + data.correos.length + ')', 'sin marcar como leídos');

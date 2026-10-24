@@ -30,6 +30,12 @@ on:
       - "metaverse/device_hub_api.py"
       - "tests/test_sky_secure_connectivity.py"
       - "tests/test_sky_s23fe_knowledge.py"
+      - "tests/test_sky_academy_innovation.py"
+      - "neural_core/sky_aula.py"
+      - "neural_core/sky_innovation_lab.py"
+      - "neural_core/sky_evidence_lab.py"
+      - "metaverse/academy_api.py"
+      - "metaverse/static/sky-academy.js"
       - "neural_core/sky_knowledge_library.py"
       - "metaverse/knowledge_api.py"
       - "neural_core/sky_mobile_unlock.py"
@@ -69,12 +75,15 @@ jobs:
       - name: Compile SKY API modules
         shell: pwsh
         run: |
-          python -m py_compile metaverse/asistente_api.py metaverse/hud_api.py agente_dispositivo.py neural_core/action_verifier.py neural_core/sky_approvals.py neural_core/sky_execution_metrics.py neural_core/sky_advanced_planner.py neural_core/sky_capability_inventory.py neural_core/sky_neural_memory.py neural_core/sky_sentinel_guard.py metaverse/neural_memory_api.py metaverse/security_api.py metaverse/multimodal_api.py neural_core/sky_multimodal_reader.py metaverse/guardian_api.py neural_core/sky_guardian.py neural_core/sky_mobile_unlock.py metaverse/mobile_unlock_api.py neural_core/sky_secure_connectivity.py metaverse/device_hub_api.py neural_core/sky_knowledge_library.py metaverse/knowledge_api.py scripts/sky_mobile_usb_check.py scripts/sky_api_smoke_windows.py
+          python -m py_compile metaverse/asistente_api.py metaverse/hud_api.py agente_dispositivo.py neural_core/action_verifier.py neural_core/sky_approvals.py neural_core/sky_execution_metrics.py neural_core/sky_advanced_planner.py neural_core/sky_capability_inventory.py neural_core/sky_neural_memory.py neural_core/sky_sentinel_guard.py metaverse/neural_memory_api.py metaverse/security_api.py metaverse/multimodal_api.py neural_core/sky_multimodal_reader.py metaverse/guardian_api.py neural_core/sky_guardian.py neural_core/sky_mobile_unlock.py metaverse/mobile_unlock_api.py neural_core/sky_secure_connectivity.py metaverse/device_hub_api.py neural_core/sky_knowledge_library.py metaverse/knowledge_api.py neural_core/sky_aula.py neural_core/sky_innovation_lab.py neural_core/sky_evidence_lab.py metaverse/academy_api.py scripts/sky_mobile_usb_check.py scripts/sky_api_smoke_windows.py
+      - name: Validate SKY Academy browser script
+        shell: pwsh
+        run: node --check metaverse/static/sky-academy.js
       - name: Test action approvals, receipts and localhost API on Windows
         shell: pwsh
         run: |
           $env:PYTHONPATH = "."
-          python -m pytest -q tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py tests/test_sky_subagents.py tests/test_sky_central_roles.py tests/test_sky_supervisor.py tests/test_sky_advanced_planner.py tests/test_sky_neural_memory_sentinel.py tests/test_sky_multimodal_reader.py tests/test_sky_guardian.py tests/test_sky_mobile_unlock.py tests/test_sky_secure_connectivity.py tests/test_sky_s23fe_knowledge.py
+          python -m pytest -q tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py tests/test_sky_subagents.py tests/test_sky_central_roles.py tests/test_sky_supervisor.py tests/test_sky_advanced_planner.py tests/test_sky_neural_memory_sentinel.py tests/test_sky_multimodal_reader.py tests/test_sky_guardian.py tests/test_sky_mobile_unlock.py tests/test_sky_secure_connectivity.py tests/test_sky_s23fe_knowledge.py tests/test_sky_academy_innovation.py
       - name: Test Windows agent controls without modifying user devices
         shell: pwsh
         run: |
