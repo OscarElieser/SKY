@@ -224,3 +224,20 @@ button.chip.on{color:var(--amber);border-color:rgba(255,176,32,.6)}
 .pin-caja b{letter-spacing:.2em;color:var(--cyan)}
 .pin-caja .hab-in{font-size:22px;letter-spacing:.4em;text-align:center}
 .btn.peligro{border-color:var(--red);color:var(--red)}
+
+/* Accesibilidad del HUD principal: no cambia las animaciones por defecto. */
+.skip-link{
+  position:fixed;z-index:10000;top:8px;left:12px;
+  transform:translateY(-180%);padding:10px 14px;background:#041d2e;
+  color:#fff;border:2px solid var(--cyan);font-weight:700
+}
+.skip-link:focus{transform:translateY(0)}
+:where(button,input,select,a,[tabindex="0"]):focus-visible{
+  outline:2px solid var(--cyan);outline-offset:3px
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto!important;animation-duration:.01ms!important;
+    animation-iteration-count:1!important;transition-duration:.01ms!important
+  }
+}
