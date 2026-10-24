@@ -16,6 +16,8 @@ on:
       - "neural_core/sky_subagents.py"
       - "neural_core/sky_internal_roles.py"
       - "neural_core/sky_supervisor.py"
+      - "neural_core/sky_advanced_planner.py"
+      - "tests/test_sky_advanced_planner.py"
       - "tests/test_sky_supervisor.py"
       - "tests/test_sky_central_roles.py"
       - "metaverse/workflow_api.py"
@@ -48,7 +50,7 @@ jobs:
         shell: pwsh
         run: |
           $env:PYTHONPATH = "."
-          python -m pytest -q tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py tests/test_sky_subagents.py tests/test_sky_central_roles.py tests/test_sky_supervisor.py
+          python -m pytest -q tests/test_sky_api_verificacion_real.py tests/test_sky_api_aprobaciones_kpis.py tests/test_sky_subagents.py tests/test_sky_central_roles.py tests/test_sky_supervisor.py tests/test_sky_advanced_planner.py
       - name: Test Windows agent controls without modifying user devices
         shell: pwsh
         run: |
