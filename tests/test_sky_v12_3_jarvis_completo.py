@@ -309,7 +309,7 @@ def test_whatsapp_accion_con_si(whatsapp, monkeypatch):
     caps.aplicar_perfil('multimedia', [])
     r = wa.atender_texto('sube el volumen')
     assert '¿Lo hago?' in r and 'sí' in r
-    assert wa.atender_texto('sí') == 'Volumen: up' and llamadas == [('volume', {'command': 'up'})]
+    assert wa.atender_texto('sí') == 'Orden enviada, todavía sin verificar: Volumen: up' and llamadas == [('volume', {'command': 'up'})]
     assert 'Cancelado' in (wa.atender_texto('sube el volumen') and wa.atender_texto('no'))
     assert len(llamadas) == 1
 

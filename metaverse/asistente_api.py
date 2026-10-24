@@ -223,6 +223,14 @@ def mensaje(body: Mensaje, request: Request):
     academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
     if academy is not None:
         return _medir_turno(academy, inicio)
+    from neural_core import sky_execution_cycle as ciclo
+    if ciclo.is_sequence(body.texto):
+        try:
+            plan = ciclo.create(ciclo.from_text(body.texto), dispositivo=body.dispositivo, origin=body.modo)
+            return _medir_turno({'tipo': 'ciclo', 'mensaje': 'Preparé el ciclo; confirmá cada paso.',
+                                 'ciclo': plan, 'proveedor': 'sky-cycle'}, inicio)
+        except (ciclo.CycleInvalid, ciclo.CycleConflict) as exc:
+            return _medir_turno({'tipo': 'error', 'mensaje': 'No puedo planificar esa secuencia: ' + str(exc)[:180]}, inicio)
     resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
     return _medir_turno(_completar(resultado, body.dispositivo, request), inicio)
 
@@ -245,6 +253,15 @@ def mensaje_stream(body: Mensaje, request: Request):
         academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
         if academy is not None:
             yield final(academy)
+            return
+        from neural_core import sky_execution_cycle as ciclo
+        if ciclo.is_sequence(body.texto):
+            try:
+                plan = ciclo.create(ciclo.from_text(body.texto), dispositivo=body.dispositivo, origin=body.modo)
+                yield final({'tipo': 'ciclo', 'mensaje': 'Preparé el ciclo; confirmá cada paso.',
+                             'ciclo': plan, 'proveedor': 'sky-cycle'})
+            except (ciclo.CycleInvalid, ciclo.CycleConflict) as exc:
+                yield final({'tipo': 'error', 'mensaje': 'No puedo planificar esa secuencia: ' + str(exc)[:180]})
             return
         original = body.texto.strip()
         texto = asis.preparar(original) if original else original
@@ -377,3 +394,95 @@ def voz_descartar(entry_id: str):
         raise HTTPException(400, 'Identificador inválido.')
     voz_inbox.dismiss_inbox(entry_id)
     return {'ok': True}
+
+
+# SKY Operational Cycle — all routes inherit the existing owner key + MFA.
+# No background autonomy and no bypass of the existing authorized device agent.
+class CicloCreate(BaseModel):
+    texto: str = Field(default='', max_length=1500)
+    pasos: list[dict] = Field(default_factory=list, max_length=6)
+    dispositivo: str = Field(default='local', min_length=1, max_length=80)
+    modo: str = Field(default='chat', pattern='^(chat|voz)$')
+
+
+class CicloApproval(BaseModel):
+    aprobado: bool = False
+
+
+@router.post('/ciclo', status_code=201)
+def ciclo_crear(body: CicloCreate):
+    from neural_core import sky_execution_cycle as ciclo
+    try:
+        if bool(body.texto.strip()) == bool(body.pasos):
+            raise ciclo.CycleInvalid('Indicá un texto con acciones secuenciales o una lista de pasos, no ambos.')
+        pasos = ciclo.from_text(body.texto) if body.texto.strip() else body.pasos
+        return ciclo.create(pasos, dispositivo=body.dispositivo, origin=body.modo)
+    except ciclo.CycleInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ciclo.CycleConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
+@router.get('/ciclo/{ident}')
+def ciclo_estado(ident: str):
+    from neural_core import sky_execution_cycle as ciclo
+    try:
+        return ciclo.snapshot(ident)
+    except ciclo.CycleInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ciclo.CycleConflict as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@router.post('/ciclo/{ident}/siguiente')
+def ciclo_siguiente(ident: str, body: CicloApproval, request: Request):
+    from neural_core import sky_execution_cycle as ciclo
+    from .sentinel import exigir_pin
+    from neural_core import sky_metricas
+
+    def _approved_step(action: str, params: dict, device: str):
+        return _llamar(device, request, action, params)
+
+    def _owner_pin():
+        exigir_pin(request, 'un paso de alto riesgo de SKY')
+
+    start = time.perf_counter()
+    try:
+        result = ciclo.execute_next(ident, _approved_step, approved=body.aprobado, pin_check=_owner_pin)
+    except ciclo.CycleInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ciclo.CycleConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+    sky_metricas.registrar('tarea', 'sky-ciclo', result.get('last_step', {}).get('status') == 'VERIFIED',
+                           (time.perf_counter()-start)*1000, origen=result['state'])
+    return result
+
+
+@router.post('/ciclo/{ident}/verificar')
+def ciclo_verificar(ident: str, request: Request):
+    from neural_core import sky_execution_cycle as ciclo
+
+    def lookup(command_id: str, device: str) -> dict:
+        url, token = _destino(device, request)
+        try:
+            return dispositivos.verify_device_action(url, token, command_id)
+        except (RuntimeError, ValueError) as exc:
+            raise HTTPException(502, str(exc)) from exc
+
+    try:
+        return ciclo.reconcile(ident, lookup)
+    except ciclo.CycleInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ciclo.CycleConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
+@router.delete('/ciclo/{ident}')
+def ciclo_cancelar(ident: str):
+    from neural_core import sky_execution_cycle as ciclo
+    try:
+        return ciclo.cancel(ident)
+    except ciclo.CycleInvalid as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ciclo.CycleConflict as exc:
+        raise HTTPException(404, str(exc)) from exc

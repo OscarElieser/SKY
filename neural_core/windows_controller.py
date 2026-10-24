@@ -410,7 +410,7 @@ def launch_authorized_app(app_id: str, create_blank: bool = True) -> Dict[str, A
                 'pid': proc.pid if proc else None,
                 'message': f"Iniciando '{app_desc}' (esperando interfaz visible)."
             }
-            verificador_acciones.mark_verified(rec.command_id, result, elapsed)
+            verificador_acciones.mark_dispatched(rec.command_id, result, elapsed)
             return result
     else:
         # Plataformas no Windows (Linux, macOS: una .app se abre con `open`)
@@ -426,7 +426,7 @@ def launch_authorized_app(app_id: str, create_blank: bool = True) -> Dict[str, A
             'executable': exe_path,
             'message': f"Listo, ya se abrió '{app_desc}' correctamente en el equipo local."
         }
-        verificador_acciones.mark_verified(rec.command_id, result, (time.time() - t0) * 1000)
+        verificador_acciones.mark_dispatched(rec.command_id, result, (time.time() - t0) * 1000)
         return result
 
 

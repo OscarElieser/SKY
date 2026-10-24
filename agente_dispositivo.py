@@ -197,7 +197,7 @@ def _ejecutar(action: str, params: dict, politica: dict) -> dict:
     if action == 'open_url':
         url = caps.validar_url_https(params.get('url', ''))
         opened = webbrowser.open(url, new=2)
-        return {'ok': bool(opened), 'status': 'VERIFIED' if opened else 'FAILED', 'message': 'Página abierta en el navegador.'}
+        return {'ok': bool(opened), 'status': 'SENT' if opened else 'FAILED', 'message': 'Se solicitó abrir la página; la carga del navegador no está verificada.'}
     if action == 'media_key':
         send_media_key(str(params.get('key')))
         return {'ok': True, 'status': 'SENT', 'message': f'Tecla multimedia {params.get("key")} enviada.'}
@@ -303,8 +303,11 @@ def execute_action(action: str, params: dict, politica: dict | None = None) -> d
         verificador_acciones.mark_failed(rec.command_id, str(exc)[:200], (time.time() - t0) * 1000)
         raise
     res.setdefault('command_id', rec.command_id)
-    if res.get('ok', True):
+    status = str(res.get('status', '')).upper()
+    if res.get('ok') is True and status == 'VERIFIED':
         verificador_acciones.mark_verified(rec.command_id, {k: v for k, v in res.items() if k != 'text'}, (time.time() - t0) * 1000)
+    elif res.get('ok') is True and status in ('SENT', 'RUNNING', 'PENDING', 'DISPATCHED'):
+        verificador_acciones.mark_dispatched(rec.command_id, res, (time.time() - t0) * 1000)
     else:
         verificador_acciones.mark_failed(rec.command_id, str(res.get('message', ''))[:200], (time.time() - t0) * 1000)
     return res
@@ -341,6 +344,19 @@ class Handler(BaseHTTPRequestHandler):
             rec = verificador_acciones.get_action(cid)
             if not rec:
                 return self.reply(404, {'ok': False, 'error': f'Acción {cid} no encontrada.'})
+            # Read-only physical recheck for a previously dispatched app launch.
+            # Never claim that RUNNING is VERIFIED without observed evidence.
+            if rec.status == 'DISPATCHED' and rec.action == 'launch_app' and rec.target in AUTHORIZED_APPS:
+                from neural_core.windows_controller import verify_window_or_process
+                details = AUTHORIZED_APPS[rec.target]
+                observation = verify_window_or_process(
+                    details.get('window_titles', [rec.target]),
+                    pid=rec.result.get('pid'), timeout_secs=1.0)
+                if observation.get('verified'):
+                    verificador_acciones.mark_verified(
+                        cid, {'app': rec.target, 'status': 'VERIFIED',
+                              'hwnd': observation.get('hwnd'),
+                              'pid': rec.result.get('pid')}, rec.execution_time_ms)
             return self.reply(200, {'ok': True, 'record': rec.to_dict()})
         if split.path == '/actions_history':
             return self.reply(200, {'ok': True, 'actions': verificador_acciones.get_recent_actions(limit=30)})

@@ -544,6 +544,82 @@
   function seguirConversacion() {
     if (S.conv && !S.listening && !S.pending) setTimeout(() => { if (S.conv && !S.speaking && !S.listening) escuchar(); }, 350);
   }
+  /* ------------------------------------------------------------------ cycle: real results, one approved action at a time */
+  async function cicloUI(data, modo) {
+    let plan = data.ciclo;
+    if (!plan || !plan.id) { await decir('El ciclo no tiene identificador.'); return; }
+    const card = addCard('Ciclo operativo SKY', plan.total + ' pasos · ' + plan.dispositivo);
+    const title = el('div', 's', 'SKY ejecutará cada acción únicamente con tu autorización y comprobará el resultado.');
+    card.appendChild(title);
+    async function abortar() {
+      try {
+        plan = await api('/api/asistente/ciclo/' + encodeURIComponent(plan.id), { method: 'DELETE' });
+        card.appendChild(el('div', 'res', 'Ciclo cancelado.'));
+        setState('idle', 'Cancelado');
+      } catch (e) { card.appendChild(el('div', 'res bad', e.message)); }
+    }
+    const cancelar = el('button', 'btn', 'Cancelar ciclo');
+    cancelar.type = 'button';
+    cancelar.addEventListener('click', () => {
+      if (S.pending) S.pending.cancel();
+      abortar();
+    });
+    card.appendChild(cancelar);
+    async function verificar() {
+      setState('thinking', 'Verificando acción...');
+      try {
+        plan = await api('/api/asistente/ciclo/' + encodeURIComponent(plan.id) + '/verificar',
+          { method: 'POST' });
+        card.appendChild(el('div', 's', 'Estado de verificación: ' + plan.state));
+        presentar();
+      } catch (e) {
+        card.appendChild(el('div', 'res bad', 'No se pudo verificar: ' + e.message));
+        setState('error', 'Verificación pendiente');
+      }
+    }
+    async function ejecutarPaso() {
+      setState('executing', 'Ejecutando paso ' + (plan.cursor + 1));
+      try {
+        plan = await api('/api/asistente/ciclo/' + encodeURIComponent(plan.id) + '/siguiente', {
+          method: 'POST', body: JSON.stringify({ aprobado: true })
+        });
+        const last = plan.last_step || {};
+        card.appendChild(el('div', 'res', 'Paso ' + (plan.cursor || 1) + ': ' + (last.status || plan.state)));
+        if (plan.state === 'VERIFIED') await speak('Ciclo completado y verificado.');
+        else if (plan.state === 'WAITING_VERIFICATION') await speak('La orden fue enviada, pero todavía no está verificada.');
+        else if (plan.state === 'FAILED') await speak('La ejecución falló. Detuve los siguientes pasos.');
+        presentar();
+        refrescarLog(); refrescarTareas();
+      } catch (e) {
+        card.appendChild(el('div', 'res bad', 'Falló la operación: ' + e.message));
+        setState('error', 'No se completó');
+      }
+    }
+    function presentar() {
+      if (plan.state === 'READY') {
+        const step = plan.steps[plan.cursor];
+        if (!step) return;
+        const label = 'Paso ' + (plan.cursor + 1) + '/' + plan.total + ': ' + step.label;
+        card.appendChild(el('div', 's', label));
+        confirmar(card, label, ejecutarPaso, step.risk >= 3);
+        setState('idle', 'Esperando autorización');
+        if (modo === 'voz') speak('¿Ejecuto el paso ' + (plan.cursor + 1) + '?').catch(() => {});
+      } else if (plan.state === 'WAITING_VERIFICATION') {
+        const btn = el('button', 'btn primary', 'Comprobar ejecución');
+        btn.type = 'button'; btn.addEventListener('click', () => { btn.remove(); verificar(); });
+        card.appendChild(btn);
+        setState('idle', 'Pendiente de verificación');
+      } else if (plan.state === 'VERIFIED') {
+        card.appendChild(el('div', 'res', 'Todos los pasos tienen resultado VERIFIED.'));
+        setState('idle', 'Ciclo verificado');
+      } else {
+        setState('error', 'Ciclo ' + plan.state);
+      }
+      scroll();
+    }
+    presentar();
+  }
+
   async function responder(data, modo) {
     if (data.tipo === 'respuesta' || data.tipo === 'local') {
       if (Array.isArray(data.correos) && data.correos.length) {
@@ -564,6 +640,7 @@
       await decir(data.mensaje || ''); return;
     }
     if (data.tipo === 'error') { setState('error', 'Revisá el motor de IA'); addMsg('sky', data.mensaje || 'Error.', 'err'); await speak('Tengo un problema: ' + (data.mensaje || '').split('.')[0]); return; }
+    if (data.tipo === 'ciclo') { await cicloUI(data, modo); return; }
     if (data.tipo === 'accion') { await accion(data, modo); return; }
     if (data.tipo === 'casa') { await casaOrden(data, modo); return; }
     if (data.tipo === 'correo') { await correoOrden(data, modo); return; }

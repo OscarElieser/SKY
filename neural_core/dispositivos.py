@@ -660,3 +660,22 @@ def _interpret_command_core(text: str):
                     'description': 'Abrir URL indicada'}
 
     return None
+
+def verify_device_action(url: str, token: str, command_id: str, timeout: int = 7) -> dict:
+    """Read back agent-owned execution evidence; never accept arbitrary URLs."""
+    if not isinstance(command_id, str) or not re.fullmatch(r"cmd_[A-Za-z0-9_]{6,75}", command_id):
+        raise ValueError("Identificador de ejecución inválido.")
+    if not isinstance(token, str) or len(token.strip()) < 32:
+        raise ValueError("Token del agente inválido.")
+    base = validate_endpoint(url)
+    req = urllib.request.Request(
+        base + "/verify_action?" + urllib.parse.urlencode({"command_id": command_id}),
+        method="GET", headers={"Authorization": "Bearer " + token.strip()})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read(16384))
+        if not isinstance(data, dict) or data.get("ok") is not True:
+            raise RuntimeError("El agente no devolvió una verificación válida.")
+        return data
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        raise RuntimeError("No se pudo verificar la acción con el agente.") from exc

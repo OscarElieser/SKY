@@ -167,6 +167,10 @@ async def lifespan(app):
 app=FastAPI(title='SKY Engine API',version='10.5.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
 app.mount('/static',StaticFiles(directory=STATIC),name='static')
 
+# Installable SKY client for Windows browsers and Android; same SKY API and HUD.
+from .mobile_pwa_api import router as mobile_pwa_router
+app.include_router(mobile_pwa_router)
+
 from .telemetria_api import router as telemetria_router
 app.include_router(telemetria_router)
 

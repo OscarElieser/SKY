@@ -256,6 +256,8 @@ def _ejecutar_pendiente(p: dict) -> str:
                 aprender_orden(p['frase'], {'tipo': 'accion', 'propuesta': prop})
             except Exception:
                 pass
+        if not ok and str(res.get('status', '')).upper() in ('SENT', 'RUNNING', 'PENDING', 'DISPATCHED'):
+            return 'Orden enviada, todavía sin verificar: ' + str(res.get('message') or prop['description'])[:180]
         return (res.get('message') or 'Listo.') if ok else 'No se pudo: ' + (motivo or 'el agente rechazó la acción.')
     if p['tipo'] == 'casa':
         from . import sky_home_assistant as casa
@@ -302,6 +304,8 @@ def _resolver(resultado: dict, estado: dict, frase: str) -> str:
                     aprender_orden(resultado['aprender'], resultado)
                 except Exception:
                     pass
+            if not ok and str(hecho.get('status', '')).upper() in ('SENT', 'RUNNING', 'PENDING', 'DISPATCHED'):
+                return 'Orden enviada, todavía sin verificar: ' + str(hecho.get('message') or prop['description'])[:180]
             return (hecho.get('message') or prop['description'] + ': listo.') if ok else 'No se pudo: ' + motivo
         if not caps.accion_habilitada(prop['action'], caps.cargar_politica(), prop.get('params')):
             cap = caps.capacidad_para(prop['action'], prop.get('params'))
