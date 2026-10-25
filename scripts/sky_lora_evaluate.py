@@ -72,9 +72,9 @@ def evaluate(*, execute=False, destination=None, limit=None):
                      "manual_score":None,"verified_receipt":None})
     with output.open("x",encoding="utf-8") as f:
         for row in rows:f.write(json.dumps(row,ensure_ascii=False)+"\n")
-    report.update(generation_executed=True,answers_saved=len(rows),
-                  finished_at_utc=datetime.now(timezone.utc).isoformat(),
-                  "evaluation_path":str(output))
+    report.update({"generation_executed":True,"answers_saved":len(rows),
+                  "finished_at_utc":datetime.now(timezone.utc).isoformat(),
+                  "evaluation_path":str(output)})
     return report
 
 
