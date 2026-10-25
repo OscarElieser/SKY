@@ -77,7 +77,7 @@ def local_only() -> bool:
 def choose_provider(name: str='auto', area: str='General') -> tuple[str,str]:
     if local_only():
         if name not in ('auto', 'sky', 'ollama', 'lmstudio'):
-            raise ProviderError('Modo local: SKY sólo permite Ollama o LM Studio local.')
+            raise ProviderError('Modo 100 % local activo: SKY sólo permite Ollama o LM Studio local.')
         if name in ('auto', 'sky'):
             name = 'lmstudio' if provider_ready('lmstudio') else 'ollama'
     if name in ('auto', 'sky'):
