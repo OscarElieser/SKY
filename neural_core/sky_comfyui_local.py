@@ -10,6 +10,7 @@ import os
 import re
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib import parse, request, error
@@ -87,6 +88,7 @@ def _dbpath() -> Path:
     return Path(os.getenv("SKY_COMFYUI_DB") or ROOT / "local_data" / "sky_comfyui_jobs.sqlite3")
 
 
+@contextmanager
 def _db():
     path = _dbpath()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -96,7 +98,16 @@ def _db():
         id TEXT PRIMARY KEY, comfy_id TEXT NOT NULL, kind TEXT NOT NULL,
         status TEXT NOT NULL, asset_id TEXT, created_at TEXT NOT NULL
     )""")
-    return con
+    try:
+        yield con
+        if con.in_transaction:
+            con.commit()
+    except BaseException:
+        if con.in_transaction:
+            con.rollback()
+        raise
+    finally:
+        con.close()
 
 
 def capabilities() -> dict:
@@ -104,7 +115,7 @@ def capabilities() -> dict:
             "configured": enabled(), "server_verified": False,
             "image_workflow": bool(os.getenv("SKY_COMFYUI_WORKFLOW_IMAGE")),
             "video_workflow": bool(os.getenv("SKY_COMFYUI_WORKFLOW_VIDEO")),
-            "true_diffusion": True, "model_bundled": False,
+            "supports_diffusion_workflows": True, "model_verified": False, "model_bundled": False,
             "source": "local_workflows_selected_by_owner",
             "outputs_verified_only_after_download": True}
 
