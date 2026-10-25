@@ -165,9 +165,21 @@
   /* ------------------------------------------------------------------ feed */
   const feed = $('feed');
   function scroll() { feed.scrollTop = feed.scrollHeight; }
+  function guardarConsulta(role, text, origen) {
+    if (!S.key || !text || !String(text).trim()) return;
+    api('/api/hud/historial', {method:'POST', body:JSON.stringify({
+      role, source:origen || S.currentOrigin || 'chat', text:String(text).slice(0,4000)})}).catch(() => {
+      // No declarar guardado si el servidor no está disponible.
+      S.historyPending = true;
+    });
+  }
   function addMsg(role, text, extra) {
     const m = el('div', 'msg ' + role + (extra ? ' ' + extra : ''), text);
-    feed.appendChild(m); scroll(); return m;
+    feed.appendChild(m); scroll();
+    if ((role === 'user' || role === 'sky') && String(text || '').trim() && extra !== 'live') {
+      guardarConsulta(role === 'user' ? 'user' : 'assistant', text);
+    }
+    return m;
   }
   function addCard(title, sub) {
     const c = el('div', 'card');
@@ -474,11 +486,25 @@
   const SI = /^(si|sí|dale|hacelo|hazlo|confirmo|confirmar|adelante|ok|okay|de acuerdo|claro|ejecuta|ejecutalo)\b/i;
   const NO = /^(no|cancela|cancelar|dejalo|déjalo|olvidalo|olvídalo|mejor no)\b/i;
   function recibir(texto, origen) {
+    S.currentOrigin = origen === 'voz' ? 'voz' : 'chat';
     if (S.pending && origen === 'voz') {
       const t = texto.trim().toLowerCase();
       if (SI.test(t) && S.pending.soloClic) { addMsg('user', texto); speak('Por seguridad, esto no se confirma sólo con la voz: tocá Ejecutar.'); return; }
       if (SI.test(t)) { addMsg('user', texto); S.pending.run(); return; }
       if (NO.test(t)) { addMsg('user', texto); S.pending.cancel(); speak('Cancelado.'); return; }
+    }
+    // Los comandos de ventanas son locales al HUD, no delegados a la IA.
+    const mini = ordenVentanaLocal(texto);
+    if (mini) {
+      addMsg('user', texto);
+      if (mini === 'chat') abrirCuadroTexto();
+      else if (mini === 'history') abrirHistorial();
+      else if (mini === 'creative') abrirVentana('studio-creativo','SKY · Estudio creativo','/creative',{w:610,h:490});
+      else if (mini === 'diagnostic') abrirDiagnostico();
+      else if (mini === 'programming') abrirProgramacion();
+      addMsg('sky', 'Abrí ' + ({chat:'un cuadro de texto',history:'el historial completo',
+        creative:'el Estudio Creativo',diagnostic:'el diagnóstico',programming:'programación'}[mini]) + ' en una ventana.');
+      return;
     }
     // Voice/text may OPEN the verified communications panel; never place
     // carrier calls, send texts or enable camera solely from voice commands.
@@ -542,6 +568,7 @@
             const msg = ev.final.mensaje || acumulado;
             if (vivo) vivo.textContent = msg; else addMsg('sky', msg);
             S.lastSky = msg; S.historial.push({ role: 'assistant', content: msg.slice(0, 4000) });
+            guardarConsulta('assistant', msg);
             await speak(''); seguirConversacion();
           } else {
             if (vivo && !acumulado.trim()) vivo.remove();
@@ -842,8 +869,77 @@
     enfocar(id); dock();
     return reg;
   }
-  function cerrarVentana(id) { const w = ventanas.get(id); if (w) { w.el.remove(); ventanas.delete(id); dock(); } }
+  function cerrarVentana(id) {
+    const w = ventanas.get(id);
+    if (!w) return;
+    if (id === 'sky-text-box') {
+      const center = document.querySelector('.center');
+      center.append(feed, $('chat-form'));
+    }
+    w.el.remove(); ventanas.delete(id); dock();
+  }
   function enfocar(id) { const w = ventanas.get(id); if (w) { w.el.style.zIndex = ++zTop; dock(id); } }
+  // Solo accesos internos conocidos. No abrir enlaces arbitrarios por un texto.
+  function ordenVentanaLocal(sentence) {
+    const s = String(sentence || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()
+      .replace(/^(oye|hey)\s+/,'').replace(/^sky[,.:\s-]+/,'');
+    if (!/^(abre|abri|abrir|mostra|muestra|mostrar)\s+/.test(s)) return null;
+    const target=s.replace(/^(abre|abri|abrir|mostra|muestra|mostrar)\s+/,'')
+      .replace(/\s+(en\s+)?(una\s+)?(ventana|ventanita|cuadro)\s+(pequena|mini|flotante).*$/,'')
+      .replace(/^(un|una|el|la|mis)\s+/,'').trim();
+    if (/^(cuadro\s+de\s+texto|chat|texto|conversacion)$/.test(target)) return 'chat';
+    if (/^(historial|historial\s+de\s+(conversaciones|consultas)|consultas)$/.test(target)) return 'history';
+    if (/^(estudio\s+creativo|creativo|creacion\s+de\s+(imagenes|videos))$/.test(target)) return 'creative';
+    if (/^(diagnostico|estado\s+del\s+sistema)$/.test(target)) return 'diagnostic';
+    if (/^(programacion|developer)$/.test(target)) return 'programming';
+    return null;
+  }
+  function abrirCuadroTexto() {
+    const content = el('div','sky-mini-chat');
+    abrirVentana('sky-text-box','SKY · Escribir y conversar',content,{w:530,h:450});
+    if (!content.parentElement) return;
+    content.append(feed, $('chat-form'));
+    $('chat-input').focus();
+  }
+  async function abrirHistorial() {
+    if (ventanas.has('sky-full-history')) {
+      ventanas.get('sky-full-history').el.classList.remove('hidden');
+      enfocar('sky-full-history'); return;
+    }
+    const pane = el('div','sky-history');
+    const search = el('input','sky-history-search');
+    search.placeholder='Buscar entre todas las consultas guardadas'; search.maxLength=100;
+    search.setAttribute('aria-label','Buscar historial');
+    const list=el('div','sky-history-list'), more=el('button','btn','Cargar consultas anteriores');
+    more.type='button'; let before=null,moreAvailable=true;
+    pane.append(search,list,more);
+    abrirVentana('sky-full-history','SKY · Historial persistente',pane,{w:610,h:490});
+    async function load(reset=false) {
+      if (reset) { before=null;moreAvailable=true;list.replaceChildren(); }
+      if (!moreAvailable) return;
+      more.disabled=true;more.textContent='Cargando…';
+      try {
+        const params=new URLSearchParams({limit:'60'});
+        if (before) params.set('before',String(before));
+        if (search.value.trim()) params.set('q',search.value.trim());
+        const data=await api('/api/hud/historial?'+params.toString());
+        for(const entry of data.entries) {
+          const item=el('article','sky-history-entry');
+          const stamp=el('small','',new Date(entry.created_at).toLocaleString()+' · '+
+            (entry.role==='user'?'Consulta':'SKY')+' · '+entry.source);
+          const content=el('p','',entry.text);
+          item.append(stamp,content);list.append(item);
+        }
+        before=data.next_before;moreAvailable=data.has_more;
+        if (!data.entries.length && !list.children.length) list.append(el('p','',
+          'Todavía no hay consultas guardadas en este equipo.'));
+      } catch(err) {list.append(el('p','', 'No se pudo consultar el historial: '+err.message));}
+      more.hidden=!moreAvailable;more.disabled=false;more.textContent='Cargar consultas anteriores';
+    }
+    more.onclick=()=>load();
+    search.addEventListener('change',()=>load(true));
+    load(true);
+  }
   function arrastrable(w, asa) {
     let sx, sy, ox, oy, mov = false;
     asa.addEventListener('pointerdown', (e) => {
@@ -2420,6 +2516,13 @@
       if (S.key) store.set('sky-owner-key', S.key);
     }
     await refrescarEstado();
+    // Recupera el contexto reciente tras reiniciar el navegador; no borra
+    // consultas anteriores ni muestra paneles por su cuenta.
+    try {
+      const h = await api('/api/hud/historial?limit=12');
+      S.historial = (h.entries || []).slice().reverse().map(e => ({
+        role:e.role, content:e.text}));
+    } catch { S.historyPending = true; }
     const h = new Date().getHours();
     addMsg('sky', (h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches') +
       ', Oscar. Sistemas en línea. Tocá el núcleo para hablar, o escribime.');
