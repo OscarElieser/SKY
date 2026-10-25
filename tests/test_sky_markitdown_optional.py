@@ -80,7 +80,7 @@ def test_preview_api_is_owner_protected():
     # circular import with metaverse.api's router registration.
     from metaverse.api import app
     matches = [route for route in app.routes
-               if route.path == "/api/sky/knowledge/convert-markdown-preview"]
+               if getattr(route, "path", None) == "/api/sky/knowledge/convert-markdown-preview"]
     assert len(matches) == 1
     assert any(dep.call.__name__ == "require_key"
                for dep in matches[0].dependant.dependencies)
