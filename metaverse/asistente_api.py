@@ -279,7 +279,7 @@ def mensaje_stream(body: Mensaje, request: Request):
             yield final(_completar(r or asis.atender(original, historial, body.proveedor, body.modo), body.dispositivo, request))
             return
         from neural_core.sky_unified_agents import maybe_answer as _sky_unified_answer
-        contribucion = _sky_unified_answer(texto, asis._turnos(historial), body.modo)
+        contribucion = _sky_unified_answer(texto, asis._turnos(historial), body.modo, body.proveedor)
         if contribucion is not None:
             # Los expertos trabajan dentro de SKY; se transmite una unica
             # respuesta generada, sin simular deltas de un stream inexistente.
