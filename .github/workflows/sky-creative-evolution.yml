@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'neural_core/sky_creative_evolution.py'
+      - 'neural_core/sky_creative_intent.py'
+      - 'metaverse/asistente_api.py'
       - 'metaverse/creative_evolution_api.py'
       - 'metaverse/api.py'
       - 'metaverse/static/creative.html'
@@ -29,7 +31,7 @@ jobs:
         run: python -m pip install pytest
       - name: Compile creative modules and existing SKY
         run: |
-          python -m py_compile neural_core/sky_creative_evolution.py metaverse/creative_evolution_api.py metaverse/api.py
+          python -m py_compile neural_core/sky_creative_evolution.py neural_core/sky_creative_intent.py metaverse/creative_evolution_api.py metaverse/asistente_api.py metaverse/api.py
       - name: Check Creative Studio browser script syntax
         run: |
           node --check metaverse/static/sky-creative-evolution.js
