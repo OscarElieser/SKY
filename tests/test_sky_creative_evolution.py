@@ -99,7 +99,11 @@ def test_movie_uses_sky_assets_and_queue(monkeypatch):
     fake.validate_spec=lambda kind,spec:checked.append(spec)
     fake.create_project=lambda kind,name,spec:{"id":"skyvideo_1"}
     fake.queue_video=lambda ident:{"id":"job_1","status":"queued"}
-    monkeypatch.setitem(sys.modules,"neural_core.sky_creative",fake)
+    from neural_core import sky_creative as real_creative
+    monkeypatch.setattr(real_creative,"ingest",fake.ingest)
+    monkeypatch.setattr(real_creative,"validate_spec",fake.validate_spec)
+    monkeypatch.setattr(real_creative,"create_project",fake.create_project)
+    monkeypatch.setattr(real_creative,"queue_video",fake.queue_video)
     monkeypatch.setattr(c,"_ask",lambda *a:(json.dumps({"shots":[
         {"visual":"Vista cinematográfica de una ciudad al amanecer","caption":"Nuevo día"},
         {"visual":"Camino natural sobre montañas con árboles verdes","caption":"El viaje"}]}),"ollama"))
