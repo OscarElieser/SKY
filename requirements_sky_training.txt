@@ -1,0 +1,6 @@
+# Solo si vas a entrenar en GPU con modelos/datos autorizados.
+# Requiere instalación PyTorch CUDA compatible por separado.
+transformers>=4.55,<6
+peft>=0.20,<1
+accelerate>=1.0,<2
+safetensors>=0.5,<1
