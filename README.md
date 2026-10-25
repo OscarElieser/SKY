@@ -23,6 +23,7 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 | **SKY CORE y HUD** | Conversación, herramientas, paneles y ventanas holográficas | La experiencia depende del motor seleccionado y servicios disponibles. |
 | **Voz y texto** | Vosk, faster-whisper, Piper y dictado/síntesis del navegador, según configuración | Requiere validar micrófono, modelos, audio y permisos en el equipo real. |
 | **OpenJarvis opcional** | Motor externo de IA de texto por API local, con selector, diagnóstico y KPI | Desactivado por defecto; requiere instalación aislada y agente simple. [Guía](docs/guias/SKY_OPENJARVIS.md). |
+| **SKY Creative Evolution** | Obras en nueve idiomas, capítulos versionados, imágenes Gemini mejoradas, WAV instrumental original y montaje MP4 real desde escenas ilustradas | Capacidades según modelo/FFmpeg instalado, autorización de API y render confirmado. [Guía](docs/guias/SKY_CREATIVE_EVOLUTION.md). |
 | **Agente del dispositivo** | Apps, webs HTTPS, controles multimedia, notas, ventanas y otras acciones según perfil | Necesita agente autenticado, política local y confirmaciones cuando corresponda. |
 | **Office y Creative Studio** | Documentos, hojas, presentaciones, PDF, medios, video y recursos visuales | Algunas funciones precisan bibliotecas, modelos o API de terceros. |
 | **SKY Aula** | Lecciones por nivel, sesiones, siete etapas, retroalimentación formativa y borradores | Revisión docente obligatoria; no equivale a un currículo oficial validado. |
