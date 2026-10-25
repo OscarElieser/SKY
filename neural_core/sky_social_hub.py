@@ -129,6 +129,8 @@ def _valid_target(kind: str, platform: str, target_id: str) -> str:
 
 def draft(platform: str, text: str, kind: str = "post", target_id: str = "") -> dict:
     platform = _valid_platform(platform)
+    if kind not in ("post", "reply"):
+        raise SocialError("Las interacciones requieren la ruta de aprobación individual.")
     text = _valid_text(platform, text)
     _valid_target(kind, platform, target_id)
     ident = "soc_" + uuid.uuid4().hex
