@@ -697,6 +697,10 @@ from .creative_evolution_api import router as sky_creative_evolution_router
 app.include_router(sky_creative_evolution_router)
 from .local_creator_api import router as sky_local_creator_router
 app.include_router(sky_local_creator_router)
+from .sky_framework_api import router as sky_framework_router
+app.include_router(sky_framework_router)
+from .make_api import router as sky_make_router
+app.include_router(sky_make_router)
 
 
 # SKY v10.1: idiomas y protección HTTP por defecto.
