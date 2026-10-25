@@ -109,3 +109,30 @@ def test_real_docx_conversion_when_optional_package_installed(monkeypatch):
     assert "Contenido de prueba" in result["markdown"]
     assert result["indexed"] is False
     assert result["content_extracted"] is True
+
+
+def test_real_docx_preview_via_owner_api(monkeypatch):
+    """Exercise the real FastAPI upload boundary, not just the Python adapter."""
+    pytest.importorskip("markitdown")
+    from fastapi.testclient import TestClient
+    from docx import Document
+    monkeypatch.setenv("SKY_API_KEY", "sky-markdown-api-e2e-owner-secret-2026")
+    monkeypatch.setenv("SKY_MARKITDOWN_ENABLED", "1")
+    from metaverse.api import app
+    doc = Document()
+    doc.add_heading("SKY archivo real", level=1)
+    doc.add_paragraph("El documento se convierte sin indexar.")
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/sky/knowledge/convert-markdown-preview",
+            headers={"X-SKY-KEY": "sky-markdown-api-e2e-owner-secret-2026"},
+            files={"file": ("clase.docx", buffer.getvalue(),
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+            data={"approved": "true"},
+        )
+    assert response.status_code == 200, response.text[:400]
+    result = response.json()
+    assert "SKY archivo real" in result["markdown"]
+    assert result["indexed"] is False and result["model_weights_updated"] is False
