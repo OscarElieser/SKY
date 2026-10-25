@@ -176,9 +176,8 @@
   function addMsg(role, text, extra) {
     const m = el('div', 'msg ' + role + (extra ? ' ' + extra : ''), text);
     feed.appendChild(m); scroll();
-    if ((role === 'user' || role === 'sky') && String(text || '').trim() && extra !== 'live') {
-      guardarConsulta(role === 'user' ? 'user' : 'assistant', text);
-    }
+    // Los mensajes normales se guardan en /api/asistente/ por el servidor
+    // (texto y streaming). El HUD solo registra comandos 100 % locales.
     return m;
   }
   function addCard(title, sub) {
@@ -497,13 +496,16 @@
     const mini = ordenVentanaLocal(texto);
     if (mini) {
       addMsg('user', texto);
+      guardarConsulta('user',texto);
       if (mini === 'chat') abrirCuadroTexto();
       else if (mini === 'history') abrirHistorial();
       else if (mini === 'creative') abrirVentana('studio-creativo','SKY · Estudio creativo','/creative',{w:610,h:490});
       else if (mini === 'diagnostic') abrirDiagnostico();
       else if (mini === 'programming') abrirProgramacion();
-      addMsg('sky', 'Abrí ' + ({chat:'un cuadro de texto',history:'el historial completo',
-        creative:'el Estudio Creativo',diagnostic:'el diagnóstico',programming:'programación'}[mini]) + ' en una ventana.');
+      const reply = 'Abrí ' + ({chat:'un cuadro de texto',history:'el historial completo',
+        creative:'el Estudio Creativo',diagnostic:'el diagnóstico',programming:'programación'}[mini]) + ' en una ventana.';
+      addMsg('sky',reply);
+      guardarConsulta('assistant',reply);
       return;
     }
     // Voice/text may OPEN the verified communications panel; never place
@@ -568,7 +570,7 @@
             const msg = ev.final.mensaje || acumulado;
             if (vivo) vivo.textContent = msg; else addMsg('sky', msg);
             S.lastSky = msg; S.historial.push({ role: 'assistant', content: msg.slice(0, 4000) });
-            guardarConsulta('assistant', msg);
+            // El servidor ya registró el turno final sin duplicarlo.
             await speak(''); seguirConversacion();
           } else {
             if (vivo && !acumulado.trim()) vivo.remove();
