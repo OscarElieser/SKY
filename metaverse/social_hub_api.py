@@ -16,6 +16,11 @@ class Draft(BaseModel):
     target_id: str = Field(default="", max_length=100)
 
 
+class EngagementX(BaseModel):
+    kind: str = Field(pattern="^(like|repost)$")
+    target_id: str = Field(min_length=5, max_length=100)
+
+
 class AiDraft(BaseModel):
     platform: str = Field(max_length=24)
     topic: str = Field(min_length=8, max_length=1200)
@@ -45,6 +50,14 @@ def _fail(exc: Exception):
     if isinstance(exc, hub.SocialError):
         raise HTTPException(422, detail=str(exc)) from exc
     raise exc
+
+
+@router.post("/x/engagement", status_code=201)
+def engagement_x(body: EngagementX):
+    try:
+        return hub.engagement_x(body.kind, body.target_id)
+    except (hub.SocialError, hub.SocialUnavailable, PermissionError) as exc:
+        _fail(exc)
 
 
 @router.get("/capabilities")
