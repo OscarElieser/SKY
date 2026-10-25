@@ -12,6 +12,33 @@ class LocalPrompt(BaseModel):
     prompt: str = Field(min_length=8,max_length=2000)
 
 
+class DiffusersPrompt(BaseModel):
+    prompt:str=Field(min_length=8,max_length=2000)
+    width:int=Field(default=512)
+    height:int=Field(default=512)
+    steps:int=Field(default=22,ge=10,le=35)
+    local_authorized:bool=False
+
+
+@router.get("/diffusers/capabilities")
+def diffusers_capabilities():
+    from neural_core.sky_diffusers_local import capabilities
+    return capabilities()
+
+
+@router.post("/diffusers/image",status_code=201)
+def diffusers_image(body:DiffusersPrompt):
+    from neural_core.sky_diffusers_local import image,DiffusersUnavailable
+    if not body.local_authorized:
+        raise HTTPException(403,"Confirmá que querés ejecutar un modelo local con recursos del equipo.")
+    try:
+        return image(body.prompt,body.width,body.height,body.steps)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
+    except DiffusersUnavailable as exc:
+        raise HTTPException(503,str(exc)) from exc
+
+
 @router.get("/capabilities")
 def capabilities():
     return comfy.capabilities()
