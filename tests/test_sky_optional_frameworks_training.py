@@ -118,3 +118,29 @@ def test_training_rejects_unapproved_and_secrets(tmp_path):
     data.write_text("\n".join(json.dumps(x) for x in rows))
     with pytest.raises(training.SkyTrainingError):
         training.validate_dataset(data)
+
+
+
+def test_model_release_is_gated_to_real_evaluation(tmp_path,monkeypatch):
+    from neural_core import sky_trained_inference as trained
+    d=tmp_path/"release"
+    (d/"adapter").mkdir(parents=True)
+    (d/"adapter"/"adapter_config.json").write_text("{}")
+    base=tmp_path/"base"
+    base.mkdir()
+    (base/"config.json").write_text("{}")
+    manifest={
+      "format":"peft_lora","base_model":str(base),"evaluation_passed":True,
+      "eval_loss_improved":True,"activated":False
+    }
+    (d/"sky_training_manifest.json").write_text(json.dumps(manifest))
+    monkeypatch.setenv("SKY_TRAINED_RELEASE_DIR",str(d))
+    monkeypatch.setenv("SKY_TRAINED_ENABLED","0")
+    assert trained.readiness()["released_to_sky"] is False
+    with pytest.raises(trained.SkyTrainedUnavailable):
+        trained.reply([{"role":"user","content":"¿Podés ayudarme a aprender?"}])
+    monkeypatch.setenv("SKY_TRAINED_ENABLED","1")
+    assert trained.readiness()["released_to_sky"] is True
+    manifest["eval_loss_improved"]=False
+    (d/"sky_training_manifest.json").write_text(json.dumps(manifest))
+    assert trained.readiness()["released_to_sky"] is False
