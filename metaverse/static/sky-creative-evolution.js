@@ -27,6 +27,14 @@ $('evo-write').onclick=()=>busy($('evo-write'),async()=>{
   $('evo-output').value=result.text;
   status('Obra guardada en SKY · '+result.locale+' · versión '+result.version+' · '+result.provider);
 });
+$('evo-continue').onclick=()=>busy($('evo-continue'),async()=>{
+  if(!lastWork)throw Error('Primero creá una historia, novela, cuento o guion.');
+  const result=await post('/writing/'+lastWork.id+'/continue',{
+    instruction:idea(8),expected_version:lastWork.version,provider:val('evo-provider')});
+  lastWork.version=result.version;
+  $('evo-output').value=result.text;
+  status('Continuación guardada: '+result.title+' · versión '+result.version);
+});
 $('evo-image').onclick=()=>busy($('evo-image'),async()=>{
   consent();
   const result=await post('/images/generate',{prompt:idea(8),...common(),
