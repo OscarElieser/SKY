@@ -65,3 +65,28 @@ def test_seed_has_no_reused_or_external_secret_sources():
     assert {r["source"] for r in rows}=={"sky_authored_seed_v1"}
     assert all(r["approved_for_training"] is True for r in rows)
     assert not any("@" in r["instruction"] for r in rows)
+
+
+
+def test_independent_evaluation_does_not_generate_or_grade_by_default(tmp_path):
+    from scripts.sky_lora_evaluate import evaluate,EvaluationInvalid
+    report=evaluate(execute=False)
+    assert report["available_cases"]>=20
+    assert report["generation_executed"] is False
+    assert report["quality_certified"] is False
+    assert report["human_review_required"] is True
+    assert not list(tmp_path.iterdir())
+    import pytest
+    with pytest.raises(EvaluationInvalid):
+        evaluate(execute=True)
+
+
+def test_independent_evaluation_fails_closed_without_release(tmp_path,monkeypatch):
+    from scripts.sky_lora_evaluate import evaluate,EvaluationInvalid
+    monkeypatch.setenv("SKY_TRAINED_ENABLED","0")
+    monkeypatch.delenv("SKY_TRAINED_RELEASE_DIR",raising=False)
+    import pytest
+    target=tmp_path/"answers.jsonl"
+    with pytest.raises(EvaluationInvalid):
+        evaluate(execute=True,destination=target)
+    assert not target.exists()
