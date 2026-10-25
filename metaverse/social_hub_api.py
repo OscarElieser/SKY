@@ -34,6 +34,16 @@ class Approval(BaseModel):
     scheduled_at: str | None = Field(default=None, max_length=64)
 
 
+class Feedback(BaseModel):
+    score: int = Field(ge=1, le=5)
+    note: str = Field(min_length=3, max_length=500)
+
+
+class StrategyRequest(BaseModel):
+    goal: str = Field(default="crecimiento orgánico y comunidad real", max_length=240)
+    provider: str = Field(default="auto", max_length=25)
+
+
 class Metrics(BaseModel):
     views: int | None = Field(default=None, ge=0)
     likes: int | None = Field(default=None, ge=0)
@@ -106,6 +116,17 @@ def generate_draft(platform: str, topic: str, style: str, audience: str = "",
             "audience": audience[:150], "owner_supplied_insights": insights,
         }, ensure_ascii=False)},
     ]
+    # Aprendizaje por retroalimentación real del propietario.
+    try:
+        from neural_core.sky_evolution import feedback_reciente
+        feedback = [r for r in feedback_reciente(10)
+                    if str(r.get("module", "")).startswith("sky_social_")]
+        messages[-1]["content"] = __import__("json").dumps({
+            "request": __import__("json").loads(messages[-1]["content"]),
+            "owner_feedback": feedback,
+        }, ensure_ascii=False)
+    except (OSError, ValueError):
+        pass
     selected, model = choose_provider(provider or "auto", "marketing")
     generated = reply(messages, selected, model, max_output_tokens=800).strip()
     if len(generated) > hub.MAX_TEXT[platform]:
@@ -151,6 +172,41 @@ def cancel(ident: str):
         return hub.cancel(ident)
     except (hub.SocialError, hub.SocialUnavailable, PermissionError) as exc:
         _fail(exc)
+
+
+@router.post("/drafts/{ident}/feedback")
+def feedback(ident: str, body: Feedback):
+    post = hub.get(ident)
+    if not post:
+        raise HTTPException(404, "Publicación inexistente.")
+    from neural_core.sky_evolution import feedback as save_feedback
+    save_feedback("sky_social_" + post["platform"], body.score, body.note)
+    return {"recorded": True, "learned_from": "owner_feedback", "model_weights_changed": False}
+
+
+@router.post("/strategy")
+def strategy(body: StrategyRequest):
+    """Recomendaciones nuevas de SKY, basadas en datos declarados como manuales."""
+    from neural_core.providers import reply, choose_provider
+    import json
+    data = {"goal": body.goal, "actual_results": hub.insights(),
+            "recent_posts": [{"platform": p["platform"], "body": p["body"][:250],
+                              "status": p["status"]} for p in hub.list_items(20)]}
+    try:
+        provider, model = choose_provider(body.provider or "auto", "marketing")
+        answer = reply([
+            {"role": "system", "content":
+             "Eres SKY, estratega de redes sociales auténticas. Analiza únicamente "
+             "los datos entregados; indica que las métricas son manuales, no verificadas. "
+             "Da sugerencias específicas de contenido, frecuencia prudente, comunidad "
+             "y experimentos éticos medibles. No prometas alcance ni recomiendes comprar "
+             "seguidores, automatizar likes o infringir reglas. Respuesta original en español."},
+            {"role": "user", "content": json.dumps(data, ensure_ascii=False)},
+        ], provider, model, max_output_tokens=1400)
+        return {"advisor": "SKY", "strategy": answer, "data_source": "owner_entered_unverified",
+                "automatic_actions": False}
+    except Exception as exc:
+        raise HTTPException(503, "SKY no pudo analizar la campaña con el motor configurado.") from exc
 
 
 @router.post("/drafts/{ident}/metrics")
