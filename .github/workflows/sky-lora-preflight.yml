@@ -1,0 +1,39 @@
+name: SKY LoRA preflight and corpus quality
+on:
+  pull_request:
+    paths:
+      - 'data/training/**'
+      - 'data/evaluation/**'
+      - 'neural_core/sky_train_model.py'
+      - 'neural_core/sky_trained_inference.py'
+      - 'tests/test_sky_lora_seed_preflight.py'
+      - 'tests/test_sky_optional_frameworks_training.py'
+      - '.github/workflows/sky-lora-preflight.yml'
+  push:
+    branches:
+      - main
+      - fix/sky-lora-training-stabilization
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  lora-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install isolated test runtime
+        run: python -m pip install pytest httpx
+      - name: Compile training/inference Python
+        run: python -m py_compile neural_core/sky_train_model.py neural_core/sky_trained_inference.py
+      - name: Validate original corpus, blinded benchmark and model safeguards
+        run: python -m pytest -q tests/test_sky_lora_seed_preflight.py tests/test_sky_optional_frameworks_training.py
+      - name: Run non-invasive offline training preflight
+        run: |
+          python -m neural_core.sky_train_model --preflight --dataset data/training/sky_seed_v1.jsonl --base-model /tmp/SKY_BASE_NOT_INSTALLED --output /tmp/sky_lora_not_trained
+      - name: State validation limits
+        run: |
+          echo "Synthetic data and preflight verified. NO GPU LoRA training or Windows acceptance occurred."
