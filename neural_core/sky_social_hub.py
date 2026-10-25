@@ -13,6 +13,7 @@ import sqlite3
 import time
 import uuid
 from datetime import datetime, timezone
+from contextlib import contextmanager
 from pathlib import Path
 from urllib import parse, request
 
@@ -46,6 +47,7 @@ def _db_path() -> Path:
     return Path(os.getenv("SKY_SOCIAL_HUB_DB") or ROOT / "local_data" / "sky_social_hub.sqlite3")
 
 
+@contextmanager
 def _db():
     p = _db_path()
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -68,7 +70,16 @@ def _db():
         comments INTEGER, shares INTEGER, followers INTEGER,
         PRIMARY KEY(post_id,recorded_at)
     );""")
-    return c
+    try:
+        yield c
+        if c.in_transaction:
+            c.commit()
+    except BaseException:
+        if c.in_transaction:
+            c.rollback()
+        raise
+    finally:
+        c.close()
 
 
 def capabilities() -> dict:
