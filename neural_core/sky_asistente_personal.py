@@ -452,7 +452,7 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
     # SKY decide si necesita expertos cognitivos efimeros. No ofrecen acciones
     # ni sustituyen sky_supervisor / agentes persistentes.
     from .sky_unified_agents import maybe_answer as _sky_unified_answer
-    contribucion = _sky_unified_answer(texto, turnos, modo)
+    contribucion = _sky_unified_answer(texto, turnos, modo, proveedor)
     if contribucion is not None:
         return contribucion
     try:
