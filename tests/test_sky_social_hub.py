@@ -171,7 +171,10 @@ def test_never_save_secrets_or_engagement_farm_commands(monkeypatch):
 
 
 def test_voice_intent_prepares_only_a_draft(monkeypatch):
-    from metaverse import social_hub_api
+    import sys
+    from types import ModuleType
+    social_hub_api = ModuleType("metaverse.social_hub_api")
+    monkeypatch.setitem(sys.modules, "metaverse.social_hub_api", social_hub_api)
     parsed = sky_social_intent.parse("SKY, redacta una publicación para Threads sobre innovación educativa")
     assert parsed["platform"] == "threads"
     assert "innovación educativa" in parsed["topic"]
