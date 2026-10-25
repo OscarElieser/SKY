@@ -15,6 +15,10 @@ permisos, control de Windows, docencia ni dispositivos.
 - No se comparten tokens de SKY, comandos, permisos ni herramientas con el
   servidor OpenJarvis. Los mensajes de texto elegidos sí se envían al servidor
   OpenJarvis configurado.
+- Antes de cada conversación SKY exige que `GET /v1/info` informe
+  `agent=simple` y un motor local permitido; ante agentes con herramientas
+  o motores de nube, **rechaza la conexión**. No se soportan versiones del
+  servidor que no ofrezcan dicho endpoint.
 - OpenJarvis, como servidor separado, puede tener sus propias herramientas o
   motores de nube. **Debe arrancar con `--agent simple` y un backend local**:
   no otorgarle herramientas de ejecución, archivos, navegador ni credenciales.
@@ -58,6 +62,7 @@ Comprobar sin enviar prompts:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod http://127.0.0.1:8000/v1/info
 Invoke-RestMethod http://127.0.0.1:8000/v1/models
 ```
 
