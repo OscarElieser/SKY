@@ -66,6 +66,56 @@ Invoke-RestMethod http://127.0.0.1:8000/v1/info
 Invoke-RestMethod http://127.0.0.1:8000/v1/models
 ```
 
+## SKY es una sola asistente, con especialistas automaticos
+
+La experiencia del propietario ocurre en el HUD y la API de SKY. No se usa una
+segunda interfaz de OpenJarvis para conversar. En solicitudes intelectuales
+complejas, SKY puede crear entre **2 y 3 subagentes consultivos temporales**:
+
+1. El modelo local planifica especialidades segun la solicitud.
+2. Cada especialista elabora un analisis generado por IA, sin herramientas.
+3. SKY confronta sus resultados y genera **una sola respuesta original**.
+4. Si falla el planificador o un especialista, SKY usa el flujo anterior.
+
+Estas respuestas NO son plantillas. El modelo genera el plan, las consultas
+internas y la respuesta final. La calidad depende del modelo disponible y
+los hechos aportados, y no se presenta analisis como investigacion web real.
+
+Los subagentes temporales **no reemplazan** `sky_subagents.py` ni
+`sky_supervisor.py`: los agentes persistentes que crean documentos o
+realizan acciones usan SKY Workflows, aprobaciones y SKY SENTINEL. Nunca
+se delegan operaciones del equipo, pagos, eliminacion de archivos,
+envios ni publicaciones al motor consultivo.
+
+La funcion `SKY_UNIFIED_AGENTS_ENABLED=1` esta habilitada por defecto
+y es reversible poniendola en `0`. La opcion generativa funciona tambien
+si OpenJarvis no esta instalado: SKY intenta el Ollama existente, y si
+no hay modelo disponible conserva su respuesta anterior.
+
+### Un solo arranque en Windows
+
+No se instala OpenJarvis dentro de `SKY/.venv`. Despues de instalar
+OpenJarvis en una carpeta aparte, en el `.env` de SKY indicar:
+
+```dotenv
+SKY_OPENJARVIS_ENABLED=1
+SKY_OPENJARVIS_MODEL=qwen2.5:7b
+SKY_OPENJARVIS_PORT=8000
+SKY_OPENJARVIS_HOME=C:\\Users\\TU_USUARIO\\OpenJarvis
+SKY_OPENJARVIS_AUTOSTART=1
+SKY_UNIFIED_AGENTS_ENABLED=1
+```
+
+Con estas variables `SKY_INICIAR.bat` -> opcion `0` iniciara el proceso
+de OpenJarvis como motor interno consultivo y lo supervisara. Se requiere
+`uv` instalado y el entorno de OpenJarvis ya preparado; SKY no descarga
+ni actualiza dependencias al arrancar. Si falla, SKY sigue arrancando.
+
+**Importante:** OpenJarvis se inicia con `--agent simple`, backend Ollama
+local, host 127.0.0.1 y puerto configurable. SKY comprueba este modo
+antes de enviar mensajes de texto. Desactivar `SKY_OPENJARVIS_AUTOSTART`
+permite mantener el arranque manual anterior.
+
 ## Conectar a SKY sin modificar la instalación principal
 
 En el **.env local de SKY** (no subirlo a GitHub):
