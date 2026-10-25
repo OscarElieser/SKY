@@ -126,6 +126,25 @@ Ejemplo de música instrumental (no hay uso externo de IA):
 "seed_text":"amanecer en las montañas"}
 ```
 
+## Solicitudes naturales a SKY
+
+Los comandos específicos de narración y música instrumental se reconocen
+en la API personal existente tanto en `/api/asistente/mensaje` como en
+`/api/asistente/stream`. Ejemplos:
+
+- «SKY, redacta una novela en francés sobre una ciudad con recuerdos».
+- «SKY, escribe un cuento en japonés sobre viajeros y nuevas amistades».
+- «SKY, crea una canción en coreano sobre la esperanza y el futuro»:
+  produce **letra**, no voz cantada.
+- «SKY, crea música instrumental inspirada en el paisaje nicaragüense»:
+  compone y guarda WAV en la biblioteca.
+
+Para crear fotogramas con Gemini o un montaje cinematográfico, el usuario
+debe iniciar la generación desde el Estudio Creativo y autorizar el envío
+a la API externa. No se autoriza consumo automático de nube por un comando
+ambiguo. Las capacidades del estudio también aparecen en
+`GET /api/sky/intelligence/overview`.
+
 ## Validación y siguientes requisitos reales
 
 ```powershell
