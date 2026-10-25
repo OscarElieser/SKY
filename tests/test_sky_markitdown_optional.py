@@ -76,9 +76,14 @@ def test_converter_failures_report_unavailable(monkeypatch):
 
 
 def test_preview_api_is_owner_protected():
-    from metaverse.knowledge_api import router
-    assert any(dep.dependency.__name__ == "require_key" for dep in router.dependencies)
-    assert any(route.path.endswith("/convert-markdown-preview") for route in router.routes)
+    # Import the app first: importing knowledge_api directly would create a
+    # circular import with metaverse.api's router registration.
+    from metaverse.api import app
+    matches = [route for route in app.routes
+               if route.path == "/api/sky/knowledge/convert-markdown-preview"]
+    assert len(matches) == 1
+    assert any(dep.call.__name__ == "require_key"
+               for dep in matches[0].dependant.dependencies)
 
 
 def test_real_docx_conversion_when_optional_package_installed(monkeypatch):
