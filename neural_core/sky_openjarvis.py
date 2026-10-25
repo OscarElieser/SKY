@@ -54,6 +54,25 @@ def _request_json(path: str, payload: dict | None = None, timeout: float = 3.0) 
     return parsed
 
 
+_LOCAL_ENGINES = frozenset(("ollama", "llamacpp", "vllm", "sglang", "mlx", "lemonade"))
+
+
+class ServerPolicyError(RuntimeError):
+    """El proceso OpenJarvis no cumple la politica local requerida por SKY."""
+
+
+def _verify_server_policy() -> dict:
+    # OpenJarvis publica su configuración efectiva en /v1/info.
+    # Una configuración agent=orchestrator podría ejecutar herramientas
+    # de OpenJarvis sin pasar por SKY Sentinel: prohibirla aquí.
+    info = _request_json("/v1/info", timeout=3.0)
+    if info.get("agent") != "simple":
+        raise ServerPolicyError("OpenJarvis debe iniciarse con --agent simple.")
+    if info.get("engine") not in _LOCAL_ENGINES:
+        raise ServerPolicyError("OpenJarvis debe usar un motor local, por ejemplo --engine ollama.")
+    return info
+
+
 def status() -> dict:
     """Diagnóstico consultable de forma explícita, sin activar OpenJarvis."""
     model = os.getenv("SKY_OPENJARVIS_MODEL", "").strip()
@@ -66,13 +85,20 @@ def status() -> dict:
         result["detail"] = "Falta SKY_OPENJARVIS_MODEL en .env."
         return result
     try:
-        _request_json("/health", timeout=2.0)
+        health = _request_json("/health", timeout=2.0)
+        if health.get("status") != "ok":
+            raise RuntimeError("Estado de salud de OpenJarvis no válido.")
         result["healthy"] = True
+        info = _verify_server_policy()
+        result["agent"] = info["agent"]
+        result["engine"] = info["engine"]
         models = _request_json("/v1/models", timeout=3.0).get("data", [])
         result["model_available"] = isinstance(models, list) and any(
             isinstance(item, dict) and item.get("id") == model for item in models
         )
         result["detail"] = "Modelo disponible." if result["model_available"] else "Modelo no anunciado por /v1/models."
+    except ServerPolicyError as exc:
+        result["detail"] = str(exc)
     except Exception as exc:
         result["detail"] = "OpenJarvis no responde correctamente (" + type(exc).__name__ + ")."
     return result
@@ -97,6 +123,7 @@ def chat(messages: list[dict], model: str, max_tokens: int = 2500) -> str:
     success = False
     token_count = None
     try:
+        _verify_server_policy()
         result = _request_json(
             "/v1/chat/completions",
             {"model": model, "messages": safe_messages,
