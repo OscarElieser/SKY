@@ -94,3 +94,19 @@ poder revertir.
 **Situación demostrada hasta ahora:** corpus y preflight en GitHub;
 sin modelo base local ni GPU del equipo disponibles en este chat.
 Ningún checkpoint especializado ha sido generado por esta ejecución.
+
+## Banco de evaluación ciego tras el entrenamiento
+
+El comando siguiente **solo muestra la estructura del banco** y no utiliza GPU ni genera respuestas:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.sky_lora_evaluate
+```
+
+Solo después de que exista un adaptador real validado y se haya habilitado expresamente para pruebas locales:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.sky_lora_evaluate --execute --output "C:\SKY-Private\evaluacion-lora-v1.jsonl"
+```
+
+Las 22 respuestas se guardan para revisión humana con los criterios de cada caso, **sin una nota automática inventada**. No exponer los resultados privados ni marcar un checkpoint como listo para producción sin aprobar seguridad, claridad, multilenguaje y comparación con el modelo base.
