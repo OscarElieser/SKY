@@ -271,7 +271,7 @@ def _color(value,default):
 def _font(size,text=''):
     # Usar una fuente CJK instalada en el SO cuando la obra contiene caracteres
     # chinos, japoneses o coreanos; nunca descargar fuentes ni añadir binarios.
-    is_cjk=bool(re.search(r'[\\u2e80-\\u9fff\\uac00-\\ud7af\\u3040-\\u30ff]',text))
+    is_cjk=bool(re.search(r'[\u2e80-\u9fff\uac00-\ud7af\u3040-\u30ff]',text))
     preferred=(
         os.getenv('SKY_CREATIVE_CJK_FONT_PATH',''),
         '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
@@ -405,7 +405,7 @@ def _caption_png(text,width):
     # Idiomas sin espacios (japonés/chino): ajustar por carácter visible.
     # Idiomas con espacios mantienen el ajuste anterior por palabra.
     by_character=(' ' not in text.strip() and bool(re.search(
-        r'[\\u2e80-\\u9fff\\u3040-\\u30ff]',text)))
+        r'[\u2e80-\u9fff\u3040-\u30ff]',text)))
     words=list(text) if by_character else text.split()
     joiner='' if by_character else ' '
     lines=[];current=''
