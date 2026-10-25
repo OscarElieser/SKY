@@ -16,6 +16,7 @@ def overview():
     from neural_core.sky_unified_agents import capability_status
     from neural_core.sky_social_hub import capabilities as social
     from neural_core.sky_openjarvis import status as openjarvis_status
+    from neural_core.sky_creative_evolution import capabilities as creative_capabilities
     from neural_core import sky_cerebro
     return {
         "identity": "SKY",
@@ -28,6 +29,7 @@ def overview():
         "providers_configured_not_healthchecked": provider_summary(),
         "local_optional_engine": openjarvis_status(),
         "automatic_cognitive_subagents": capability_status(),
+        "creative_evolution": creative_capabilities(),
         "social_accounts_configured_not_authenticated": social(),
         "learning": {
             "owner_feedback": "sky_evolution",
