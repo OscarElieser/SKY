@@ -36,6 +36,12 @@
   </div>
   <label>Título<input id="evo-title" maxlength="120" value="Una creación original de SKY"></label>
   <label>Idea, historia o descripción<textarea id="evo-idea" rows="4" maxlength="2500" placeholder="Describí el personaje, la escena, la música o el video que querés crear."></textarea></label>
+  <label>Motor visual
+    <select id="evo-media-engine">
+      <option value="comfyui">SKY local · ComfyUI (sin Gemini)</option>
+      <option value="gemini">Gemini (requiere consentimiento externo)</option>
+    </select></label>
+  <p class="hint">Para el motor local instalá ComfyUI y un workflow compatible en tu equipo. SKY no instala modelos al abrirse.</p>
   <div class="tools"><button type="button" id="evo-write">Crear obra literaria con IA</button>
   <button type="button" id="evo-image">Crear imagen con Gemini</button>
   <button type="button" id="evo-movie">Crear montaje cinematográfico IA</button></div>
