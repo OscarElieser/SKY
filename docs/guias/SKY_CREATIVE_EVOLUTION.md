@@ -47,6 +47,24 @@ Variantes como `es-NI`, `pt-BR` y `zh-CN` se normalizan al idioma principal.
   Cada revisión o continuación exige `expected_version`. La continuación
   respeta partes previas; ningún modelo garantiza coherencia perfecta.
 
+## Tipografía multilingüe en imágenes y subtítulos
+
+El renderizador anterior ahora detecta texto chino/japonés/coreano, intenta
+usar una fuente Noto CJK o una fuente CJK instalada en Windows/macOS y
+ajusta las leyendas sin espacios por carácter, conservando el mecanismo
+anterior para alfabetos latinos.
+
+Si tu sistema no dispone de fuentes adecuadas, instalar una fuente CJK
+compatible y definir opcionalmente en el `.env` privado:
+
+```dotenv
+# SKY_CREATIVE_CJK_FONT_PATH=C:/Windows/Fonts/msyh.ttc
+```
+
+La ruta es un ejemplo de Windows, **no una fuente incluida en SKY**. La
+existencia de la fuente y la representación correcta de cada glifo deben
+comprobarse en el equipo real antes de afirmar soporte visual perfecto.
+
 ## Imagen IA
 
 La ruta de generación mejora opcionalmente el prompt mediante un modelo de
