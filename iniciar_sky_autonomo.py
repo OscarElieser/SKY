@@ -305,6 +305,17 @@ class SkySupervisor:
             print("[SKY] Iniciando puente de WhatsApp en 127.0.0.1:8770 (publicalo con: tailscale funnel --bg 8770)...")
             self._iniciar("whatsapp", [PYTHON_EXE, str(WORKSPACE / "sky_whatsapp_puente.py")])
 
+        # Social Hub de SKY: solo empieza si el propietario lo habilitó.
+        # El servicio nunca crea, aprueba ni publica borradores sin aprobación.
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(WORKSPACE / ".env", override=False)
+            if os.getenv("SKY_SOCIAL_WORKER_ENABLED", "0") == "1":
+                print("[SKY] Iniciando programador de publicaciones previamente aprobadas...")
+                self._iniciar("social_hub", [PYTHON_EXE, str(WORKSPACE / "sky_social_worker.py")])
+        except (ImportError, OSError) as exc:
+            print(f"[SKY] Programador social no iniciado: {type(exc).__name__}")
+
         # 4. Iniciar Escucha de Voz Continua (sky_manos_libres.py)
         model_dir = WORKSPACE / "modelos" / "vosk-model-es"
         if self.with_voice and not model_dir.is_dir():
