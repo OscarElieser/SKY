@@ -4,6 +4,7 @@ import os
 import re
 import sqlite3
 from datetime import datetime, timezone
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -11,6 +12,7 @@ ROLE={"user","assistant"}
 SOURCE={"chat","voz","hud"}
 
 
+@contextmanager
 def _connect():
     p=Path(os.getenv("SKY_HUD_HISTORY_DB") or ROOT/"local_data"/"sky_hud_history.sqlite3")
     p.parent.mkdir(parents=True,exist_ok=True)
@@ -27,7 +29,16 @@ def _connect():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sky_history_created ON entries(id DESC)")
     try:p.chmod(0o600)
     except OSError:pass
-    return conn
+    try:
+        yield conn
+        if conn.in_transaction:
+            conn.commit()
+    except BaseException:
+        if conn.in_transaction:
+            conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def append(role,text,source="chat"):
