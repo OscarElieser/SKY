@@ -51,11 +51,14 @@ def test_conversacion_real_por_endpoint_mock_sin_enviar_herramientas(monkeypatch
     called = []
     def fake_request(path, payload=None, timeout=3):
         called.append((path, payload, timeout))
+        if path == "/v1/info":
+            return {"agent": "simple", "engine": "ollama", "model": "qwen3:0.6b"}
         return {"choices": [{"message": {"role": "assistant", "content": "Hola desde SKY."}}],
                 "usage": {"total_tokens": 31}}
     monkeypatch.setattr(sky_openjarvis, "_request_json", fake_request)
     assert providers.reply(MESSAGES, "openjarvis") == "Hola desde SKY."
-    path, payload, timeout = called[0]
+    path, payload, timeout = next(item for item in called if item[0] == "/v1/chat/completions")
+    assert called[0][0] == "/v1/info"
     assert path == "/v1/chat/completions"
     assert payload["model"] == "qwen3:0.6b"
     assert payload["stream"] is False
@@ -79,6 +82,8 @@ def test_diagnostico_verifica_servicio_y_modelo(monkeypatch):
     def fake(path, payload=None, timeout=3):
         if path == "/health":
             return {"status": "ok"}
+        if path == "/v1/info":
+            return {"agent": "simple", "engine": "ollama", "model": "qwen3:0.6b"}
         if path == "/v1/models":
             return {"data": [{"id": "qwen3:0.6b"}]}
         raise AssertionError(path)
@@ -112,7 +117,27 @@ def test_no_acepta_mensajes_de_herramientas_ni_respuestas_vacias(monkeypatch):
     monkeypatch.setenv("SKY_OPENJARVIS_MODEL", "qwen3:0.6b")
     with pytest.raises(ValueError, match="Rol"):
         sky_openjarvis.chat([{"role": "tool", "content": "exec"}], "qwen3:0.6b")
-    monkeypatch.setattr(sky_openjarvis, "_request_json", lambda *a, **kw:
-                        {"choices": [{"message": {"content": None}}]})
+    def empty(path, *args, **kwargs):
+        if path == "/v1/info":
+            return {"agent": "simple", "engine": "ollama"}
+        return {"choices": [{"message": {"content": None}}]}
+    monkeypatch.setattr(sky_openjarvis, "_request_json", empty)
     with pytest.raises(ValueError, match="texto"):
         sky_openjarvis.chat(MESSAGES, "qwen3:0.6b")
+
+
+@pytest.mark.parametrize("agent,engine", [
+    ("orchestrator", "ollama"), ("react", "ollama"), ("openhands", "ollama"),
+    ("simple", "cloud"), ("simple", "multi"), ("simple", ""),
+])
+def test_no_permita_agentes_con_herramientas_ni_motores_nube(monkeypatch, agent, engine):
+    monkeypatch.setenv("SKY_OPENJARVIS_ENABLED", "1")
+    monkeypatch.setenv("SKY_OPENJARVIS_MODEL", "qwen3:0.6b")
+    seen = []
+    def fake(path, *args, **kwargs):
+        seen.append(path)
+        return {"agent": agent, "engine": engine}
+    monkeypatch.setattr(sky_openjarvis, "_request_json", fake)
+    with pytest.raises(sky_openjarvis.ServerPolicyError):
+        sky_openjarvis.chat(MESSAGES, "qwen3:0.6b")
+    assert seen == ["/v1/info"]
