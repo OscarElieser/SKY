@@ -22,7 +22,7 @@ ACTION_PATTERN = re.compile(
     r"borra|borrar|envia|enviar|publica|publicar|despliega|desplegar|"
     r"compra|comprar|paga|pagar|transfiere|transferir|reproduce|"
     r"apaga|apagar|enciende|encender|descarga|descargar|modifica|"
-    r"modificar|guarda|guardar|sube|subir)\b", re.I
+    r"modificar|guarda|guardar|sube|subir|crea|crear|edita|editar|"\n    r"corrige|corregir|genera|generar|actualiza|actualizar)\b", re.I
 )
 COMPLEX_PATTERN = re.compile(
     r"\b(?:investig|analiz|audit|disen|arquitect|desarroll|program|"
