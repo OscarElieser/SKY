@@ -140,9 +140,10 @@ def test_lmstudio_local_policy(monkeypatch):
 def test_inventory_does_not_claim_optional_agents_installed():
     result=inventory.report()
     assert result["controller"]=="SKY"
-    assert result["modules"]["crewai"]["exists_in_repo"] is False
+    assert result["modules"]["crewai"]["exists_in_repo"] is True
+    assert result["modules"]["crewai"]["readiness"]["role"]=="text_only_internal_specialist"
     assert result["modules"]["n8n"]["exists_in_repo"] is True
-    assert result["modules"]["make"]["exists_in_repo"] is False
+    assert result["modules"]["make"]["exists_in_repo"] is True
     assert result["modules"]["comfyui"]["configured"] is True
     assert "installed_here" in result["packages"]["pyautogui"]
 
