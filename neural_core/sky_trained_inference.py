@@ -85,9 +85,9 @@ def reply(messages, model=None, max_tokens=500):
         raise ValueError("Falta pregunta del usuario.")
     import torch
     tok,engine=_load(str(release[0]))
-    text="\n".join(("Sistema: " if x["role"]=="system" else
-                   "Usuario: " if x["role"]=="user" else "SKY: ")+x["content"]
-                   for x in turns)+"\nSKY:"
+    from .sky_train_model import format_prompt
+    history=[x for x in turns[:-1] if x["role"] in ("user","assistant")]
+    text=format_prompt(turns[-1]["content"],history=history)
     try:
         inputs=tok(text,return_tensors="pt",truncation=True,max_length=2048).to("cuda")
         with torch.inference_mode():
