@@ -68,6 +68,20 @@ garantiza que el token esté vigente, aprobado o tenga cuota. La plataforma
 verifica permisos, costes y expiración durante la llamada real. No agregar
 claves de servicio con privilegios innecesarios ni compartir contraseñas.
 
+## Estado unificado de todas las inteligencias
+
+`GET /api/sky/intelligence/overview` muestra desde la API original:
+- Proveedores de IA registrados y configurados (sin devolver secretos).
+- Cerebro SKY seleccionado y estado operacional si es verificable.
+- OpenJarvis local (agente simple y motor local).
+- Subagentes cognitivos automáticos existentes.
+- Capacidades sociales y qué cuentas tienen configuración local.
+- Subsistemas de memoria, experiencia, KPI, permisos y aprendizaje.
+
+**Importante:** un proveedor configurado no equivale a una conexión comprobada.
+No se mezclan pesos de modelos, tokens ni bases de datos de terceros.
+La única coordinación corresponde a SKY CORE.
+
 ## API SKY protegida
 
 Todas las rutas requieren la autorización de propietario `X-SKY-KEY`
