@@ -125,4 +125,11 @@ def chat(messages: list[dict], model: str, max_tokens: int = 2500) -> str:
 
 
 if __name__ == "__main__":
+    # Solo el chequeo lanzado desde terminal carga las variables locales de SKY.
+    try:
+        from pathlib import Path
+        from dotenv import load_dotenv
+        load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    except ImportError:
+        pass
     print(json.dumps(status(), ensure_ascii=False, indent=2))
