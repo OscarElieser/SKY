@@ -81,6 +81,8 @@ def estado():
         stt = {'disponible': False}
     from neural_core import sky_tts, sky_correo, sky_cerebro
     ia['cerebro'] = sky_cerebro.disponible()
+    from neural_core.sky_unified_agents import capability_status
+    ia['subagentes_cognitivos'] = capability_status()
     return {'version': VERSION_SKY, 'agente': agente, 'ia': ia, 'stt_local': stt,
             'tts_local': sky_tts.disponible(), 'correo': sky_correo.configurado(),
             'casa': {'configurado': casa.configurado()},
