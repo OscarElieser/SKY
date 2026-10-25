@@ -2,6 +2,70 @@
 <header><a class="brand" href="/sky">✦ SKY IA</a><span><span data-sky-i18n="studio">Estudio creativo</span> <small>v10.5</small></span><a href="/sky" class="toplink">← Volver a SKY</a></header>
 <main>
 <section class="intro"><h1 data-sky-i18n="studio">Estudio creativo</h1><p>Importá tus archivos, combiná capas o clips, revisá el resultado y exportá sin perder los originales.</p></section>
+<section id="sky-evolution-creative" class="command" aria-label="Producción creativa inteligente de SKY">
+  <h2>✦ SKY Evolution · Crear historias, música, imágenes y películas</h2>
+  <p>Una sola SKY, con tu motor de IA y biblioteca actual. Las obras se guardan con versiones; el video usa imágenes generadas y la línea de tiempo existente.</p>
+  <div class="grid-form">
+    <label>Idioma de la obra
+      <select id="evo-locale">
+        <option value="es">Español</option><option value="en">English</option>
+        <option value="fr">Français</option><option value="pt">Português</option>
+        <option value="it">Italiano</option><option value="ko">한국어</option>
+        <option value="zh">中文</option><option value="ja">日本語</option>
+        <option value="de">Deutsch</option>
+      </select></label>
+    <label>Tipo de obra
+      <select id="evo-kind"><option value="cuento">Cuento</option>
+      <option value="historia">Historia</option><option value="novela">Novela (plan y capítulo)</option>
+      <option value="guion">Guion</option><option value="pelicula">Tratamiento de película</option>
+      <option value="cancion">Letra de canción</option></select></label>
+    <label>Género
+      <select id="evo-genre"><option value="aventura">Aventura</option>
+      <option value="fantasia">Fantasía</option><option value="romance">Romance</option>
+      <option value="drama">Drama</option><option value="comedia">Comedia</option>
+      <option value="ciencia_ficcion">Ciencia ficción</option>
+      <option value="misterio">Misterio</option><option value="educativo">Educativo</option>
+      <option value="documental">Documental</option><option value="epico">Épico</option>
+      </select></label>
+    <label>Motor de texto SKY
+      <select id="evo-provider"><option value="auto">Automático de SKY</option>
+      <option value="ollama">Ollama local</option><option value="gemini">Gemini</option>
+      <option value="openai">OpenAI</option><option value="anthropic">Claude</option>
+      <option value="groq">Groq</option><option value="openjarvis">OpenJarvis opcional</option>
+      </select></label>
+  </div>
+  <label>Título<input id="evo-title" maxlength="120" value="Una creación original de SKY"></label>
+  <label>Idea, historia o descripción<textarea id="evo-idea" rows="4" maxlength="2500" placeholder="Describí el personaje, la escena, la música o el video que querés crear."></textarea></label>
+  <label>Motor visual
+    <select id="evo-media-engine">
+      <option value="comfyui">SKY local · ComfyUI (sin Gemini)</option>
+      <option value="diffusers">SKY local · Modelo Diffusers directo (imágenes)</option>
+      <option value="gemini">Gemini (requiere consentimiento externo)</option>
+    </select></label>
+  <p class="hint">Para el motor local instalá ComfyUI y un workflow compatible en tu equipo. SKY no instala modelos al abrirse.</p>
+  <div class="tools"><button type="button" id="evo-write">Crear obra literaria con IA</button>
+  <button type="button" id="evo-image">Crear imagen con Gemini</button>
+  <button type="button" id="evo-movie">Crear montaje cinematográfico IA</button></div>
+  <div class="grid-form">
+    <label>Estilo de música<select id="evo-music-style">
+    <option value="cinematic">Cinemático</option><option value="ambient">Ambiental</option>
+    <option value="folk">Folclórico instrumental</option><option value="electronic">Electrónico</option>
+    <option value="pop">Pop instrumental</option></select></label>
+    <label>Emoción<select id="evo-music-mood"><option value="hopeful">Esperanza</option>
+    <option value="calm">Calma</option><option value="dramatic">Drama</option>
+    <option value="happy">Alegría</option><option value="mysterious">Misterio</option></select></label>
+    <label>Segundos (8–30)<input id="evo-music-seconds" type="number" min="8" max="30" value="12"></label>
+    <label>Tempo BPM<input id="evo-bpm" type="number" min="60" max="160" value="100"></label>
+  </div>
+  <div class="tools"><button type="button" id="evo-music">Componer instrumental WAV original</button></div>
+  <label><input id="evo-improve" type="checkbox" checked> Mejorar la dirección artística del prompt de imagen usando el cerebro de SKY</label>
+  <label><input id="evo-soundtrack" type="checkbox"> Añadir música instrumental al montaje de película</label>
+  <label><input id="evo-cloud-consent" type="checkbox"> Autorizo el envío del texto y las instrucciones a Gemini para generar imágenes (puede consumir cuota)</label>
+  <p id="evo-status" role="status" aria-live="polite"></p>
+  <label>Resultado generado por SKY<textarea id="evo-output" rows="8" readonly placeholder="Las obras aparecerán aquí; podés copiarlas o descargarlas como texto."></textarea></label>
+  <div class="tools"><button type="button" id="evo-continue">Continuar capítulo o escena</button><button type="button" id="evo-download-text">Descargar obra TXT</button></div>
+  <p class="hint">La música es WAV instrumental sintetizada; las novelas largas se trabajan por entregas. El video es un montaje MP4 de fotogramas IA, no generación de movimiento real. Antes de exportar video es necesario que FFmpeg procese el trabajo de la cola.</p>
+</section>
 <section class="workspace">
   <aside class="side">
     <h2>Biblioteca personal</h2><label class="upload">＋ Importar imagen, video o audio<input type="file" id="upload" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,video/x-matroska,audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/flac,audio/aac" multiple hidden></label>
@@ -86,4 +150,4 @@
  </details>
  <p id="v102-status" role="status" aria-live="polite"></p>
 </details>
-</main><script src="/static/creative.js" defer></script><script src="/static/sky-language-ui.js" defer></script><script src="/static/sky-security-ui.js" defer></script><script src="/static/sky-global-i18n.js" defer></script></body></html>
+</main><script src="/static/creative.js" defer></script><script src="/static/sky-creative-evolution.js" defer></script><script src="/static/sky-language-ui.js" defer></script><script src="/static/sky-security-ui.js" defer></script><script src="/static/sky-global-i18n.js" defer></script></body></html>

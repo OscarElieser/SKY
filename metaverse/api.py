@@ -693,6 +693,14 @@ app.include_router(sky_intelligent_router)
 # SKY v9.7: editor profesional por capas + renders multimedia, propietario solamente.
 from .creative_api import router as creative_router
 app.include_router(creative_router)
+from .creative_evolution_api import router as sky_creative_evolution_router
+app.include_router(sky_creative_evolution_router)
+from .local_creator_api import router as sky_local_creator_router
+app.include_router(sky_local_creator_router)
+from .sky_framework_api import router as sky_framework_router
+app.include_router(sky_framework_router)
+from .make_api import router as sky_make_router
+app.include_router(sky_make_router)
 
 
 # SKY v10.1: idiomas y protección HTTP por defecto.
@@ -762,6 +770,12 @@ app.include_router(sky_knowledge_router)
 
 from .hud_api import router as sky_hud_router
 app.include_router(sky_hud_router)
+from .hud_history_api import router as sky_history_router
+app.include_router(sky_history_router)
+from .social_hub_api import router as sky_social_hub_router
+app.include_router(sky_social_hub_router)
+from .sky_intelligence_api import router as sky_intelligence_router
+app.include_router(sky_intelligence_router)
 
 @app.get('/hud')
 def hud_page():

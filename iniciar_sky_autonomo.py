@@ -283,10 +283,38 @@ class SkySupervisor:
         print(f"[SKY] Iniciando API y Metaverso en 127.0.0.1:{PORTS['api']}...")
         self._iniciar("api", [PYTHON_EXE, "-m", "uvicorn", "metaverse.api:app", "--host", "127.0.0.1", "--port", str(PORTS["api"])])
 
+        # 3a. Motor cognitivo adicional integrado en SKY (opt-in).
+        # Se supervisa como servicio interno; nunca reemplaza el núcleo ni
+        # ocupa un puerto ajeno, y tampoco instala paquetes al iniciar.
+        try:
+            from neural_core.sky_openjarvis_boot import launch_spec
+            spec = launch_spec()
+            if spec:
+                from neural_core.sky_openjarvis import _base_url
+                jarvis_port = int(_base_url().rsplit(":", 1)[1])
+                if is_port_in_use(jarvis_port):
+                    print(f"[SKY] Puerto OpenJarvis {jarvis_port} ocupado; no se cierra ni sustituye el proceso.")
+                else:
+                    print(f"[SKY] Iniciando motor consultivo interno en 127.0.0.1:{jarvis_port}...")
+                    self._iniciar("openjarvis", spec[0])
+        except (ValueError, FileNotFoundError, OSError) as exc:
+            print(f"[SKY] OpenJarvis opcional no iniciado: {exc}")
+
         # 3b. Puente de WhatsApp (v12.3): sólo si está configurado en .env
         if _whatsapp_configurado():
             print("[SKY] Iniciando puente de WhatsApp en 127.0.0.1:8770 (publicalo con: tailscale funnel --bg 8770)...")
             self._iniciar("whatsapp", [PYTHON_EXE, str(WORKSPACE / "sky_whatsapp_puente.py")])
+
+        # Social Hub de SKY: solo empieza si el propietario lo habilitó.
+        # El servicio nunca crea, aprueba ni publica borradores sin aprobación.
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(WORKSPACE / ".env", override=False)
+            if os.getenv("SKY_SOCIAL_WORKER_ENABLED", "0") == "1":
+                print("[SKY] Iniciando programador de publicaciones previamente aprobadas...")
+                self._iniciar("social_hub", [PYTHON_EXE, str(WORKSPACE / "sky_social_worker.py")])
+        except (ImportError, OSError) as exc:
+            print(f"[SKY] Programador social no iniciado: {type(exc).__name__}")
 
         # 4. Iniciar Escucha de Voz Continua (sky_manos_libres.py)
         model_dir = WORKSPACE / "modelos" / "vosk-model-es"

@@ -1,0 +1,55 @@
+name: SKY Local Creator and Core-only HUD
+on:
+  pull_request:
+    paths:
+      - 'neural_core/sky_comfyui_local.py'
+      - 'neural_core/sky_lmstudio.py'
+      - 'neural_core/sky_diffusers_local.py'
+      - 'neural_core/sky_hud_history.py'
+      - 'neural_core/sky_runtime_inventory.py'
+      - 'neural_core/sky_make_bridge.py'
+      - 'neural_core/sky_framework_agents.py'
+      - 'neural_core/sky_train_model.py'
+      - 'neural_core/sky_trained_inference.py'
+      - 'metaverse/make_api.py'
+      - 'metaverse/sky_framework_api.py'
+      - 'tests/test_sky_optional_frameworks_training.py'
+      - 'neural_core/providers.py'
+      - 'metaverse/local_creator_api.py'
+      - 'metaverse/hud_history_api.py'
+      - 'metaverse/api.py'
+      - 'metaverse/asistente_api.py'
+      - 'metaverse/static/creative.html'
+      - 'metaverse/sky_intelligence_api.py'
+      - 'metaverse/static/hud.*'
+      - 'metaverse/static/sky-creative-evolution.js'
+      - 'tests/test_sky_local_media_hud_history.py'
+      - '.github/workflows/sky-local-creator-hud.yml'
+  push:
+    branches: ['integracion/sky-local-creation-jarvis-hud-history']
+permissions:
+  contents: read
+jobs:
+  local-and-history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pytest python-dotenv Pillow
+      - name: Compile new modules and existing SKY
+        run: |
+          python -m py_compile neural_core/sky_comfyui_local.py neural_core/sky_diffusers_local.py neural_core/sky_make_bridge.py neural_core/sky_framework_agents.py neural_core/sky_train_model.py neural_core/sky_trained_inference.py neural_core/sky_lmstudio.py neural_core/sky_hud_history.py neural_core/sky_runtime_inventory.py neural_core/providers.py metaverse/local_creator_api.py metaverse/hud_history_api.py metaverse/make_api.py metaverse/sky_framework_api.py metaverse/asistente_api.py metaverse/api.py metaverse/sky_intelligence_api.py
+      - name: JavaScript syntax checks
+        run: |
+          node --check metaverse/static/hud.js
+          node --check metaverse/static/sky-creative-evolution.js
+      - name: Confirm core-only view and private history routes
+        run: |
+          grep -q 'class="sky-cinematic"' metaverse/static/hud.html
+          grep -q 'api/hud/historial' metaverse/static/hud.js
+          grep -q 'def mensaje_stream' metaverse/asistente_api.py
+      - name: Run offline security and compatibility tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_sky_local_media_hud_history.py tests/test_sky_optional_frameworks_training.py tests/test_sky_creative_evolution.py tests/test_sky_unified_agents.py tests/test_sky_openjarvis_integration.py tests/test_multiia.py

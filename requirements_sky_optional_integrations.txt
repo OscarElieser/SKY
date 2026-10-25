@@ -1,0 +1,10 @@
+# Instalación VOLUNTARIA para integraciones opcionales de SKY.
+# No instalar al iniciar; revisar compatibilidad Python y licencias primero.
+crewai>=1.15,<2
+autogen-agentchat>=0.7,<1
+autogen-ext[openai]>=0.7,<1
+langchain-openai>=1,<2
+keyboard>=0.13,<1
+pyautogui>=0.9,<1
+requests>=2.32,<3
+# Make y Home Assistant usan el HTTP del núcleo SKY, sin SDK adicional.

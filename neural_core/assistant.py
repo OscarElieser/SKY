@@ -37,6 +37,13 @@ def responder(pregunta, area, historial=None, modelo=None, fuentes_externas=None
     evidencias = buscar_documentos(pregunta)
     recuerdos = memorias()[:12]
     fuentes_externas = (fuentes_externas or [])[:6]
+    # Las consultas generales complejas pueden repartirse entre subagentes
+    # efimeros, sin saltarse RAG documental ni reemplazar a SKY.
+    if area in ('Asistente SKY personal', 'General', 'IA universal') and not evidencias and not fuentes_externas:
+        from .sky_unified_agents import maybe_answer
+        result = maybe_answer(pregunta, historial or [], 'chat', proveedor)
+        if result is not None:
+            return result['mensaje'], evidencias
     web_meta = '\n'.join(f"- Título: {str(x.get('titulo', x.get('titular','')) )[:170]} | Fuente: {str(x.get('fuente',''))[:90]} | Fecha: {str(x.get('fecha',''))[:90]} | URL: {str(x.get('url',x.get('enlace','')))[:400]}" for x in fuentes_externas)[:3500]
     contexto = '\n\n'.join(f'[Documento {i+1}: {x["nombre"]}]\n{x["contenido"]}' for i,x in enumerate(evidencias))[:7500]
     perfil = '\n'.join('- '+x['texto'] for x in recuerdos)[:2500]

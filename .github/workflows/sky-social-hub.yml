@@ -1,0 +1,39 @@
+name: SKY Social Hub safe integrations
+on:
+  pull_request:
+    paths:
+      - 'neural_core/sky_social_hub.py'
+      - 'neural_core/sky_social_intent.py'
+      - 'metaverse/social_hub_api.py'
+      - 'metaverse/sky_intelligence_api.py'
+      - 'metaverse/api.py'
+      - 'metaverse/asistente_api.py'
+      - 'metaverse/hud_api.py'
+      - 'sky_social_worker.py'
+      - 'iniciar_sky_autonomo.py'
+      - 'tests/test_sky_social_hub.py'
+      - '.github/workflows/sky-social-hub.yml'
+  push:
+    branches:
+      - 'integracion/sky-evolution-social-hub'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  social-isolated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install unit tests
+        run: python -m pip install pytest python-dotenv
+      - name: Compile changed modules
+        run: |
+          python -m py_compile neural_core/sky_social_hub.py neural_core/sky_social_intent.py
+          python -m py_compile metaverse/social_hub_api.py metaverse/sky_intelligence_api.py metaverse/api.py metaverse/asistente_api.py metaverse/hud_api.py
+          python -m py_compile sky_social_worker.py iniciar_sky_autonomo.py
+      - name: Verify no live platform calls in tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_sky_social_hub.py tests/test_sky_openjarvis_integration.py tests/test_sky_unified_agents.py tests/test_multiia.py
