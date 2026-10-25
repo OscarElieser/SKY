@@ -101,6 +101,45 @@ Si la salida no es compatible, el trabajo permanece sin importarse.
 La ruta Gemini anterior **permanece disponible como opción explícita**
 para comparación o equipos sin modelos locales.
 
+## Motor alternativo Diffusers ejecutado directamente por SKY
+
+Para que SKY pueda crear imágenes **sin Gemini y sin ComfyUI**, también se
+añadió `sky_diffusers_local.py`. Llama directamente desde Python a los
+pesos de un modelo Diffusers existente y devuelve un PNG válido a
+`sky_creative.ingest`.
+
+Documentación base: https://huggingface.co/docs/diffusers/main/index
+
+Instalación opt-in, después de analizar capacidad GPU, licencia del
+modelo y compatibilidad PyTorch/CUDA:
+
+```powershell
+# Ejemplo ilustrativo, no ejecutado en tu PC:
+.venv\Scripts\python.exe -m pip install diffusers transformers accelerate safetensors
+```
+
+```dotenv
+SKY_DIFFUSERS_ENABLED=1
+SKY_DIFFUSERS_IMAGE_MODEL_DIR=C:/SKY-Models/imagen-local
+```
+
+El directorio contiene `model_index.json` y los pesos/pipelines
+compatibles instalados previamente. SKY usa
+`DiffusionPipeline.from_pretrained(..., local_files_only=True,
+use_safetensors=True)` y no descarga nada. Seleccionar en el estudio
+**«SKY local · Modelo Diffusers directo (imágenes)»**.
+
+El motor local admite imágenes de **512×512** o **768×768** en este
+contrato y 10–35 pasos. Algunos modelos requieren formatos de entrada,
+resoluciones o GPU distintas; un error significa que se necesita ajustar
+el modelo y sus requisitos. La ejecución puede ser lenta en CPU.
+**No se han entrenado pesos fundacionales nuevos**: la creación propia
+consiste en la orquestación, el render, los flujos y el resultado generado
+sobre modelos open-weight instalados y licenciados por el propietario.
+
+Para **video generativo local**, la ruta implementada es ComfyUI con
+un workflow y un modelo realmente especializados en video.
+
 ## LM Studio y LLM locales
 
 LM Studio puede servir modelos mediante su API OpenAI-compatible
