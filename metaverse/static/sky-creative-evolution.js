@@ -6,6 +6,27 @@ const status=message=>{$('evo-status').textContent=message};
 const val=id=>$(id).value.trim();
 const common=()=>({locale:val('evo-locale'),provider:val('evo-provider')});
 const post=(url,data)=>{if(typeof window.SKYCreativeAPI!=='function')throw Error('Ingresá primero como propietario de SKY');return window.SKYCreativeAPI(ROOT+url,'POST',data)};
+const localPost=(path,data)=>window.SKYCreativeAPI('/api/creative/local'+path,'POST',data);
+async function localJob(kind,prompt) {
+  const queued=await localPost('/submit',{kind,prompt});
+  status('SKY trabaja localmente en '+kind+' · tarea '+queued.job_id+'.');
+  for(let tries=0;tries<20;tries++) {
+    await new Promise(resolve=>setTimeout(resolve,2500));
+    const result=await window.SKYCreativeAPI('/api/creative/local/jobs/'+encodeURIComponent(queued.job_id));
+    if(result.status==='completed'){
+      status('SKY generó un archivo real con ComfyUI y lo incorporó a tu biblioteca.');
+      await window.SKYCreativeRefresh();
+      if(kind==='image'){
+        await window.SKYCreativeDownload('/api/creative/assets/'+result.asset_id+'/preview','SKY_imagen.png',true);
+      }else{
+        await window.SKYCreativeDownload('/api/creative/assets/'+result.asset_id+'/download','SKY_video_local.mp4',false);
+      }
+      return;
+    }
+    if(result.status==='failed'||result.status==='needs_review') throw Error('ComfyUI no pudo terminar este render.');
+  }
+  status('El motor local sigue trabajando. Consultá su ID de tarea en /api/creative/local/jobs/'+queued.job_id);
+}
 async function busy(button,operation){
   button.disabled=true;
   status('SKY está procesando la solicitud. La respuesta depende del motor instalado.');
@@ -36,6 +57,9 @@ $('evo-continue').onclick=()=>busy($('evo-continue'),async()=>{
   status('Continuación guardada: '+result.title+' · versión '+result.version);
 });
 $('evo-image').onclick=()=>busy($('evo-image'),async()=>{
+  if(val('evo-media-engine')==='comfyui'){
+    await localJob('image',idea(8));return;
+  }
   consent();
   const result=await post('/images/generate',{prompt:idea(8),...common(),
     improve:$('evo-improve').checked,cloud_authorized:true,mode:'image'});
@@ -52,6 +76,9 @@ $('evo-music').onclick=()=>busy($('evo-music'),async()=>{
   await window.SKYCreativeDownload('/api/creative/assets/'+result.asset.id+'/download','SKY_Musica_Original.wav',false);
 });
 $('evo-movie').onclick=()=>busy($('evo-movie'),async()=>{
+  if(val('evo-media-engine')==='comfyui'){
+    await localJob('video',idea(12));return;
+  }
   consent();
   const argument=idea(12);
   if(!window.confirm('SKY solicitará varias imágenes a Gemini; esto puede consumir cuota. ¿Continuar con el montaje MP4?'))return;
