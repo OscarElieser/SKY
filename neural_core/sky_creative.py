@@ -268,10 +268,23 @@ def _color(value,default):
     if isinstance(value,str) and re.fullmatch(r'#[0-9a-fA-F]{6}',value):return value
     return default
 
-def _font(size):
-    for path in ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf','C:/Windows/Fonts/arial.ttf'):
+def _font(size,text=''):
+    # Usar una fuente CJK instalada en el SO cuando la obra contiene caracteres
+    # chinos, japoneses o coreanos; nunca descargar fuentes ni añadir binarios.
+    is_cjk=bool(re.search(r'[\\u2e80-\\u9fff\\uac00-\\ud7af\\u3040-\\u30ff]',text))
+    preferred=(
+        os.getenv('SKY_CREATIVE_CJK_FONT_PATH',''),
+        '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+        '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+        'C:/Windows/Fonts/msyh.ttc',
+        'C:/Windows/Fonts/malgun.ttf',
+        'C:/Windows/Fonts/meiryo.ttc',
+        '/System/Library/Fonts/Hiragino Sans GB.ttc',
+    ) if is_cjk else ()
+    for path in (*preferred,'/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf','C:/Windows/Fonts/arial.ttf'):
+        if not path:continue
         try:return ImageFont.truetype(path,int(size))
-        except OSError:pass
+        except (OSError,ValueError):pass
     return ImageFont.load_default()
 
 def render_image(spec,format='png'):
@@ -305,7 +318,7 @@ def render_image(spec,format='png'):
         elif kind=='rectangle':
             tile=Image.new('RGBA',(int(layer.get('width',200)),int(layer.get('height',100))),_color(layer.get('color'),'#00ceea'))
         else:
-            text=str(layer.get('text',''));font=_font(int(layer.get('size',48)))
+            text=str(layer.get('text',''));font=_font(int(layer.get('size',48)),text)
             # Texto Unicode, saltos de línea. Sin HTML ni evaluación de código.
             bbox=ImageDraw.Draw(Image.new('RGBA',(1,1))).multiline_textbbox((0,0),text,font=font,spacing=8)
             tile=Image.new('RGBA',(min(5500,max(1,bbox[2]-bbox[0]+24)),min(5500,max(1,bbox[3]-bbox[1]+24))),(0,0,0,0))
@@ -384,14 +397,20 @@ def _execute(command,timeout=120):
     if res.returncode:raise RuntimeError('FFmpeg: '+res.stderr[-1100:])
 
 def _caption_png(text,width):
-    f=_font(max(20,int(width/26)))
+    f=_font(max(20,int(width/26)),text)
     h=max(90,int(width/7))
     pic=Image.new('RGBA',(width,h),(0,0,0,0));draw=ImageDraw.Draw(pic)
     draw.rounded_rectangle((15,14,width-15,h-10),radius=18,fill=(3,13,25,190))
     # varias líneas en panel inferior
-    words=text.split();lines=[];current=''
+    # Idiomas sin espacios (japonés/chino): ajustar por carácter visible.
+    # Idiomas con espacios mantienen el ajuste anterior por palabra.
+    by_character=(' ' not in text.strip() and bool(re.search(
+        r'[\\u2e80-\\u9fff\\u3040-\\u30ff]',text)))
+    words=list(text) if by_character else text.split()
+    joiner='' if by_character else ' '
+    lines=[];current=''
     for word in words:
-        trial=(current+' '+word).strip()
+        trial=(current+joiner+word).strip()
         if draw.textbbox((0,0),trial,font=f)[2]>width-90 and current:
             lines.append(current);current=word
         else:current=trial
