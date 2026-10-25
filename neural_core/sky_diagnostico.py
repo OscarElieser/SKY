@@ -58,6 +58,14 @@ def revisar() -> list[dict]:
     from .providers import local_only
     r.append(_item('privacidad', 'Modo 100 % local', local_only(), 'activo' if local_only() else 'la IA puede usar la nube',
                    'Poné SKY_LOCAL_ONLY=1 en .env si querés que nada salga del equipo.', importante=False))
+    # OpenJarvis: opcional, no participa en el estado del núcleo principal.
+    from .sky_openjarvis import status as openjarvis_status
+    oj = openjarvis_status()
+    oj_ok = oj["healthy"] and oj["model_available"]
+    r.append(_item("openjarvis", "OpenJarvis (motor de texto opcional)", oj_ok,
+                   oj["detail"],
+                   "Consultá docs/guias/SKY_OPENJARVIS.md; configurá el modelo y levantá jarvis serve --agent simple.",
+                   importante=False))
     # Voz
     from . import sky_tts
     r.append(_item('piper', 'Voz natural (Piper)', sky_tts.disponible(),
