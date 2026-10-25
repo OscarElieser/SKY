@@ -145,3 +145,53 @@ def test_inventory_does_not_claim_optional_agents_installed():
     assert result["modules"]["make"]["exists_in_repo"] is False
     assert result["modules"]["comfyui"]["configured"] is True
     assert "installed_here" in result["packages"]["pyautogui"]
+
+
+
+def test_direct_diffusers_uses_only_local_weights_and_creates_png(tmp_path,monkeypatch):
+    import sys
+    from types import ModuleType,SimpleNamespace
+    from contextlib import nullcontext
+    from PIL import Image
+    from neural_core import sky_diffusers_local as direct
+    model=tmp_path/"my_owned_model"
+    model.mkdir()
+    (model/"model_index.json").write_text("{}")
+    monkeypatch.setenv("SKY_DIFFUSERS_ENABLED","1")
+    monkeypatch.setenv("SKY_DIFFUSERS_IMAGE_MODEL_DIR",str(model))
+    torch=ModuleType("torch")
+    torch.cuda=SimpleNamespace(is_available=lambda:False,empty_cache=lambda:None)
+    torch.float16="float16";torch.float32="float32"
+    torch.inference_mode=lambda:nullcontext()
+    diffusers=ModuleType("diffusers")
+    calls=[]
+    class Pipe:
+        def from_pretrained(*args,**kwargs):
+            calls.append((args,kwargs))
+            return Pipe()
+        def to(self,device):
+            assert device=="cpu"
+            return self
+        def __call__(self,**kw):
+            return SimpleNamespace(images=[Image.new("RGB",(kw["width"],kw["height"]))])
+    diffusers.DiffusionPipeline=Pipe
+    monkeypatch.setitem(sys.modules,"torch",torch)
+    monkeypatch.setitem(sys.modules,"diffusers",diffusers)
+    from neural_core import sky_creative
+    saved=[]
+    monkeypatch.setattr(sky_creative,"ingest",lambda data,filename:
+                        (saved.append((data,filename)) or {"id":"asset_diffusers_real"}))
+    result=direct.image("Paisaje cinematográfico original de montañas",512,512,12)
+    assert result["provider"]=="SKY Diffusers local"
+    assert result["real_image"] is True
+    assert saved[0][0].startswith(b"\x89PNG")
+    assert calls[0][1]["local_files_only"] is True
+    assert calls[0][1]["use_safetensors"] is True
+
+
+def test_diffusers_fails_closed_when_not_configured(monkeypatch):
+    from neural_core import sky_diffusers_local as direct
+    monkeypatch.setenv("SKY_DIFFUSERS_ENABLED","0")
+    assert direct.capabilities()["configured"] is False
+    with pytest.raises(direct.DiffusersUnavailable):
+        direct.image("Una imagen inédita de SKY IA")
