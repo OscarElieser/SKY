@@ -75,15 +75,24 @@ def test_converter_failures_report_unavailable(monkeypatch):
         markitdown.preview("manual.pdf", b"%PDF-1.4", approved=True)
 
 
-def test_preview_api_is_owner_protected():
-    # Import the app first: importing knowledge_api directly would create a
-    # circular import with metaverse.api's router registration.
+def test_preview_api_is_owner_protected(monkeypatch):
+    # Test the HTTP route, because SKY wraps included routers for its HUD.
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("SKY_API_KEY", "sky-markdown-route-test-owner-secret-2026")
+    monkeypatch.delenv("SKY_MARKITDOWN_ENABLED", raising=False)
     from metaverse.api import app
-    matches = [route for route in app.routes
-               if getattr(route, "path", None) == "/api/sky/knowledge/convert-markdown-preview"]
-    assert len(matches) == 1
-    assert any(dep.call.__name__ == "require_key"
-               for dep in matches[0].dependant.dependencies)
+    url = "/api/sky/knowledge/convert-markdown-preview"
+    files = {"file": ("sample.pdf", b"%PDF-1.4", "application/pdf")}
+    headers = {"X-SKY-KEY": "sky-markdown-route-test-owner-secret-2026"}
+    with TestClient(app) as client:
+        assert client.post(url, files=files, data={"approved": "true"}).status_code in (401, 403)
+        assert client.post(url, headers=headers, files=files,
+                           data={"approved": "true"}).status_code == 503
+        monkeypatch.setenv("SKY_MARKITDOWN_ENABLED", "1")
+        assert client.post(url, headers=headers, files=files).status_code == 403
+        invalid = {"file": ("fake.exe", b"PKhello", "application/octet-stream")}
+        assert client.post(url, headers=headers, files=invalid,
+                           data={"approved": "true"}).status_code == 422
 
 
 def test_real_docx_conversion_when_optional_package_installed(monkeypatch):
