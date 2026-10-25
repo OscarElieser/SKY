@@ -693,6 +693,8 @@ app.include_router(sky_intelligent_router)
 # SKY v9.7: editor profesional por capas + renders multimedia, propietario solamente.
 from .creative_api import router as creative_router
 app.include_router(creative_router)
+from .creative_evolution_api import router as sky_creative_evolution_router
+app.include_router(sky_creative_evolution_router)
 
 
 # SKY v10.1: idiomas y protección HTTP por defecto.
