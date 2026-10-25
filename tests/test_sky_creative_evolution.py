@@ -151,3 +151,15 @@ def test_do_not_claim_creation_if_provider_fails(monkeypatch):
     result=intent.handle("SKY, crea un cuento sobre una ciudad misteriosa y el amanecer")
     assert result["tipo"]=="error"
     assert "Private token" not in result["mensaje"]
+
+
+@pytest.mark.parametrize("sample",[
+    "你好世界欢迎来到天空智能助手",
+    "こんにちは世界へようこそ物語を始めましょう",
+    "안녕하세요 새로운 여행 이야기를 시작합니다"
+])
+def test_existing_creative_caption_accepts_cjk_text(sample):
+    from neural_core import sky_creative as renderer
+    image=renderer._caption_png(sample, 380)
+    assert image.size[0]==380 and image.size[1]>60
+    assert renderer._font(24,sample) is not None
