@@ -30,6 +30,8 @@ def overview():
         "local_optional_engine": openjarvis_status(),
         "automatic_cognitive_subagents": capability_status(),
         "creative_evolution": creative_capabilities(),
+        "local_image_video": __import__("neural_core.sky_comfyui_local",fromlist=["capabilities"]).capabilities(),
+        "lmstudio": __import__("neural_core.sky_lmstudio",fromlist=["status"]).status(),
         "social_accounts_configured_not_authenticated": social(),
         "learning": {
             "owner_feedback": "sky_evolution",
@@ -40,3 +42,9 @@ def overview():
         },
         "tools_and_device_permissions": "SKY SENTINEL y agente existentes",
     }
+
+
+@router.get("/integrations-audit")
+def integrations_audit():
+    from neural_core.sky_runtime_inventory import report
+    return report()
