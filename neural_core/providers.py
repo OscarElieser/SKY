@@ -30,6 +30,8 @@ PROVIDERS = {
     'groq': Provider('groq','Groq (Llama)','GROQ_API_KEY','GROQ_MODEL','llama-3.3-70b-versatile',True),
     'deepseek': Provider('deepseek','DeepSeek','DEEPSEEK_API_KEY','DEEPSEEK_MODEL','deepseek-chat',True),
     'ollama': Provider('ollama','Ollama local','','OLLAMA_MODEL','llama3.2',False),
+    # Motor externo opcional, nunca se agrega a AUTO_ORDER ni reemplaza SKY.
+    'openjarvis': Provider('openjarvis','OpenJarvis local (opcional)','SKY_OPENJARVIS_ENABLED','SKY_OPENJARVIS_MODEL','',False),
     # Opt-in only: never silently send a prompt or incur usage on these new providers.
     'openrouter': Provider('openrouter','OpenRouter','OPENROUTER_API_KEY','OPENROUTER_MODEL','',True),
     'huggingface': Provider('huggingface','Hugging Face Inference','HF_TOKEN','HF_MODEL','',True),
@@ -50,6 +52,9 @@ DOMAIN_PREF = {
 def provider_ready(name: str) -> bool:
     if name not in PROVIDERS: return False
     cfg=PROVIDERS[name]
+    if name == 'openjarvis':
+        from .sky_openjarvis import configured
+        return configured()
     if not cfg.env:
         return True  # Ollama puede estar apagado; se comprueba al consultar.
     if name in ('openrouter','huggingface'):
@@ -79,6 +84,8 @@ def choose_provider(name: str='auto', area: str='General') -> tuple[str,str]:
     if name not in PROVIDERS: raise ValueError('Proveedor desconocido. Revisá el selector de SKY.')
     if not provider_ready(name):
         cfg=PROVIDERS[name]
+        if name == 'openjarvis':
+            raise ProviderError('Para OpenJarvis configurá SKY_OPENJARVIS_ENABLED=1 y SKY_OPENJARVIS_MODEL en .env.')
         raise ProviderError(f'Falta {cfg.env} en .env para {cfg.name}.')
     cfg=PROVIDERS[name]
     model=os.getenv(cfg.model_env,cfg.model_default).strip() or cfg.model_default
@@ -169,6 +176,11 @@ def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_
                                                    max_tokens=max_output_tokens,temperature=0.2)
                 return _result(resp.choices[0].message.content,provider)
             finally: client.close()
+        if provider=='openjarvis':
+            from .sky_openjarvis import chat
+            # Solo texto, hacia loopback. Sin herramientas ni rutas nuevas en la API SKY.
+            return _result(chat([{'role':'system','content':system}, *turns], model,
+                                max_tokens=max_output_tokens), provider)
         if provider=='ollama':
             # Sólo localhost: no permitir URLs arbitrarias ni exposición accidental de contenido.
             payload=json.dumps({'model':model,'messages':[{'role':'system','content':system},*turns],
