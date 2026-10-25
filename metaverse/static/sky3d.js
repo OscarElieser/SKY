@@ -112,7 +112,7 @@ function moveAvatar(dx,dz){
   const result=window.SKYWorldPhysics.resolveMovement(avatar,{x:dx,z:dz},world.scene.objects);
   if(result.moved){avatar.x=result.x;avatar.z=result.z;lastWalkAt=performance.now();sendPosition()}
   safeText($('coords'),'X: '+avatar.x.toFixed(1)+' · Z: '+avatar.z.toFixed(1)+
-    (result.collided?' · Obstáculo':'');
+    (result.collided?' · Obstáculo':''));
   refreshWhiteboardEditor();
 }
 window.addEventListener('keydown',e=>{

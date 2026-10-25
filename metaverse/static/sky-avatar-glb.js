@@ -112,7 +112,7 @@
         return {node:channel.target.node,path,times,values,stride,
                 step:s.interpolation==='STEP'};
       })
-    })));
+    }));
     return {json,meshes,animations};
   }
   function quaternionMix(a,b,t){
