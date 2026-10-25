@@ -102,5 +102,5 @@ def test_build_features_are_bound_to_actual_existing_hud(env):
     assert "/build-campus" in js
     assert "SKYWorldPhysics.resolveMovement(" in js
     assert "function drawAvatar(" in js
-    assert "drawAvatar(peer.position,peer.color)" in js
+    assert "drawAvatar(peer.position,peer.color," in js
     assert "for(let ob of [...(world?.scene?.objects||[]),...avatars2d])" in js
