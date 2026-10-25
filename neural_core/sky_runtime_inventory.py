@@ -29,11 +29,11 @@ CODE={
     "subprocess":("subprocess", "Biblioteca estándar; SKY la usa en controlador Windows"),
     "home_assistant":("neural_core.sky_home_assistant","Control REST con restricciones y confirmaciones"),
     "n8n":("neural_core.sky_n8n_bridge","Bridge de workflows con allowlist y autorización"),
-    "make":(None,"No hay adaptador oficial activo; pendiente de OAuth/webhook seguro"),
+    "make":("neural_core.sky_make_bridge","Webhook oficial Make controlado, aprobado y restringido"),
     "no_code_low_code":(None,"n8n integrado; Make pendiente, no implica controlador universal"),
-    "crewai":(None,"El supervisor SKY actual no depende de CrewAI"),
-    "autogen":(None,"El supervisor SKY actual no depende de AutoGen"),
-    "langchain":(None,"SKY dispone de funciones propias de RAG/modelos; LangChain no necesario"),
+    "crewai":("neural_core.sky_framework_agents","Especialista cognitivo local opcional sin herramientas"),
+    "autogen":("neural_core.sky_framework_agents","Especialista cognitivo local opcional sin herramientas"),
+    "langchain":("neural_core.sky_framework_agents","Especialista cognitivo local opcional sin herramientas"),
 }
 
 
@@ -50,8 +50,7 @@ def report():
     packages={name:{"module":module,"installed_here":installed(module),
                     "note":description}
               for name,(module,description) in PACKAGES.items()}
-    tools={name:{"exists_in_repo":name not in ("make","no_code_low_code","crewai",
-                                              "autogen","langchain"),
+    tools={name:{"exists_in_repo":name not in ("no_code_low_code",),
                  "note":description}
            for name,(_,description) in CODE.items()}
     tools["lmstudio"]["configured"]=lm_ready()
@@ -60,6 +59,18 @@ def report():
     tools["home_assistant"]["configured"]=bool(
         os.getenv("SKY_HA_URL") and (os.getenv("SKY_HA_TOKEN") or os.getenv("SKY_HA_TOKEN_FILE")))
     tools["n8n"]["configured"]=bool(os.getenv("SKY_N8N_URL") and os.getenv("SKY_N8N_API_KEY"))
+    from .sky_make_bridge import capabilities as make_capabilities
+    from .sky_framework_agents import configured_frameworks
+    tools["make"]["readiness"]=make_capabilities()
+    fw=configured_frameworks()["frameworks"]
+    for key in ("crewai","autogen","langchain"):
+        tools[key]["readiness"]=fw[key]
+    from .sky_diffusers_local import capabilities as diffusers_capabilities
+    tools["diffusers"]=diffusers_capabilities()
+    tools["desktop_optional"]={"keyboard_package":packages["keyboard"]["installed_here"],
+                               "pyautogui_package":packages["pyautogui"]["installed_here"],
+                               "restricted_agent_required":True}
+
     for name,exe in (("ffmpeg","ffmpeg"),("ffprobe","ffprobe"),
                      ("blender","blender")):
         tools[name]={"installed_here":bool(shutil.which(exe)),
