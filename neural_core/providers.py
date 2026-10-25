@@ -32,6 +32,7 @@ PROVIDERS = {
     'ollama': Provider('ollama','Ollama local','','OLLAMA_MODEL','llama3.2',False),
     # Motor externo opcional, nunca se agrega a AUTO_ORDER ni reemplaza SKY.
     'openjarvis': Provider('openjarvis','OpenJarvis local (opcional)','SKY_OPENJARVIS_ENABLED','SKY_OPENJARVIS_MODEL','',False),
+    'lmstudio': Provider('lmstudio','LM Studio local (opcional)','SKY_LMSTUDIO_ENABLED','SKY_LMSTUDIO_MODEL','',False),
     # Opt-in only: never silently send a prompt or incur usage on these new providers.
     'openrouter': Provider('openrouter','OpenRouter','OPENROUTER_API_KEY','OPENROUTER_MODEL','',True),
     'huggingface': Provider('huggingface','Hugging Face Inference','HF_TOKEN','HF_MODEL','',True),
@@ -55,6 +56,9 @@ def provider_ready(name: str) -> bool:
     if name == 'openjarvis':
         from .sky_openjarvis import configured
         return configured()
+    if name == 'lmstudio':
+        from .sky_lmstudio import configured
+        return configured()
     if not cfg.env:
         return True  # Ollama puede estar apagado; se comprueba al consultar.
     if name in ('openrouter','huggingface'):
@@ -72,9 +76,10 @@ def local_only() -> bool:
 
 def choose_provider(name: str='auto', area: str='General') -> tuple[str,str]:
     if local_only():
-        if name not in ('auto', 'sky', 'ollama'):
-            raise ProviderError('Modo 100 % local activo (SKY_LOCAL_ONLY=1): SKY sólo usa Ollama en este equipo.')
-        name = 'ollama'
+        if name not in ('auto', 'sky', 'ollama', 'lmstudio'):
+            raise ProviderError('Modo local: SKY sólo permite Ollama o LM Studio local.')
+        if name in ('auto', 'sky'):
+            name = 'lmstudio' if provider_ready('lmstudio') else 'ollama'
     if name in ('auto', 'sky'):
         a=area.casefold()
         preferred=next((pref for token,pref in DOMAIN_PREF.items() if token in a),AUTO_ORDER)
@@ -86,6 +91,8 @@ def choose_provider(name: str='auto', area: str='General') -> tuple[str,str]:
         cfg=PROVIDERS[name]
         if name == 'openjarvis':
             raise ProviderError('Para OpenJarvis configurá SKY_OPENJARVIS_ENABLED=1 y SKY_OPENJARVIS_MODEL en .env.')
+        if name == 'lmstudio':
+            raise ProviderError('Configurá SKY_LMSTUDIO_ENABLED=1 y SKY_LMSTUDIO_MODEL en .env.')
         raise ProviderError(f'Falta {cfg.env} en .env para {cfg.name}.')
     cfg=PROVIDERS[name]
     model=os.getenv(cfg.model_env,cfg.model_default).strip() or cfg.model_default
@@ -176,6 +183,10 @@ def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_
                                                    max_tokens=max_output_tokens,temperature=0.2)
                 return _result(resp.choices[0].message.content,provider)
             finally: client.close()
+        if provider=='lmstudio':
+            from .sky_lmstudio import chat
+            return _result(chat([{'role':'system','content':system},*turns], model,
+                                max_tokens=max_output_tokens), provider)
         if provider=='openjarvis':
             from .sky_openjarvis import chat
             # Solo texto, hacia loopback. Sin herramientas ni rutas nuevas en la API SKY.
