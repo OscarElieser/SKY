@@ -764,6 +764,8 @@ from .hud_api import router as sky_hud_router
 app.include_router(sky_hud_router)
 from .social_hub_api import router as sky_social_hub_router
 app.include_router(sky_social_hub_router)
+from .sky_intelligence_api import router as sky_intelligence_router
+app.include_router(sky_intelligence_router)
 
 @app.get('/hud')
 def hud_page():
