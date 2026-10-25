@@ -216,35 +216,50 @@ def _completar(resultado: dict, dispositivo: str, request: Request) -> dict:
     return resultado
 
 
+def _guardar_turno_seguro(role: str, text: str, mode: str) -> None:
+    # Persistente y privado, no guarda PIN ni headers ni credenciales.
+    try:
+        from neural_core.sky_hud_history import append
+        if isinstance(text, str) and text.strip():
+            append(role, text[:4000], 'voz' if mode == 'voz' else 'chat')
+    except (OSError, ValueError, RuntimeError):
+        pass
+
+
 @router.post('/mensaje')
 def mensaje(body: Mensaje, request: Request):
     inicio = time.perf_counter()
+    _guardar_turno_seguro('user',body.texto,body.modo)
+    def terminar(resultado):
+        if isinstance(resultado,dict):
+            _guardar_turno_seguro('assistant',str(resultado.get('mensaje') or ''),body.modo)
+        return _medir_turno(resultado,inicio)
     from .academy_voice import class_command
     academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
     if academy is not None:
-        return _medir_turno(academy, inicio)
+        return terminar(academy)
     from neural_core.sky_creative_intent import handle as creative_handle
     creative_result = creative_handle(body.texto, body.proveedor)
     if creative_result is not None:
-        return _medir_turno(creative_result, inicio)
+        return terminar(creative_result)
     from neural_core.sky_social_intent import prepare as social_prepare
     social_result = social_prepare(body.texto, body.proveedor)
     if social_result is not None:
-        return _medir_turno(social_result, inicio)
+        return terminar(social_result)
     from neural_core import sky_experience_learning as learning
     learned=learning.interpretar(body.texto,device=body.dispositivo,modo=body.modo)
     if learned is not None:
-        return _medir_turno(learned, inicio)
+        return terminar(learned)
     from neural_core import sky_execution_cycle as ciclo
     if ciclo.is_sequence(body.texto):
         try:
             plan = ciclo.create(ciclo.from_text(body.texto), dispositivo=body.dispositivo, origin=body.modo)
-            return _medir_turno({'tipo': 'ciclo', 'mensaje': 'Preparé el ciclo; confirmá cada paso.',
-                                 'ciclo': plan, 'proveedor': 'sky-cycle'}, inicio)
+            return terminar({'tipo': 'ciclo', 'mensaje': 'Preparé el ciclo; confirmá cada paso.',
+                                 'ciclo': plan, 'proveedor': 'sky-cycle'})
         except (ciclo.CycleInvalid, ciclo.CycleConflict) as exc:
-            return _medir_turno({'tipo': 'error', 'mensaje': 'No puedo planificar esa secuencia: ' + str(exc)[:180]}, inicio)
+            return terminar({'tipo': 'error', 'mensaje': 'No puedo planificar esa secuencia: ' + str(exc)[:180]})
     resultado = atender(body.texto, [t.model_dump() for t in body.historial], body.proveedor, body.modo)
-    return _medir_turno(_completar(resultado, body.dispositivo, request), inicio)
+    return terminar(_completar(resultado, body.dispositivo, request))
 
 
 @router.post('/stream')
@@ -256,10 +271,13 @@ def mensaje_stream(body: Mensaje, request: Request):
 
     def eventos():
         inicio = time.perf_counter()
+        _guardar_turno_seguro('user',body.texto,body.modo)
         historial = [t.model_dump() for t in body.historial]
         def linea(obj):
             return json.dumps(obj, ensure_ascii=False) + '\n'
         def final(resultado):
+            if isinstance(resultado,dict):
+                _guardar_turno_seguro('assistant',str(resultado.get('mensaje') or ''),body.modo)
             return linea({'final': _medir_turno(resultado, inicio)})
         from .academy_voice import class_command
         academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
