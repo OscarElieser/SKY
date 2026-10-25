@@ -156,7 +156,9 @@ def test_installable_shell_is_present_but_does_not_cache_private_data():
 def test_existing_api_and_voice_route_remain_connected():
     source=Path("metaverse/asistente_api.py").read_text(encoding="utf-8")
     assert "ciclo.is_sequence(body.texto)" in source
-    assert "return _medir_turno(_completar(resultado" in source
+    assert "return terminar(_completar(resultado" in source
+    assert "return _medir_turno(resultado,inicio)" in source
+    assert "_guardar_turno_seguro('assistant'" in source
     assert "dispositivos.verify_device_action" in source
     hud=Path("metaverse/static/hud.js").read_text(encoding="utf-8")
     assert "data.tipo === 'ciclo'" in hud and "S.pending" in hud
