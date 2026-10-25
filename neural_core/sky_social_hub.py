@@ -20,7 +20,7 @@ from urllib import parse, request
 ROOT = Path(__file__).resolve().parents[1]
 PLATFORMS = ("x", "facebook", "instagram", "tiktok", "threads", "snapchat")
 DIRECT_TEXT = ("x", "facebook", "threads")
-VALID_KINDS = ("post", "reply")
+VALID_KINDS = ("post", "reply", "like", "repost")
 MAX_TEXT = {"x": 280, "facebook": 5000, "threads": 500, "instagram": 2200,
             "tiktok": 2200, "snapchat": 2000}
 ENV = {
@@ -118,7 +118,9 @@ def _valid_target(kind: str, platform: str, target_id: str) -> str:
         raise SocialError("Solo se permiten publicaciones y respuestas de texto.")
     if kind == "reply" and platform not in ("x", "threads"):
         raise SocialError("Las respuestas directas todavía no están conectadas para esta red.")
-    if kind == "reply" and not re.fullmatch(r"[A-Za-z0-9_-]{5,100}", target_id or ""):
+    if kind in ("like", "repost") and platform != "x":
+        raise SocialError("Las interacciones individuales solo están integradas en X.")
+    if kind in ("reply", "like", "repost") and not re.fullmatch(r"[A-Za-z0-9_-]{5,100}", target_id or ""):
         raise SocialError("Para responder se requiere el identificador del post autorizado.")
     if kind == "post" and target_id:
         raise SocialError("Un post nuevo no necesita target_id.")
@@ -134,6 +136,19 @@ def draft(platform: str, text: str, kind: str = "post", target_id: str = "") -> 
         c.execute("INSERT INTO outbound(id,platform,kind,body,target_id,status,created_at) "
                   "VALUES(?,?,?,?,?,?,?)",
                   (ident, platform, kind, text, target_id, "draft", _now()))
+    return get(ident)
+
+
+def engagement_x(kind: str, target_id: str) -> dict:
+    """Una sola interacción solicitada. Nunca se auto-lanzan likes o reposts."""
+    _valid_target(kind, "x", target_id)
+    if kind not in ("like", "repost"):
+        raise SocialError("Interacción no reconocida.")
+    ident = "soc_" + uuid.uuid4().hex
+    with _db() as c:
+        c.execute("INSERT INTO outbound(id,platform,kind,body,target_id,status,created_at) "
+                  "VALUES(?,?,?,?,?,?,?)",
+                  (ident, "x", kind, "", target_id, "draft", _now()))
     return get(ident)
 
 
@@ -213,7 +228,7 @@ class _NoRedirect(request.HTTPRedirectHandler):
 
 def _http(url: str, token: str, data: dict) -> dict:
     # Endpoints FIJOS y HTTPS: no URLs de usuario ni redirecciones.
-    if not url.startswith(("https://api.x.com/2/tweets",
+    if not url.startswith(("https://api.x.com/2/tweets", "https://api.x.com/2/users/",
                            "https://graph.facebook.com/v26.0/",
                            "https://graph.threads.net/v1.0/me/")):
         raise SocialError("Endpoint fuera del catálogo oficial.")
@@ -244,6 +259,17 @@ def _send(item: dict) -> tuple[str, str | None]:
     token = _token(platform)
     text = item["body"]
     if platform == "x":
+        if item["kind"] in ("like", "repost"):
+            user_id = os.getenv("SKY_SOCIAL_X_USER_ID", "").strip()
+            if not re.fullmatch(r"\d{4,32}", user_id) or not re.fullmatch(r"\d{5,30}", item["target_id"]):
+                raise SocialUnavailable("Configurá el ID real de usuario y el ID numérico del post de X.")
+            operation = "likes" if item["kind"] == "like" else "retweets"
+            key = "liked" if item["kind"] == "like" else "retweeted"
+            response = _http(f"https://api.x.com/2/users/{user_id}/{operation}",
+                             token, {"tweet_id": item["target_id"]})
+            if (response.get("data") or {}).get(key) is not True:
+                raise SocialUnavailable("X no confirmó la interacción.")
+            return item["target_id"], None
         payload = {"text": text}
         if item["kind"] == "reply":
             payload["reply"] = {"in_reply_to_tweet_id": item["target_id"]}
@@ -299,7 +325,7 @@ def _claim(ident: str | None) -> dict | None:
                 return None
         else:
             row = c.execute("SELECT * FROM outbound WHERE status='approved' "
-                            "AND (scheduled_at IS NULL OR scheduled_at<=?) "
+                            "AND kind IN ('post','reply') AND (scheduled_at IS NULL OR scheduled_at<=?) "
                             "ORDER BY COALESCE(scheduled_at,approved_at),id LIMIT 1",
                             (_now(),)).fetchone()
             if not row:
