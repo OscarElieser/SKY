@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from .api import require_key
 from .multimodal_api import _bounded_read
 from neural_core import sky_knowledge_library as knowledge
+from neural_core import sky_markitdown_optional as markdown
 
 router=APIRouter(prefix="/api/sky/knowledge",dependencies=[Depends(require_key)])
 
@@ -22,7 +23,7 @@ class SearchQuery(BaseModel):
 
 @router.get("/capabilities")
 def capabilities():
-    return knowledge.catalogue()
+    return {**knowledge.catalogue(), "markitdown_preview": markdown.readiness()}
 
 
 @router.post("/documents",status_code=201)
@@ -67,3 +68,26 @@ def search(body: SearchQuery):
         raise HTTPException(422,str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(503,str(exc)[:200]) from exc
+
+
+@router.post("/convert-markdown-preview")
+async def convert_markdown_preview(file: UploadFile=File(...),
+                                   approved: bool=Form(default=False)):
+    """Explicit preview only; it does not index or train on the uploaded file."""
+    if not approved:
+        raise HTTPException(403, "Autorizá expresamente la conversión Markdown.")
+    if not markdown.readiness()["enabled"]:
+        raise HTTPException(503, "MarkItDown opcional está desactivado.")
+    try:
+        payload = await file.read(markdown.MAX_INPUT_BYTES + 1)
+        if len(payload) > markdown.MAX_INPUT_BYTES:
+            raise HTTPException(413, "El archivo excede el máximo de 4 MB.")
+        return markdown.preview(file.filename or "", payload, approved=True)
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)[:200]) from exc
+    except markdown.MarkItDownUnavailable as exc:
+        raise HTTPException(503, str(exc)[:200]) from exc
+    finally:
+        await file.close()
