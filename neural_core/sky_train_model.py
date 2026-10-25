@@ -7,6 +7,9 @@ eligible for manual activation.
 """
 from __future__ import annotations
 import argparse
+import hashlib
+import importlib.util
+import platform
 import json
 import math
 import os
@@ -18,6 +21,21 @@ from pathlib import Path
 MAX_SAMPLES=150000
 MAX_TEXT=9000
 MIN_SAMPLES=20
+SKY_SYSTEM_PROMPT=('Eres SKY, asistente personal que coordina modelos y herramientas autorizadas. '
+                   'Responde en el idioma solicitado y distingue resultados confirmados de acciones pendientes. '
+                   'No inventes ejecuciones ni datos. Respeta privacidad, permisos y seguridad.')
+
+
+def format_prompt(question, history=None):
+    """Plantilla única para entrenamiento e inferencia, con el mismo rol SKY."""
+    if not isinstance(question,str) or not question.strip():
+        raise SkyTrainingError('La consulta del modelo está vacía.')
+    lines=[SKY_SYSTEM_PROMPT]
+    for turn in history or []:
+        if turn.get('role')=='user':lines.append('Usuario: '+turn['content'])
+        elif turn.get('role')=='assistant':lines.append('SKY: '+turn['content'])
+    lines.extend(('Usuario: '+question,'SKY:'))
+    return '\n'.join(lines)
 
 class SkyTrainingError(ValueError):pass
 
@@ -66,7 +84,7 @@ def build_training_examples(pairs,tokenizer,max_length):
         def __init__(self):
             self.items=[]
             for question,answer in pairs:
-                prefix="Eres SKY. Responde en español con precisión.\nUsuario: "+question+"\nSKY:"
+                prefix=format_prompt(question)
                 ids_prefix=tokenizer(prefix,add_special_tokens=False)["input_ids"]
                 ids_answer=tokenizer(" "+answer+tokenizer.eos_token,add_special_tokens=False)["input_ids"]
                 ids=(ids_prefix+ids_answer)[:max_length]
@@ -102,6 +120,7 @@ def train(*,dataset,base_model,output,confirm_rights=False,
         raise SkyTrainingError("Destino existente: no sobrescribo checkpoints previos.")
     examples=validate_dataset(dataset)
     train_set,val_set=split_dataset(examples,seed)
+    dataset_hash=hashlib.sha256(Path(dataset).expanduser().read_bytes()).hexdigest()
     try:
         import torch
         from transformers import AutoTokenizer,AutoModelForCausalLM,Trainer,TrainingArguments
@@ -152,10 +171,51 @@ def train(*,dataset,base_model,output,confirm_rights=False,
               "eval_loss_improved":after<before,
               "trained_at_utc":datetime.now(timezone.utc).isoformat(),
               "activated":False,"evaluation_passed":math.isfinite(after),
-              "not_foundational_model":True}
+              "not_foundational_model":True,"dataset_sha256":dataset_hash,
+              "model_family":"SKY LoRA specialized","training_seed":seed,
+              "base_weights_unchanged":True,"language_policy":"requested_language"}
     (destination/"sky_training_manifest.json").write_text(
         json.dumps(manifest,indent=2,ensure_ascii=False),encoding="utf-8")
     return manifest
+
+
+def preflight(*, dataset, base_model=None, output=None):
+    """Comprobación NO invasiva y sin red: cero entrenamiento o descargas."""
+    p=Path(dataset).expanduser()
+    report={"controller":"SKY","mode":"lora_preflight_only",
+            "os":platform.system(),"dataset_exists":p.is_file(),
+            "sample_count":0,"data_approved":False,"base_model_ready":False,
+            "output_available":False,"cuda_available":False,"cuda_device":None,
+            "dependencies":{},"ready_to_train":False,
+            "training_performed":False,"model_trained":False}
+    if p.is_file():
+        try:
+            data=validate_dataset(p)
+            report.update(sample_count=len(data),data_approved=True,
+                          train_count=len(split_dataset(data)[0]),
+                          validation_count=len(split_dataset(data)[1]))
+        except (SkyTrainingError,OSError,ValueError) as exc:
+            report["dataset_error"]=str(exc)[:180]
+    if base_model:
+        b=Path(base_model).expanduser()
+        report["base_model_ready"]=b.is_dir() and (b/"config.json").is_file()
+    if output:
+        d=Path(output).expanduser()
+        report["output_available"]=(not d.exists() or (d.is_dir() and not any(d.iterdir())))
+    for package in ("torch","transformers","peft","accelerate","safetensors"):
+        report["dependencies"][package]=importlib.util.find_spec(package) is not None
+    if report["dependencies"]["torch"]:
+        try:
+            import torch
+            report["cuda_available"]=bool(torch.cuda.is_available())
+            if report["cuda_available"]:
+                report["cuda_device"]=torch.cuda.get_device_name(0)
+        except (ImportError,RuntimeError,OSError):
+            pass
+    report["ready_to_train"]=all([
+        report["data_approved"],report["base_model_ready"],report["output_available"],
+        report["cuda_available"],all(report["dependencies"].values())])
+    return report
 
 
 def main(argv=None):
@@ -164,10 +224,15 @@ def main(argv=None):
     parser.add_argument("--base-model",required=True)
     parser.add_argument("--output",required=True)
     parser.add_argument("--confirm-rights",action="store_true")
+    parser.add_argument("--preflight",action="store_true",help="Solo comprobar, sin entrenar ni bajar modelos")
     parser.add_argument("--epochs",type=int,default=1)
     parser.add_argument("--steps",type=int,default=100)
     parser.add_argument("--max-length",type=int,default=512)
     args=parser.parse_args(argv)
+    if args.preflight:
+        print(json.dumps(preflight(dataset=args.dataset,base_model=args.base_model,
+                                   output=args.output),indent=2,ensure_ascii=False))
+        return
     result=train(dataset=args.dataset,base_model=args.base_model,
                  output=args.output,confirm_rights=args.confirm_rights,
                  epochs=args.epochs,steps=args.steps,max_length=args.max_length)
