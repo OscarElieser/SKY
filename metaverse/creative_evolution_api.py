@@ -106,6 +106,12 @@ def revise(ident:str,body:Revision):
         ident,body.instruction,body.expected_version,provider=body.provider))
 
 
+@router.post("/writing/{ident}/continue")
+def continue_writing(ident:str,body:Revision):
+    return execute(lambda:studio.continue_writing(
+        ident,body.instruction,body.expected_version,provider=body.provider))
+
+
 @router.post("/images/improve-prompt")
 def improve_prompt(body:VisualPrompt):
     return execute(lambda:studio.improve_visual_prompt(**body.model_dump()))
