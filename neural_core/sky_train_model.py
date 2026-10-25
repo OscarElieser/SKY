@@ -39,6 +39,20 @@ def format_prompt(question, history=None):
 
 class SkyTrainingError(ValueError):pass
 
+
+def base_model_ready(path):
+    """Confirmar pesos safetensors y tokenizer locales, no solo config.json."""
+    if not path:
+        return False
+    folder=Path(path).expanduser()
+    if not folder.is_dir() or not (folder/"config.json").is_file():
+        return False
+    weights=(folder/"model.safetensors").is_file() or any(folder.glob("model-*.safetensors"))
+    tokenizer=any((folder/x).is_file() for x in
+                  ("tokenizer.json","tokenizer.model","spiece.model"))
+    return bool(weights and tokenizer)
+
+
 def validate_dataset(path,limit=MAX_SAMPLES):
     p=Path(path).expanduser().resolve(strict=True)
     if not p.is_file() or p.suffix.lower()!=".jsonl":
@@ -113,8 +127,8 @@ def train(*,dataset,base_model,output,confirm_rights=False,
     if type(max_length) is not int or not 128<=max_length<=4096:
         raise SkyTrainingError("longitud de contexto inválida.")
     base=Path(base_model).expanduser().resolve(strict=True)
-    if not base.is_dir() or not (base/"config.json").is_file():
-        raise SkyTrainingError("La base debe ser un modelo Transformer ya descargado en carpeta local.")
+    if not base_model_ready(base):
+        raise SkyTrainingError("La base local requiere config.json, tokenizer y pesos safetensors completos.")
     destination=Path(output).expanduser().resolve()
     if destination.exists() and any(destination.iterdir()):
         raise SkyTrainingError("Destino existente: no sobrescribo checkpoints previos.")
@@ -198,7 +212,7 @@ def preflight(*, dataset, base_model=None, output=None):
             report["dataset_error"]=str(exc)[:180]
     if base_model:
         b=Path(base_model).expanduser()
-        report["base_model_ready"]=b.is_dir() and (b/"config.json").is_file()
+        report["base_model_ready"]=base_model_ready(b)
     if output:
         d=Path(output).expanduser()
         report["output_available"]=(not d.exists() or (d.is_dir() and not any(d.iterdir())))
@@ -210,6 +224,7 @@ def preflight(*, dataset, base_model=None, output=None):
             report["cuda_available"]=bool(torch.cuda.is_available())
             if report["cuda_available"]:
                 report["cuda_device"]=torch.cuda.get_device_name(0)
+                report["cuda_memory_gb"]=round(torch.cuda.get_device_properties(0).total_memory/1024**3,2)
         except (ImportError,RuntimeError,OSError):
             pass
     report["ready_to_train"]=all([
