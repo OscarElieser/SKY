@@ -888,6 +888,7 @@
     if (!/^(abre|abri|abrir|mostra|muestra|mostrar)\s+/.test(s)) return null;
     const target=s.replace(/^(abre|abri|abrir|mostra|muestra|mostrar)\s+/,'')
       .replace(/\s+(en\s+)?(una\s+)?(ventana|ventanita|cuadro)\s+(pequena|mini|flotante).*$/,'')
+      .replace(/^(?:(?:en\s+)?(?:una\s+)?(?:ventana|ventanita)\s+(?:pequena|mini|flotante)\s+)+/,'')
       .replace(/^(un|una|el|la|mis)\s+/,'').trim();
     if (/^(cuadro\s+de\s+texto|chat|texto|conversacion)$/.test(target)) return 'chat';
     if (/^(historial|historial\s+de\s+(conversaciones|consultas)|consultas)$/.test(target)) return 'history';
@@ -2489,6 +2490,8 @@
   document.addEventListener('keydown', (e) => {
     const enCampo = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement && document.activeElement.tagName);
     if (e.key === 'Escape') { callar(); detenerEscucha(); }
+    if (!enCampo && e.key === 'F4') { e.preventDefault(); abrirCuadroTexto(); }
+    if (!enCampo && e.key === 'F6') { e.preventDefault(); abrirHistorial(); }
     if (!enCampo && (e.code === 'Space' || e.key === 'F2')) { e.preventDefault(); escuchar(); }
   });
   function mostrarPanel(id) {
