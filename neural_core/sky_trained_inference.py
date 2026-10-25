@@ -69,7 +69,7 @@ def reply(messages, model=None, max_tokens=500):
     info=readiness()
     if not release or not info["released_to_sky"]:
         raise SkyTrainedUnavailable("El adaptador SKY no ha sido evaluado ni aprobado para inferencia.")
-    if type(max_tokens) is not int or not 1<=max_tokens<=1600:
+    if type(max_tokens) is not int or not 1<=max_tokens<=4096:
         raise ValueError("Límite de tokens no admitido.")
     if not isinstance(messages,list) or not messages:
         raise ValueError("Se necesita conversación de SKY.")
