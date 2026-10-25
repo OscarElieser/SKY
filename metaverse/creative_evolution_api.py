@@ -59,8 +59,11 @@ def execute(operation):
         return operation()
     except (studio.CreativeInvalid,ValueError) as exc:
         raise HTTPException(422,detail=str(exc)[:180]) from exc
-    except (studio.CreativeUnavailable,RuntimeError) as exc:
+    except studio.CreativeUnavailable as exc:
         raise HTTPException(503,detail=str(exc)[:180]) from exc
+    except RuntimeError as exc:
+        # Las excepciones de SDK externos pueden incluir tokens o solicitudes privadas.
+        raise HTTPException(503,"El motor creativo no está disponible. Revisá el diagnóstico privado.") from exc
     except Exception as exc:
         # SDK errors can leak prompt/credentials: report generic failure.
         raise HTTPException(503,"El motor creativo no respondió. Verificá la configuración privada.") from exc
