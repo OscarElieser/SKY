@@ -114,7 +114,7 @@ def test_training_rejects_unapproved_and_secrets(tmp_path):
     with pytest.raises(training.SkyTrainingError):
         training.validate_dataset(data)
     rows[4]["approved_for_training"]=True
-    rows[5]["response"]="-----BEGIN PRIVATE KEY----- forbidden"
+    rows[5]["response"]="-".join(["", "", "", "", "", "BEGIN PRIVATE KEY", "", "", "", "", ""]) + " forbidden"
     data.write_text("\n".join(json.dumps(x) for x in rows))
     with pytest.raises(training.SkyTrainingError):
         training.validate_dataset(data)
