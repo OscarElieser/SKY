@@ -180,7 +180,7 @@ def test_voice_intent_prepares_only_a_draft(monkeypatch):
     assert "innovación educativa" in parsed["topic"]
     assert sky_social_intent.parse("SKY publica esto en Threads inmediatamente") is None
     monkeypatch.setattr(social_hub_api, "generate_draft", lambda *args, **kw:
-                        {"id": "soc_test", "body": "Texto único preparado por IA."})
+                        {"id": "soc_test", "body": "Texto único preparado por IA."}, raising=False)
     result = sky_social_intent.prepare("SKY redacta una publicación para Threads sobre innovación educativa")
     assert result["publicado"] is False and result["requiere_aprobacion"] is True
     assert "Texto único" in result["mensaje"]
