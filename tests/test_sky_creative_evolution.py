@@ -115,3 +115,39 @@ def test_capabilities_are_honest():
     assert set(result["languages"])==set(c.LANGUAGES)
     assert result["video"]["real_motion_generation"] is False
     assert result["music"]["sung_vocals"] is False
+
+
+def test_creative_voice_writing_nine_languages(monkeypatch):
+    from neural_core import sky_creative_intent as intent
+    request="SKY, redacta una novela en francés sobre un viaje por los mares y montañas de Nicaragua"
+    info=intent.parse(request)
+    assert info["kind"]=="novela" and info["locale"]=="fr"
+    assert "Nicaragua" in info["topic"]
+    assert intent.parse("SKY, abre Word") is None
+    assert intent.parse("SKY, genera una imagen de mi familia") is None
+    monkeypatch.setattr(c,"create_writing",lambda *a,**kw:
+        {"text":"Un capítulo original","id":"skywork_abc","version":1,"locale":kw["locale"]})
+    result=intent.handle(request)
+    assert result["created"] is True
+    assert result["creative_locale"]=="fr"
+    assert result["generated_media"] is False
+
+
+def test_music_voice_makes_a_real_asset_when_requested(monkeypatch):
+    from neural_core import sky_creative_intent as intent
+    assert intent.parse("SKY, crea música instrumental inspirada en Nicaragua")["action"]=="instrumental"
+    monkeypatch.setattr(c,"save_music",lambda **kwargs:
+        {"asset":{"id":"asset_real_audio"}})
+    result=intent.handle("SKY, crea música instrumental inspirada en Nicaragua")
+    assert result["creative_asset_id"]=="asset_real_audio"
+    assert result["sung_vocals"] is False
+
+
+def test_do_not_claim_creation_if_provider_fails(monkeypatch):
+    from neural_core import sky_creative_intent as intent
+    def unavailable(*args,**kwargs):
+        raise RuntimeError("Private token secret")
+    monkeypatch.setattr(c,"create_writing",unavailable)
+    result=intent.handle("SKY, crea un cuento sobre una ciudad misteriosa y el amanecer")
+    assert result["tipo"]=="error"
+    assert "Private token" not in result["mensaje"]
