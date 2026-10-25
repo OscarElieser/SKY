@@ -143,7 +143,7 @@ def _personal_context() -> str:
                       if isinstance(row, dict) and row.get("texto"))
     except (ImportError, OSError, ValueError):
         pass
-    return "\\n".join(pieces)[:1800]
+    return "\n".join(pieces)[:1800]
 
 
 def capability_status() -> dict:
