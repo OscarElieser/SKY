@@ -60,6 +60,15 @@ $('evo-image').onclick=()=>busy($('evo-image'),async()=>{
   if(val('evo-media-engine')==='comfyui'){
     await localJob('image',idea(8));return;
   }
+  if(val('evo-media-engine')==='diffusers'){
+    const result=await localPost('/diffusers/image',{prompt:idea(8),
+      width:512,height:512,steps:22,local_authorized:true});
+    status('SKY creó una imagen local real con su motor Diffusers.');
+    await window.SKYCreativeRefresh();
+    await window.SKYCreativeDownload('/api/creative/assets/'+result.asset.id+'/preview',
+                                    result.asset.filename,true);
+    return;
+  }
   consent();
   const result=await post('/images/generate',{prompt:idea(8),...common(),
     improve:$('evo-improve').checked,cloud_authorized:true,mode:'image'});
@@ -76,6 +85,9 @@ $('evo-music').onclick=()=>busy($('evo-music'),async()=>{
   await window.SKYCreativeDownload('/api/creative/assets/'+result.asset.id+'/download','SKY_Musica_Original.wav',false);
 });
 $('evo-movie').onclick=()=>busy($('evo-movie'),async()=>{
+  if(val('evo-media-engine')==='diffusers'){
+    throw Error('El modelo Diffusers directo genera imágenes. Para video IA local elegí ComfyUI y un modelo de video instalado.');
+  }
   if(val('evo-media-engine')==='comfyui'){
     await localJob('video',idea(12));return;
   }
