@@ -16,6 +16,7 @@ PLAN = {"agents": [
 def enabled(monkeypatch):
     monkeypatch.setenv("SKY_UNIFIED_AGENTS_ENABLED", "1")
     monkeypatch.setenv("SKY_METRICAS", "0")
+    monkeypatch.setattr(team, "_personal_context", lambda: "")
 
 
 def test_no_usa_agentes_para_saludos_o_comandos_de_pc():
