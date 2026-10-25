@@ -1,0 +1,3 @@
+# Opcional: nunca instalar junto al núcleo SKY sin autorización.
+# Versión concreta verificada en PyPI a 2026-10-24.
+markitdown[pdf,docx,pptx,xlsx]==0.1.9

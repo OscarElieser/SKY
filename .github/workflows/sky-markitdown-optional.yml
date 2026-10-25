@@ -1,0 +1,43 @@
+name: SKY MarkItDown optional preview validation
+on:
+  pull_request:
+    paths:
+      - 'neural_core/sky_markitdown_optional.py'
+      - 'neural_core/sky_markitdown_worker.py'
+      - 'metaverse/knowledge_api.py'
+      - 'tests/test_sky_markitdown_optional.py'
+      - 'requirements_markitdown_optional.txt'
+      - '.github/workflows/sky-markitdown-optional.yml'
+  push:
+    branches: [main, 'feat/sky-markitdown-*']
+    paths:
+      - 'neural_core/sky_markitdown_optional.py'
+      - 'neural_core/sky_markitdown_worker.py'
+      - 'metaverse/knowledge_api.py'
+      - 'tests/test_sky_markitdown_optional.py'
+      - 'requirements_markitdown_optional.txt'
+      - '.github/workflows/sky-markitdown-optional.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  opt-in-markdown:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install SKY baseline and isolated optional dependency
+        run: |
+          python -m pip install -r requirements_social.txt -r requirements_studio.txt pytest
+          python -m pip install -r requirements_markitdown_optional.txt
+      - name: Syntax and no automatic replacement
+        run: |
+          python -m py_compile neural_core/sky_markitdown_optional.py neural_core/sky_markitdown_worker.py metaverse/knowledge_api.py
+          python -c "from neural_core.sky_markitdown_optional import readiness; assert readiness()['enabled'] is False"
+      - name: Verify consent, privacy and real DOCX Markdown conversion
+        run: PYTHONPATH=. python -m pytest -q tests/test_sky_markitdown_optional.py
