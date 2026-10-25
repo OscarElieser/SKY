@@ -222,7 +222,9 @@ def _guardar_turno_seguro(role: str, text: str, mode: str) -> None:
         from neural_core.sky_hud_history import append
         if isinstance(text, str) and text.strip():
             append(role, text[:4000], 'voz' if mode == 'voz' else 'chat')
-    except (OSError, ValueError, RuntimeError):
+    except Exception:
+        # SQLite sin espacio, bloqueos u otros errores de historial jamás
+        # deben impedir que SKY responda al usuario.
         pass
 
 
