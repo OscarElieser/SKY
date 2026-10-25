@@ -58,16 +58,18 @@ def eligible(task: str, mode: str = "chat") -> bool:
     return len(complex_words) >= 2 or (len(clean) >= 160 and bool(complex_words))
 
 
-def _backend():
+def _backend(preferred: str = "auto"):
     """OpenJarvis solo como motor interno de SKY; si no, Ollama existente.
 
     No se elige automaticamente un proveedor de nube ni se cambian las
     preferencias del chat principal.
     """
     from . import providers
-    if not providers.local_only() and providers.provider_ready("openjarvis"):
-        return "openjarvis", providers.choose_provider("openjarvis")[1]
-    return providers.choose_provider("ollama")[0], providers.choose_provider("ollama")[1]
+    if preferred == "openjarvis" and not providers.local_only():
+        return providers.choose_provider("openjarvis")
+    if preferred != "ollama" and not providers.local_only() and providers.provider_ready("openjarvis"):
+        return providers.choose_provider("openjarvis")
+    return providers.choose_provider("ollama")
 
 
 def _ask(provider: str, model: str, system: str, prompt: str, max_tokens: int) -> str:
@@ -137,19 +139,20 @@ def capability_status() -> dict:
 
 
 def maybe_answer(task: str, history: list[dict] | None = None,
-                 mode: str = "chat") -> dict | None:
+                 mode: str = "chat", preferred: str = "auto") -> dict | None:
     """Responde en el unico chat SKY tras consultar subagentes generativos.
 
     Ningun subagente recibe tokens, herramientas, filesystem ni credenciales.
     En caso de error retorna None para preservar el comportamiento previo.
     """
-    if not eligible(task, mode):
+    # Respetar una seleccion explicita de proveedores en la nube.
+    if preferred not in ("auto", "sky", "ollama", "openjarvis") or not eligible(task, mode):
         return None
     start = time.monotonic()
     done = False
     count = 0
     try:
-        provider, model = _backend()
+        provider, model = _backend(preferred)
         context = _context(history)
         plan_prompt = json.dumps({"task": task[:MAX_CONTEXT_CHARS], "history": context},
                                  ensure_ascii=False)
