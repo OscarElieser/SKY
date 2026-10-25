@@ -223,6 +223,10 @@ def mensaje(body: Mensaje, request: Request):
     academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
     if academy is not None:
         return _medir_turno(academy, inicio)
+    from neural_core.sky_creative_intent import handle as creative_handle
+    creative_result = creative_handle(body.texto, body.proveedor)
+    if creative_result is not None:
+        return _medir_turno(creative_result, inicio)
     from neural_core.sky_social_intent import prepare as social_prepare
     social_result = social_prepare(body.texto, body.proveedor)
     if social_result is not None:
@@ -261,6 +265,11 @@ def mensaje_stream(body: Mensaje, request: Request):
         academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
         if academy is not None:
             yield final(academy)
+            return
+        from neural_core.sky_creative_intent import handle as creative_handle
+        creative_result = creative_handle(body.texto, body.proveedor)
+        if creative_result is not None:
+            yield final(creative_result)
             return
         from neural_core.sky_social_intent import prepare as social_prepare
         social_result = social_prepare(body.texto, body.proveedor)
