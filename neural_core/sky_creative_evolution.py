@@ -16,6 +16,7 @@ import struct
 import uuid
 import wave
 from datetime import datetime, timezone
+from contextlib import contextmanager
 from pathlib import Path
 
 LANGUAGES = {
@@ -72,6 +73,7 @@ def _ask(system, prompt, provider="auto", max_tokens=2500):
     return _clean(result, "Respuesta de IA", 38000, 20), name
 
 
+@contextmanager
 def _db():
     path = Path(os.getenv("SKY_CREATIVE_EVOLUTION_DB") or
                 ROOT / "local_data" / "sky_creative_evolution.sqlite3")
@@ -86,7 +88,16 @@ def _db():
     CREATE TABLE IF NOT EXISTS work_versions(
         id TEXT NOT NULL,version INTEGER NOT NULL,text TEXT NOT NULL,
         recorded TEXT NOT NULL,PRIMARY KEY(id,version));""")
-    return db
+    try:
+        yield db
+        if db.in_transaction:
+            db.commit()
+    except BaseException:
+        if db.in_transaction:
+            db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def get_work(ident):
@@ -156,6 +167,40 @@ def revise_writing(ident,instruction,version,provider="auto"):
         if result.rowcount!=1:
             raise CreativeInvalid("Conflicto de versiones.")
         db.execute("INSERT INTO work_versions VALUES(?,?,?,?)",(ident,version+1,body,now))
+    return get_work(ident)
+
+
+def continue_writing(ident,instruction,version,provider="auto"):
+    """Extiende novelas y guiones con un capítulo o escena cada vez."""
+    instruction=_clean(instruction,"Continuación",1000,8)
+    if type(version) is not int or version < 1:
+        raise CreativeInvalid("Versión inválida.")
+    work=get_work(ident)
+    if not work or work["version"]!=version:
+        raise CreativeInvalid("La obra no existe o su versión ya cambió.")
+    if work["kind"] not in ("novela","historia","guion","pelicula","cuento"):
+        raise CreativeInvalid("Este tipo de obra no admite capítulos adicionales.")
+    if len(work["text"]) > 24000:
+        raise CreativeInvalid("Este volumen está completo; creá un volumen nuevo para continuar.")
+    addition,engine=_ask(
+        f"Sos SKY escritora y supervisora de continuidad. Escribí la siguiente parte de "
+        f"la obra en {LANGUAGES[work['locale']]}. Respetá personajes, hechos, "
+        "identidad, cronología y estilo. Generá material NUEVO, no repitas capítulos. "
+        "Entregá SOLO la nueva escena o capítulo con un título propio. "
+        "No copies material ajeno.",
+        json.dumps({"title":work["title"],"previous":work["text"][-12500:],
+                    "direction":instruction},ensure_ascii=False),provider,2700)
+    combined=work["text"].rstrip()+"\n\n"+addition
+    if len(combined)>38000:
+        raise CreativeInvalid("Se alcanzó el límite de este volumen.")
+    now=datetime.now(timezone.utc).isoformat()
+    with _db() as db:
+        result=db.execute("UPDATE works SET text=?,version=version+1,provider=? "
+                          "WHERE id=? AND version=?",(combined,engine,ident,version))
+        if result.rowcount!=1:
+            raise CreativeInvalid("Conflicto de versiones.")
+        db.execute("INSERT INTO work_versions VALUES(?,?,?,?)",
+                   (ident,version+1,combined,now))
     return get_work(ident)
 
 
