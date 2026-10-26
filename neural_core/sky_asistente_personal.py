@@ -68,6 +68,11 @@ def interpretar(texto: str) -> dict | None:
     atajo = atajo_escritorio(texto)
     if atajo:
         return atajo
+    # Direct writing is an explicit Word action; do not infer from LLM prose.
+    from .sky_word_editor import propuesta as word_direct
+    word = word_direct(texto)
+    if word:
+        return word
     propio = _interpretar_propio(texto)
     if propio and propio['action'] == 'list_path':
         return propio
@@ -283,6 +288,10 @@ def reglas(texto: str) -> dict | None:
     shortcut = atajo_local(texto)
     if shortcut:
         return shortcut
+    from .sky_word_editor import solicitud as word_local
+    word = word_local(texto)
+    if word:
+        return word
     # HUD commands are local UI actions, not generative conversation.
     # Keep this deterministic even when Ollama or the provider is unavailable.
     from .sky_hud_intents import panel_chat
