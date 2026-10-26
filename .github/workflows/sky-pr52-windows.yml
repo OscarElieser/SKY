@@ -18,7 +18,7 @@ jobs:
         run: python -m pip install -r requirements_studio.txt pytest
       - name: Windows syntax checks
         run: |
-          python -m py_compile iniciar_sky_autonomo.py neural_core/sky_voice_single_instance.py metaverse/api.py neural_core/sky_http_metrics_queue.py sky_manos_libres.py scripts/APLICAR_SKY_LATENCIA_VOZ.py scripts/sky_windows_pr52_acceptance.py scripts/sky_pr52_reconcile_local.py scripts/sky_pr52_fix_chat_panel.py
+          python -m py_compile iniciar_sky_autonomo.py neural_core/sky_voice_single_instance.py metaverse/api.py neural_core/sky_http_metrics_queue.py sky_manos_libres.py scripts/APLICAR_SKY_LATENCIA_VOZ.py scripts/sky_windows_pr52_acceptance.py scripts/sky_pr52_reconcile_local.py scripts/sky_pr52_fix_chat_panel.py scripts/sky_pr52_single_listener_fix.py
           node --check metaverse/static/hud.js
       - name: Windows local voice and metrics regressions
         run: python -m pytest -q tests/test_sky_latency_and_wordless_voice.py tests/test_sky_hud_chat_voice_bridge.py tests/test_sky_voice_single_instance.py tests/test_sky_pr52_reconcile_local.py
