@@ -123,7 +123,7 @@ def plan(root: Path):
             changes.append((rel, "AUSENTE"))
             continue
         raw = local.read_bytes()
-        text = raw.decode("utf-8-sig")
+        text = raw.decode("utf-8-sig").replace("\r\n", "\n")
         conflict = False
         for before, after in replacements:
             if after in text:
