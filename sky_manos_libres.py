@@ -20,6 +20,23 @@ from neural_core.providers import choose_provider
 
 WAKE_WORDS=('sky','esquai','es kay','es cai','escai')
 
+# This mode is opt-in: ambient speech is *never* treated as a command by
+# default. Even when enabled, require a direct imperative/question, or an
+# already-active conversational follow-up. Device permissions still apply.
+DIRECTED_START = re.compile(
+    r'^(?:hola|buenas|oye|mira|necesito|quiero|ayudame|explicame|'
+    r'abre|abri|abrir|mostra|muestra|mostrar|crea|crear|redacta|redactame|'
+    r'escribe|escribi|prepara|preparame|guarda|guardar|busca|buscar|'
+    r'reproduce|pausa|continua|reanuda|baja|sube|silencia|'
+    r'cierra|cerra|cerrar|lee|leeme|dime|decime|pon|pone|'
+    r'como|que|cual|cuanto|cuando|donde|por que|para que|'
+    r'quiero saber|puedes|podes|podrias|podrias ayudarme)\\b'
+)
+
+
+def is_directed_speech(text: str) -> bool:
+    return bool(DIRECTED_START.match(norm(str(text or '')).strip()))
+
 
 def text_after_wake(text):
     normalized=norm(text)
@@ -39,8 +56,17 @@ def main():
     parser.add_argument('--rate',type=int,default=16000)
     parser.add_argument('--execute-safe',action='store_true',
                         default=os.getenv('SKY_EXECUTE_SAFE', '1') in ('1', 'true', 'yes'),
-                        help='Ejecuta al oír SKY las capacidades que marcaste como automáticas (agente_dispositivo.py --auto ...).')
+                        help='Ejecuta solo capacidades automáticas autorizadas por el dueño.')
+    listen_group = parser.add_mutually_exclusive_group()
+    listen_group.add_argument('--no-wake-word', action='store_true',
+                              help='Habilita escucha natural sin decir SKY, por decisión del propietario.')
+    listen_group.add_argument('--require-wake', action='store_true',
+                              help='Exige SKY incluso si la opción de escucha natural está configurada.')
     args=parser.parse_args()
+    allow_wordless = not args.require_wake and (
+        args.no_wake_word or os.getenv('SKY_VOICE_ALWAYS_LISTEN', '0').lower()
+        in ('1', 'true', 'yes'))
+    wordless_active = allow_wordless
     if not args.model or not Path(args.model).is_dir():
         sys.exit('No existe el modelo Vosk de español. Descargá uno y pasá --model carpeta.')
     try:
@@ -89,7 +115,11 @@ def main():
         return st, rec
 
     stream, recognizer = create_stream_and_recognizer()
-    print('SKY: micrófono activo; decí “SKY” antes de la pregunta. Ctrl+C para finalizar.')
+    if allow_wordless:
+        print('SKY: escucha natural activada por el dueño; acepto órdenes directas sin decir “SKY”.')
+        print('Para pausar: “pausa la conversación”; para volver: “reanuda la conversación”.')
+    else:
+        print('SKY: micrófono activo; decí “SKY” antes de la pregunta. Ctrl+C para finalizar.')
     print('La voz se reconoce localmente con Vosk; el texto consulta al proveedor SKY que configuraste.')
     from neural_core.voice_coordinator import coordinador_voz, VoiceState, InteractionMode
 
@@ -158,8 +188,10 @@ def main():
                     active_until = now + SESSION_TIMEOUT
                     coordinador_voz.activate_session()
                     sync_state({'session_active': True, 'active_until': active_until, 'last_wake': now, 'coordinator_state': VoiceState.ESCUCHANDO.value})
-                elif coordinador_voz.is_in_follow_up_window() or (now < active_until):
-                    # Turno conversacional continuo activo: no requiere repetir "SKY"
+                elif (coordinador_voz.is_in_follow_up_window() or (now < active_until)
+                      or (wordless_active and is_directed_speech(result))):
+                    # In owner-enabled natural mode, a direct instruction can
+                    # start a session without requiring the wake word.
                     command = result.strip(' ,.:;!?¿¡')
                     active_until = now + SESSION_TIMEOUT
                     coordinador_voz.activate_session()
@@ -179,7 +211,10 @@ def main():
                     msg = v_ctrl.get('message', 'Comando recibido.')
                     if subact in ('pause_session', 'end_session'):
                         active_until = 0.0
+                        wordless_active = False
                         sync_state({'session_active': False, 'status': 'paused' if subact == 'pause_session' else 'idle', 'coordinator_state': coordinador_voz.get_state().value})
+                    elif subact in ('resume_session', 'activate_natural'):
+                        wordless_active = allow_wordless
                     say(msg)
                     continue
 
