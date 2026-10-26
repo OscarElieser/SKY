@@ -58,44 +58,101 @@ def propuesta(texto: str) -> dict | None:
     return result.get("propuesta") if result else None
 
 
-def enviar_ctrl_f4_word() -> dict:
-    """Dispatch only when the foreground window belongs to WINWORD.EXE.
+def seleccionar_ventana_word(candidatas: list[int]) -> int:
+    """Fail closed if there is no unambiguous Word document window."""
+    if len(candidatas) != 1:
+        raise RuntimeError(
+            "Necesito exactamente una ventana principal de Word abierta "
+            "para aplicar Ctrl+F4; no cerré ningún documento."
+        )
+    return candidatas[0]
 
-    Returns SENT, never VERIFIED: Word may show a save confirmation instead of
-    closing the document. ctypes imports deliberately happen only on Windows.
+
+def enviar_ctrl_f4_word() -> dict:
+    """Focus the *only* visible WINWORD.EXE window and send one Ctrl+F4.
+
+    The HUD's Confirm button naturally leaves Chrome in the foreground.
+    We therefore select a unique, verified Word window instead of assuming
+    the active browser belongs to Word. Failure to focus cancels the action.
+    SENT never means the document was closed or saved.
     """
     import os
     if os.name != "nt":
         raise RuntimeError("Los atajos de escritorio de SKY requieren Windows.")
     import ctypes
     from ctypes import wintypes
-
-    user32 = ctypes.WinDLL("user32", use_last_error=True)
-    hwnd = user32.GetForegroundWindow()
-    if not hwnd:
-        raise RuntimeError("No hay una ventana activa. Enfocá Word y volvé a confirmar.")
-    pid = wintypes.DWORD(0)
-    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
-    user32.GetWindowThreadProcessId.restype = wintypes.DWORD
-    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-    if not pid.value:
-        raise RuntimeError("No pude identificar la ventana activa.")
+    import time
     try:
         import psutil
-        executable = psutil.Process(pid.value).name().lower()
-    except (ImportError, OSError, Exception):
-        raise RuntimeError("No pude verificar que Word sea la ventana activa.")
-    if executable != "winword.exe":
-        raise RuntimeError("No envié Ctrl+F4: la ventana activa no es Microsoft Word.")
+    except ImportError as exc:
+        raise RuntimeError("Para controlar ventanas necesitás psutil instalado.") from exc
+
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    hwnd_t = wintypes.HWND
+    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, hwnd_t, wintypes.LPARAM)
+    user32.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
+    user32.EnumWindows.restype = wintypes.BOOL
+    user32.IsWindowVisible.argtypes = [hwnd_t]
+    user32.IsWindowVisible.restype = wintypes.BOOL
+    user32.GetWindow.argtypes = [hwnd_t, wintypes.UINT]
+    user32.GetWindow.restype = hwnd_t
+    user32.GetWindowTextLengthW.argtypes = [hwnd_t]
+    user32.GetWindowTextLengthW.restype = ctypes.c_int
+    user32.GetWindowThreadProcessId.argtypes = [
+        hwnd_t, ctypes.POINTER(wintypes.DWORD)
+    ]
+    user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+    user32.GetForegroundWindow.restype = hwnd_t
+    user32.ShowWindow.argtypes = [hwnd_t, ctypes.c_int]
+    user32.SetForegroundWindow.argtypes = [hwnd_t]
+    user32.SetForegroundWindow.restype = wintypes.BOOL
+
+    windows = []
+
+    @callback_type
+    def enum_window(hwnd, _):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        if user32.GetWindow(hwnd, 4):  # GW_OWNER; exclude owned dialogs
+            return True
+        if user32.GetWindowTextLengthW(hwnd) <= 0:
+            return True
+        pid = wintypes.DWORD(0)
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if not pid.value:
+            return True
+        try:
+            if psutil.Process(pid.value).name().lower() == "winword.exe":
+                windows.append(int(hwnd))
+        except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+            pass
+        return True
+
+    if not user32.EnumWindows(enum_window, 0):
+        raise RuntimeError("No pude enumerar las ventanas de Word.")
+    target = seleccionar_ventana_word(list(dict.fromkeys(windows)))
+    # The user confirmed in the HUD; restore and focus Word before sending.
+    user32.ShowWindow(target, 9)  # SW_RESTORE
+    user32.SetForegroundWindow(target)
+    for _ in range(3):
+        if user32.GetForegroundWindow() == target:
+            break
+        time.sleep(0.12)
+    if user32.GetForegroundWindow() != target:
+        raise RuntimeError(
+            "Windows no permitió enfocar Word. No envié Ctrl+F4. "
+            "Activá Word manualmente y cerrá el documento desde allí."
+        )
 
     KEYEVENTF_KEYUP = 0x0002
     VK_CTRL = 0x11
     VK_F4 = 0x73
     keybd = user32.keybd_event
-    keybd.argtypes = [ctypes.c_ubyte, ctypes.c_ubyte, wintypes.DWORD, ctypes.c_size_t]
+    keybd.argtypes = [
+        ctypes.c_ubyte, ctypes.c_ubyte, wintypes.DWORD, ctypes.c_size_t
+    ]
     keybd.restype = None
-    # Never dispatch if Word no longer owns foreground immediately beforehand.
-    if hwnd != user32.GetForegroundWindow():
+    if user32.GetForegroundWindow() != target:
         raise RuntimeError("La ventana activa cambió. Atajo cancelado.")
     try:
         keybd(VK_CTRL, 0, 0, 0)
@@ -106,6 +163,8 @@ def enviar_ctrl_f4_word() -> dict:
     return {
         "ok": True,
         "status": "SENT",
-        "message": ("Envié Ctrl+F4 a Word. No puedo asegurar que el documento "
-                    "se haya cerrado; Word podría pedir guardar cambios."),
+        "message": (
+            "Envié Ctrl+F4 a la única ventana de Word. No puedo asegurar "
+            "que el documento se haya cerrado: Word podría solicitar guardar."
+        ),
     }
