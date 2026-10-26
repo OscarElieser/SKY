@@ -41,6 +41,9 @@ def isolated_transcribe(audio: bytes, *, filename: str = 'audio.wav',
         allowed = ('PATH', 'SYSTEMROOT', 'WINDIR', 'HOME', 'USERPROFILE', 'TMP',
                    'TEMP', 'LD_LIBRARY_PATH', 'VIRTUAL_ENV', 'LANG')
         env = {key: os.environ[key] for key in allowed if key in os.environ}
+        # Explicit UTF-8 for the child stdout/stderr, independent of Windows cp1252.
+        # Only the audio worker gets this setting; secrets stay excluded.
+        env['PYTHONIOENCODING'] = 'utf-8'
         env.update({'SKY_STT_MODEL_DIR': str(base.model_directory()),
                     'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1',
                     'HF_DATASETS_OFFLINE': '1', 'PYTHONPATH': str(root)})
