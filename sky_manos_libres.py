@@ -280,4 +280,18 @@ def main():
         sync_state({'hands_free_listening': False, 'session_active': False, 'status': 'stopped', 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
         print('Micrófono desactivado. SKY-IA finalizado.')
 
-if __name__=='__main__': main()
+def _start_single_instance() -> None:
+    # Reject duplicate manual/supervisor starts before loading the Vosk model,
+    # creating a second TTS engine, or claiming the Logitech microphone.
+    from neural_core.sky_voice_single_instance import single_voice_instance
+    with single_voice_instance() as acquired:
+        if not acquired:
+            print('SKY: ya hay un servicio de escucha Vosk activo. '
+                  'No iniciaré otro micrófono. Usá la instancia existente.',
+                  flush=True)
+            return
+        main()
+
+
+if __name__ == '__main__':
+    _start_single_instance()
