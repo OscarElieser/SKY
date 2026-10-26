@@ -239,7 +239,20 @@ def test_gpt_y_gemini(monkeypatch):
                                      'usageMetadata': {'totalTokenCount': 20}})
     eventos = list(cerebro.decidir_eventos('capital de Nicaragua', [], 'voz'))
     assert eventos[-1] == ('fin', 'Managua es la capital.') and 'generateContent' in capt['url']
+    # La conversación sin acciones ya NO debe enviar las 22 definiciones de herramientas.
+    assert 'tools' not in capt['cuerpo']
+
+    # Una orden concreta sí conserva declaraciones de herramientas Gemini válidas.
+    capt = _nube_falsa(monkeypatch, {
+        'candidates': [{'content': {'parts': [{
+            'functionCall': {'name': 'reproducir', 'args': {'consulta': 'lofi', 'servicio': 'youtube'}}
+        }]}}],
+        'usageMetadata': {'totalTokenCount': 30}
+    })
+    eventos = list(cerebro.decidir_eventos('pon música en YouTube', [], 'voz'))
+    assert eventos and eventos[0][0] == 'herramienta'
     decl = capt['cuerpo']['tools'][0]['functionDeclarations']
+    assert {d['name'] for d in decl} == {'reproducir', 'reproductor_sky'}
     assert all('parameters' not in d or d['parameters']['properties'] for d in decl)
 
 
