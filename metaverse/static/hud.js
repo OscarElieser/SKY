@@ -868,11 +868,11 @@
       renderAccion(p, card, data.ejecucion); setState('idle', 'Listo.');
       await speak(textoAccion(p, data.ejecucion)); refrescarLog(); seguirConversacion(); return;
     }
-    if (data.aviso) { card.appendChild(el('div', 'note', data.aviso)); setState('idle', 'Permiso desactivado');
+    if (data.aviso) { card.appendChild(el('div', 'note', 'Esta función está desactivada. Revisá los permisos de SKY.')); setState('idle', 'Permiso desactivado');
       await speak('Esa función está desactivada en tu equipo. Te dejé cómo activarla.'); seguirConversacion(); return; }
-    confirmar(card, p.description, () => ejecutar(p, card, data.aprender), (data.nivel_riesgo || 0) >= 3);
+    confirmar(card, titulo, () => ejecutar(p, card, data.aprender), (data.nivel_riesgo || 0) >= 3);
     setState('idle', 'Esperando tu confirmación');
-    if (modo === 'voz') { await speak('¿Lo hago? ' + p.description + '.'); if (S.conv || modo === 'voz') escuchar(); }
+    if (modo === 'voz') { await speak('¿Lo hago? ' + titulo + '.'); if (S.conv || modo === 'voz') escuchar(); }
   }
   function tarjetaParada() {
     const card = addCard('⏹ Parada de emergencia activa', 'Ninguna acción se ejecuta en tus equipos ni en tu casa hasta que la levantes.');
@@ -901,7 +901,7 @@
     S.pending = pend;
   }
   async function ejecutar(p, card, frase) {
-    setState('executing', p.description);
+    setState('executing', p.action === 'open_url' ? 'Abriendo página…' : p.description);
     try {
       const cuerpo = { action: p.action, params: p.params, dispositivo: 'local' };
       if (frase) cuerpo.frase = String(frase).slice(0, 120);
@@ -914,7 +914,8 @@
   }
   async function casaOrden(data, modo) {
     const p = data.propuesta;
-    const card = addCard('▸ ' + p.description, 'casa · ' + p.service + (data.nivel_riesgo ? ' · nivel ' + data.nivel_riesgo : ''));
+    const card = addCard('▸ ' + p.description,
+      (data.nivel_riesgo || 0) >= 3 ? 'Esta operación necesita tu autorización explícita.' : '');
     const correr = async () => {
       setState('executing', p.description);
       try {
