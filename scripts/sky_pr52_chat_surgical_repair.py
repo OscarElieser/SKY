@@ -21,7 +21,6 @@ import urllib.request
 
 REPO = "OscarElieser/SKY"
 BASE = "7526b8092301d6834e5c935407581dedcee57f09"
-TARGET = "fa69d42b54f26693751881cf3b7f9baf35f7b09c"  # adjusted below to verified commit
 # Pin to the exact earlier reviewed HUD-chat implementation, not branch HEAD:
 TARGET = "fa69d42b54f26693751881cf3badee6f078d6fe1"
 
