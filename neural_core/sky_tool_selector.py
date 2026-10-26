@@ -107,6 +107,7 @@ def select_tool_names(text: str, available: Iterable[str]) -> list[str]:
     """
     present = list(dict.fromkeys(str(name) for name in available))
     utterance = _norm(text)
+    utterance = re.sub(r"^(?:(?:oye|hey|mira) )?(?:sky )?", "", utterance)
     if not utterance:
         return []
     # Una pregunta explicativa sobre Word, volumen o YouTube no es una orden.
