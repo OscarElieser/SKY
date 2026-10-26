@@ -284,3 +284,13 @@ body.sky-cinematic{background:
  .sky-cinematic .sky-mini-chat .composer .send{flex:0 0 auto}
  .sky-cinematic .dock{bottom:10px}
 }
+
+/* SKY: documentos adjuntos en cápsula holográfica y módulos bajo demanda. */
+.sky-attached-chips{display:flex;flex:0 0 100%;order:10;gap:6px;flex-wrap:wrap;max-height:76px;overflow-y:auto}
+.sky-attached-chips[hidden]{display:none!important}
+.sky-attached-chips .chip{font-size:11px;display:inline-flex;align-items:center;gap:6px}
+.sky-attached-chips .chip button{cursor:pointer;border:0;background:transparent;color:var(--cyan);font-size:13px}
+.sky-cinematic .sky-mini-chat .composer .ctl.attach{display:inline-flex!important;align-items:center;justify-content:center}
+.sky-extra-modules{margin-top:12px;border-top:1px solid var(--line2);padding-top:10px}
+.sky-extra-modules summary{color:var(--cyan);font-size:12px;cursor:pointer;margin-bottom:8px}
+#p-mod .tiles + .sky-extra-modules .tiles{margin-top:8px}
