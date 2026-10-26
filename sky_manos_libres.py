@@ -17,7 +17,7 @@ from neural_core.sky_asistente_personal import interpretar as interpret_command,
 from neural_core.voz_inbox import add_inbox
 from neural_core.assistant import responder
 from neural_core.providers import choose_provider
-from neural_core.sky_voice_queue import VoiceWorkQueue, wake_during_speech
+from neural_core.sky_voice_queue import VoiceWorkQueue, wake_during_speech, parada_emergencia_voz
 
 WAKE_WORDS=('sky','esquai','es kay','es cai','escai')
 
@@ -229,9 +229,28 @@ def main():
                 result=json.loads(recognizer.Result()).get('text','').strip()
                 if not result: continue
 
+                # La parada de emergencia NO espera a que Ollama termine.
+                # Durante TTS se exige el prefijo SKY para evitar falsos
+                # positivos del audio de salida.
+                durante_tts = audio_durante_tts or voice_runtime.speaking
+                if parada_emergencia_voz(result, exigir_activacion=durante_tts):
+                    from neural_core.sky_asistente_personal import parada
+                    alerta = parada("sky para todo")
+                    if alerta:
+                        voice_runtime.cancel_pending()
+                        voice_runtime.interrupt_speech()
+                        active_until = 0.0
+                        wordless_active = False
+                        coordinador_voz.end_session()
+                        sync_state({'session_active': False, 'status': 'paused',
+                                    'wordless_active': False,
+                                    'coordinator_state': VoiceState.PAUSADO.value})
+                        say(alerta['mensaje'])
+                    continue
+
                 # Para evitar autoejecuciones por eco: durante TTS sólo se
                 # permite pedir silencio con "SKY ..."; nunca ejecutar acciones.
-                if audio_durante_tts or voice_runtime.speaking:
+                if durante_tts:
                     if wake_during_speech(result):
                         voice_runtime.interrupt_speech()
                         print('SKY: interrumpiendo voz; repetí la orden cuando termine.')
