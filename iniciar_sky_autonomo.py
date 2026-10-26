@@ -246,6 +246,7 @@ class SkySupervisor:
         self.processes: Dict[str, subprocess.Popen] = {}
         self.specs: Dict[str, tuple] = {}
         self.reinicios: Dict[str, list] = {}
+        self._voice_retry_after = 0.0  # Another Vosk listener may own the mic.
         self.running = False
 
     def start_all(self):
@@ -362,6 +363,18 @@ class SkySupervisor:
                 for name, proc in list(self.processes.items()):
                     ret = proc.poll()
                     if ret is None:
+                        continue
+                    if name == "voice" and ret == 42:
+                        # Another SKY listener already holds the microphone.
+                        # Retry periodically without penalizing crash recovery.
+                        # Never start two Vosk engines on one owner session.
+                        now = time.monotonic()
+                        if now >= self._voice_retry_after and name in self.specs:
+                            print("[SKY] Ya existe una escucha Vosk activa; "
+                                  "reintentaré el servicio supervisado en 30 segundos.")
+                            self._voice_retry_after = now + 30.0
+                            args, env = self.specs[name]
+                            self._iniciar(name, args, env)
                         continue
                     # v12.3: reinicio controlado (máx. 5 por hora y proceso) para que SKY siga disponible.
                     ahora = time.time()
