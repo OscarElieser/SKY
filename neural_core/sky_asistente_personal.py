@@ -60,6 +60,10 @@ _PRIORIDAD_JARVIS = frozenset({'player_control', 'holographic_window', 'voice_co
 
 def interpretar(texto: str) -> dict | None:
     """Une los dos intérpretes de SKY y devuelve una propuesta de acción, o None si es conversación."""
+    from .sky_hud_intents import panel_chat
+    hud_chat = panel_chat(texto)
+    if hud_chat:
+        return hud_chat
     propio = _interpretar_propio(texto)
     if propio and propio['action'] == 'list_path':
         return propio
@@ -269,6 +273,13 @@ def reglas(texto: str) -> dict | None:
     stop = parada(_norm(texto))   # la parada de emergencia va antes que todo
     if stop:
         return stop
+    # HUD commands are local UI actions, not generative conversation.
+    # Keep this deterministic even when Ollama or the provider is unavailable.
+    from .sky_hud_intents import panel_chat
+    hud_chat = panel_chat(texto)
+    if hud_chat:
+        return {'tipo': 'accion', 'propuesta': hud_chat,
+                'mensaje': hud_chat['description']}
     # SKY-SALUDO-INMEDIATO: no cargar Ollama para una bienvenida simple.
     # La parada de emergencia sigue evaluándose antes de este atajo.
     saludo = re.sub(r'[\s,;:.!¡?¿]+', ' ', _norm(texto)).strip()
