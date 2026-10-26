@@ -37,6 +37,7 @@ Ninguna capacidad marcada «sin validación completa» debe presentarse como fun
 | Habilidades | Catálogo nativo: viajes, proyectos, casa, automonitoreo, seguridad, música, creación | Implementada y probada (APIs externas simuladas) |
 | Skill Builder | Detección de necesidades, propuesta con IA, revisión estática, pruebas aisladas, aprobación con permisos, versiones | Implementada y probada (aislamiento por proceso; sin contenedor del SO) |
 | Integraciones | Centro con vía, requisitos y estado real de 20 plataformas | Implementada y probada |
+| Integraciones | Hermes Agent como consultor (sólo pregunta y texto; SKY se niega si Hermes puede actuar sobre el equipo) (v12.6) | Implementada sin validación completa (API de Hermes simulada; falta probarlo con Hermes real en tu PC) |
 | Creación | Imágenes (OpenAI, Adobe Firefly), presentaciones (Gamma), letras de canciones | Implementada sin validación completa (APIs simuladas; requiere tus claves) |
 | Creación | Canciones con audio (Suno) | **Bloqueada**: Suno no tiene API pública |
 | Creación | Diseños en Canva | Pendiente (OAuth de Canva Connect) |

@@ -49,6 +49,13 @@ Rama: `sky-v12.6-fiabilidad`, desde `main` en `e910f99`. La auditoría completa,
 - `SKY_INICIAR.bat`: opciones **P** (PIN) y **S** (detener). El instalador ofrece configurar el PIN.
 - Variables nuevas en `.env.example`: `SKY_SESION_MAX_HORAS`, `SKY_MODULOS_CONCURRENCIA`, `SKY_MODULOS_RESERVA_MB`, `SKY_OLLAMA_RAM_MB`, `SKY_OLLAMA_KEEP_ALIVE`, `SKY_RECORDATORIO_TOLERANCIA_MIN`, `SKY_VOZ_DEPURAR`, `SKY_SUPERVISOR_DIR` y `SKY_LOG_DIR`.
 
+## Hermes Agent como consultor
+- `neural_core/sky_hermes.py`: SKY le pregunta a [Hermes Agent](https://github.com/NousResearch/hermes-agent) por su API local (127.0.0.1:8642), por voz o texto: «SKY, preguntale a Hermes…», «Hermes, …», «¿cómo está Hermes?».
+- Antes de cada consulta, SKY se niega si Hermes tiene activa alguna herramienta que actúe sobre tu equipo (terminal, archivos, código, navegador, uso de la computadora, delegación, tareas programadas, mensajería) o si su API carga MCP. Con `SKY_LOCAL_ONLY=1` exige además un modelo local.
+- Sólo se envía tu pregunta. La respuesta es texto: SKY nunca ejecuta acciones a partir de ella.
+- Aparece en el registro de módulos, en el centro de integraciones y en el catálogo de extensiones. No se copió código de Hermes y no hay dependencias nuevas.
+- Guía en PowerShell: [docs/guias/SKY_HERMES.md](docs/guias/SKY_HERMES.md). 18 pruebas con una API de Hermes simulada (`tests/test_sky_v12_6_hermes.py`); Hermes real sin validar en tu PC.
+
 ## Compatibilidad
 - Se conservan las rutas, las opciones de línea de comandos y las funciones públicas del lanzador:
   - `is_port_in_use`, `es_servicio_sky`, `get_pid_using_port`, `kill_process_by_pid`, `clean_port_conflicts`, `check_system_status`, `manage_windows_startup` y `SkySupervisor`;

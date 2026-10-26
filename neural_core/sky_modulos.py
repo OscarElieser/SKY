@@ -135,6 +135,11 @@ def _activo_3d() -> bool:
     return 'metaverse.export3d' in sys.modules
 
 
+def _req_hermes() -> list[str]:
+    from .sky_hermes import requisitos
+    return requisitos()
+
+
 def _req_entrenado() -> list[str]:
     from .sky_trained_inference import readiness
     r = readiness()
@@ -225,6 +230,7 @@ def _nucleo() -> list[dict]:
            _req_ollama, _cargar_ollama, None, _activo_ollama, ram_mb=int(os.getenv('SKY_OLLAMA_RAM_MB', '5000') or 5000)),
         _m('export3d', 'Exportación 3D (GLB)', 'motor', ('3d', 'exportacion 3d', 'trimesh', 'glb'),
            _req_3d, _cargar_3d, None, _activo_3d, ram_mb=150),
+        _m('hermes', 'Hermes Agent (consultor)', 'integracion', ('hermes', 'hermes agent'), _req_hermes),
         _m('sky_entrenado', 'Adaptador SKY entrenado (LoRA)', 'motor', ('adaptador', 'modelo entrenado', 'lora'),
            _req_entrenado, _cargar_entrenado, ram_mb=6000),
     ]
@@ -233,7 +239,7 @@ def _nucleo() -> list[dict]:
 def catalogo() -> list[dict]:
     from .sky_integraciones import INTEGRACIONES
     mods = _nucleo()
-    propios = {m['id'] for m in mods} | {'piper', 'whisper', 'agente', 'whatsapp', 'ollama'}
+    propios = {m['id'] for m in mods} | {'piper', 'whisper', 'agente', 'whatsapp', 'ollama', 'hermes-agent'}
     for iid, nombre, via, variables, uso, nota, _docs in INTEGRACIONES:
         if iid in propios:
             continue

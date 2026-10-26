@@ -291,6 +291,13 @@ def reglas(texto: str) -> dict | None:
     if mod:
         return mod
     try:
+        from . import sky_hermes
+        hermes = sky_hermes.interpretar(texto)   # v12.6: Hermes Agent como consultor (sólo texto, nunca acciones)
+    except Exception as exc:
+        hermes = {'tipo': 'error', 'mensaje': 'No pude consultar a Hermes: ' + str(exc)[:120]}
+    if hermes:
+        return hermes
+    try:
         from .sky_agent import interpret_local_command
         local = interpret_local_command(texto)
         if local:

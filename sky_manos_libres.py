@@ -172,6 +172,18 @@ def main():
             return
         turno = time.perf_counter()
         coordinador_voz.set_state(VoiceState.PROCESANDO)
+        from neural_core import sky_hermes
+        if sky_hermes._ORDEN.match(sky_hermes._norm(command)):
+            # v12.6: Hermes como consultor; su respuesta es sólo texto y nunca se ejecuta.
+            voice_runtime.say('Le pregunto a Hermes; puede tardar un poco.')
+            t = time.perf_counter()
+            r = sky_hermes.interpretar(command)
+            _medir('ml_modelo', t, bool(r), 'hermes')
+            if r and not voice_runtime.current_turn_cancelled:
+                coordinador_voz.record_turn(command, r['mensaje'])
+                voice_runtime.say(r['mensaje'])
+            _medir('ml_turno', turno, bool(r), 'hermes')
+            return
         t = time.perf_counter()
         intent = interpret_command(command)
         _medir('ml_interpretar', t)
