@@ -36,6 +36,8 @@ class ToolSelectionTests(unittest.TestCase):
             ("SKY, abrí Word", "abrir_app"),
             ("Poneme algo tranquilo", "reproducir"),
             ("Subí el volumen", "volumen"),
+            ("Me está dejando sordo", "volumen"),
+            ("Necesito escribir un informe", "abrir_app"),
             ("Buscá recetas en Google", "buscar_web"),
             ("Abrí mi carpeta de Documentos", "abrir_carpeta_o_documento"),
             ("Creá una nota para mañana", "nota"),
