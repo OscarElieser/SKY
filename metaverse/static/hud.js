@@ -1491,7 +1491,7 @@
     { id: 'perfil', t: 'Perfil', d: 'Quién sos: SKY lo lee en cada respuesta', accion: () => abrirPerfil() },
     { id: 'habilidades', t: 'Habilidades', d: 'Catálogo, Skill Builder e integraciones', accion: () => abrirHabilidades() },
     { id: 'sentinel', t: 'Seguridad', d: 'SKY SENTINEL: PIN, accesos, dispositivos y emergencia', accion: () => abrirSentinel() },
-    { id: 'streamlit', t: 'Panel completo', d: 'Deportes, finanzas, visión… (pestaña aparte)', externo: 'http://127.0.0.1:8501' },
+    { id: 'streamlit', t: 'Panel técnico', d: 'Panel heredado dentro de SKY, únicamente al solicitarlo', accion: () => abrirModuloTecnico('tablero') },
   ];
   // Los 27 módulos heredados se presentan aquí, pero jamás se cargan al iniciar.
   // El catálogo original de atajos del HUD se conserva bajo "Herramientas avanzadas".
