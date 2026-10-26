@@ -62,7 +62,10 @@ class VoiceWorkQueue:
         self._tts_factory = tts_factory
         self._rate_factory = rate_factory or (lambda: 180)
         self._speech_state = speech_state
-        self._queue: queue.Queue[tuple[str, str]] = queue.Queue(maxsize=capacity)
+        self._queue: queue.Queue[tuple[str, str, int]] = queue.Queue(maxsize=capacity)
+        self._generation = 0
+        self._active_generation = -1
+        self._generation_lock = threading.Lock()
         self._stop = threading.Event()
         self._cancel_speech = threading.Event()
         self._cancel_current = threading.Event()
@@ -111,35 +114,39 @@ class VoiceWorkQueue:
     def submit(self, command: str) -> bool:
         if not isinstance(command, str) or not command.strip() or self._stop.is_set():
             return False
-        try:
-            self._queue.put_nowait(("command", command))
-            return True
-        except queue.Full:
-            return False
+        with self._generation_lock:
+            try:
+                self._queue.put_nowait(("command", command, self._generation))
+                return True
+            except queue.Full:
+                return False
 
     def announce(self, message: str) -> bool:
         if not message or self._stop.is_set():
             return False
-        try:
-            self._queue.put_nowait(("speech", message))
-            return True
-        except queue.Full:
-            return False
+        with self._generation_lock:
+            try:
+                self._queue.put_nowait(("speech", message, self._generation))
+                return True
+            except queue.Full:
+                return False
 
     def cancel_pending(self) -> int:
         """Parada de emergencia: suprimir salida pendiente y vaciar órdenes futuras."""
-        self._cancel_current.set()
-        self._cancel_speech.set()
-        discarded = 0
-        while True:
-            try:
-                self._queue.get_nowait()
-            except queue.Empty:
-                break
-            else:
-                discarded += 1
-                self._queue.task_done()
-        return discarded
+        with self._generation_lock:
+            self._generation += 1  # invalida incluso el turno actualmente ejecutado
+            self._cancel_current.set()
+            self._cancel_speech.set()
+            discarded = 0
+            while True:
+                try:
+                    self._queue.get_nowait()
+                except queue.Empty:
+                    break
+                else:
+                    discarded += 1
+                    self._queue.task_done()
+            return discarded
 
     def interrupt_speech(self) -> bool:
         """Solicita detener TTS. Nunca intenta llamar COM/pyttsx3 desde el hilo del micrófono."""
@@ -173,7 +180,9 @@ class VoiceWorkQueue:
     def say(self, message: str) -> None:
         """Solo debe invocarse desde el trabajador; texto no se encola como orden."""
         message = str(message or "")
-        if not message or self._stop.is_set() or self._cancel_current.is_set():
+        with self._generation_lock:
+            vigente = self._active_generation == self._generation
+        if not message or self._stop.is_set() or self._cancel_current.is_set() or not vigente:
             return
         print("SKY-IA:", message)
         if self._engine is None:
@@ -210,11 +219,18 @@ class VoiceWorkQueue:
         self._engine = self._init_tts()
         while not self._stop.is_set():
             try:
-                kind, value = self._queue.get(timeout=0.5)
+                kind, value, generation = self._queue.get(timeout=0.5)
             except queue.Empty:
                 continue
+            with self._generation_lock:
+                vigente = generation == self._generation
+                if vigente:
+                    self._active_generation = generation
+                    self._cancel_current.clear()
+            if not vigente:
+                self._queue.task_done()
+                continue
             self._busy.set()
-            self._cancel_current.clear()
             try:
                 if kind == "command":
                     self._handle(value)
