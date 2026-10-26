@@ -480,19 +480,22 @@ async def upload_chat_file(file:UploadFile=File(...)):
 
     try:
         texto = extraer_texto(filename, data)
-    except Exception as exc:
-        texto = f"[Archivo {filename} ({len(data)} bytes) listo para procesamiento]"
+        parsed = bool(str(texto or '').strip())
+    except Exception:
+        texto, parsed = "", False
 
+    # Nunca declarar "conocimiento integrado" cuando sólo se recibió un binario.
     doc_id = None
-    try:
-        doc_id = agregar_documento(filename, texto[:245000])
-    except Exception:
-        pass
-    try:
-        guardar_memoria(f"Archivo asimilado: '{filename}' ({media_type.upper()}, {round(len(data)/1024, 1)} KB). Conocimiento integrado.")
-        feedback("aprendizaje_documental", 5, f"Incorporado conocimiento desde archivo {filename}")
-    except Exception:
-        pass
+    if parsed:
+        try:
+            doc_id = agregar_documento(filename, texto[:245000])
+        except Exception:
+            pass
+        try:
+            guardar_memoria(f"Archivo de texto incorporado: '{filename}' ({media_type.upper()}, {round(len(data)/1024, 1)} KB).")
+            feedback("aprendizaje_documental", 5, f"Texto procesado de archivo {filename}")
+        except Exception:
+            pass
     return {
         'ok': True,
         'filename': filename,
@@ -500,9 +503,9 @@ async def upload_chat_file(file:UploadFile=File(...)):
         'media_type': media_type,
         'media_url': f'/api/media/uploads/{safe_name}',
         'doc_id': doc_id,
-        'chars_extracted': len(texto),
-        'summary': texto[:800],
-        'full_text': texto[:30000]
+        'chars_extracted': len(texto) if parsed else 0,
+        'summary': texto[:800] if parsed else 'Archivo almacenado; requiere un módulo compatible para analizar su formato.',
+        'full_text': texto[:30000] if parsed else ''
     }
 
 @app.get('/api/evolution/stats',dependencies=[Depends(require_key)])
