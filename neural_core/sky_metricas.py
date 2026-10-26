@@ -26,7 +26,7 @@ from pathlib import Path
 
 _LOCK = threading.Lock()
 RETENCION_DIAS = 30
-TIPOS = ('api', 'turno', 'accion', 'casa', 'agente', 'interfaz', 'voz', 'tarea', 'servicio', 'modelo')
+TIPOS = ('api', 'turno', 'accion', 'pendiente', 'casa', 'agente', 'interfaz', 'voz', 'tarea', 'servicio', 'modelo')
 _insertados = 0
 
 NOMBRES_ACCION = {
@@ -97,6 +97,23 @@ _SEGMENTO_ID = re.compile(r'/(?:[0-9a-f]{8,}|\d+|[0-9a-f-]{32,36})(?=/|$)', re.I
 
 def ruta_plantilla(path: str) -> str:
     return _SEGMENTO_ID.sub('/{id}', path)[:80]
+
+
+ESTADOS_PENDIENTES = frozenset(('SENT', 'RUNNING', 'PENDING', 'DISPATCHED', 'UI'))
+
+
+def respuesta_pendiente(res) -> bool:
+    """Una orden aceptada no equivale a una acción completada ni fallida."""
+    return (isinstance(res, dict) and res.get('ok') is True
+            and str(res.get('status', '')).upper() in ESTADOS_PENDIENTES)
+
+
+def accion_pendiente(f) -> bool:
+    """Incluye eventos antiguos mal clasificados, sin modificar la base de datos."""
+    if f['tipo'] == 'pendiente':
+        return True
+    return (f['tipo'] == 'accion' and not f['ok']
+            and str(f['origen'] or '').upper() in ESTADOS_PENDIENTES)
 
 
 def resultado_ok(res) -> tuple[bool, str]:
@@ -182,6 +199,8 @@ def detectar(ahora: datetime | None = None, filas: list | None = None, base: lis
     inicio = _desde('hoy', ahora)
     hoy = filas if filas is not None else _filas(inicio, ahora.timestamp() + 1)
     previo = base if base is not None else _filas(inicio - 7 * 86400, inicio)
+    # Las alertas reflejan el estado reciente; las estadísticas conservan todo el día.
+    recientes = [f for f in hoy if f['ts'] >= ahora.timestamp() - 30 * 60]
     problemas = []
 
     def agregar(pid, severidad, titulo, detalle, sugerencia):
@@ -189,7 +208,7 @@ def detectar(ahora: datetime | None = None, filas: list | None = None, base: lis
 
     # 1) Rutas de la API lentas o más lentas que lo normal
     por_ruta, base_ruta = {}, {}
-    for f in hoy:
+    for f in recientes:
         if f['tipo'] == 'api' and f['ms'] is not None:
             por_ruta.setdefault(f['nombre'], []).append(f['ms'])
     for f in previo:
@@ -210,7 +229,7 @@ def detectar(ahora: datetime | None = None, filas: list | None = None, base: lis
                     f'p95 de {p95} ms en {len(ms)} peticiones.', 'Revisá el diagnóstico (DIAG) y el uso de CPU del equipo.')
 
     # 2) Errores del servidor
-    api = [f for f in hoy if f['tipo'] == 'api']
+    api = [f for f in recientes if f['tipo'] == 'api']
     errores = [f for f in api if (f['codigo'] or 0) >= 500]
     if len(api) >= 10 and len(errores) / len(api) >= 0.10:
         rutas = sorted({f['nombre'] for f in errores})[:3]
@@ -219,11 +238,11 @@ def detectar(ahora: datetime | None = None, filas: list | None = None, base: lis
                 'Mirá la consola de SKY; ejecutá python sky_diagnostico.py.')
 
     # 3) Acciones fallidas
-    acciones = [f for f in hoy if f['tipo'] in ('accion', 'casa')]
+    acciones = [f for f in recientes if f['tipo'] in ('accion', 'casa') and not accion_pendiente(f)]
     fallidas = [f for f in acciones if not f['ok']]
     if len(acciones) >= 4 and len(fallidas) / len(acciones) >= 0.25:
         agregar('acciones_fallidas', 'alta', 'Están fallando muchas acciones',
-                f'{len(fallidas)} de {len(acciones)} acciones fallaron hoy. Último motivo: {fallidas[-1]["detalle"] or "sin detalle"}.',
+                f'{len(fallidas)} de {len(acciones)} acciones verificadas fallaron en los últimos 30 minutos. Último motivo: {fallidas[-1]["detalle"] or "sin detalle"}.',
                 'Revisá que el agente del equipo esté activo y los permisos en el panel Permisos.')
     racha = {}
     for f in acciones:
@@ -235,16 +254,16 @@ def detectar(ahora: datetime | None = None, filas: list | None = None, base: lis
                     'Probala desde el panel; si dice "desactivada", activá la capacidad.')
 
     # 4) Agente del equipo sin respuesta
-    agente = [f for f in hoy if f['tipo'] == 'agente']
+    agente = [f for f in recientes if f['tipo'] == 'agente']
     if agente and agente[-1]['ok'] == 0 and sum(1 for f in agente[-3:] if not f['ok']) >= 2:
         agregar('agente_caido', 'alta', 'El agente del equipo no responde',
                 agente[-1]['detalle'] or 'Sin conexión con el agente.', 'Inicialo: python agente_dispositivo.py (opción 0 del menú).')
 
     # 4b) Servicios que se reinician solos
-    reinicios = [f for f in hoy if f['tipo'] == 'servicio' and f['nombre'] == 'reinicio']
+    reinicios = [f for f in recientes if f['tipo'] == 'servicio' and f['nombre'] == 'reinicio']
     if len(reinicios) >= 3:
         agregar('reinicios', 'alta', 'Un servicio de SKY se está reiniciando seguido',
-                f'{len(reinicios)} reinicios hoy. Último: {reinicios[-1]["detalle"]}.',
+                f'{len(reinicios)} reinicios en los últimos 30 minutos. Último: {reinicios[-1]["detalle"]}.',
                 'Ejecutá python sky_diagnostico.py y mirá la consola del servicio.')
 
     # 4c) WhatsApp cerca del límite gratis del mes
@@ -266,7 +285,7 @@ def detectar(ahora: datetime | None = None, filas: list | None = None, base: lis
                     'Usá Ollama local (SKY_CEREBRO=auto) o subí el presupuesto en .env.')
 
     # 5) Cerebro lento o fallando
-    turnos = [f for f in hoy if f['tipo'] == 'turno']
+    turnos = [f for f in recientes if f['tipo'] == 'turno']
     cerebro = [f['ms'] for f in turnos if f['origen'] == 'cerebro' and f['ms'] is not None]
     if len(cerebro) >= 3 and percentil(cerebro, 50) > 6000:
         agregar('cerebro_lento', 'media', 'El cerebro local tarda en decidir',
@@ -286,7 +305,8 @@ def resumen(periodo: str = 'hoy', ahora: datetime | None = None) -> dict:
     desde = _desde(periodo, ahora)
     filas = _filas(desde, ahora.timestamp() + 1)
 
-    acciones = [f for f in filas if f['tipo'] in ('accion', 'casa')]
+    acciones = [f for f in filas if f['tipo'] in ('accion', 'casa') and not accion_pendiente(f)]
+    pendientes = [f for f in filas if accion_pendiente(f)]
     ok = [f for f in acciones if f['ok']]
     fallidas = [f for f in acciones if not f['ok']]
     por_accion = {}
@@ -330,7 +350,7 @@ def resumen(periodo: str = 'hoy', ahora: datetime | None = None) -> dict:
     r = {
         'periodo': periodo, 'desde': datetime.fromtimestamp(desde).isoformat(timespec='seconds'),
         'generado': ahora.isoformat(timespec='seconds'), 'eventos': len(filas),
-        'acciones': {'total': len(acciones), 'completadas': len(ok), 'fallidas': len(fallidas),
+        'acciones': {'total': len(acciones), 'completadas': len(ok), 'fallidas': len(fallidas), 'pendientes': len(pendientes),
                      'tasa_exito': round(len(ok) / len(acciones) * 100, 1) if acciones else None,
                      **_estad([f['ms'] for f in acciones]),
                      'por_accion': tabla[:12],
@@ -496,7 +516,9 @@ def describir(r: dict) -> str:
             txt += ' y no falló ninguna'
         partes.append(txt + '.')
     else:
-        partes.append(f'{cuando} no ejecuté tareas en tus equipos.')
+        partes.append(f'{cuando} no ejecuté tareas verificadas en tus equipos.')
+    if a.get('pendientes'):
+        partes.append(f"Hay {a['pendientes']} órdenes enviadas o en proceso, todavía sin verificación; no se cuentan como éxitos ni como fallos.")
     if t['turnos']:
         detalle = ', '.join(f"{v['n']} {ORIGENES.get(o, o)} (mediana {_seg(v['p50_ms'])})"
                             for o, v in sorted(t['por_origen'].items(), key=lambda x: -x[1]['n']))
