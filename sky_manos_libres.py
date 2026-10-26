@@ -54,6 +54,10 @@ def main():
     parser.add_argument('--model', default=str(default_model) if model_exists else None,
                         required=not model_exists, help='Carpeta descargada del modelo Vosk de español')
     parser.add_argument('--rate',type=int,default=16000)
+    parser.add_argument('--input-device', default=os.getenv('SKY_MICROPHONE_DEVICE',''),
+                        help='Índice o parte del nombre del micrófono; consultá --list-input-devices.')
+    parser.add_argument('--list-input-devices', action='store_true',
+                        help='Lista micrófonos sin iniciar Vosk ni capturar sonido.')
     parser.add_argument('--execute-safe',action='store_true',
                         default=os.getenv('SKY_EXECUTE_SAFE', '1') in ('1', 'true', 'yes'),
                         help='Ejecuta solo capacidades automáticas autorizadas por el dueño.')
@@ -63,6 +67,15 @@ def main():
     listen_group.add_argument('--require-wake', action='store_true',
                               help='Exige SKY incluso si la opción de escucha natural está configurada.')
     args=parser.parse_args()
+    if args.list_input_devices:
+        try:
+            import sounddevice as sd
+            from neural_core.sky_audio_devices import input_summary
+            for item in input_summary(sd.query_devices()):
+                print(f"{item['index']}: {item['name']}")
+        except Exception as exc:
+            print('No pude listar micrófonos:', type(exc).__name__)
+        return
     allow_wordless = not args.require_wake and (
         args.no_wake_word or os.getenv('SKY_VOICE_ALWAYS_LISTEN', '0').lower()
         in ('1', 'true', 'yes'))
@@ -86,33 +99,48 @@ def main():
         try: audio.put_nowait(bytes(indata))
         except queue.Full: pass
     def create_stream_and_recognizer():
-        input_devices = [None]
+        from neural_core.sky_audio_devices import candidate_inputs
         try:
-            for idx, d in enumerate(sd.query_devices()):
-                if d.get('max_input_channels', 0) > 0:
-                    input_devices.append(idx)
-        except Exception:
-            pass
-
-        for dev_id in input_devices:
-            dev_sr = None
-            if dev_id is not None:
-                try:
-                    dev_sr = int(sd.query_devices(dev_id).get('default_samplerate', 0))
-                except Exception:
-                    pass
-            rates = [r for r in [args.rate, dev_sr, 48000, 44100, 16000] if r]
+            devices = sd.query_devices()
+            default_input = sd.default.device[0]
+            inputs = candidate_inputs(devices, default_input, args.input_device)
+        except ValueError as exc:
+            sys.exit('Selección de micrófono: ' + str(exc))
+        except Exception as exc:
+            sys.exit('No se pueden consultar entradas de sonido: ' + type(exc).__name__)
+        if not inputs:
+            sys.exit('No hay entradas de micrófono detectadas por sounddevice.')
+        model = Model(args.model)  # cargar una sola vez; nunca por cada intento
+        errors = []
+        for dev_id, name in inputs:
+            try:
+                dev_sr = int(devices[dev_id].get('default_samplerate', 0))
+            except (TypeError, ValueError):
+                dev_sr = 0
+            rates = list(dict.fromkeys(r for r in
+                         (args.rate, dev_sr, 48000, 44100, 16000) if r))
             for candidate_rate in rates:
+                st = None
                 try:
-                    st = sd.RawInputStream(device=dev_id, samplerate=candidate_rate, blocksize=8000, dtype='int16', channels=1, callback=callback)
+                    st = sd.RawInputStream(device=dev_id,
+                                           samplerate=candidate_rate, blocksize=8000,
+                                           dtype='int16', channels=1, callback=callback)
                     st.start()
-                    rec = KaldiRecognizer(Model(args.model), candidate_rate)
+                    rec = KaldiRecognizer(model, candidate_rate)
+                    print(f'SKY micrófono: {name} (índice {dev_id}, {candidate_rate} Hz)',
+                          flush=True)
                     return st, rec
-                except Exception:
-                    continue
-        rec = KaldiRecognizer(Model(args.model), args.rate)
-        st = sd.RawInputStream(samplerate=args.rate, blocksize=8000, dtype='int16', channels=1, callback=callback)
-        return st, rec
+                except Exception as exc:
+                    errors.append((dev_id, candidate_rate, type(exc).__name__))
+                    if st is not None:
+                        try: st.close()
+                        except Exception: pass
+            if args.input_device:
+                # Explicit user selection must never silently select another mic.
+                continue
+        print('SKY: no pude abrir un micrófono. Intentos:',
+              errors[:8], flush=True)
+        sys.exit('No se pudo inicializar el micrófono; revisá permisos o elegí --input-device.')
 
     stream, recognizer = create_stream_and_recognizer()
     if allow_wordless:
