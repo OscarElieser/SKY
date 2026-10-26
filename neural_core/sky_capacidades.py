@@ -314,6 +314,8 @@ def nivel_riesgo(accion: str, params: dict | None = None) -> int:
 
 
 def requiere_confirmacion(accion: str, params: dict, politica: dict) -> bool:
+    if accion == 'word_write':
+        return True  # El dueño confirma cada edición de su documento.
     if nivel_riesgo(accion, params) >= 3:
         return True   # alto riesgo: confirmación expresa por acción, siempre
     return capacidad_para(accion, params) not in politica.get('auto_confirm', [])
