@@ -83,6 +83,8 @@ def _render(items: list[dict], *, topic: str, voting: bool, now: datetime) -> di
         date = _rss_date(item.get("fecha", ""))
         if not title or not link.startswith("https://") or not date:
             continue
+        if voting and not ("balon de oro" in _fold(title) or "ballon d" in _fold(title)):
+            continue
         if date > now + timedelta(minutes=10) or now - date > timedelta(days=7):
             continue
         recents.append((date, title, link, str(item.get("fuente") or "fuente de noticias")[:80]))
@@ -138,7 +140,7 @@ def maybe_answer(text: str) -> dict | None:
     try:
         from .actualidad import noticias
         items = noticias(query, limite=8)
-    except (OSError, ValueError, TimeoutError, ConnectionError, Exception) as exc:
+    except Exception as exc:
         # Do not pass network errors into the model as an alleged answer,
         # and do not silently fall back to stale training-time knowledge.
         return {
