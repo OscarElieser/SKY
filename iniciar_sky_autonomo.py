@@ -459,7 +459,9 @@ def main():
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
-    supervisor.start_all()
+    if supervisor.start_all() is False:
+        # No se arrancó ningún proceso; no detener ni vigilar servicios ajenos.
+        return
     supervisor.monitor()
 
 
