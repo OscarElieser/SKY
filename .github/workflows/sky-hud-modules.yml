@@ -1,0 +1,45 @@
+name: SKY HUD Modules and Attachments
+on:
+  push:
+    paths:
+      - 'neural_core/sky_module_registry.py'
+      - 'metaverse/sky_modules_api.py'
+      - 'metaverse/asistente_api.py'
+      - 'metaverse/api.py'
+      - 'app.py'
+      - 'sky_manos_libres.py'
+      - 'metaverse/static/hud.js'
+      - 'metaverse/static/hud.html'
+      - 'metaverse/static/hud.css'
+      - 'tests/test_sky_module_registry.py'
+      - '.github/workflows/sky-hud-modules.yml'
+  pull_request:
+    paths:
+      - 'neural_core/sky_module_registry.py'
+      - 'metaverse/sky_modules_api.py'
+      - 'metaverse/asistente_api.py'
+      - 'metaverse/api.py'
+      - 'app.py'
+      - 'sky_manos_libres.py'
+      - 'metaverse/static/hud.js'
+      - 'metaverse/static/hud.html'
+      - 'metaverse/static/hud.css'
+      - 'tests/test_sky_module_registry.py'
+      - '.github/workflows/sky-hud-modules.yml'
+jobs:
+  local-module-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax for HUD JS
+        run: node --check metaverse/static/hud.js
+      - name: Python syntax
+        run: python -m py_compile neural_core/sky_module_registry.py metaverse/sky_modules_api.py metaverse/asistente_api.py metaverse/api.py app.py sky_manos_libres.py
+      - name: Registry and voice activation tests
+        run: python -m unittest discover -s tests -p test_sky_module_registry.py -v
