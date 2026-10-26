@@ -15,7 +15,7 @@ import urllib.request
 
 REPO = "OscarElieser/SKY"
 # Immutable reviewed implementation (this commit contains the full new feature).
-REF = "267c171828a4176bbebb30245c1e61fa3c458280"
+REF = "b32422b28286703aa25b6964e421aa4f8a85de08"
 
 CHAT_ORIGINAL = """    from .sky_hud_intents import panel_chat
     hud_chat = panel_chat(texto)
