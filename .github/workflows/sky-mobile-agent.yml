@@ -39,8 +39,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      # GitHub-hosted Ubuntu runners provide Android SDK and sdkmanager.
-      # Avoid reinstalling the removed legacy 'tools' SDK package.
+      - name: Configure Android command-line SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
       - name: Install Android 35 SDK
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
