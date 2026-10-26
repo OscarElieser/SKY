@@ -487,6 +487,52 @@
     sr.start();
   }
 
+  // Adjuntos de la conversación actual. Se guardan por la API existente de SKY.
+  const adjuntosChat = [];
+  function mostrarAdjuntos() {
+    const chips = $('chat-files'); chips.replaceChildren();
+    chips.hidden = adjuntosChat.length === 0;
+    adjuntosChat.forEach((a, i) => {
+      const chip = el('span', 'chip');
+      chip.appendChild(document.createTextNode('📎 ' + a.filename));
+      const quitar = el('button', '', '×'); quitar.type = 'button';
+      quitar.title = 'Quitar ' + a.filename;
+      quitar.addEventListener('click', () => { adjuntosChat.splice(i, 1); mostrarAdjuntos(); });
+      chip.appendChild(quitar); chips.appendChild(chip);
+    });
+  }
+  async function subirAdjuntos(files) {
+    for (const file of files) {
+      // Cualquier extensión: límite por archivo para proteger memoria y disco.
+      if (file.size > 50 * 1024 * 1024) {
+        addMsg('sky', 'El archivo ' + file.name + ' supera 50 MB. Usá una versión más pequeña.', 'err');
+        continue;
+      }
+      const fd = new FormData(); fd.append('file', file);
+      try {
+        const data = await api('/api/chat/upload', { method: 'POST', body: fd });
+        if (!data.ok) throw Error('El servidor no confirmó la carga.');
+        adjuntosChat.push({filename:data.filename, media_type:data.media_type,
+          full_text:String(data.full_text || '').slice(0, 11000), media_url:data.media_url});
+        mostrarAdjuntos();
+        addMsg('sky', 'Adjunté ' + data.filename + ' (' + data.media_type + '). ' +
+          (data.chars_extracted ? 'Texto disponible para preguntas.' : 'Formato recibido; la interpretación depende de herramientas compatibles.'));
+      } catch (e) {
+        addMsg('sky', 'No se pudo adjuntar ' + file.name + ': ' + e.message, 'err');
+      }
+    }
+  }
+  $('btn-attach').addEventListener('click', () => $('chat-file-input').click());
+  $('chat-file-input').addEventListener('change', e => {
+    subirAdjuntos(Array.from(e.target.files || []));
+    e.target.value = '';
+  });
+  function contextoDeAdjuntos() {
+    return adjuntosChat.map(a => 'ARCHIVO: ' + a.filename + ' · ' + a.media_type +
+      '\nCONTENIDO EXTRAÍDO:\n' + a.full_text).join('\n\n').slice(0, 11900);
+  }
+  function confirmarEnvioAdjuntos() { adjuntosChat.splice(0); mostrarAdjuntos(); }
+
   /* ------------------------------------------------------------------ conversación */
   const SI = /^(si|sí|dale|hacelo|hazlo|confirmo|confirmar|adelante|ok|okay|de acuerdo|claro|ejecuta|ejecutalo)\b/i;
   const NO = /^(no|cancela|cancelar|dejalo|déjalo|olvidalo|olvídalo|mejor no)\b/i;
@@ -532,22 +578,25 @@
   }
   async function enviar(texto, modo) {
     texto = String(texto || '').trim();
+    if (!texto && adjuntosChat.length) texto = 'Analizá y resumí los archivos adjuntos.';
     if (!texto) return;
+    const fileContext = modo === 'chat' ? contextoDeAdjuntos() : '';
     addMsg('user', texto); $('chat-input').value = '';
     S.tEnvio = performance.now();
     setState('thinking', modo === 'voz' ? 'Pensando…' : 'Procesando…');
     // SKY-PERF: voz Y chat reciben deltas de la API; mantener fallback antiguo.
-    if (window.ReadableStream) { await enviarStream(texto, modo); return; }
+    if (window.ReadableStream) { await enviarStream(texto, modo, fileContext); return; }
     try {
       const data = await api('/api/asistente/mensaje', { method: 'POST', body: JSON.stringify({
-        texto, historial: S.historial.slice(-12), modo, dispositivo: 'local' }) });
+        texto, historial: S.historial.slice(-12), modo, dispositivo: 'local', file_context: fileContext }) });
       S.historial.push({ role: 'user', content: texto });
       await responder(data, modo);
+      if (fileContext) confirmarEnvioAdjuntos();
     } catch (e) {
       addMsg('sky', 'No pude contactar a SKY: ' + e.message, 'err'); setState('error', 'Sin conexión con SKY');
     }
   }
-  async function enviarStream(texto, modo = 'voz') {
+  async function enviarStream(texto, modo = 'voz', fileContext = '') {
     const voz = modo === 'voz';
     // SKY-STREAM-TIMEOUT: no dejar el HUD en PROCESANDO indefinidamente.
     const control = new AbortController();
@@ -566,7 +615,7 @@
     try {
       const r = await fetch('/api/asistente/stream', {
         method: 'POST', headers: headers(), signal: control.signal,
-        body: JSON.stringify({ texto, historial: S.historial.slice(-12), modo, dispositivo: 'local' })
+        body: JSON.stringify({ texto, historial: S.historial.slice(-12), modo, dispositivo: 'local', file_context: fileContext })
       });
       if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
       S.historial.push({ role: 'user', content: texto });
@@ -601,6 +650,7 @@
               if (vivo && !acumulado.trim()) vivo.remove();
               await responder(ev.final, modo);
             }
+            if (fileContext) confirmarEnvioAdjuntos();
             return;
           }
         }
