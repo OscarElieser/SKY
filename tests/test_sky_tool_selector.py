@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from unittest.mock import patch
 
@@ -30,6 +31,12 @@ class ToolSelectionTests(unittest.TestCase):
         ):
             with self.subTest(message=message):
                 self.assertEqual(select_tool_names(message, self.names), [])
+
+    def test_explicit_compatibility_switch_preserves_full_catalogue(self):
+        with patch.dict(os.environ, {"SKY_TOOL_ROUTING": "all"}):
+            self.assertEqual(
+                select_tool_names("Hola SKY", self.names), self.names
+            )
 
     def test_targeted_intents(self):
         cases = [
