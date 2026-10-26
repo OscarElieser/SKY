@@ -182,7 +182,7 @@ def main():
                 if time.monotonic() - ultimo_latido >= 5:
                     sync_state({'last_seen': time.time(), 'last_audio': last_audio,
                                 'hands_free_listening': True, 'wordless_active': wordless_active,
-                                'status': 'ready'})
+                                'status': 'paused' if coordinador_voz.get_state() == VoiceState.PAUSADO else 'ready'})
                     ultimo_latido = time.monotonic()
                 if buffer is None:
                     continue
