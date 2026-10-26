@@ -1,0 +1,26 @@
+name: SKY Selective Model Tools
+on:
+  push:
+    paths:
+      - 'neural_core/sky_cerebro.py'
+      - 'neural_core/sky_tool_selector.py'
+      - 'tests/test_sky_tool_selector.py'
+      - '.github/workflows/sky-selective-tools.yml'
+  pull_request:
+    paths:
+      - 'neural_core/sky_cerebro.py'
+      - 'neural_core/sky_tool_selector.py'
+      - 'tests/test_sky_tool_selector.py'
+      - '.github/workflows/sky-selective-tools.yml'
+jobs:
+  selective-model-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Python static compilation
+        run: python -m py_compile neural_core/sky_cerebro.py neural_core/sky_tool_selector.py tests/test_sky_tool_selector.py
+      - name: Run deterministic routing and mock API tests
+        run: python -m unittest discover -s tests -p test_sky_tool_selector.py -v
