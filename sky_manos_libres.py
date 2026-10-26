@@ -161,7 +161,8 @@ def main():
     import time
     SESSION_TIMEOUT = 35.0
     active_until = 0.0
-    sync_state({'hands_free_listening': True, 'last_seen': time.time(), 'status': 'ready', 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
+    sync_state({'hands_free_listening': True, 'wordless_owner_enabled': allow_wordless,
+                'last_seen': time.time(), 'status': 'ready', 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
 
     try:
         with stream:
@@ -189,7 +190,10 @@ def main():
                     coordinador_voz.activate_session()
                     sync_state({'session_active': True, 'active_until': active_until, 'last_wake': now, 'coordinator_state': VoiceState.ESCUCHANDO.value})
                 elif (coordinador_voz.is_in_follow_up_window() or (now < active_until)
-                      or (wordless_active and is_directed_speech(result))):
+                      or (wordless_active and is_directed_speech(result))
+                      or (allow_wordless and re.fullmatch(
+                          r'(?:reanuda|reactiva|continua) (?:la conversacion|a escuchar)',
+                          clean_raw))):
                     # In owner-enabled natural mode, a direct instruction can
                     # start a session without requiring the wake word.
                     command = result.strip(' ,.:;!?¿¡')
