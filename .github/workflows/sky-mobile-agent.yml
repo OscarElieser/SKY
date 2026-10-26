@@ -48,3 +48,10 @@ jobs:
           gradle-version: '8.11.1'
       - name: Compile Android debug APK
         run: gradle -p mobile/android-agent :app:assembleDebug --no-daemon
+      - name: Attach development APK (not device-validated)
+        uses: actions/upload-artifact@v4
+        with:
+          name: sky-mobile-agent-debug
+          path: mobile/android-agent/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
