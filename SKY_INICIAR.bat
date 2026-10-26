@@ -117,7 +117,16 @@ pause
 goto menu
 
 :opt_tests
-".venv\Scripts\python.exe" -m pytest tests
+".venv\Scripts\python.exe" -c "import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('pytest') else 1)"
+if errorlevel 1 (
+    echo [SKY] pytest no esta instalado. Ejecutando pruebas de regresion con unittest, sin instalar paquetes...
+    ".venv\Scripts\python.exe" -m unittest discover -s tests -p "test_sky_latency_and_wordless_voice.py" -v
+    ".venv\Scripts\python.exe" -m unittest discover -s tests -p "test_sky_hud_chat_voice_bridge.py" -v
+    ".venv\Scripts\python.exe" -m unittest discover -s tests -p "test_sky_voice_single_instance.py" -v
+    ".venv\Scripts\python.exe" -m unittest discover -s tests -p "test_sky_runtime_full_audit.py" -v
+) else (
+    ".venv\Scripts\python.exe" -m pytest tests
+)
 pause
 goto menu
 
