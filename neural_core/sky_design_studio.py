@@ -109,6 +109,10 @@ def _domain(brief: str, domain: str) -> str:
     return "tecnologia"
 
 
+_GENERADOS = frozenset({"build", ".dart_tool", "node_modules", "dist", ".flutter-plugins",
+                        ".flutter-plugins-dependencies", ".idea", ".vscode"})
+
+
 def _file_set(platform: str) -> dict[str, str]:
     root = _ROOT / _ALLOWED[platform]
     files: dict[str, str] = {}
@@ -116,6 +120,10 @@ def _file_set(platform: str) -> dict[str, str]:
         if not path.is_file():
             continue
         relative = path.relative_to(root).as_posix()
+        # Lo que generan `flutter test`/`flutter build`/`npm` dentro de la plantilla no es parte de ella:
+        # se ignora en lugar de romper todos los diseños (pasó con build/ y .dart_tool/ de 45 MB).
+        if relative.split("/", 1)[0] in _GENERADOS:
+            continue
         if len(files) >= 25 or path.stat().st_size > 72_000 or relative.startswith("."):
             raise DesignInvalid("La plantilla interna excedió el límite permitido.")
         files[relative] = path.read_text(encoding="utf-8")
