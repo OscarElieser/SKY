@@ -1,0 +1,45 @@
+name: SKY Internal HUD Windows
+on:
+  push:
+    paths:
+      - 'metaverse/static/sky-window-intents.js'
+      - 'metaverse/static/hud.js'
+      - 'metaverse/static/hud.html'
+      - 'metaverse/static/hud.css'
+      - 'sky_manos_libres.py'
+      - 'metaverse/sky_modules_api.py'
+      - 'neural_core/sky_hud_window_requests.py'
+      - 'tests/test_sky_hud_window_intents.js'
+      - 'tests/test_sky_hud_window_requests.py'
+      - '.github/workflows/sky-hud-windows.yml'
+  pull_request:
+    paths:
+      - 'metaverse/static/sky-window-intents.js'
+      - 'metaverse/static/hud.js'
+      - 'metaverse/static/hud.html'
+      - 'metaverse/static/hud.css'
+      - 'sky_manos_libres.py'
+      - 'metaverse/sky_modules_api.py'
+      - 'neural_core/sky_hud_window_requests.py'
+      - 'tests/test_sky_hud_window_intents.js'
+      - 'tests/test_sky_hud_window_requests.py'
+      - '.github/workflows/sky-hud-windows.yml'
+jobs:
+  internal-window-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax JS
+        run: node --check metaverse/static/hud.js && node --check metaverse/static/sky-window-intents.js
+      - name: Syntax Python
+        run: python -m py_compile neural_core/sky_hud_window_requests.py sky_manos_libres.py metaverse/sky_modules_api.py
+      - name: Verify browser window routing
+        run: node --test tests/test_sky_hud_window_intents.js
+      - name: Verify voice window routing
+        run: python -m unittest discover -s tests -p test_sky_hud_window_requests.py -v
