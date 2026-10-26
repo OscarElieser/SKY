@@ -15,7 +15,7 @@ IMPERATIVE = re.compile(
     r"(?:haz\s+(?:el\s+)?intento\s+de\s+(?:poner|presionar|pulsar)|"
     r"(?:intenta|prueba|prob[aá])\s+(?:poner|presionar|pulsar|con)|"
     r"presiona|presion[aá]|pulsa|puls[aá]|"
-    r"aprieta|apret[aá]|teclea|env[ií]a|pon|pon[eé]|ejecuta|ejecut[aá]|usa)"
+    r"aprieta|apret[aá]|teclea|env[ií][aá]|pon|pon[eé]|ejecuta|ejecut[aá]|usa)"
     r"(?:\s+(?:la\s+combinaci[oó]n\s+de\s+teclas?|las?\s+teclas?|"
     r"el\s+atajo|la\s+combinaci[oó]n|el\s+comando))?\s*",
     re.I,
