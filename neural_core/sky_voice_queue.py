@@ -89,6 +89,12 @@ class VoiceWorkQueue:
         with self._epoch_lock:
             return self._speech_epoch
 
+    @property
+    def current_turn_cancelled(self) -> bool:
+        with self._generation_lock:
+            outdated = self._active_generation != self._generation
+        return outdated or self._cancel_current.is_set() or self._stop.is_set()
+
     def _transition_speech(self, value: bool) -> None:
         if self._speaking.is_set() == value:
             return
