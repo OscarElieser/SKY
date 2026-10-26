@@ -136,6 +136,8 @@ def main():
         nonlocal history
         coordinador_voz.set_state(VoiceState.PROCESANDO)
         intent = interpret_command(command)
+        if voice_runtime.current_turn_cancelled:
+            return
         if intent:
             coordinador_voz.set_state(VoiceState.EJECUTANDO_HERRAMIENTA)
             hecho = None
@@ -145,6 +147,8 @@ def main():
                 except Exception as exc:
                     hecho = {'ok': False, 'message': 'No se pudo ejecutar la orden. Revisá el agente local.'}
                     print('Detalle:', str(exc))
+            if voice_runtime.current_turn_cancelled:
+                return
             if hecho is not None:
                 mensaje = hecho.get('message') or (
                     'Listo.' if hecho.get('ok', True) else 'No se pudo completar la orden.')
@@ -157,13 +161,16 @@ def main():
         try:
             provider, modelo = choose_provider(os.getenv('SKY_VOICE_PROVIDER', 'auto'), 'SKY voz')
             answer, _ = responder(command, 'SKY voz local', history, modelo, proveedor=provider)
+            if voice_runtime.current_turn_cancelled:
+                return
             history.extend([{'role': 'user', 'content': command}, {'role': 'assistant', 'content': answer}])
             history = history[-10:]
             coordinador_voz.record_turn(command, answer)
             voice_runtime.say(answer)
         except Exception as exc:
             print('Detalle:', str(exc))
-            voice_runtime.say('No pude completar esta consulta. Revisá Ollama o el proveedor de IA.')
+            if not voice_runtime.current_turn_cancelled:
+                voice_runtime.say('No pude completar esta consulta. Revisá Ollama o el proveedor de IA.')
 
     voice_runtime = VoiceWorkQueue(
         process_command,
