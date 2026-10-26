@@ -269,6 +269,13 @@ def reglas(texto: str) -> dict | None:
     stop = parada(_norm(texto))   # la parada de emergencia va antes que todo
     if stop:
         return stop
+    # SKY-SALUDO-INMEDIATO: no cargar Ollama para una bienvenida simple.
+    # La parada de emergencia sigue evaluándose antes de este atajo.
+    saludo = re.sub(r'[\s,;:.!¡?¿]+', ' ', _norm(texto)).strip()
+    if saludo in {'hola sky', 'sky hola', 'hola', 'buenas sky', 'buenas',
+                  'buenos dias sky', 'buenas tardes sky', 'buenas noches sky'}:
+        return {'tipo': 'respuesta', 'mensaje': 'Hola, te escucho. ¿Qué necesitás?',
+                'proveedor': 'sky-local'}
     try:
         from . import sentinel_estado
         seg = sentinel_estado.interpretar(texto)   # SENTINEL: consultas y restricciones de seguridad

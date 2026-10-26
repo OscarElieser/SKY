@@ -23,7 +23,10 @@ def main(argv=None):
         raise ValueError('El audio excede el límite')
     # stdout contains only JSON; exceptions must not leak credentials.
     result = base.transcribe(wav.read_bytes(), filename='audio.wav', language=arguments.language)
-    sys.stdout.write(json.dumps(result, ensure_ascii=False, separators=(',', ':')))
+    # The parent decodes JSON as UTF-8. On Windows a Python child may default
+    # to cp1252; write bytes explicitly so accents can never corrupt the pipe.
+    payload = json.dumps(result, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    sys.stdout.buffer.write(payload)
     return 0
 
 

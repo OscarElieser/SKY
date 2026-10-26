@@ -535,52 +535,73 @@
     }
   }
   async function enviarStream(texto) {
-    let r;
-    try {
-      r = await fetch('/api/asistente/stream', { method: 'POST', headers: headers(), body: JSON.stringify({
-        texto, historial: S.historial.slice(-12), modo: 'voz', dispositivo: 'local' }) });
-      if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
-    } catch (e) { addMsg('sky', 'No pude contactar a SKY: ' + e.message, 'err'); setState('error', 'Sin conexión'); return; }
-    S.historial.push({ role: 'user', content: texto });
-    const lector = r.body.getReader(), dec = new TextDecoder();
-    let resto = '', acumulado = '', pendiente = '', vivo = null;
+    // SKY-STREAM-TIMEOUT: no dejar el HUD en PROCESANDO indefinidamente.
+    const control = new AbortController();
+    let finalizado = false;
+    const aviso = setTimeout(() => {
+      if (!finalizado && estado === 'thinking') setState('thinking', 'Ollama sigue procesando la respuesta…');
+    }, 12000);
+    const limite = setTimeout(() => control.abort(), 90000);
+    let acumulado = '', pendiente = '', resto = '', vivo = null;
     const soltarFrases = (forzar) => {
       const m = pendiente.match(/^[\s\S]*[.!?…:;](?=\s|$)/);
       if (m && m[0].trim().length > 2) { encolar(limpiarParaVoz(m[0])); pendiente = pendiente.slice(m[0].length); }
       if (forzar && pendiente.trim()) { encolar(limpiarParaVoz(pendiente)); pendiente = ''; }
     };
-    for (;;) {
-      const { value, done } = await lector.read();
-      if (done) break;
-      resto += dec.decode(value, { stream: true });
-      let nl;
-      while ((nl = resto.indexOf('\n')) >= 0) {
-        const linea = resto.slice(0, nl).trim(); resto = resto.slice(nl + 1);
-        if (!linea) continue;
-        let ev; try { ev = JSON.parse(linea); } catch { continue; }
-        if (ev.delta) {
-          if (!vivo) { vivo = addMsg('sky', '', 'live'); }
-          acumulado += ev.delta; pendiente += ev.delta; vivo.textContent = acumulado; scroll();
-          soltarFrases(false);
-        }
-        if (ev.final) {
-          if (vivo) vivo.classList.remove('live');
-          if (ev.final.transmitido) {
-            soltarFrases(true);
-            const msg = ev.final.mensaje || acumulado;
-            if (vivo) vivo.textContent = msg; else addMsg('sky', msg);
-            S.lastSky = msg; S.historial.push({ role: 'assistant', content: msg.slice(0, 4000) });
-            // El servidor ya registró el turno final sin duplicarlo.
-            await speak(''); seguirConversacion();
-          } else {
-            if (vivo && !acumulado.trim()) vivo.remove();
-            await responder(ev.final, 'voz');
+    try {
+      const r = await fetch('/api/asistente/stream', {
+        method: 'POST', headers: headers(), signal: control.signal,
+        body: JSON.stringify({ texto, historial: S.historial.slice(-12), modo: 'voz', dispositivo: 'local' })
+      });
+      if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
+      S.historial.push({ role: 'user', content: texto });
+      const lector = r.body.getReader(), dec = new TextDecoder();
+      for (;;) {
+        const { value, done } = await lector.read();
+        if (done) break;
+        resto += dec.decode(value, { stream: true });
+        let nl;
+        while ((nl = resto.indexOf('\n')) >= 0) {
+          const linea = resto.slice(0, nl).trim(); resto = resto.slice(nl + 1);
+          if (!linea) continue;
+          let ev; try { ev = JSON.parse(linea); } catch { continue; }
+          if (ev.delta) {
+            if (!vivo) vivo = addMsg('sky', '', 'live');
+            acumulado += ev.delta; pendiente += ev.delta; vivo.textContent = acumulado; scroll();
+            soltarFrases(false);
           }
-          return;
+          if (ev.final) {
+            finalizado = true;
+            if (vivo) vivo.classList.remove('live');
+            if (ev.final.transmitido) {
+              soltarFrases(true);
+              const msg = ev.final.mensaje || acumulado;
+              if (vivo) vivo.textContent = msg; else addMsg('sky', msg);
+              if (!acumulado && msg) encolar(limpiarParaVoz(msg));
+              S.lastSky = msg;
+              S.historial.push({ role: 'assistant', content: msg.slice(0, 4000) });
+              await speak(''); seguirConversacion();
+              if (!S.speaking) setState('idle', 'Listo.');
+            } else {
+              if (vivo && !acumulado.trim()) vivo.remove();
+              await responder(ev.final, 'voz');
+            }
+            return;
+          }
         }
       }
+      throw new Error('La conexión terminó sin una respuesta final.');
+    } catch (e) {
+      if (vivo) vivo.classList.remove('live');
+      const mensaje = control.signal.aborted
+        ? 'Ollama tardó más de 90 segundos. Probá otra vez o revisá su uso de memoria con ollama ps.'
+        : 'SKY no completó la respuesta: ' + e.message;
+      addMsg('sky', mensaje, 'err');
+      setState('error', 'No se completó la respuesta');
+    } finally {
+      clearTimeout(aviso);
+      clearTimeout(limite);
     }
-    if (vivo) vivo.classList.remove('live');
   }
   async function decir(texto, extra) {
     addMsg('sky', texto, extra);
