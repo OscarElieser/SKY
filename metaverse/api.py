@@ -449,11 +449,15 @@ def get_generated_media(filename: str):
 
 @app.post('/api/chat/upload',dependencies=[Depends(require_key)])
 async def upload_chat_file(file:UploadFile=File(...)):
-    """Sube un archivo de cualquier tipo (Video, Música, Audio, PDF, DOCX, XLSX, CSV, TXT, Código, etc.) sin restricciones."""
+    """Recibe cualquier extensión (hasta 50 MB); interpretar binarios requiere una herramienta compatible."""
     from neural_core.documentos import extraer_texto
     from neural_core.storage import agregar_documento, guardar_memoria
     from neural_core.sky_evolution import feedback
-    data = await file.read()
+    # Acepta cualquier extensión sin intentar ejecutar el archivo.
+    # El límite evita que una subida agote la RAM del proceso API.
+    data = await file.read(50 * 1024 * 1024 + 1)
+    if len(data) > 50 * 1024 * 1024:
+        raise HTTPException(413, 'Máximo 50 MB por archivo. Dividí el archivo grande en partes.')
     filename = file.filename or 'archivo_adjunto'
     ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else ''
     
