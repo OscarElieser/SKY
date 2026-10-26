@@ -15,7 +15,7 @@ import shutil
 import urllib.request
 
 ROOT = Path.cwd()
-REF = "bfca46b456e14512fdaa7634ee56209c770f9f8a"
+REF = "4c689a505cf5b9f36c692b17ec5c7195c11809e7"
 REPO = "OscarElieser/SKY"
 NEW = (
     "neural_core/sky_word_editor.py",
