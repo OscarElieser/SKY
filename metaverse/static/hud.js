@@ -910,7 +910,10 @@
   function enfocar(id) { const w = ventanas.get(id); if (w) { w.el.style.zIndex = ++zTop; dock(id); } }
   // Solo accesos internos conocidos. No abrir enlaces arbitrarios por un texto.
   function ordenVentanaLocal(sentence) {
+    // Vosk and browser STT often finish an utterance with "." or "!".
+    // A trailing period must not turn a real HUD command into an LLM question.
     const s = String(sentence || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()
+      .replace(/^[\s¿¡]+|[\s.!?¿¡]+$/g,'')
       .replace(/^(oye|hey)\s+/,'').replace(/^sky[,.:\s-]+/,'');
     if (!/^(abre|abri|abrir|mostra|muestra|mostrar)\s+/.test(s)) return null;
     const target=s.replace(/^(abre|abri|abrir|mostra|muestra|mostrar)\s+/,'')
@@ -994,6 +997,7 @@
     });
   }
   function ventanasHolograficas(sub) {
+    if (sub === 'open_chat') { abrirCuadroTexto(); return; }
     if (sub === 'minimize_all' || sub === 'leave_only_core') ventanas.forEach(w => w.el.classList.add('hidden'));
     else if (sub === 'restore_all') ventanas.forEach(w => w.el.classList.remove('hidden'));
     else if (sub === 'close_multimedia') cerrarVentana('player');
@@ -2440,6 +2444,37 @@
       });
     } catch { /* sin acceso */ }
   }
+  // The Vosk service is independent from Chrome: its local voice inbox is the
+  // existing authenticated bridge to the HUD. Only this exact allowlisted
+  // UI-only action can run without a confirmation click. NEVER auto-execute
+  // device, file, social, or arbitrary holographic actions from this queue.
+  const hudVoiceHandled = new Set();
+  let hudVoicePolling = false;
+  async function atenderPanelSolicitadoPorVoz() {
+    if (hudVoicePolling || document.visibilityState === 'hidden') return;
+    hudVoicePolling = true;
+    try {
+      const r = await api('/api/asistente/voz');
+      for (const item of (r.pendientes || [])) {
+        if (item.action !== 'holographic_window' ||
+            !item.params || item.params.subaction !== 'open_chat') continue;
+        if (hudVoiceHandled.has(item.id)) continue;
+        const age = Date.now() - Date.parse(item.timestamp || '');
+        if (!Number.isFinite(age) || age < -5000 || age > 60000) continue;
+        // Acknowledgement first: do not report a successful open until the
+        // authenticated delete succeeds and the HUD window actually opens.
+        await api('/api/asistente/voz/' + encodeURIComponent(item.id),
+                  { method: 'DELETE' });
+        hudVoiceHandled.add(item.id);
+        if (hudVoiceHandled.size > 80) hudVoiceHandled.clear();
+        abrirCuadroTexto();
+        $('transcript').textContent = '“' + String(item.text || '').slice(0, 200) + '”';
+        setState('idle', 'Panel de conversación abierto.');
+        refrescarVoz();
+      }
+    } catch { /* no se duplica la ejecución si el servidor no responde */ }
+    finally { hudVoicePolling = false; }
+  }
   async function refrescarCasa() {
     let r; try { r = await api('/api/hud/casa'); } catch { return; }
     const box = $('casa-list'); box.textContent = '';
@@ -2561,8 +2596,10 @@
     addMsg('sky', (h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches') +
       ', Oscar. Sistemas en línea. Tocá el núcleo para hablar, o escribime.');
     refrescarLog(); refrescarTareas(); refrescarNotas(); refrescarVoz(); refrescarCasa();
+    atenderPanelSolicitadoPorVoz();
     setInterval(refrescarEstado, 10000); setInterval(refrescarLog, 8000); setInterval(refrescarTareas, 8000);
-    setInterval(refrescarVoz, 15000); setInterval(refrescarNotas, 30000); setInterval(refrescarCasa, 20000);
+    setInterval(refrescarVoz, 15000); setInterval(atenderPanelSolicitadoPorVoz, 2500);
+    setInterval(refrescarNotas, 30000); setInterval(refrescarCasa, 20000);
     refrescarAgenda(); setInterval(refrescarAgenda, 30000); setInterval(refrescarAvisos, 8000);
     if (store.lget('sky-wake', '0') === '1') activarEscucha(true);
   }
