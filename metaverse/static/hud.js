@@ -487,6 +487,52 @@
     sr.start();
   }
 
+  // Adjuntos de la conversación actual. Se guardan por la API existente de SKY.
+  const adjuntosChat = [];
+  function mostrarAdjuntos() {
+    const chips = $('chat-files'); chips.replaceChildren();
+    chips.hidden = adjuntosChat.length === 0;
+    adjuntosChat.forEach((a, i) => {
+      const chip = el('span', 'chip');
+      chip.appendChild(document.createTextNode('📎 ' + a.filename));
+      const quitar = el('button', '', '×'); quitar.type = 'button';
+      quitar.title = 'Quitar ' + a.filename;
+      quitar.addEventListener('click', () => { adjuntosChat.splice(i, 1); mostrarAdjuntos(); });
+      chip.appendChild(quitar); chips.appendChild(chip);
+    });
+  }
+  async function subirAdjuntos(files) {
+    for (const file of files) {
+      // Cualquier extensión: límite por archivo para proteger memoria y disco.
+      if (file.size > 50 * 1024 * 1024) {
+        addMsg('sky', 'El archivo ' + file.name + ' supera 50 MB. Usá una versión más pequeña.', 'err');
+        continue;
+      }
+      const fd = new FormData(); fd.append('file', file);
+      try {
+        const data = await api('/api/chat/upload', { method: 'POST', body: fd });
+        if (!data.ok) throw Error('El servidor no confirmó la carga.');
+        adjuntosChat.push({filename:data.filename, media_type:data.media_type,
+          full_text:String(data.full_text || '').slice(0, 11000), media_url:data.media_url});
+        mostrarAdjuntos();
+        addMsg('sky', 'Adjunté ' + data.filename + ' (' + data.media_type + '). ' +
+          (data.chars_extracted ? 'Texto disponible para preguntas.' : 'Formato recibido; la interpretación depende de herramientas compatibles.'));
+      } catch (e) {
+        addMsg('sky', 'No se pudo adjuntar ' + file.name + ': ' + e.message, 'err');
+      }
+    }
+  }
+  $('btn-attach').addEventListener('click', () => $('chat-file-input').click());
+  $('chat-file-input').addEventListener('change', e => {
+    subirAdjuntos(Array.from(e.target.files || []));
+    e.target.value = '';
+  });
+  function contextoDeAdjuntos() {
+    return adjuntosChat.map(a => 'ARCHIVO: ' + a.filename + ' · ' + a.media_type +
+      '\nCONTENIDO EXTRAÍDO:\n' + a.full_text).join('\n\n').slice(0, 11900);
+  }
+  function confirmarEnvioAdjuntos() { adjuntosChat.splice(0); mostrarAdjuntos(); }
+
   /* ------------------------------------------------------------------ conversación */
   const SI = /^(si|sí|dale|hacelo|hazlo|confirmo|confirmar|adelante|ok|okay|de acuerdo|claro|ejecuta|ejecutalo)\b/i;
   const NO = /^(no|cancela|cancelar|dejalo|déjalo|olvidalo|olvídalo|mejor no)\b/i;
@@ -497,6 +543,12 @@
       if (SI.test(t) && S.pending.soloClic) { addMsg('user', texto); speak('Por seguridad, esto no se confirma sólo con la voz: tocá Ejecutar.'); return; }
       if (SI.test(t)) { addMsg('user', texto); S.pending.run(); return; }
       if (NO.test(t)) { addMsg('user', texto); S.pending.cancel(); speak('Cancelado.'); return; }
+    }
+    const requestedModule = solicitudModulo(texto);
+    if (requestedModule) {
+      addMsg('user', texto); guardarConsulta('user', texto);
+      abrirModuloTecnico(requestedModule);
+      return;
     }
     // Los comandos de ventanas son locales al HUD, no delegados a la IA.
     const mini = ordenVentanaLocal(texto);
@@ -526,22 +578,25 @@
   }
   async function enviar(texto, modo) {
     texto = String(texto || '').trim();
+    if (!texto && adjuntosChat.length) texto = 'Analizá y resumí los archivos adjuntos.';
     if (!texto) return;
+    const fileContext = modo === 'chat' ? contextoDeAdjuntos() : '';
     addMsg('user', texto); $('chat-input').value = '';
     S.tEnvio = performance.now();
     setState('thinking', modo === 'voz' ? 'Pensando…' : 'Procesando…');
     // SKY-PERF: voz Y chat reciben deltas de la API; mantener fallback antiguo.
-    if (window.ReadableStream) { await enviarStream(texto, modo); return; }
+    if (window.ReadableStream) { await enviarStream(texto, modo, fileContext); return; }
     try {
       const data = await api('/api/asistente/mensaje', { method: 'POST', body: JSON.stringify({
-        texto, historial: S.historial.slice(-12), modo, dispositivo: 'local' }) });
+        texto, historial: S.historial.slice(-12), modo, dispositivo: 'local', file_context: fileContext }) });
       S.historial.push({ role: 'user', content: texto });
       await responder(data, modo);
+      if (fileContext) confirmarEnvioAdjuntos();
     } catch (e) {
       addMsg('sky', 'No pude contactar a SKY: ' + e.message, 'err'); setState('error', 'Sin conexión con SKY');
     }
   }
-  async function enviarStream(texto, modo = 'voz') {
+  async function enviarStream(texto, modo = 'voz', fileContext = '') {
     const voz = modo === 'voz';
     // SKY-STREAM-TIMEOUT: no dejar el HUD en PROCESANDO indefinidamente.
     const control = new AbortController();
@@ -560,7 +615,7 @@
     try {
       const r = await fetch('/api/asistente/stream', {
         method: 'POST', headers: headers(), signal: control.signal,
-        body: JSON.stringify({ texto, historial: S.historial.slice(-12), modo, dispositivo: 'local' })
+        body: JSON.stringify({ texto, historial: S.historial.slice(-12), modo, dispositivo: 'local', file_context: fileContext })
       });
       if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
       S.historial.push({ role: 'user', content: texto });
@@ -595,6 +650,7 @@
               if (vivo && !acumulado.trim()) vivo.remove();
               await responder(ev.final, modo);
             }
+            if (fileContext) confirmarEnvioAdjuntos();
             return;
           }
         }
@@ -1435,10 +1491,99 @@
     { id: 'perfil', t: 'Perfil', d: 'Quién sos: SKY lo lee en cada respuesta', accion: () => abrirPerfil() },
     { id: 'habilidades', t: 'Habilidades', d: 'Catálogo, Skill Builder e integraciones', accion: () => abrirHabilidades() },
     { id: 'sentinel', t: 'Seguridad', d: 'SKY SENTINEL: PIN, accesos, dispositivos y emergencia', accion: () => abrirSentinel() },
-    { id: 'streamlit', t: 'Panel completo', d: 'Deportes, finanzas, visión… (pestaña aparte)', externo: 'http://127.0.0.1:8501' },
+    { id: 'streamlit', t: 'Panel técnico', d: 'Panel heredado dentro de SKY, únicamente al solicitarlo', accion: () => abrirModuloTecnico('tablero') },
   ];
+  // Los 27 módulos heredados se presentan aquí, pero jamás se cargan al iniciar.
+  // El catálogo original de atajos del HUD se conserva bajo "Herramientas avanzadas".
+  let modulosTecnicos = [];
+  let cursorModulos = null;
+  const normalizarModulo = value => String(value || '').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  function solicitudModulo(sentence) {
+    const frase = normalizarModulo(sentence)
+      .replace(/^(?:oye |mira |hey )?(?:sky )?/, '');
+    if (!/^(?:activa|activar|abre|abri|abrir|inicia|iniciar|muestra|mostra|mostrame|pon|pone|ejecuta)\b/.test(frase)) return null;
+    const nombre = frase.replace(/^(?:activa|activar|abre|abri|abrir|inicia|iniciar|muestra|mostra|mostrame|pon|pone|ejecuta)\s+/, '')
+      .replace(/^(?:(?:el|la|los|las|modulo|modulos|seccion|panel|de|del)\s+)+/, '');
+    const aliases = modulosTecnicos.flatMap(m =>
+      [m.title, m.label, ...(m.aliases || [])].map(a => ({id:m.id, nombre:normalizarModulo(a)})));
+    aliases.sort((a,b) => b.nombre.length - a.nombre.length);
+    return aliases.find(a => nombre === a.nombre || nombre.startsWith(a.nombre + ' '))?.id || null;
+  }
+
+  async function abrirModuloTecnico(moduleId) {
+    const modulo = modulosTecnicos.find(m => m.id === moduleId);
+    if (!modulo) return;
+    const winId = 'sky-tecnico-' + moduleId;
+    if (ventanas.has(winId)) {
+      const win = ventanas.get(winId);
+      win.el.classList.remove('hidden'); enfocar(winId); return;
+    }
+    setState('thinking', 'Activando ' + modulo.title + '…');
+    try {
+      const abrir = await api('/api/sky/modules/' + encodeURIComponent(moduleId) + '/open', { method: 'POST' });
+      if (!abrir.ready) {
+        let listo = false;
+        for (let i = 0; i < 16; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const estadoModulo = await api('/api/sky/modules/' + encodeURIComponent(moduleId) + '/status');
+          if (estadoModulo.ready) { listo = true; break; }
+        }
+        if (!listo) throw new Error('El módulo aún no está disponible. Revisá el registro de Streamlit.');
+      }
+      // URL provista por SKY y restringida a rutas conocidas; nunca desde texto arbitrario.
+      abrirVentana(winId, modulo.title, abrir.url, { w: 1060, h: 710 });
+      if (window.matchMedia('(max-width:900px)').matches) mostrarPanel('core');
+      setState('idle', modulo.title + ' activado');
+      addMsg('sky', 'Activé el módulo ' + modulo.title + ' dentro de SKY.');
+    } catch (err) {
+      const detalle = 'No pude activar ' + modulo.title + ': ' + err.message;
+      addMsg('sky', detalle, 'err'); setState('error', 'Módulo no disponible');
+    }
+  }
+
+  async function cargarModulosTecnicos() {
+    try {
+      const data = await api('/api/sky/modules');
+      modulosTecnicos = data.modules || [];
+      const cursor = await api('/api/sky/modules/events/latest');
+      cursorModulos = cursor.cursor;
+      pintarModulos();
+      // Recibe órdenes desde la escucha Vosk del servicio local (sin usar otro micrófono).
+      setInterval(async () => {
+        if (cursorModulos === null) return;
+        try {
+          const r = await api('/api/sky/modules/events?after=' + cursorModulos);
+          for (const evento of r.events || []) {
+            cursorModulos = Math.max(cursorModulos, evento.id);
+            await abrirModuloTecnico(evento.module_id);
+          }
+        } catch { /* API temporalmente ocupada: se reintentará */ }
+      }, 3000);
+    } catch (e) {
+      console.warn('Catálogo SKY no disponible:', e.message);
+      pintarModulos();
+    }
+  }
+
   function pintarModulos() {
     const box = $('tiles'); box.textContent = '';
+    document.querySelectorAll('#p-mod > .sky-extra-modules').forEach(el => el.remove());
+    for (const m of modulosTecnicos) {
+      const b = el('button', 'tile'); b.type = 'button';
+      b.appendChild(el('b', '', m.title));
+      b.appendChild(el('small', '', m.backend === 'hud'
+        ? 'Integrado en el HUD · activar al pedirlo'
+        : 'Función original · cargar al pedirla'));
+      b.addEventListener('click', () => abrirModuloTecnico(m.id));
+      box.appendChild(b);
+    }
+    // Nunca se retiran atajos ni controles desarrollados previamente.
+    const details = el('details', 'sky-extra-modules');
+    const summary = el('summary', '', 'Herramientas adicionales de SKY');
+    const inner = el('div', 'tiles'); details.append(summary, inner);
     MODULOS.forEach(m => {
       const b = el('button', 'tile'); b.type = 'button';
       b.appendChild(el('b', '', m.t)); b.appendChild(el('small', '', m.d));
@@ -1448,8 +1593,15 @@
         abrirVentana(m.id, m.t, m.url);
         if (window.matchMedia('(max-width:900px)').matches) mostrarPanel('core');
       });
-      box.appendChild(b);
+      inner.appendChild(b);
     });
+    // Antes de autenticar o si la API falla, seguir mostrando lo existente.
+    if (!modulosTecnicos.length) {
+      details.open = true;
+      box.append(...Array.from(inner.children));
+    } else {
+      $('p-mod').appendChild(details);
+    }
   }
 
   /* ------------------------------------------------------------------ SKY Teléfono, con PIN y consentimiento explícito */
@@ -2552,6 +2704,7 @@
       S.key = (prompt('Llave del dueño de SKY (X-SKY-KEY):') || '').trim();
       if (S.key) store.set('sky-owner-key', S.key);
     }
+    await cargarModulosTecnicos();
     await refrescarEstado();
     // Recupera el contexto reciente tras reiniciar el navegador; no borra
     // consultas anteriores ni muestra paneles por su cuenta.

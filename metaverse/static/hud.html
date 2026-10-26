@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="SKY IA">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2212%22 fill=%22none%22 stroke=%22%2300e5ff%22 stroke-width=%224%22/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/hud.css?v=13.0">
+  <link rel="stylesheet" href="/static/hud.css?v=13.1">
 </head>
 <body data-state="idle" class="sky-cinematic">
 <div class="grid-bg" aria-hidden="true"></div>
@@ -64,6 +64,9 @@
     <div class="feed" id="feed" aria-live="polite"></div>
     <form class="composer" id="chat-form" autocomplete="off">
       <button type="button" class="ctl" id="btn-mic" title="Hablar con SKY" aria-label="Hablar con SKY">MIC</button>
+      <button type="button" class="ctl attach" id="btn-attach" title="Adjuntar archivos de cualquier formato" aria-label="Adjuntar archivos">📎</button>
+      <input id="chat-file-input" type="file" multiple hidden style="display:none">
+      <div id="chat-files" class="sky-attached-chips" hidden aria-live="polite"></div>
       <input id="chat-input" maxlength="4000" placeholder="Escribí una orden o pregunta para SKY…" aria-label="Mensaje para SKY">
       <button type="button" class="ctl toggle" id="btn-wake" title="Escucha continua: decí “SKY…” sin tocar nada" aria-pressed="false">SKY</button>
       <button type="button" class="ctl toggle" id="btn-conv" title="Conversación continua: SKY vuelve a escucharte después de responder" aria-pressed="false">CONV</button>
@@ -111,6 +114,6 @@
 
 <script src="/static/sky-pwa-install.js" defer></script>
 <script src="/static/sky-security-ui.js" defer></script>
-<script src="/static/hud.js?v=13.0" defer></script>
+<script src="/static/hud.js?v=13.1" defer></script>
 </body>
 </html>

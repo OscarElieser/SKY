@@ -134,6 +134,21 @@ def main():
     def process_command(command):
         """Ejecutado por un solo trabajador; nunca bloquea el micrófono."""
         nonlocal history
+        # Las solicitudes de módulos usan el mismo catálogo que HUD, sin invocar Ollama.
+        # El navegador autenticado recoge el evento y abre únicamente el módulo pedido.
+        from neural_core.sky_module_registry import match_activation, publish_activation
+        modulo_pedido = match_activation(command)
+        if modulo_pedido:
+            try:
+                publish_activation(modulo_pedido["id"])
+                voice_runtime.say(
+                    "Preparé el módulo " + modulo_pedido["title"] +
+                    ". Se abrirá en el HUD principal si está conectado."
+                )
+            except Exception as exc:
+                print("SKY: error activando módulo:", type(exc).__name__, str(exc)[:120])
+                voice_runtime.say("No pude preparar ese módulo. Revisá el registro de SKY.")
+            return
         coordinador_voz.set_state(VoiceState.PROCESANDO)
         intent = interpret_command(command)
         if voice_runtime.current_turn_cancelled:

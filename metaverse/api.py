@@ -173,6 +173,10 @@ async def lifespan(app):
 app=FastAPI(title='SKY Engine API',version='10.5.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
 app.mount('/static',StaticFiles(directory=STATIC),name='static')
 
+# Catálogo central: Streamlit heredado sólo se inicia tras una orden del dueño.
+from .sky_modules_api import router as sky_modules_router
+app.include_router(sky_modules_router, dependencies=[Depends(require_key)])
+
 # Installable SKY client for Windows browsers and Android; same SKY API and HUD.
 from .mobile_pwa_api import router as mobile_pwa_router
 app.include_router(mobile_pwa_router)
@@ -445,11 +449,15 @@ def get_generated_media(filename: str):
 
 @app.post('/api/chat/upload',dependencies=[Depends(require_key)])
 async def upload_chat_file(file:UploadFile=File(...)):
-    """Sube un archivo de cualquier tipo (Video, Música, Audio, PDF, DOCX, XLSX, CSV, TXT, Código, etc.) sin restricciones."""
+    """Recibe cualquier extensión (hasta 50 MB); interpretar binarios requiere una herramienta compatible."""
     from neural_core.documentos import extraer_texto
     from neural_core.storage import agregar_documento, guardar_memoria
     from neural_core.sky_evolution import feedback
-    data = await file.read()
+    # Acepta cualquier extensión sin intentar ejecutar el archivo.
+    # El límite evita que una subida agote la RAM del proceso API.
+    data = await file.read(50 * 1024 * 1024 + 1)
+    if len(data) > 50 * 1024 * 1024:
+        raise HTTPException(413, 'Máximo 50 MB por archivo. Dividí el archivo grande en partes.')
     filename = file.filename or 'archivo_adjunto'
     ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else ''
     
@@ -472,19 +480,22 @@ async def upload_chat_file(file:UploadFile=File(...)):
 
     try:
         texto = extraer_texto(filename, data)
-    except Exception as exc:
-        texto = f"[Archivo {filename} ({len(data)} bytes) listo para procesamiento]"
+        parsed = bool(str(texto or '').strip())
+    except Exception:
+        texto, parsed = "", False
 
+    # Nunca declarar "conocimiento integrado" cuando sólo se recibió un binario.
     doc_id = None
-    try:
-        doc_id = agregar_documento(filename, texto[:245000])
-    except Exception:
-        pass
-    try:
-        guardar_memoria(f"Archivo asimilado: '{filename}' ({media_type.upper()}, {round(len(data)/1024, 1)} KB). Conocimiento integrado.")
-        feedback("aprendizaje_documental", 5, f"Incorporado conocimiento desde archivo {filename}")
-    except Exception:
-        pass
+    if parsed:
+        try:
+            doc_id = agregar_documento(filename, texto[:245000])
+        except Exception:
+            pass
+        try:
+            guardar_memoria(f"Archivo de texto incorporado: '{filename}' ({media_type.upper()}, {round(len(data)/1024, 1)} KB).")
+            feedback("aprendizaje_documental", 5, f"Texto procesado de archivo {filename}")
+        except Exception:
+            pass
     return {
         'ok': True,
         'filename': filename,
@@ -492,9 +503,9 @@ async def upload_chat_file(file:UploadFile=File(...)):
         'media_type': media_type,
         'media_url': f'/api/media/uploads/{safe_name}',
         'doc_id': doc_id,
-        'chars_extracted': len(texto),
-        'summary': texto[:800],
-        'full_text': texto[:30000]
+        'chars_extracted': len(texto) if parsed else 0,
+        'summary': texto[:800] if parsed else 'Archivo almacenado; requiere un módulo compatible para analizar su formato.',
+        'full_text': texto[:30000] if parsed else ''
     }
 
 @app.get('/api/evolution/stats',dependencies=[Depends(require_key)])

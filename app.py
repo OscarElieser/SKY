@@ -116,12 +116,18 @@ def elegir_motor(key, area='General'):
     return elegido, m
 
 
-SECCIONES_TECNICAS = [
-    "🏠 Tablero general (v8.0)", "🌐 SKY IA Universal v12.0", "🧠 IA universal", "🧬 Centro multi-IA", "👁️ SKY Visión", "🎨 SKY Studio 3D", "📁 SKY Office Studio", "🧬 SKY Evolución", "🧰 Herramientas SKY", "🔔 SKY Live", "🌐 SKY Metaverso y API", "🎙️ SKY y dispositivos", "💰 Finanzas personales", "🚀 Generar ingresos", "📈 Bolsa y Bitcoin",
-    "📰 Noticias e Internet", "📣 Redes sociales", "🎵 Música y películas", "🎞️ Imágenes y videos",
-    "🔐 Antivirus y hacking ético", "🎓 Educación e investigación", "📚 Biblioteca y memoria",
-    "🧭 BAQUEANO Control Center", "🧾 Transacciones", "📡 Engine Sensor MLP + GRU", "✅ Proyectos y tareas", "⚽ SKY Sports Madridista"
-]
+# Catálogo compartido: el HUD 8765 y el panel heredado 8501 describen los mismos módulos.
+from neural_core.sky_module_registry import MODULES as _SKY_MODULES
+SECCIONES_TECNICAS = [label for _, label, _ in _SKY_MODULES]
+_MODULOS_POR_ID = {slug: label for slug, label, _ in _SKY_MODULES}
+# Sólo usar el módulo indicado al abrir la ventana bajo demanda.
+_MODULO_SOLICITADO = str(getattr(st, "query_params", {}).get("sky_mod", ""))
+if _MODULO_SOLICITADO in _MODULOS_POR_ID:
+    if st.session_state.get("_sky_module_query_last") != _MODULO_SOLICITADO:
+        st.session_state["_sky_module_query_last"] = _MODULO_SOLICITADO
+        st.session_state["sky_selected_module"] = _MODULOS_POR_ID[_MODULO_SOLICITADO]
+        st.session_state["sky_modules_mode"] = "🛠️ Módulos Técnicos (Modo Dev)"
+    st.session_state["sky_ui_view_mode"] = "classic"
 
 if "sky_ui_view_mode" not in st.session_state:
     st.session_state["sky_ui_view_mode"] = "holographic"
@@ -129,23 +135,23 @@ if "sky_ui_view_mode" not in st.session_state:
 if st.session_state["sky_ui_view_mode"] == "classic":
     with st.sidebar:
         st.markdown("### 🧠 SKY-IA")
-        st.caption("Asistente Central · 26 módulos internos")
+        st.caption("Asistente Central · 27 módulos registrados")
         
         modo_interfaz = st.radio(
             "Modo de Interfaz",
             ["🎙️ Asistente Unificado (Voz & Chat)", "🛠️ Módulos Técnicos (Modo Dev)"],
-            label_visibility="collapsed"
+            label_visibility="collapsed", key="sky_modules_mode"
         )
         
         if modo_interfaz == "🎙️ Asistente Unificado (Voz & Chat)":
             seccion = "🎙️ Asistente Central"
-            st.caption("🟢 **26 módulos conectados internamente**")
+            st.caption("🟢 **27 módulos registrados (carga bajo demanda)**")
             ejecucion_dispositivo = st.checkbox("⚡ Ejecución directa en PC", value=True,
                                                 help="Permite a SKY abrir programas y páginas locales cuando se lo pidas.")
             proveedor_jarvis, modelo_jarvis = elegir_motor('motor_jarvis', 'General')
         else:
             st.caption("🛠️ **Explorador de Módulos (Dev):**")
-            seccion_elegida = st.radio("Módulos", SECCIONES_TECNICAS, label_visibility="collapsed")
+            seccion_elegida = st.radio("Módulos", SECCIONES_TECNICAS, label_visibility="collapsed", key="sky_selected_module")
             seccion = "🏠 Inicio" if seccion_elegida == "🏠 Tablero general (v8.0)" else seccion_elegida
             ejecucion_dispositivo = True
             proveedor_jarvis = 'auto'
@@ -2119,11 +2125,11 @@ def render_asistente_holografico_3d(proveedor, modelo, ejecucion_dispositivo=Tru
     with col_hdr_c:
         col_m1, col_m2 = st.columns(2)
         with col_m1:
-            if st.button("✦ Módulos (26)", help="Abrir ventana holográfica con los 26 módulos del ecosistema"):
+            if st.button("✦ Módulos (27)", help="Abrir ventana holográfica con los 26 módulos del ecosistema"):
                 if gestor_ventanas.windows['modules'].is_open:
                     gestor_ventanas.close_window('modules')
                 else:
-                    gestor_ventanas.open_window('modules', win_type='modules', title='🧠 Ecosistema SKY-IA (26 Módulos)', position='center')
+                    gestor_ventanas.open_window('modules', win_type='modules', title='🧠 Ecosistema SKY-IA (27 Módulos)', position='center')
                 st.rerun()
         with col_m2:
             if st.button("📋 Modo Clásico", help="Regresar a la interfaz anterior de consola/tablero"):
@@ -2234,7 +2240,7 @@ def render_asistente_holografico_3d(proveedor, modelo, ejecucion_dispositivo=Tru
                 else:
                     st.info("No hay tareas en segundo plano en ejecución. Pídele a SKY crear una presentación o documento.")
             elif win.id == 'modules':
-                st.markdown("### 🧠 Ecosistema SKY-IA — Los 26 Módulos Reales")
+                st.markdown("### 🧠 Ecosistema SKY-IA — Los 27 Módulos Registrados")
                 st.caption("Acceso directo a cualquier módulo del sistema sin perder la sesión.")
                 cols_mod = st.columns(4)
                 for idx, mod in enumerate(SECCIONES_TECNICAS):
