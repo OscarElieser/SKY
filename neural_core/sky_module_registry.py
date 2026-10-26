@@ -6,6 +6,7 @@ Ningún módulo pesado se carga al consultar este archivo.
 from __future__ import annotations
 
 import re
+from contextlib import contextmanager
 import sqlite3
 import time
 import unicodedata
@@ -59,7 +60,7 @@ def all_modules() -> list[dict]:
         {"id": slug, "label": label, "title": re.sub(r"^[^A-Za-zÁÉÍÓÚÑ0-9]+", "", label), "aliases": list(aa),
          "backend": "hud" if slug in NATIVE_PATHS else "streamlit_on_demand",
          "url": NATIVE_PATHS.get(slug)}
-        for slug, label, _ in MODULES
+        for slug, label, aa in MODULES
     ]
 
 def lookup(module_id: str) -> dict | None:
@@ -69,7 +70,7 @@ def match_activation(frase: str) -> dict | None:
     """Sólo órdenes explícitas de abrir/activar, nunca conversaciones incidentales."""
     phrase = _norm(frase)
     phrase = re.sub(r"^(?:oye |mira |hey )?(?:sky )?", "", phrase)
-    if not re.match(r"^(?:activa|activar|abre|abri|abrir|inicia|iniciar|muestra|mostra|mostrame|mostrame|pon|pone|ejecuta)\b", phrase):
+    if not re.match(r"^(?:activa|activar|abre|abri|abrir|inicia|iniciar|muestra|mostra|mostrame|pon|pone|ejecuta)\b", phrase):
         return None
     rest = re.sub(r"^(?:activa|activar|abre|abri|abrir|inicia|iniciar|muestra|mostra|mostrame|pon|pone|ejecuta)\b", "", phrase).strip()
     rest = re.sub(r"^(?:el |la |los |las |modulo |modulos |seccion |secciones |apartado |panel |de |del )+", "", rest)
@@ -83,11 +84,16 @@ def match_activation(frase: str) -> dict | None:
 
 DB = Path(__file__).resolve().parent.parent / "local_data" / "sky_module_activation.sqlite3"
 
+@contextmanager
 def _connect():
     DB.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB, timeout=5)
-    con.execute("CREATE TABLE IF NOT EXISTS activations (id INTEGER PRIMARY KEY, module_id TEXT NOT NULL, created REAL NOT NULL)")
-    return con
+    try:
+        con.execute("CREATE TABLE IF NOT EXISTS activations (id INTEGER PRIMARY KEY, module_id TEXT NOT NULL, created REAL NOT NULL)")
+        yield con
+        con.commit()
+    finally:
+        con.close()
 
 def publish_activation(module_id: str) -> int:
     if lookup(module_id) is None:
