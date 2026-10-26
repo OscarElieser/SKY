@@ -256,23 +256,25 @@ class SkySupervisor:
         print(f"[SKY] Intérprete Python: {PYTHON_EXE}")
         print(f"[SKY] Directorio Base:   {WORKSPACE}")
 
-        # 1. Comprobar y resolver colisiones en puertos
+        # 1. Los servicios ya activos NO se sustituyen ni se terminan
+        # automáticamente: otro iniciador puede pertenecer al mismo usuario.
+        # Cerrar una API que funciona destruye sesiones y puede causar ciclos
+        # de reinicio y comandos duplicados. No lanzar un supervisor parcial.
         needed_ports = [PORTS["api"], PORTS["agent"]]
         if self.with_ui:
             needed_ports.append(PORTS["streamlit"])
-
-        for p in needed_ports:
-            if is_port_in_use(p):
-                if not es_servicio_sky(p):
-                    print(f"[AVISO] El puerto {p} está ocupado por otro programa (no es SKY). No se cierra.")
-                    if p == PORTS["api"]:
-                        sys.exit("[SKY] Liberá el puerto 8765 o cerrá ese programa y volvé a intentar.")
-                    continue
-                pid = get_pid_using_port(p)
-                print(f"[SKY] Reiniciando instancia previa de SKY en el puerto {p} (PID {pid})...")
-                if pid:
-                    kill_process_by_pid(pid)
-                    time.sleep(0.5)
+        occupied = [(p, es_servicio_sky(p)) for p in needed_ports
+                    if is_port_in_use(p)]
+        if occupied:
+            for p, own in occupied:
+                if own:
+                    print(f"[SKY] Servicio existente en puerto {p}; se conserva intacto.")
+                else:
+                    print(f"[AVISO] Puerto {p} ocupado por un proceso no verificado; no se toca.")
+            print("[SKY] No iniciaré otro supervisor mientras existan puertos "
+                  "ocupados. Usá --status para consultar o cerrá desde su propia "
+                  "consola la instancia anterior si necesitás reiniciarla.")
+            return False
 
         # 2. Iniciar Agente de Dispositivo Windows (Puerto 8766)
         print(f"[SKY] Iniciando Agente de Dispositivo en 127.0.0.1:{PORTS['agent']}...")
