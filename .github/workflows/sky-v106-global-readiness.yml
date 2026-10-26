@@ -22,7 +22,7 @@ jobs:
       - name: Syntax of local Windows updater
         run: python -m py_compile scripts/APLICAR_SKY_LATENCIA_VOZ.py
       - name: Regression tests
-        run: PYTHONPATH=. pytest -q tests/test_sky_v10_5_global.py tests/test_sky_v10_6_global.py tests/test_sky_latency_and_wordless_voice.py tests/test_sky_hud_chat_voice_bridge.py
+        run: PYTHONPATH=. pytest -q tests/test_sky_v10_5_global.py tests/test_sky_v10_6_global.py tests/test_sky_latency_and_wordless_voice.py tests/test_sky_hud_chat_voice_bridge.py tests/test_sky_voice_single_instance.py
       - name: Local encrypted recovery rehearsal
         env:
           SKY_BACKUP_PASSPHRASE: test-only-password-for-ci-not-for-production
