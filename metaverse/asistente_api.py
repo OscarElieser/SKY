@@ -287,6 +287,11 @@ def mensaje(body: Mensaje, request: Request):
         return _medir_turno(resultado,inicio)
     if body.file_context:
         return terminar(_respuesta_archivos(body))
+    # Orden explícita en el teléfono: cola segura, sin ejecución automática.
+    from neural_core.sky_mobile_agent import voice_request
+    mobile_request = voice_request(body.texto)
+    if mobile_request is not None:
+        return terminar(mobile_request)
     rapido = _atajo_rapido(body.texto, body.dispositivo, request)
     if rapido is not None:
         return terminar(rapido)
@@ -337,6 +342,11 @@ def mensaje_stream(body: Mensaje, request: Request):
             return linea({'final': _medir_turno(resultado, inicio)})
         if body.file_context:
             yield final(_respuesta_archivos(body))
+            return
+        from neural_core.sky_mobile_agent import voice_request
+        mobile_request = voice_request(body.texto)
+        if mobile_request is not None:
+            yield final(mobile_request)
             return
         rapido = _atajo_rapido(body.texto, body.dispositivo, request)
         if rapido is not None:
