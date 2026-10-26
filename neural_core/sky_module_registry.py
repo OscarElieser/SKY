@@ -56,7 +56,7 @@ def _norm(s: str) -> str:
 
 def all_modules() -> list[dict]:
     return [
-        {"id": slug, "label": label, "title": re.sub(r"^[^A-Za-zÁÉÍÓÚÑ0-9]+", "", label),
+        {"id": slug, "label": label, "title": re.sub(r"^[^A-Za-zÁÉÍÓÚÑ0-9]+", "", label), "aliases": list(aa),
          "backend": "hud" if slug in NATIVE_PATHS else "streamlit_on_demand",
          "url": NATIVE_PATHS.get(slug)}
         for slug, label, _ in MODULES
