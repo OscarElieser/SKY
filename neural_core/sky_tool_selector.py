@@ -7,6 +7,7 @@ el catálogo para conservar el comportamiento previo.
 """
 from __future__ import annotations
 
+import os
 import re
 import unicodedata
 from typing import Iterable
@@ -111,6 +112,9 @@ def select_tool_names(text: str, available: Iterable[str]) -> list[str]:
     - Esta función no ejecuta nada ni altera la política de SKY.
     """
     present = list(dict.fromkeys(str(name) for name in available))
+    # Reversión operacional sin modificar ni eliminar ninguna integración.
+    if os.getenv("SKY_TOOL_ROUTING", "selective").strip().lower() in ("all", "full", "legacy"):
+        return present
     utterance = _norm(text)
     utterance = re.sub(r"^(?:(?:oye|hey|mira) )?(?:sky )?", "", utterance)
     if not utterance:
