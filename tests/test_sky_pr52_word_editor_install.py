@@ -6,7 +6,11 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from scripts import sky_pr52_word_editor_install as installer
+try:
+    from scripts import sky_pr52_word_editor_install as installer
+except ImportError:
+    # Owner installs the incremental updater in the SKY project root.
+    import sky_pr52_word_editor_install as installer
 
 
 class InstallerTests(unittest.TestCase):
