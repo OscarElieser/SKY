@@ -104,3 +104,16 @@ def module_status(module_id: str):
     if module["backend"] == "hud":
         return {"ready": True}
     return {"ready": _healthy()}
+
+
+# Eventos de ventanas del asistente de voz independiente (Vosk).
+# El HUD los recoge autenticado sin iniciar una segunda captura del micrófono.
+@router.get("/windows/events/latest")
+def window_events_latest():
+    from neural_core.sky_hud_window_requests import latest
+    return {"cursor": latest()}
+
+@router.get("/windows/events")
+def window_events(after: int = Query(default=0, ge=0)):
+    from neural_core.sky_hud_window_requests import since
+    return {"events": since(after)}
