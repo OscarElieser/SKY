@@ -19,13 +19,14 @@ coordinador_voz=Coordinator()
 
 def voice_loop():
     while True:
-        command = "abrí el panel de conversación"
-        if command:
-            intent=interpret_command(command)
-            if intent:
-                say("otra tarea")
-            else:
-                say("charlar")
+        if True:
+            command = "abrí el panel de conversación"
+            if command:
+                intent=interpret_command(command)
+                if intent:
+                    say("otra tarea")
+                else:
+                    say("charlar")
 """)
 
 
@@ -49,7 +50,7 @@ class SurgicalChatTests(unittest.TestCase):
 
     def test_conflicting_interpreter_layout_is_rejected(self):
         local = local_voice_fixture().replace(
-            "            if intent:\n", "            if intent and other_condition:\n")
+            "                if intent:\n", "                if intent and other_condition:\n")
         with self.assertRaises(RuntimeError):
             surgically_prepare_voice(local.encode("utf-8"))
 
@@ -62,9 +63,9 @@ class SurgicalChatTests(unittest.TestCase):
     def test_only_one_voice_anchor_accepted(self):
         body = local_voice_fixture()
         body = body.replace(
-            "            intent=interpret_command(command)\n",
-            "            intent=interpret_command(command)\n"
-            "            intent=interpret_command(command)\n",
+            "                intent=interpret_command(command)\n",
+            "                intent=interpret_command(command)\n"
+            "                intent=interpret_command(command)\n",
         )
         with self.assertRaises(RuntimeError):
             surgically_prepare_voice(body.encode("utf-8"))
