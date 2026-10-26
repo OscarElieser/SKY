@@ -36,7 +36,10 @@ def parse_window_request(text: str) -> dict | None:
         return {"kind":"window_control", "target":"player" if m.group(2) in ("youtube","reproductor","video") else "search",
                 "mode": ("minimized" if verb.startswith("minim") else "max" if verb.startswith("maxim") else "close" if verb.startswith("cierr") else "normal")}
     m = re.match(r"^(?:(?:abre|abri|abrir|activa|muestra) (?:el )?youtube (?:y )?)?(?:pon|pone|ponme|reproduce|reproducir|reproduci|busca|buscame|quiero escuchar|quiero ver) (?:(?:(?:la|el|un) )?(?:musica|cancion|canciones|tema|temas|video|videos) (?:de )?)?(.+)$", t)
-    if m and m.group(1) and not re.match(r"^(?:volumen|alarma|recordatorio|temporizador)\b", m.group(1)):
+    if m and m.group(1) and (
+        re.match(r"^(?:abre|abri|abrir|activa|muestra) (?:el )?youtube\b", t) or
+        re.match(r"^(?:pon|pone|ponme|reproduce|reproducir|reproduci|quiero escuchar|quiero ver) (?:la |el |un )?(?:musica|cancion|canciones|tema|temas|video|videos)\b", t)
+    ) and not re.match(r"^(?:volumen|alarma|recordatorio|temporizador)\b", m.group(1)):
         return {"kind":"youtube","query":m.group(1)[:120],"mode":mode}
     if re.match(r"^(?:abre|abri|abrir|activa|activar|inicia|iniciar|muestra|mostra)(?: (?:el|la))? (?:(?:modulo|panel|herramienta) (?:de )?)?(?:buscar|buscador|busqueda|search)(?: web)?$", t):
         return {"kind":"search","provider":"web","mode":mode}
