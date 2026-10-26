@@ -64,6 +64,10 @@ def interpretar(texto: str) -> dict | None:
     hud_chat = panel_chat(texto)
     if hud_chat:
         return hud_chat
+    from .sky_keyboard_shortcuts import propuesta as atajo_escritorio
+    atajo = atajo_escritorio(texto)
+    if atajo:
+        return atajo
     propio = _interpretar_propio(texto)
     if propio and propio['action'] == 'list_path':
         return propio
@@ -273,6 +277,12 @@ def reglas(texto: str) -> dict | None:
     stop = parada(_norm(texto))   # la parada de emergencia va antes que todo
     if stop:
         return stop
+    # Atajos de teclado peligrosos NO llegan al modelo generativo, y no se
+    # ejecutan como herramientas del reproductor. Siempre piden autorización.
+    from .sky_keyboard_shortcuts import solicitud as atajo_local
+    shortcut = atajo_local(texto)
+    if shortcut:
+        return shortcut
     # HUD commands are local UI actions, not generative conversation.
     # Keep this deterministic even when Ollama or the provider is unavailable.
     from .sky_hud_intents import panel_chat
