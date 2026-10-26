@@ -419,7 +419,8 @@
     const tipo = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
     let partes = [], voz = 0, silencio = 0, inicio = 0;
     W.timer = setInterval(() => {
-      if (!W.on || W.ocupado || S.listening || S.speaking || hablando) return;
+      if (!W.on || W.ocupado || S.listening || S.speaking || hablando ||
+          estado === 'thinking' || estado === 'executing') return;
       W.an.getByteTimeDomainData(W.buf);
       let sum = 0; for (const v of W.buf) sum += (v - 128) * (v - 128);
       const rms = Math.sqrt(sum / W.buf.length) / 128, ahora = performance.now();
@@ -445,7 +446,12 @@
       const fd = new FormData(); fd.append('file', new Blob(partes, { type: mime }), (mime || '').includes('mp4') ? 'w.m4a' : 'w.webm');
       fd.append('language', 'es');
       const r = await api('/api/global-media/stt/transcribe', { method: 'POST', body: fd });
-      const orden = ordenDespertador(r.text);
+      // CONV + listening are both explicit owner controls. When both are on,
+      // recognize direct speech without the 'SKY' prefix, as the browser
+      // recognizer already does. Do not enable silently.
+      const wakeOrder = ordenDespertador(r.text);
+      const orden = wakeOrder !== null ? wakeOrder
+        : (S.conv ? String(r.text || '').trim() : null);
       if (orden !== null) {
         $('transcript').textContent = '“' + (r.text || '').trim() + '”';
         if (orden) recibir(orden, 'voz'); else { await speak('¿Sí?'); escuchar(); }
@@ -911,7 +917,9 @@
       .replace(/\s+(en\s+)?(una\s+)?(ventana|ventanita|cuadro)\s+(pequena|mini|flotante).*$/,'')
       .replace(/^(?:(?:en\s+)?(?:una\s+)?(?:ventana|ventanita)\s+(?:pequena|mini|flotante)\s+)+/,'')
       .replace(/^(un|una|el|la|mis)\s+/,'').trim();
-    if (/^(cuadro\s+de\s+texto|chat|texto|conversacion)$/.test(target)) return 'chat';
+    if (/^(cuadro\s+de\s+texto|chat|texto|conversacion)$/.test(target) ||
+        /^(?:panel\s+(?:de\s+)?)?(?:chat|conversacion|texto)(?:\s+de\s+sky)?$/.test(target) ||
+        target === 'panel de sky') return 'chat';
     if (/^(historial|historial\s+de\s+(conversaciones|consultas)|consultas)$/.test(target)) return 'history';
     if (/^(estudio\s+creativo|creativo|creacion\s+de\s+(imagenes|videos))$/.test(target)) return 'creative';
     if (/^(diagnostico|estado\s+del\s+sistema)$/.test(target)) return 'diagnostic';
