@@ -71,6 +71,13 @@ def call_device(url: str, token: str, action: str='status', params: dict | None=
     except Exception as exc:
         sky_metricas.registrar(tipo, action, False, (time.perf_counter()-inicio)*1000, detalle=str(exc))
         raise
+    if tipo == 'accion' and sky_metricas.respuesta_pendiente(res):
+        # Una operación enviada/iniciada no es un fallo, pero tampoco un éxito verificado.
+        sky_metricas.registrar('pendiente', action, False,
+                               (time.perf_counter()-inicio)*1000,
+                               detalle='Operación enviada; falta verificar el resultado.',
+                               origen=str(res.get('status', ''))[:20])
+        return res
     ok, motivo = sky_metricas.resultado_ok(res)
     if tipo == 'agente' and ok and not sky_metricas.toca_muestra('agente:' + str(url), 60):
         return res   # el estado se consulta seguido: una muestra por minuto alcanza (los fallos siempre se registran)
