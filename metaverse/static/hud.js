@@ -2581,7 +2581,34 @@
       const panel = el('div', 'sky-search-panel');
       panel.append(el('b', '', 'YouTube dentro de SKY'), el('p', '',
         r.motivo || 'No hay un video incrustable disponible.'));
-      panel.appendChild(el('p', '', 'SKY conserva esta ventana. Para reproducir un video integrado, configurá YOUTUBE_API_KEY o seleccioná un video embebible.'));
+      panel.appendChild(el('p', '', 'SKY conserva esta ventana. Podés configurar YOUTUBE_API_KEY o pegar un enlace de YouTube con un video permitido.'));
+      const manual = el('form', 'sky-search-form');
+      const urlInput = el('input', 'hab-in'); urlInput.type = 'url';
+      urlInput.placeholder = 'https://www.youtube.com/watch?v=...';
+      urlInput.setAttribute('aria-label', 'URL de video YouTube para reproducir dentro de SKY');
+      const loadVideo = el('button', 'btn primary', 'Reproducir aquí');
+      loadVideo.type = 'submit';
+      manual.append(urlInput, loadVideo);
+      const errorVideo = el('p', 'res bad', '');
+      manual.addEventListener('submit', e => {
+        e.preventDefault();
+        try {
+          const u = new URL(urlInput.value.trim());
+          if (u.protocol !== 'https:') throw Error('Se requiere enlace HTTPS.');
+          const host = u.hostname.toLowerCase();
+          let id = '';
+          if (host === 'youtu.be' || host === 'www.youtu.be') {
+            id = u.pathname.slice(1).split('/')[0];
+          } else if (['youtube.com', 'www.youtube.com', 'm.youtube.com',
+                      'youtube-nocookie.com', 'www.youtube-nocookie.com'].includes(host)) {
+            id = u.searchParams.get('v') || u.pathname.match(/^\/(?:embed|shorts|live)\/([^/]+)/)?.[1] || '';
+          }
+          if (!/^[A-Za-z0-9_-]{11}$/.test(id)) throw Error('Enlace de video no válido.');
+          lista = [{id, titulo:'Video seleccionado'}]; indice = 0;
+          mostrarVideo(); aplicarModoVentana('player', mode);
+        } catch(err) { errorVideo.textContent = 'No pude incorporar ese video: ' + err.message; }
+      });
+      panel.append(manual, errorVideo);
       const link = el('a', 'btn', 'Buscar en YouTube fuera de SKY (opcional)');
       link.href = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(consulta);
       link.target = '_blank'; link.rel = 'noopener noreferrer';
