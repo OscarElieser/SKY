@@ -22,10 +22,13 @@
     if (directWindow) {
       const verb = directWindow[1];
       return {kind:"window_control", target:/youtube|reproductor|video/.test(directWindow[2])?"player":"search",
-        mode:/minim/.test(verb)?"minimized":/maxim/.test(verb)?"max":/cerr/.test(verb)?"close":"normal"};
+        mode:/minim/.test(verb)?"minimized":/maxim/.test(verb)?"max":/cierr/.test(verb)?"close":"normal"};
     }
     const player = s.match(/^(?:(?:abre|abri|abrir|activa|muestra)\s+(?:el\s+)?youtube\s+(?:y\s+)?)?(?:pon|pone|ponme|reproduce|reproducir|reproduci|busca|buscame|quiero escuchar|quiero ver)\s+(?:(?:la |el |un )?(?:musica|cancion|canciones|tema|temas|video|videos)\s+(?:de\s+)?)?(.+)$/);
-    if (player && player[1] && !/^(?:volumen|alarma|recordatorio|temporizador)\b/.test(player[1])) {
+    if (player && player[1] &&
+        (/^(?:abre|abri|abrir|activa|muestra) (?:el )?youtube\b/.test(s) ||
+         /^(?:pon|pone|ponme|reproduce|reproducir|reproduci|quiero escuchar|quiero ver) (?:la |el |un )?(?:musica|cancion|canciones|tema|temas|video|videos)\b/.test(s)) &&
+        !/^(?:volumen|alarma|recordatorio|temporizador)\b/.test(player[1])) {
       return {kind:"youtube", query:player[1].slice(0,120), mode:mode || "normal"};
     }
     if (/^(?:abre|abri|abrir|activa|activar|inicia|iniciar|muestra|mostra)(?:\s+(?:el|la))?\s+(?:(?:modulo|panel|herramienta)\s+(?:de\s+)?)?(?:buscar|buscador|busqueda|search)(?:\s+web)?$/.test(s) ||
