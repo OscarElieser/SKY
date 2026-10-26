@@ -1652,6 +1652,23 @@
           }
         } catch { /* API temporalmente ocupada: se reintentará */ }
       }, 3000);
+      // La voz de Windows comparte órdenes de ventanas con el HUD, sin micrófono duplicado.
+      try {
+        const last = await api('/api/sky/modules/windows/events/latest');
+        let cursorVentanas = last.cursor;
+        setInterval(async () => {
+          try {
+            const d = await api('/api/sky/modules/windows/events?after=' + cursorVentanas);
+            for (const ev of d.events || []) {
+              cursorVentanas = Math.max(cursorVentanas, ev.id);
+              await gestionarSolicitudVentana({
+                kind: ev.kind, target: ev.target, provider: ev.target,
+                mode: ev.mode, query: ev.query
+              });
+            }
+          } catch { /* Se vuelve a consultar cuando la API regresa */ }
+        }, 3000);
+      } catch (e) { console.warn('Eventos de ventanas no disponibles:', e.message); }
     } catch (e) {
       console.warn('Catálogo SKY no disponible:', e.message);
       pintarModulos();
