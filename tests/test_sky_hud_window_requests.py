@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -40,6 +41,28 @@ class HUDWindowRequestTests(unittest.TestCase):
                 self.assertEqual(w.since(n), [])
                 with self.assertRaises(ValueError):
                     w.publish({"kind":"launch_app","mode":"mini"})
+
+    def test_connections_closed_after_database_operations(self):
+        """SQLite debe liberar events.db al finalizar, incluso en Windows."""
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(w, "DB", Path(directory) / "connections.db"):
+                opened = []
+                original_connect = sqlite3.connect
+
+                def track_connect(*args, **kwargs):
+                    connection = original_connect(*args, **kwargs)
+                    opened.append(connection)
+                    return connection
+
+                with patch.object(w.sqlite3, "connect", side_effect=track_connect):
+                    self.assertEqual(w.latest(), 0)
+                    w.publish({"kind": "youtube", "query": "prueba", "mode": "mini"})
+                    self.assertEqual(len(w.since(0)), 1)
+
+                self.assertEqual(len(opened), 3)
+                for connection in opened:
+                    with self.assertRaises(sqlite3.ProgrammingError):
+                        connection.execute("SELECT 1")
 
 
 if __name__ == "__main__":
