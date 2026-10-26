@@ -107,7 +107,7 @@ class DocumentTests(unittest.TestCase):
         self.assertTrue(app.activated)
         self.assertEqual(doc.Content.Text, "Hola\rMundo\r")
         self.assertEqual(r["status"], "VERIFIED")
-        self.assertFalse(r["saved"])
+        self.assertFalse(r["save_requested"])
 
     def test_second_append_keeps_existing_content(self):
         doc = FakeDocument("Anterior\r")
