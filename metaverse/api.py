@@ -163,6 +163,12 @@ async def lifespan(app):
             pump.cancel()
             try:await pump
             except asyncio.CancelledError:pass
+        # Drain the asynchronous HTTP metrics queue for at most 3 seconds.
+        try:
+            from neural_core.sky_http_metrics_queue import flush
+            await asyncio.to_thread(flush, 3.0)
+        except Exception:
+            pass
 
 app=FastAPI(title='SKY Engine API',version='10.5.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
 app.mount('/static',StaticFiles(directory=STATIC),name='static')
@@ -662,27 +668,27 @@ app.include_router(sky_workspace_router)
 
 @app.middleware('http')
 async def sky_real_activity(request:Request,call_next):
-    from neural_core.sky_telemetry import record
+    # Database measurements are informational: never hold HTTP responses for
+    # SQLite writes, which can block for seconds under concurrent load.
     start=time.perf_counter()
     try:
         response=await call_next(request)
-        ms=(time.perf_counter()-start)*1000
-        record(request.url.path,ms,response.status_code)
-        _kpi_api(request,ms,response.status_code)
+        _kpi_api(request,(time.perf_counter()-start)*1000,response.status_code)
         return response
     except Exception:
-        ms=(time.perf_counter()-start)*1000
-        record(request.url.path,ms,500)
-        _kpi_api(request,ms,500)
+        _kpi_api(request,(time.perf_counter()-start)*1000,500)
         raise
 
 def _kpi_api(request:Request,ms:float,status:int):
-    # SKY v12.2: KPIs reales por ruta (plantilla sin IDs), código y milisegundos.
-    path=request.url.path
-    if not path.startswith('/api/'):return
-    from neural_core import sky_metricas
-    ruta=getattr(request.scope.get('route'),'path',None) or sky_metricas.ruta_plantilla(path)
-    sky_metricas.registrar('api',f'{request.method} {ruta}',status<500,ms,codigo=status)
+    # Preserve both existing telemetry and KPI stores, but write on one bounded
+    # worker instead of the FastAPI event loop. Queue overflow is observable.
+    try:
+        from neural_core.sky_http_metrics_queue import enqueue
+        path=request.url.path
+        ruta=getattr(request.scope.get('route'),'path',None) or ''
+        enqueue(path,request.method,ruta,ms,status)
+    except Exception:
+        pass  # Logging must never break the request.
 
 # v9.3: flujos autónomos locales, privilegios exclusivos del creador.
 from .workflow_api import router as workflow_router
