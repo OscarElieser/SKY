@@ -227,6 +227,22 @@ def main():
                 sync_state({'last_command': command, 'timestamp': now, 'coordinator_state': VoiceState.PROCESANDO.value})
                 
                 intent=interpret_command(command)
+                if (intent and intent.get('action') == 'holographic_window'
+                        and (intent.get('params') or {}).get('subaction') == 'open_chat'):
+                    # This is an HUD-only command: device execution cannot
+                    # open an in-browser pane. Queue through the existing
+                    # authenticated voice inbox. Do this even with --execute-safe
+                    # disabled; that switch controls *device* actions only.
+                    try:
+                        add_inbox(command, intent)
+                        msg_chat = ('Envié la orden al HUD. El chat se abrirá '
+                                    'si la ventana de SKY está disponible.')
+                    except (OSError, ValueError) as exc:
+                        msg_chat = 'No pude enviar la orden al panel. Revisá la conexión.'
+                        print('Detalle UI:', type(exc).__name__)
+                    coordinador_voz.record_turn(command, msg_chat)
+                    say(msg_chat)
+                    continue
                 if intent:
                     coordinador_voz.set_state(VoiceState.EJECUTANDO_HERRAMIENTA)
                     sync_state({'coordinator_state': VoiceState.EJECUTANDO_HERRAMIENTA.value})
