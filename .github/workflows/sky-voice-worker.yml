@@ -1,0 +1,27 @@
+name: SKY Voice Worker - streaming mic safety
+on:
+  pull_request:
+    paths:
+      - "sky_manos_libres.py"
+      - "neural_core/sky_voice_queue.py"
+      - "tests/test_sky_voice_queue.py"
+      - ".github/workflows/sky-voice-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile isolated Windows voice modules
+        run: python -m py_compile sky_manos_libres.py neural_core/sky_voice_queue.py
+      - name: Verify queue behavior and wake echo protection
+        run: |
+          python -m pip install pytest
+          PYTHONPATH=. pytest -q tests/test_sky_voice_queue.py tests/test_sky_listening_status.py

@@ -17,6 +17,7 @@ from neural_core.sky_asistente_personal import interpretar as interpret_command,
 from neural_core.voz_inbox import add_inbox
 from neural_core.assistant import responder
 from neural_core.providers import choose_provider
+from neural_core.sky_voice_queue import VoiceWorkQueue, wake_during_speech, parada_emergencia_voz
 
 WAKE_WORDS=('sky','esquai','es kay','es cai','escai')
 
@@ -74,23 +75,19 @@ def main():
         from vosk import Model, KaldiRecognizer
     except ImportError:
         sys.exit('Instalá dependencias opcionales: pip install vosk sounddevice pyttsx3')
-    try:
-        import pyttsx3
-        tts=pyttsx3.init()
-    except Exception:
-        tts=None
     audio=queue.Queue(maxsize=50)
-    speaking=False
+    voice_runtime = None
     last_audio = 0.0
     def callback(indata, frames, time_info, status):
         nonlocal last_audio
-        # Confirmar que el controlador sigue entregando audio al micrófono.
-        # No se guarda contenido de voz; sólo marca temporal de actividad.
+        # El callback del micrófono nunca espera a Ollama ni a pyttsx3.
         last_audio = time.time()
-        if speaking: return
-        try: audio.put_nowait(bytes(indata))
+        speaking_at_capture = bool(voice_runtime and voice_runtime.speaking)
+        try: audio.put_nowait((speaking_at_capture, bytes(indata)))
         except queue.Full: pass
     def create_stream_and_recognizer():
+        # Cargar el modelo Vosk sólo una vez, no una vez por dispositivo/rate.
+        vosk_model = Model(args.model)
         input_devices = [None]
         try:
             for idx, d in enumerate(sd.query_devices()):
@@ -111,11 +108,16 @@ def main():
                 try:
                     st = sd.RawInputStream(device=dev_id, samplerate=candidate_rate, blocksize=8000, dtype='int16', channels=1, callback=callback)
                     st.start()
-                    rec = KaldiRecognizer(Model(args.model), candidate_rate)
+                    rec = KaldiRecognizer(vosk_model, candidate_rate)
                     return st, rec
                 except Exception:
+                    try:
+                        st.stop()
+                        st.close()
+                    except Exception:
+                        pass
                     continue
-        rec = KaldiRecognizer(Model(args.model), args.rate)
+        rec = KaldiRecognizer(vosk_model, args.rate)
         st = sd.RawInputStream(samplerate=args.rate, blocksize=8000, dtype='int16', channels=1, callback=callback)
         return st, rec
 
@@ -128,27 +130,59 @@ def main():
     print('La voz se reconoce localmente con Vosk; el texto consulta al proveedor SKY que configuraste.')
     from neural_core.voice_coordinator import coordinador_voz, VoiceState, InteractionMode
 
-    history=[]
+    history = []
+    def process_command(command):
+        """Ejecutado por un solo trabajador; nunca bloquea el micrófono."""
+        nonlocal history
+        coordinador_voz.set_state(VoiceState.PROCESANDO)
+        intent = interpret_command(command)
+        if voice_runtime.current_turn_cancelled:
+            return
+        if intent:
+            coordinador_voz.set_state(VoiceState.EJECUTANDO_HERRAMIENTA)
+            hecho = None
+            if args.execute_safe:
+                try:
+                    hecho = ejecutar_local_si_autorizado(intent)
+                except Exception as exc:
+                    hecho = {'ok': False, 'message': 'No se pudo ejecutar la orden. Revisá el agente local.'}
+                    print('Detalle:', str(exc))
+            if voice_runtime.current_turn_cancelled:
+                return
+            if hecho is not None:
+                mensaje = hecho.get('message') or (
+                    'Listo.' if hecho.get('ok', True) else 'No se pudo completar la orden.')
+            else:
+                add_inbox(command, intent)
+                mensaje = 'Preparé la orden: ' + intent.get('description', 'acción') + '. Confirmala en el panel de SKY.'
+            coordinador_voz.record_turn(command, mensaje)
+            voice_runtime.say(mensaje)
+            return
+        try:
+            provider, modelo = choose_provider(os.getenv('SKY_VOICE_PROVIDER', 'auto'), 'SKY voz')
+            answer, _ = responder(command, 'SKY voz local', history, modelo, proveedor=provider)
+            if voice_runtime.current_turn_cancelled:
+                return
+            history.extend([{'role': 'user', 'content': command}, {'role': 'assistant', 'content': answer}])
+            history = history[-10:]
+            coordinador_voz.record_turn(command, answer)
+            voice_runtime.say(answer)
+        except Exception as exc:
+            print('Detalle:', str(exc))
+            if not voice_runtime.current_turn_cancelled:
+                voice_runtime.say('No pude completar esta consulta. Revisá Ollama o el proveedor de IA.')
+
+    voice_runtime = VoiceWorkQueue(
+        process_command,
+        rate_factory=lambda: int(180 * coordinador_voz.get_speech_rate()),
+        speech_state=coordinador_voz.set_speaking,
+    )
+    voice_runtime.start()
+
     def say(message):
-        nonlocal speaking
-        print('SKY-IA:',message)
-        coordinador_voz.set_speaking(True)
-        if tts:
-            speaking=True
-            try:
-                # Ajustar velocidad si está configurada
-                rate = int(180 * coordinador_voz.get_speech_rate())
-                try: tts.setProperty('rate', rate)
-                except Exception: pass
-                tts.say(message[:1000]); tts.runAndWait()
-            finally:
-                speaking=False
-                coordinador_voz.set_speaking(False)
-                while not audio.empty():
-                    try: audio.get_nowait()
-                    except queue.Empty: break
-        else:
-            coordinador_voz.set_speaking(False)
+        """Encolar respuesta, sin bloquear el hilo que reconoce la voz."""
+        if not voice_runtime.announce(message):
+            print('SKY: cola de voz llena; omitida notificación:', str(message)[:100])
 
     def sync_state(data):
         try:
@@ -170,25 +204,64 @@ def main():
                 'last_seen': time.time(), 'status': 'ready', 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
 
     ultimo_latido = time.monotonic()
+    ultima_transicion_tts = voice_runtime.speech_epoch
     try:
         with stream:
             while True:
                 # Timeout para poder verificar la escucha incluso durante silencio.
                 # El latido refleja el consumo REAL del audio por este proceso.
                 try:
-                    buffer = audio.get(timeout=1.0)
+                    packet = audio.get(timeout=1.0)
                 except queue.Empty:
-                    buffer = None
+                    packet = None
+                # Cuando cambia la reproducción de SKY, descartar fonemas de
+                # eco pendientes antes de aceptar órdenes nuevas.
+                epoch = voice_runtime.speech_epoch
+                if epoch != ultima_transicion_tts:
+                    recognizer.Reset()
+                    ultima_transicion_tts = epoch
+                    while not audio.empty():
+                        try: audio.get_nowait()
+                        except queue.Empty: break
+                    packet = None
                 if time.monotonic() - ultimo_latido >= 5:
                     sync_state({'last_seen': time.time(), 'last_audio': last_audio,
                                 'hands_free_listening': True, 'wordless_active': wordless_active,
                                 'status': 'paused' if coordinador_voz.get_state() == VoiceState.PAUSADO else 'ready'})
                     ultimo_latido = time.monotonic()
-                if buffer is None:
+                if packet is None:
                     continue
+                audio_durante_tts, buffer = packet
                 if not recognizer.AcceptWaveform(buffer): continue
                 result=json.loads(recognizer.Result()).get('text','').strip()
                 if not result: continue
+
+                # La parada de emergencia NO espera a que Ollama termine.
+                # Durante TTS se exige el prefijo SKY para evitar falsos
+                # positivos del audio de salida.
+                durante_tts = audio_durante_tts or voice_runtime.speaking
+                if parada_emergencia_voz(result, exigir_activacion=durante_tts):
+                    from neural_core.sky_asistente_personal import parada
+                    alerta = parada("sky para todo")
+                    if alerta:
+                        voice_runtime.cancel_pending()
+                        voice_runtime.interrupt_speech()
+                        active_until = 0.0
+                        wordless_active = False
+                        coordinador_voz.pause_session()
+                        sync_state({'session_active': False, 'status': 'paused',
+                                    'wordless_active': False,
+                                    'coordinator_state': VoiceState.PAUSADO.value})
+                        say(alerta['mensaje'])
+                    continue
+
+                # Para evitar autoejecuciones por eco: durante TTS sólo se
+                # permite pedir silencio con "SKY ..."; nunca ejecutar acciones.
+                if durante_tts:
+                    if wake_during_speech(result):
+                        voice_runtime.interrupt_speech()
+                        print('SKY: interrumpiendo voz; repetí la orden cuando termine.')
+                    continue
 
                 # Verificar si el usuario está en modo C (texto) y no solicitó reactivar voz
                 current_mode = coordinador_voz.get_mode()
@@ -242,47 +315,17 @@ def main():
                     say(msg)
                     continue
 
-                print('Escuchado:',command)
-                coordinador_voz.set_state(VoiceState.PROCESANDO)
+                print('Escuchado:', command)
                 sync_state({'last_command': command, 'timestamp': now, 'coordinator_state': VoiceState.PROCESANDO.value})
-                
-                intent=interpret_command(command)
-                if intent:
-                    coordinador_voz.set_state(VoiceState.EJECUTANDO_HERRAMIENTA)
-                    sync_state({'coordinator_state': VoiceState.EJECUTANDO_HERRAMIENTA.value})
-                    hecho=None
-                    if args.execute_safe:
-                        # Sólo lo que el dueño marcó como automático en su política local.
-                        try:
-                            hecho=ejecutar_local_si_autorizado(intent)
-                        except Exception as exc:
-                            hecho={'ok':False,'message':'No se pudo ejecutar la orden. Revisá que el agente local esté activo.'}
-                            print('Detalle:',str(exc))
-                    if hecho is not None:
-                        msg_resp=hecho.get('message') or ('Listo.' if hecho.get('ok',True) else 'No se pudo completar la orden.')
-                        coordinador_voz.record_turn(command, msg_resp)
-                        say(msg_resp)
-                    else:
-                        add_inbox(command,intent)
-                        msg_p='Preparé la orden: '+intent.get('description','acción')+'. Confirmala en el panel de SKY.'
-                        coordinador_voz.record_turn(command, msg_p)
-                        say(msg_p)
-                    continue
-
-                provider,modelo=choose_provider(os.getenv('SKY_VOICE_PROVIDER','auto'), 'SKY voz')
-                try:
-                    answer,_=responder(command,'SKY voz local',history,modelo,proveedor=provider)
-                    history.extend([{'role':'user','content':command},{'role':'assistant','content':answer}])
-                    history=history[-10:]
-                    coordinador_voz.record_turn(command, answer)
-                    say(answer)
-                except Exception as exc:
-                    say('No pude completar esta consulta. Revisá la conexión y la configuración de Gemini u Ollama.')
-                    print('Detalle:',str(exc))
+                if not voice_runtime.submit(command):
+                    # Nunca ejecutar una acción concurrentemente ni perder el límite
+                    # de seguridad de la cola: se solicita repetir cuando libere.
+                    print('SKY: cola de voz ocupada. Repetí tu solicitud en unos momentos.')
     except KeyboardInterrupt:
         coordinador_voz.set_state(VoiceState.ESPERANDO_ACTIVACION)
         print('Micrófono desactivado. SKY-IA finalizado.')
     finally:
+        voice_runtime.stop()
         sync_state({'hands_free_listening': False, 'session_active': False, 'status': 'stopped',
                     'wordless_active': False, 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
 
