@@ -44,7 +44,7 @@ def propuesta(orden: str) -> dict | None:
         "params": {"text": content, "mode": "append"},
         "description": (
             f"Escribir {len(content)} caracteres en el único documento abierto "
-            "de Microsoft Word (no se guardará automáticamente)"
+            "de Microsoft Word (SKY no ordenará guardarlo)"
         ),
     }
 
@@ -103,10 +103,10 @@ def escribir_documento_abierto(app, texto: str) -> dict:
     return {
         "ok": True, "status": "VERIFIED", "characters": len(texto),
         "document": str(doc.Name)[:140],
-        "saved": False,
+        "save_requested": False,
         "message": (
             f"Comprobé {len(texto)} caracteres nuevos en «{str(doc.Name)[:100]}». "
-            "Todavía no he guardado el documento."
+            "SKY no ejecutó Guardar; Word puede tener autoguardado activo."
         ),
     }
 
