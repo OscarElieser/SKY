@@ -30,7 +30,7 @@ DIRECTED_START = re.compile(
     r'reproduce|pausa|continua|reanuda|baja|sube|silencia|'
     r'cierra|cerra|cerrar|lee|leeme|dime|decime|pon|pone|'
     r'como|que|cual|cuanto|cuando|donde|por que|para que|'
-    r'quiero saber|puedes|podes|podrias|podrias ayudarme)\\b'
+    r'quiero saber|puedes|podes|podrias|podrias ayudarme)\b'
 )
 
 
