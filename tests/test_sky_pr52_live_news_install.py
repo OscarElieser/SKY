@@ -20,7 +20,7 @@ class InstallerTests(unittest.TestCase):
             for name, (before, _) in updater.CHANGES.items():
                 dst = root / name
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                dst.write_text("conservar personalizado\n" + before + "\n", encoding="utf-8")
+                dst.write_text("# conservar personalizado\ndef test():\n" + before + "\n", encoding="utf-8")
             def test_download(path):
                 return ("# nueva utilidad: " + path + "\n").encode("utf-8")
             with patch.object(updater, "download", side_effect=test_download):
@@ -32,7 +32,7 @@ class InstallerTests(unittest.TestCase):
                 self.assertEqual((root / name).read_text(encoding="utf-8"), "NO TOCAR")
                 self.assertNotIn(name, plan)
             for name in updater.CHANGES:
-                self.assertIn(b"conservar personalizado", plan[name])
+                self.assertIn(b"# conservar personalizado", plan[name])
 
     def test_unrecognized_chat_version_blocks_every_change(self):
         with tempfile.TemporaryDirectory() as td:
