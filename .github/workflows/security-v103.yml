@@ -17,8 +17,12 @@ jobs:
       - name: Install video and voice tools
         timeout-minutes: 8
         run: |
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends ffmpeg espeak
+          # Si los espejos de Ubuntu fallan, ffmpeg llega por pip (tests/conftest.py usa static_ffmpeg).
+          if ! (timeout 240 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update &&
+                timeout 240 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends ffmpeg espeak); then
+            echo "apt no disponible: uso static-ffmpeg"
+            python -m pip install static-ffmpeg
+          fi
       - name: Install scoped test dependencies
         run: |
           python -m pip install -U pip 'setuptools>=83'
