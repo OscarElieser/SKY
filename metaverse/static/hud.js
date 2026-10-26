@@ -999,9 +999,14 @@
       }
     }
   }
+  let proveedorBuscador = null;
   function abrirBuscador(mode = 'normal', provider = 'web') {
     const id = 'sky-buscador';
-    if (ventanas.has(id)) { aplicarModoVentana(id, mode); return; }
+    if (ventanas.has(id)) {
+      if (proveedorBuscador === provider) { aplicarModoVentana(id, mode); return; }
+      cerrarVentana(id);
+    }
+    proveedorBuscador = provider;
     const root = el('div', 'sky-search-panel');
     const info = el('div', 's', 'Buscá dentro de SKY. Los resultados se muestran aquí y los enlaces externos sólo se abren cuando vos los elegís.');
     const form = el('form', 'sky-search-form');
@@ -1017,8 +1022,38 @@
       results.textContent = 'Buscando fuentes…'; send.disabled = true;
       try {
         if (provider === 'youtube') {
-          await reproductor(q, mode);
-          results.textContent = 'Revisá la ventana del reproductor para continuar.';
+          const data = await api('/api/hud/youtube?q=' + encodeURIComponent(q));
+          results.replaceChildren();
+          const videos = (Array.isArray(data.videos) ? data.videos : [])
+            .filter(v => v && /^[A-Za-z0-9_-]{11}$/.test(String(v.id || '')) && String(v.titulo || '').trim())
+            .slice(0, 6);
+          if (!videos.length) {
+            results.appendChild(el('p', 'res bad', data.motivo || 'YouTube no devolvió videos para esta búsqueda.'));
+          } else {
+            results.appendChild(el('p', 's', data.incrustacion_verificada
+              ? 'Resultados de YouTube listos para reproducirse dentro de SKY.'
+              : 'Resultados públicos de YouTube. Algunos videos pueden impedir la reproducción integrada por decisión del propietario.'));
+            videos.forEach((video, pos) => {
+              const card = el('div', 'sky-search-result');
+              const select = el('button', 'sky-youtube-select'); select.type = 'button';
+              const thumb = el('img', 'sky-youtube-thumb');
+              thumb.src = 'https://i.ytimg.com/vi/' + encodeURIComponent(video.id) + '/hqdefault.jpg';
+              thumb.alt = 'Miniatura de ' + video.titulo; thumb.loading = 'lazy';
+              const details = el('span', 'sky-youtube-details');
+              details.appendChild(el('b', '', video.titulo));
+              if (video.canal) details.appendChild(el('small', '', video.canal));
+              details.appendChild(el('span', 'sky-youtube-action', '▶ Reproducir en SKY'));
+              select.append(thumb, details);
+              select.addEventListener('click', () => {
+                lista = videos; indice = pos;
+                mostrarVideo();
+                aplicarModoVentana('player', mode === 'minimized' ? 'normal' : mode);
+                setState('idle', 'Video seleccionado.');
+              });
+              card.appendChild(select);
+              results.appendChild(card);
+            });
+          }
         } else {
           const data = await api('/api/tools/search', {method: 'POST', body: JSON.stringify({query: q})});
           results.replaceChildren();
@@ -2581,7 +2616,7 @@
       const panel = el('div', 'sky-search-panel');
       panel.append(el('b', '', 'YouTube dentro de SKY'), el('p', '',
         r.motivo || 'No hay un video incrustable disponible.'));
-      panel.appendChild(el('p', '', 'SKY conserva esta ventana. Podés configurar YOUTUBE_API_KEY o pegar un enlace de YouTube con un video permitido.'));
+      panel.appendChild(el('p', '', 'SKY conserva esta ventana. Podés intentar otra búsqueda, configurar la API oficial o pegar un enlace de un video permitido.'));
       const manual = el('form', 'sky-search-form');
       const urlInput = el('input', 'hab-in'); urlInput.type = 'url';
       urlInput.placeholder = 'https://www.youtube.com/watch?v=...';
@@ -2615,12 +2650,12 @@
       panel.appendChild(link);
       abrirVentana('player', '♪ YouTube · ' + consulta, panel, {w:760,h:460});
       aplicarModoVentana('player', mode);
-      setState('idle', 'YouTube requiere configuración');
+      setState('error', 'Búsqueda de YouTube no disponible');
       addMsg('sky', 'Abrí el panel de YouTube dentro de SKY, pero no puedo reproducir sin un video incrustable. ' + (r.motivo || ''));
       return;
     }
     lista = r.videos; indice = 0; mostrarVideo(); aplicarModoVentana('player', mode);
-    await decir('Reproduciendo ' + lista[0].titulo + '.');
+    await decir('Cargué ' + lista[0].titulo + ' en el reproductor de SKY.');
   }
   function mostrarVideo() {
     const v = lista[indice]; if (!v) return;
