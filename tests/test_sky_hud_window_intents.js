@@ -18,6 +18,11 @@ test('YouTube opening alone prepares internal search', () => {
   assert.deepEqual(parse('SKY, abrí Youtube'),
     {kind:'search',provider:'youtube',mode:'normal'});
 });
+
+test('YouTube opening with punctuation stays inside SKY', () => {
+  assert.deepEqual(parse('¡Abre YouTube!'),
+    {kind:'search',provider:'youtube',mode:'normal'});
+});
 test('Maximize, restore and close local windows', () => {
   assert.deepEqual(parse('maximiza youtube'), {kind:'window_control',target:'player',mode:'max'});
   assert.deepEqual(parse('restaurá el buscador'), {kind:'window_control',target:'search',mode:'normal'});
