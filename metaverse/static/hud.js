@@ -544,6 +544,13 @@
       if (SI.test(t)) { addMsg('user', texto); S.pending.run(); return; }
       if (NO.test(t)) { addMsg('user', texto); S.pending.cancel(); speak('Cancelado.'); return; }
     }
+    // Prioridad a órdenes sobre ventanas del propio SKY; no abrir Windows.
+    const localWindow = window.SKYWindowIntents && window.SKYWindowIntents.parse(texto);
+    if (localWindow) {
+      addMsg('user', texto); guardarConsulta('user', texto);
+      gestionarSolicitudVentana(localWindow);
+      return;
+    }
     const requestedModule = solicitudModulo(texto);
     if (requestedModule) {
       addMsg('user', texto); guardarConsulta('user', texto);
@@ -956,6 +963,89 @@
     arrastrable(w, hd);
     enfocar(id); dock();
     return reg;
+  }
+  function aplicarModoVentana(id, mode) {
+    const w = ventanas.get(id);
+    if (!w || !mode) return;
+    const node = w.el;
+    if (mode === 'close') { cerrarVentana(id); return; }
+    node.classList.remove('mini', 'max', 'hidden');
+    if (mode === 'minimized') node.classList.add('hidden');
+    else if (mode === 'mini') node.classList.add('mini');
+    else if (mode === 'max') node.classList.add('max');
+    else if (mode === 'fullscreen') {
+      // El navegador puede exigir interacción explícita para fullscreen.
+      if (node.requestFullscreen) node.requestFullscreen().catch(() => node.classList.add('max'));
+      else node.classList.add('max');
+    }
+    if (mode !== 'minimized') enfocar(id);
+    dock();
+  }
+  async function gestionarSolicitudVentana(orden) {
+    if (orden.kind === 'youtube') {
+      await reproductor(orden.query, orden.mode);
+      return;
+    }
+    if (orden.kind === 'search') {
+      abrirBuscador(orden.mode, orden.provider);
+      return;
+    }
+    if (orden.kind === 'window_control') {
+      const id = orden.target === 'player' ? 'player' : 'sky-buscador';
+      if (!ventanas.has(id)) {
+        addMsg('sky', 'No hay una ventana abierta de ' + orden.target + '.');
+      } else {
+        aplicarModoVentana(id, orden.mode);
+      }
+    }
+  }
+  function abrirBuscador(mode = 'normal', provider = 'web') {
+    const id = 'sky-buscador';
+    if (ventanas.has(id)) { aplicarModoVentana(id, mode); return; }
+    const root = el('div', 'sky-search-panel');
+    const info = el('div', 's', 'Buscá dentro de SKY. Los resultados se muestran aquí y los enlaces externos sólo se abren cuando vos los elegís.');
+    const form = el('form', 'sky-search-form');
+    const query = el('input', 'hab-in'); query.type = 'search'; query.maxLength = 200;
+    query.placeholder = provider === 'youtube' ? 'Buscar videos en YouTube…' : '¿Qué querés buscar?';
+    query.setAttribute('aria-label', 'Buscar desde SKY');
+    const send = el('button', 'btn primary', 'Buscar'); send.type = 'submit';
+    form.append(query, send);
+    const results = el('div', 'sky-search-results', 'Escribí lo que querés buscar.');
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const q = query.value.trim(); if (!q) return;
+      results.textContent = 'Buscando fuentes…'; send.disabled = true;
+      try {
+        if (provider === 'youtube') {
+          await reproductor(q, mode);
+          results.textContent = 'Revisá la ventana del reproductor para continuar.';
+        } else {
+          const data = await api('/api/tools/search', {method: 'POST', body: JSON.stringify({query: q})});
+          results.replaceChildren();
+          const entries = Array.isArray(data.results) ? data.results : [];
+          if (!entries.length) results.textContent = 'Sin resultados disponibles con el buscador configurado.';
+          for (const hit of entries.slice(0, 8)) {
+            const item = el('div', 'sky-search-result');
+            item.appendChild(el('b', '', hit.title || hit.name || 'Resultado'));
+            item.appendChild(el('p', '', hit.content || hit.snippet || ''));
+            try {
+              const u = new URL(String(hit.url || ''));
+              if (u.protocol === 'https:') {
+                const link = el('a', '', 'Ver fuente externa');
+                link.href = u.href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+                item.appendChild(link);
+              }
+            } catch { /* No abrir destinos sin URL HTTPS válida */ }
+            results.append(item);
+          }
+        }
+      } catch (err) { results.textContent = 'Búsqueda no disponible: ' + err.message; }
+      finally { send.disabled = false; }
+    });
+    root.append(info, form, results);
+    abrirVentana(id, 'SKY · Buscador interno', root, {w:780,h:560});
+    aplicarModoVentana(id, mode);
+    if (mode !== 'minimized') query.focus();
   }
   function cerrarVentana(id) {
     const w = ventanas.get(id);
@@ -1562,6 +1652,23 @@
           }
         } catch { /* API temporalmente ocupada: se reintentará */ }
       }, 3000);
+      // La voz de Windows comparte órdenes de ventanas con el HUD, sin micrófono duplicado.
+      try {
+        const last = await api('/api/sky/modules/windows/events/latest');
+        let cursorVentanas = last.cursor;
+        setInterval(async () => {
+          try {
+            const d = await api('/api/sky/modules/windows/events?after=' + cursorVentanas);
+            for (const ev of d.events || []) {
+              cursorVentanas = Math.max(cursorVentanas, ev.id);
+              await gestionarSolicitudVentana({
+                kind: ev.kind, target: ev.target, provider: ev.target,
+                mode: ev.mode, query: ev.query
+              });
+            }
+          } catch { /* Se vuelve a consultar cuando la API regresa */ }
+        }, 3000);
+      } catch (e) { console.warn('Eventos de ventanas no disponibles:', e.message); }
     } catch (e) {
       console.warn('Catálogo SKY no disponible:', e.message);
       pintarModulos();
@@ -2464,18 +2571,55 @@
   function preguntarReproducir() {
     const i = $('chat-input'); i.value = 'reproduce '; i.focus();
   }
-  async function reproductor(consulta) {
+  async function reproductor(consulta, mode = 'normal') {
     setState('thinking', 'Buscando “' + consulta + '”');
     let r;
     try { r = await api('/api/hud/youtube?q=' + encodeURIComponent(consulta)); } catch (e) { r = { embebible: false, motivo: e.message }; }
     if (!r.embebible) {
-      setState('idle', 'Abriendo en el navegador');
-      const card = addCard('▸ Reproducir “' + consulta + '”', 'YouTube');
-      card.appendChild(el('div', 'note', r.motivo || ''));
-      await ejecutar({ action: 'play_media', params: { query: consulta, service: 'youtube' }, description: 'Reproducir ' + consulta }, card);
+      // No lanzar navegador sin preguntar ni simular que se está reproduciendo.
+      cerrarVentana('player');
+      const panel = el('div', 'sky-search-panel');
+      panel.append(el('b', '', 'YouTube dentro de SKY'), el('p', '',
+        r.motivo || 'No hay un video incrustable disponible.'));
+      panel.appendChild(el('p', '', 'SKY conserva esta ventana. Podés configurar YOUTUBE_API_KEY o pegar un enlace de YouTube con un video permitido.'));
+      const manual = el('form', 'sky-search-form');
+      const urlInput = el('input', 'hab-in'); urlInput.type = 'url';
+      urlInput.placeholder = 'https://www.youtube.com/watch?v=...';
+      urlInput.setAttribute('aria-label', 'URL de video YouTube para reproducir dentro de SKY');
+      const loadVideo = el('button', 'btn primary', 'Reproducir aquí');
+      loadVideo.type = 'submit';
+      manual.append(urlInput, loadVideo);
+      const errorVideo = el('p', 'res bad', '');
+      manual.addEventListener('submit', e => {
+        e.preventDefault();
+        try {
+          const u = new URL(urlInput.value.trim());
+          if (u.protocol !== 'https:') throw Error('Se requiere enlace HTTPS.');
+          const host = u.hostname.toLowerCase();
+          let id = '';
+          if (host === 'youtu.be' || host === 'www.youtu.be') {
+            id = u.pathname.slice(1).split('/')[0];
+          } else if (['youtube.com', 'www.youtube.com', 'm.youtube.com',
+                      'youtube-nocookie.com', 'www.youtube-nocookie.com'].includes(host)) {
+            id = u.searchParams.get('v') || u.pathname.match(/^\/(?:embed|shorts|live)\/([^/]+)/)?.[1] || '';
+          }
+          if (!/^[A-Za-z0-9_-]{11}$/.test(id)) throw Error('Enlace de video no válido.');
+          lista = [{id, titulo:'Video seleccionado'}]; indice = 0;
+          mostrarVideo(); aplicarModoVentana('player', mode);
+        } catch(err) { errorVideo.textContent = 'No pude incorporar ese video: ' + err.message; }
+      });
+      panel.append(manual, errorVideo);
+      const link = el('a', 'btn', 'Buscar en YouTube fuera de SKY (opcional)');
+      link.href = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(consulta);
+      link.target = '_blank'; link.rel = 'noopener noreferrer';
+      panel.appendChild(link);
+      abrirVentana('player', '♪ YouTube · ' + consulta, panel, {w:760,h:460});
+      aplicarModoVentana('player', mode);
+      setState('idle', 'YouTube requiere configuración');
+      addMsg('sky', 'Abrí el panel de YouTube dentro de SKY, pero no puedo reproducir sin un video incrustable. ' + (r.motivo || ''));
       return;
     }
-    lista = r.videos; indice = 0; mostrarVideo();
+    lista = r.videos; indice = 0; mostrarVideo(); aplicarModoVentana('player', mode);
     await decir('Reproduciendo ' + lista[0].titulo + '.');
   }
   function mostrarVideo() {
