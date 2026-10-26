@@ -5,6 +5,7 @@ The model must already exist in SKY_STT_MODEL_DIR. Availability is truthful.
 """
 from __future__ import annotations
 import io
+import math
 import os
 import shutil
 import subprocess
@@ -64,14 +65,21 @@ def _pcm_mono_16khz(audio: bytes, filename: str = 'audio.wav') -> bytes:
         duration = subprocess.run([ffprobe, '-v', 'error', '-show_entries', 'format=duration',
                                    '-of', 'default=noprint_wrappers=1:nokey=1', str(inp)],
                                   capture_output=True, text=True, timeout=15, check=False)
-        try:
-            seconds = float(duration.stdout.strip())
-        except ValueError as exc:
-            raise ValueError('Audio sin duración verificable') from exc
-        if duration.returncode or not 0 < seconds <= MAX_SECONDS:
+        # Browser MediaRecorder WebM/Opus blobs may omit container duration.
+        # A missing metadata duration is not proof that the audio is invalid.
+        # Always verify decoded PCM length; never accept an unverified input.
+        reported_seconds = None
+        if duration.returncode == 0:
+            try:
+                candidate = float(duration.stdout.strip())
+                if math.isfinite(candidate) and candidate > 0:
+                    reported_seconds = candidate
+            except ValueError:
+                pass
+        if reported_seconds is not None and reported_seconds > MAX_SECONDS:
             raise ValueError('Audio excede el máximo de 60 segundos o está vacío')
         args = [ffmpeg, '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
-                '-i', str(inp), '-t', str(MAX_SECONDS), '-vn', '-ac', '1', '-ar', '16000',
+                '-i', str(inp), '-t', str(MAX_SECONDS + 1), '-vn', '-ac', '1', '-ar', '16000',
                 '-acodec', 'pcm_s16le', str(out)]
         try:
             proc = subprocess.run(args, capture_output=True, timeout=25, check=False)
