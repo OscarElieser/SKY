@@ -241,7 +241,7 @@ def main():
                         voice_runtime.interrupt_speech()
                         active_until = 0.0
                         wordless_active = False
-                        coordinador_voz.end_session()
+                        coordinador_voz.pause_session()
                         sync_state({'session_active': False, 'status': 'paused',
                                     'wordless_active': False,
                                     'coordinator_state': VoiceState.PAUSADO.value})
