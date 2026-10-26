@@ -173,7 +173,20 @@ def check_system_status() -> Dict[str, dict]:
             voice_info["active"] = v_data.get("is_session_active", False)
         except Exception:
             pass
+    # El modo "sesión activa" no significa que el proceso siga escuchando.
+    # Exponer ambos estados por separado, con evidencia de audio reciente.
+    from neural_core.sky_listening_status import resumen_escucha
+    session_file = WORKSPACE / "local_data" / "sky_session_state.json"
+    try:
+        estado_escucha = json.loads(session_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        estado_escucha = {}
+    voice_info.update(resumen_escucha(estado_escucha))
     status["voice"] = voice_info
+    status["chat_texto"] = {
+        "disponible": api_info["status"] == "online",
+        "requiere_hud_abierto": False,
+    }
 
     return status
 

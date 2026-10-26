@@ -1,0 +1,29 @@
+name: SKY Voice Persistence - listener checks
+on:
+  pull_request:
+    paths:
+      - "sky_manos_libres.py"
+      - "iniciar_sky_autonomo.py"
+      - "neural_core/sky_listening_status.py"
+      - "tests/test_sky_listening_status.py"
+      - ".github/workflows/sky-voice-listener-status.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-listener-state:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile listener and supervisor
+        run: python -m py_compile sky_manos_libres.py iniciar_sky_autonomo.py neural_core/sky_listening_status.py
+      - name: Check stale and live state handling
+        run: |
+          python -m pip install pytest
+          PYTHONPATH=. pytest -q tests/test_sky_listening_status.py

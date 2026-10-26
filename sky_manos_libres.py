@@ -8,7 +8,7 @@ La voz sólo ejecuta al instante las capacidades que el dueño marcó como autom
 (agente_dispositivo.py --auto ...); el resto queda pendiente de confirmación en /asistente.
 """
 from __future__ import annotations
-import argparse, json, os, queue, sys, re
+import argparse, json, os, queue, sys, re, time
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent/'.env')
@@ -81,7 +81,12 @@ def main():
         tts=None
     audio=queue.Queue(maxsize=50)
     speaking=False
-    def callback(indata, frames, time, status):
+    last_audio = 0.0
+    def callback(indata, frames, time_info, status):
+        nonlocal last_audio
+        # Confirmar que el controlador sigue entregando audio al micrófono.
+        # No se guarda contenido de voz; sólo marca temporal de actividad.
+        last_audio = time.time()
         if speaking: return
         try: audio.put_nowait(bytes(indata))
         except queue.Full: pass
@@ -158,16 +163,29 @@ def main():
         except Exception:
             pass
 
-    import time
     SESSION_TIMEOUT = 35.0
     active_until = 0.0
     sync_state({'hands_free_listening': True, 'wordless_owner_enabled': allow_wordless,
+                'wordless_active': wordless_active, 'last_audio': last_audio,
                 'last_seen': time.time(), 'status': 'ready', 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
 
+    ultimo_latido = time.monotonic()
     try:
         with stream:
             while True:
-                buffer=audio.get()
+                # Timeout para poder verificar la escucha incluso durante silencio.
+                # El latido refleja el consumo REAL del audio por este proceso.
+                try:
+                    buffer = audio.get(timeout=1.0)
+                except queue.Empty:
+                    buffer = None
+                if time.monotonic() - ultimo_latido >= 5:
+                    sync_state({'last_seen': time.time(), 'last_audio': last_audio,
+                                'hands_free_listening': True, 'wordless_active': wordless_active,
+                                'status': 'paused' if coordinador_voz.get_state() == VoiceState.PAUSADO else 'ready'})
+                    ultimo_latido = time.monotonic()
+                if buffer is None:
+                    continue
                 if not recognizer.AcceptWaveform(buffer): continue
                 result=json.loads(recognizer.Result()).get('text','').strip()
                 if not result: continue
@@ -216,9 +234,11 @@ def main():
                     if subact in ('pause_session', 'end_session'):
                         active_until = 0.0
                         wordless_active = False
-                        sync_state({'session_active': False, 'status': 'paused' if subact == 'pause_session' else 'idle', 'coordinator_state': coordinador_voz.get_state().value})
+                        sync_state({'session_active': False, 'status': 'paused' if subact == 'pause_session' else 'idle',
+                                    'wordless_active': wordless_active, 'coordinator_state': coordinador_voz.get_state().value})
                     elif subact in ('resume_session', 'activate_natural'):
                         wordless_active = allow_wordless
+                        sync_state({'wordless_active': wordless_active, 'status': 'ready'})
                     say(msg)
                     continue
 
@@ -261,7 +281,9 @@ def main():
                     print('Detalle:',str(exc))
     except KeyboardInterrupt:
         coordinador_voz.set_state(VoiceState.ESPERANDO_ACTIVACION)
-        sync_state({'hands_free_listening': False, 'session_active': False, 'status': 'stopped', 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
         print('Micrófono desactivado. SKY-IA finalizado.')
+    finally:
+        sync_state({'hands_free_listening': False, 'session_active': False, 'status': 'stopped',
+                    'wordless_active': False, 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
 
 if __name__=='__main__': main()
