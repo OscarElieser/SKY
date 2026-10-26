@@ -26,10 +26,12 @@
     if (window.SKYOwnerAuth) Object.assign(h, window.SKYOwnerAuth.headers());
     return h;
   }
-  async function api(path, opts = {}, conPin = false) {
+  async function api(path, opts = {}, conPin = false, reintento = false) {
     const r = await fetch(path, { ...opts, headers: headers(opts.headers, !(opts.body instanceof FormData)) });
     let data = {};
     try { data = await r.json(); } catch { /* vacío */ }
+    // v12.6: la sesión del dueño se bloqueó (por voz, por otra pestaña o al caducar): pedir el PIN y reintentar una vez.
+    if (r.status === 423 && !reintento) { await desbloquear(); return api(path, opts, conPin, true); }
     // SENTINEL: lo crítico pide el PIN en ese momento; lo valida el servidor.
     if (r.status === 403 && !conPin && typeof data.detail === 'string' && data.detail.startsWith('Se requiere tu PIN')) {
       const pin = await pedirPin(data.detail.replace('Se requiere tu PIN para ', 'Tu PIN para '));
@@ -55,7 +57,12 @@
       no.addEventListener('click', () => fin(null));
     });
   }
-  async function desbloquear() {
+  function desbloquear() {
+    // Una sola ventana de PIN aunque varias llamadas reciban 423 a la vez.
+    if (!S.desbloqueando) S.desbloqueando = pedirDesbloqueo().finally(() => { S.desbloqueando = null; });
+    return S.desbloqueando;
+  }
+  async function pedirDesbloqueo() {
     callar(); S.key = ''; store.set('sky-owner-key', '');
     for (;;) {
       const pin = await pedirPin('SKY está bloqueada. Ingresá tu PIN para desbloquearla.');
@@ -562,6 +569,7 @@
         method: 'POST', headers: headers(), signal: control.signal,
         body: JSON.stringify({ texto, historial: S.historial.slice(-12), modo, dispositivo: 'local' })
       });
+      if (r.status === 423) { await desbloquear(); throw new Error('SKY estaba bloqueada. Ya la desbloqueaste: repetí tu pedido.'); }
       if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
       S.historial.push({ role: 'user', content: texto });
       const lector = r.body.getReader(), dec = new TextDecoder();
@@ -738,6 +746,7 @@
       if (data.modulo === 'kpi') abrirKPI(data.kpi);
       if (data.modulo === 'perfil') abrirPerfil();
       if (data.modulo === 'sentinel') abrirSentinel();
+      if (data.modulo === 'modulos') abrirModulos();
       if (data.bloquear_hud) { await decir(data.mensaje || ''); await desbloquear(); return; }
       if (data.modulo === 'habilidades') abrirHabilidades(); else if (ventanas.has('habilidades')) HAB.cargar();
       if (data.imagen) mostrarImagen(data.imagen);
@@ -1435,6 +1444,7 @@
     { id: 'perfil', t: 'Perfil', d: 'Quién sos: SKY lo lee en cada respuesta', accion: () => abrirPerfil() },
     { id: 'habilidades', t: 'Habilidades', d: 'Catálogo, Skill Builder e integraciones', accion: () => abrirHabilidades() },
     { id: 'sentinel', t: 'Seguridad', d: 'SKY SENTINEL: PIN, accesos, dispositivos y emergencia', accion: () => abrirSentinel() },
+    { id: 'modulos', t: 'Módulos', d: 'Estado real, qué falta y activación bajo demanda', accion: () => abrirModulos() },
     { id: 'streamlit', t: 'Panel completo', d: 'Deportes, finanzas, visión… (pestaña aparte)', externo: 'http://127.0.0.1:8501' },
   ];
   function pintarModulos() {
@@ -2265,6 +2275,7 @@
     c.textContent = '';
     const tiles = el('div', 'kpi-tiles');
     tiles.appendChild(tarjeta('PIN', d.pin ? 'Activo' : 'Sin PIN', d.pin ? 'lo crítico lo pide' : 'configuralo abajo', d.pin ? 'ok' : 'bad'));
+    if (d.sesion) tiles.appendChild(tarjeta('Sesión', d.sesion.bloqueada ? 'Bloqueada' : 'Abierta', d.sesion.pin ? 'voz, HUD, WhatsApp y agente' : 'sin PIN no se bloquea', d.sesion.bloqueada ? 'warn' : (d.sesion.pin ? 'ok' : 'bad')));
     tiles.appendChild(tarjeta('Acceso', d.solo_local ? 'Sólo este equipo' : 'Con llave', d.solo_local ? 'otros equipos rechazados' : 'celular/Tailscale con llave', d.solo_local ? 'ok' : ''));
     tiles.appendChild(tarjeta('2FA', d.mfa ? 'Activo' : 'Inactivo', 'segundo factor del creador', d.mfa ? 'ok' : ''));
     tiles.appendChild(tarjeta('Emergencia', d.parada ? 'PARADA' : 'Normal', d.parada ? 'nada se ejecuta' : 'acciones según permisos', d.parada ? 'bad' : 'ok'));
@@ -2297,13 +2308,58 @@
       SEN.cargar(); refrescarEstado();
     });
     const bLock = el('button', 'btn', 'Bloquear SKY'); bLock.type = 'button'; bLock.disabled = !d.pin;
-    bLock.addEventListener('click', () => desbloquear());
+    bLock.addEventListener('click', async () => {
+      // v12.6: el bloqueo es del servidor: también deja de obedecer la voz manos libres, WhatsApp y el agente.
+      try { await api('/api/sentinel/bloquear', { method: 'POST' }); } catch (e) { addMsg('sky', e.message, 'err'); return; }
+      await desbloquear(); SEN.cargar();
+    });
     bx.append(bPin, bLoc, bAut, bEm, bLock); sc.appendChild(bx);
     seccion(c, 'Dispositivos').appendChild(tabla(['Nombre', 'Tipo', 'Dirección'], d.dispositivos.map(x => [x.nombre, x.tipo, x.url])));
     if (d.habilidades_instaladas.length) seccion(c, 'Habilidades instaladas y sus permisos').appendChild(tabla(['Habilidad', 'Permisos'], d.habilidades_instaladas.map(x => [x.nombre, x.permisos.join(', ') || 'ninguno'])));
     seccion(c, 'Eventos de seguridad (7 días)').appendChild(d.accesos_recientes.length ? tabla(['Hora', 'Evento', 'Código', 'Detalle'], d.accesos_recientes.map(a => [a.hora, a.que, a.codigo || '', a.detalle])) : el('div', 'kpi-ok', 'Sin eventos.'));
     const sh = seccion(c, 'Auditoría');
     d.hallazgos.forEach(h => { const b = el('div', 'kpi-prob ' + (h.nivel === 'alta' ? 'bad' : h.nivel === 'media' ? 'warn' : '')); b.appendChild(el('b', '', '[' + h.nivel + '] ' + h.texto)); if (h.accion) b.appendChild(el('small', '', '→ ' + h.accion)); sh.appendChild(b); });
+  };
+
+  /* ------------------------------------------------------------------ v12.6 — registro de módulos */
+  const MOD = { raiz: null };
+  const MOD_ESTADO = { disponible: ['Disponible', 'neutro'], no_configurado: ['Sin configurar', 'warn'], cargando: ['Cargando…', 'neutro'],
+    activo: ['Activo', 'ok'], degradado: ['Degradado', 'warn'], error: ['Error', 'bad'] };
+  function abrirModulos() {
+    if (!MOD.raiz || !ventanas.has('modulos')) MOD.raiz = el('div', 'kpi');
+    abrirVentana('modulos', 'Módulos de SKY', MOD.raiz, { w: 900, h: 620 });
+    MOD.cargar();
+  }
+  MOD.cargar = async function () {
+    if (!MOD.raiz) return;
+    const c = MOD.raiz; let d;
+    try { d = await api('/api/hud/modulos'); } catch (e) { c.textContent = ''; c.appendChild(el('div', 'note', 'No pude leer los módulos: ' + e.message)); return; }
+    c.textContent = '';
+    const tiles = el('div', 'kpi-tiles');
+    Object.entries(MOD_ESTADO).forEach(([k, v]) => tiles.appendChild(tarjeta(v[0], String(d.resumen[k] || 0), 'módulos', d.resumen[k] && (k === 'error') ? 'bad' : '')));
+    c.appendChild(tiles);
+    const grupos = { servicio: 'Servicios', motor: 'Motores (se cargan sólo cuando los pedís)', integracion: 'Integraciones' };
+    Object.entries(grupos).forEach(([tipo, titulo]) => {
+      const s = seccion(c, titulo);
+      d.modulos.filter(m => m.tipo === tipo).forEach(m => {
+        const [txt, cls] = MOD_ESTADO[m.estado] || [m.estado, ''];
+        const fila = el('div', 'kpi-prob ' + cls);
+        fila.appendChild(el('b', '', m.nombre + ' — ' + txt));
+        const det = (m.falta && m.falta.length) ? 'Falta: ' + m.falta.join('; ') : (m.detalle || '');
+        if (det) fila.appendChild(el('small', '', det));
+        if (m.puede_activar && (m.estado === 'disponible' || m.estado === 'error' || m.estado === 'degradado')) {
+          const b = el('button', 'btn', 'Activar'); b.type = 'button';
+          b.addEventListener('click', async () => { b.disabled = true; try { const r = await api('/api/hud/modulos/' + m.id + '/activar', { method: 'POST' }); addMsg('sky', r.mensaje || ''); } catch (e) { addMsg('sky', e.message, 'err'); } setTimeout(() => MOD.cargar(), 1500); });
+          fila.appendChild(b);
+        } else if (m.puede_activar && m.estado === 'activo') {
+          const b = el('button', 'btn', 'Liberar'); b.type = 'button';
+          b.addEventListener('click', async () => { try { const r = await api('/api/hud/modulos/' + m.id + '/liberar', { method: 'POST' }); addMsg('sky', r.mensaje || ''); } catch (e) { addMsg('sky', e.message, 'err'); } MOD.cargar(); });
+          fila.appendChild(b);
+        }
+        s.appendChild(fila);
+      });
+    });
+    if (d.modulos.some(m => m.estado === 'cargando')) setTimeout(() => { if (ventanas.has('modulos')) MOD.cargar(); }, 3000);
   };
 
   /* ------------------------------------------------------------------ reproductor */

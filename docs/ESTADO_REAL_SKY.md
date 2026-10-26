@@ -1,4 +1,4 @@
-# SKY: estado real de cada capacidad (v12.5)
+# SKY: estado real de cada capacidad (v12.6)
 
 Formato del prompt maestro §20. Cada capacidad tiene uno de estos estados:
 
@@ -50,7 +50,7 @@ Ninguna capacidad marcada «sin validación completa» debe presentarse como fun
 | Equipo | Abrir apps, webs, carpetas y documentos; multimedia; volumen; ventanas; notas; capturas; portapapeles; escribir; bloquear | Implementada sin validación completa en Windows (probado con el agente real y efectos del sistema simulados) |
 | Equipo | Buscar archivos por **contenido**, editar documentos de Office, ejecutar scripts | Pendiente; los scripts sólo se ejecutan con el Intérprete, en modo aparte y confirmando cada bloque |
 | Voz | Escucha continua «SKY…», conversación, interrupción con Esc, respuesta por frases | Implementada sin validación completa (micrófono real sin probar) |
-| Voz | Identificación del hablante | Pendiente |
+| Voz | Identificación del hablante | Pendiente: conocer el PIN no identifica a quien habla |
 | Agenda | Recordatorios, alarmas, rutinas, «buenos días» | Implementada y probada |
 | Automatización | Tareas programadas por voz y en panel (activar, pausar, borrar) | Implementada y probada |
 | Correo | Borradores de respuesta preparados por SKY, enviados sólo con tu aprobación | Implementada sin validación completa (IMAP y la IA simulados) |
@@ -62,11 +62,17 @@ Ninguna capacidad marcada «sin validación completa» debe presentarse como fun
 | Casa | Home Assistant: luces, escenas, clima, cortinas y cerraduras con confirmación | Implementada sin validación completa |
 | KPIs | Mediciones reales de API, asistente, acciones, voz, modelo y seguridad; SLO; detección; diagnóstico por voz; panel a pedido | Implementada y probada |
 | KPIs | Tokens y costo de la IA en la nube, presupuesto mensual, cupo gratis de WhatsApp | Implementada y probada (el costo requiere que configures el precio por 1000 tokens) |
-| Servicio | Arranque con Windows, sin suspensión, reinicio automático de servicios caídos | Implementada sin validación completa en Windows |
+| Servicio | Una sola instancia: un segundo arranque no interrumpe a la primera; adopta un SKY sano previo (v12.6) | Implementada y probada |
+| Servicio | «Listo» sólo tras comprobar la preparación de cada servicio; `--status` con causa y pasos (v12.6) | Implementada y probada |
+| Servicio | Reinicio con espera progresiva y límites, detección de cuelgues, registros rotativos y `--stop` (v12.6) | Implementada y probada en Linux; sin validar en Windows |
+| Servicio | Arranque con tu sesión de Windows sin consola (`pythonw.exe`) y sin suspensión | Implementada sin validación completa en Windows |
+| Módulos | Registro con estados reales y lo que falta; carga bajo demanda con límites de memoria y concurrencia (v12.6) | Implementada y probada (cargadores reales de faster-whisper, Ollama y LoRA sin validar con modelos) |
 | Seguridad | Niveles de riesgo 1–3; el nivel 3 siempre se confirma | Implementada y probada |
 | Seguridad | Parada de emergencia (voz o HUD); reanudar sólo con clic | Implementada y probada |
 | Seguridad | API privada por defecto (todas las rutas `/api/*`), falla cerrado, 429 ante fuerza bruta | Implementada y probada (SENTINEL) |
 | Seguridad | PIN del dueño: interfaz bloqueada y operaciones críticas | Implementada y probada (SENTINEL) |
+| Seguridad | Sesión del dueño compartida: bloqueada al arrancar y respetada por API, HUD, agente, WhatsApp, Streamlit y voz (v12.6) | Implementada y probada (voz con micrófono real sin validar) |
+| Seguridad | PIN hablado dígito por dígito, procesado localmente y nunca registrado (v12.6) | Implementada sin validación completa (Vosk y micrófono reales) |
 | Seguridad | Modo «sólo este equipo», Security Center y órdenes de seguridad por voz | Implementada y probada (SENTINEL) |
 | Seguridad | Passkeys (WebAuthn), biometría, cifrado en reposo de la memoria | Pendiente (SENTINEL fases 4 y 5) |
 | Seguridad | Límite de velocidad general por IP (90 por minuto) | Implementada (ya existía; con Redis en modo público) |

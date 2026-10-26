@@ -284,6 +284,13 @@ def reglas(texto: str) -> dict | None:
     if seg:
         return seg
     try:
+        from . import sky_modulos
+        mod = sky_modulos.interpretar(texto)   # v12.6: estado y activación de módulos bajo demanda
+    except Exception as exc:
+        mod = {'tipo': 'error', 'mensaje': 'No pude consultar los módulos: ' + str(exc)[:120]}
+    if mod:
+        return mod
+    try:
         from .sky_agent import interpret_local_command
         local = interpret_local_command(texto)
         if local:
@@ -540,16 +547,22 @@ def token_agente_local() -> str:
         return ''
 
 
-def ejecutar_local_si_autorizado(propuesta: dict) -> dict | None:
+def ejecutar_local_si_autorizado(propuesta: dict, origen: str = '') -> dict | None:
     """Para la voz en este mismo equipo: ejecuta la propuesta sólo si el dueño
     activó la capacidad Y la marcó como automática en su política local.
-    Devuelve el resultado del agente, o None si hace falta confirmar en el panel."""
+    Devuelve el resultado del agente, o None si hace falta confirmar en el panel.
+    v12.6: con la sesión del dueño bloqueada devuelve {'status': 'LOCKED'} sin llamar al agente, salvo
+    `origen='programada'` con una acción automática de nivel 1 (el agente vuelve a comprobarlo)."""
     from . import sky_capacidades as caps
     from .dispositivos import call_device
+    from .sentinel_identidad import sesion_bloqueada
     if caps.parada_activa():
         return None   # parada de emergencia: nada automático
     politica = caps.cargar_politica()
     accion, params = propuesta['action'], propuesta.get('params', {})
+    if sesion_bloqueada() and not (origen == 'programada' and caps.nivel_riesgo(accion, params) == 1
+                                   and not caps.requiere_confirmacion(accion, params, politica)):
+        return {'ok': False, 'status': 'LOCKED', 'message': 'SKY está bloqueada: decí o escribí tu PIN.'}
     if not caps.accion_habilitada(accion, politica, params) or caps.requiere_confirmacion(accion, params, politica):
         return None
     try:
@@ -559,4 +572,25 @@ def ejecutar_local_si_autorizado(propuesta: dict) -> dict | None:
         base, token = url_agente_local(), token_agente_local()
     if not token:
         return None
-    return call_device(base, token, accion, params, timeout=12)
+    # `origen` sólo se envía cuando existe: conserva la firma anterior de call_device para integraciones existentes.
+    return call_device(base, token, accion, params, timeout=12, **({'origen': origen} if origen else {}))
+
+
+def describir_resultado(hecho: dict | None) -> tuple[str, str]:
+    """v12.6 — distingue lo que pasó de verdad: (estado, frase).
+    estados: 'verificada' (el agente comprobó el efecto), 'enviada' (la orden salió pero nadie comprobó el resultado),
+    'pendiente' (espera tu confirmación), 'bloqueada' (falta el PIN) y 'fallida'."""
+    if hecho is None:
+        return 'pendiente', 'Queda pendiente de tu confirmación en el panel de SKY.'
+    estado = str(hecho.get('status', '')).upper()
+    mensaje = str(hecho.get('message') or hecho.get('error') or '').strip()
+    if estado == 'LOCKED':
+        return 'bloqueada', mensaje or 'SKY está bloqueada.'
+    if hecho.get('ok') is False or estado in ('FAILED', 'ERROR', 'DENIED'):
+        return 'fallida', mensaje or 'No se pudo completar la orden.'
+    if estado == 'VERIFIED':
+        return 'verificada', mensaje or 'Listo, comprobado.'
+    if estado == 'UI':
+        return 'enviada', mensaje or 'La interfaz de SKY aplica esta acción.'
+    base = mensaje or 'Envié la orden'
+    return 'enviada', base.rstrip('.') + '. No pude comprobar el resultado.' if estado in ('', 'SENT', 'DISPATCHED', 'RUNNING', 'PENDING') and 'comprob' not in base.lower() else base

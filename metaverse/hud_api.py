@@ -228,6 +228,42 @@ def kpi(periodo: str = 'hoy'):
     return {**datos, 'texto': sky_metricas.describir(datos)}
 
 
+@router.get('/modulos')
+def modulos():
+    """v12.6: registro de módulos con su estado real (disponible, no configurado, cargando, activo, degradado, error)
+    y lo que falta exactamente para cada uno."""
+    from neural_core import sky_modulos
+    return sky_modulos.listar()
+
+
+@router.get('/modulos/{mid}')
+def modulo(mid: str):
+    from neural_core import sky_modulos
+    try:
+        return sky_modulos.estado(mid)
+    except KeyError:
+        raise HTTPException(404, 'Módulo desconocido.')
+
+
+@router.post('/modulos/{mid}/activar')
+def modulo_activar(mid: str):
+    """Carga bajo demanda (en segundo plano, con límite de memoria y de concurrencia). No ejecuta acciones externas."""
+    from neural_core import sky_modulos, sky_rutinas
+    try:
+        return sky_modulos.activar(mid, aviso=lambda t: sky_rutinas.avisar(t, 'modulos'))
+    except KeyError:
+        raise HTTPException(404, 'Módulo desconocido.')
+
+
+@router.post('/modulos/{mid}/liberar')
+def modulo_liberar(mid: str):
+    from neural_core import sky_modulos
+    try:
+        return sky_modulos.descargar(mid)
+    except KeyError:
+        raise HTTPException(404, 'Módulo desconocido.')
+
+
 @router.get('/aprendizaje')
 def aprendizaje():
     """Lo que SKY aprendió: atajos, órdenes enseñadas, temas de internet, datos y temas que sigue."""

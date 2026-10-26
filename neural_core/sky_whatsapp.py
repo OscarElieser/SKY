@@ -340,10 +340,35 @@ def _turno_metrica(resultado: dict, ms: float) -> None:
         pass
 
 
+def _sesion_bloqueada_whatsapp(texto: str) -> str | None:
+    """v12.6: con la sesión del dueño bloqueada, WhatsApp no ejecuta ni responde con datos (el PIN no se manda por
+    chat). Sólo la parada de emergencia sigue funcionando. El mensaje no se guarda en el historial."""
+    from .sentinel_identidad import sesion_bloqueada
+    if not sesion_bloqueada():
+        return None
+    try:
+        from .sky_aprendizaje import _norm as _norm_asis
+        from .sky_asistente_personal import parada
+        alerta = parada(_norm_asis(texto))
+        if alerta and not (alerta.get('parada') or {}).get('reanudar'):
+            return alerta.get('mensaje', 'Parada de emergencia activada.')
+    except Exception:
+        pass
+    try:
+        from . import sky_metricas
+        sky_metricas.registrar('servicio', 'whatsapp_rechazado', False, detalle='sesión bloqueada')
+    except Exception:
+        pass
+    return '🔒 SKY está bloqueada. Desbloqueala en tu PC diciendo o escribiendo tu PIN; por seguridad no lo envíes por chat.'
+
+
 def atender_texto(texto: str, ahora: float | None = None) -> str:
     """Un mensaje del dueño → texto de respuesta (ejecutando lo que corresponda)."""
     ahora = ahora or time.time()
     texto = ' '.join(str(texto or '').split())[:MAX_TEXTO]
+    bloqueo = _sesion_bloqueada_whatsapp(texto)
+    if bloqueo:
+        return bloqueo
     with _LOCK:
         estado = _estado()
     t = _norm(texto)

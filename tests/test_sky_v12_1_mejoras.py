@@ -82,7 +82,7 @@ def test_rutina_buenos_dias_y_programadas(monkeypatch):
     assert [x['nombre'] for x in rut.rutinas_programadas(AHORA + timedelta(minutes=5))] == ['Trabajo']
     assert rut.rutinas_programadas(AHORA + timedelta(minutes=6)) == []          # una vez por día
     pendientes = []
-    monkeypatch.setattr(asis, 'ejecutar_local_si_autorizado', lambda a: None)
+    monkeypatch.setattr(asis, 'ejecutar_local_si_autorizado', lambda a, **k: None)
     from neural_core import voz_inbox
     monkeypatch.setattr(voz_inbox, 'add_inbox', lambda t, a: pendientes.append(a['action']))
     res = rut.ejecutar_rutina(rut.rutina_por_frase('modo trabajo'))

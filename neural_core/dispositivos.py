@@ -60,14 +60,17 @@ def validate_endpoint(url: str) -> str:
     return f'{u.scheme}://{u.netloc}'
 
 
-def call_device(url: str, token: str, action: str='status', params: dict | None=None, timeout: int=7):
-    """Llama al agente y registra el resultado real en los KPIs de SKY (sin parámetros ni tokens)."""
+def call_device(url: str, token: str, action: str='status', params: dict | None=None, timeout: int=7,
+                origen: str = ''):
+    """Llama al agente y registra el resultado real en los KPIs de SKY (sin parámetros ni tokens).
+    `origen='programada'` lo usan sólo las tareas programadas del propio SKY (v12.6: con la sesión bloqueada,
+    el agente únicamente les permite acciones automáticas de nivel 1)."""
     import time
     from . import sky_metricas
     inicio = time.perf_counter()
     tipo = 'agente' if action == 'status' else 'accion'
     try:
-        res = _call_device(url, token, action, params, timeout)
+        res = _call_device(url, token, action, params, timeout, origen)
     except Exception as exc:
         sky_metricas.registrar(tipo, action, False, (time.perf_counter()-inicio)*1000, detalle=str(exc))
         raise
@@ -79,7 +82,8 @@ def call_device(url: str, token: str, action: str='status', params: dict | None=
     return res
 
 
-def _call_device(url: str, token: str, action: str='status', params: dict | None=None, timeout: int=7):
+def _call_device(url: str, token: str, action: str='status', params: dict | None=None, timeout: int=7,
+                 origen: str = ''):
     if action not in ACTION_CAPABILITIES:
         raise ValueError('Acción no permitida por NeuralT.')
     if not token or len(token.strip()) < 32:
@@ -88,7 +92,8 @@ def _call_device(url: str, token: str, action: str='status', params: dict | None
     payload = None if action == 'status' else json.dumps({'action':action, 'params': params or {}}, ensure_ascii=False).encode('utf-8')
     method = 'GET' if action == 'status' else 'POST'
     req = urllib.request.Request(base+('/status' if action=='status' else '/action'), method=method,
-            data=payload, headers={'Authorization':'Bearer '+token.strip(), 'Content-Type':'application/json'})
+            data=payload, headers={'Authorization':'Bearer '+token.strip(), 'Content-Type':'application/json',
+                                   **({'X-SKY-ORIGEN': origen} if origen else {})})
     try:
         with urllib.request.urlopen(req,timeout=timeout) as resp:
             data=resp.read(131_072)
@@ -97,7 +102,7 @@ def _call_device(url: str, token: str, action: str='status', params: dict | None
         detalle=''
         try: detalle=json.loads(exc.read(4096)).get('error','')
         except Exception: pass
-        if exc.code in (400,403) and detalle:
+        if exc.code in (400,403,423) and detalle:
             raise RuntimeError(str(detalle)[:250]) from exc
         raise RuntimeError(f'El agente respondió HTTP {exc.code}: verificá el token y los permisos.') from exc
     except (urllib.error.URLError,TimeoutError,OSError) as exc:

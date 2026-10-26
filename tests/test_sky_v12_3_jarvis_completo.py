@@ -34,7 +34,7 @@ def _base(tmp_path, monkeypatch):
               'SKY_WA_PLANTILLA', 'SKY_WA_AVISOS', 'SKY_COSTO_ANTHROPIC_USD_1K'):
         monkeypatch.delenv(v, raising=False)
     # El agente nunca autoriza nada por su cuenta en estas pruebas, salvo que la prueba lo diga.
-    monkeypatch.setattr(asis, 'ejecutar_local_si_autorizado', lambda p: None)
+    monkeypatch.setattr(asis, 'ejecutar_local_si_autorizado', lambda p, **k: None)
 
 
 def _r(texto):
@@ -93,7 +93,7 @@ def test_crear_y_usar_skill_por_voz():
 
 def test_skill_ejecuta_lo_autorizado(monkeypatch):
     hechos = []
-    monkeypatch.setattr(asis, 'ejecutar_local_si_autorizado', lambda p: hechos.append(p['action']) or {'ok': True})
+    monkeypatch.setattr(asis, 'ejecutar_local_si_autorizado', lambda p, **k: hechos.append(p['action']) or {'ok': True, 'status': 'VERIFIED'})
     skills.guardar({'nombre': 'Silencio', 'pasos': [{'tipo': 'orden', 'texto': 'silencia'}, {'tipo': 'decir', 'texto': 'Shhh'}]})
     r = skills.ejecutar(skills.obtener('silencio'))
     assert hechos == ['volume'] and 'Shhh' in r['mensaje'] and r['acciones'][0]['estado'] == 'ok'

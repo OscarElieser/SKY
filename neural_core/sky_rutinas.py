@@ -467,17 +467,23 @@ def ejecutar_rutina(rutina: dict, ahora: datetime | None = None, _nivel: int = 0
     for a in acciones:
         try:
             from .sky_asistente_personal import ejecutar_local_si_autorizado
-            hecho = ejecutar_local_si_autorizado(a)
+            hecho = ejecutar_local_si_autorizado(a, origen='programada')
         except Exception as exc:
             hecho = {'ok': False, 'error': str(exc)[:120]}
+        from .sky_asistente_personal import describir_resultado
+        estado, _ = describir_resultado(hecho)
         if hecho is None:
             from .voz_inbox import add_inbox
             add_inbox('rutina ' + rutina.get('nombre', ''), a)
             resultados.append({'description': a['description'], 'estado': 'pendiente'})
         else:
-            resultados.append({'description': a['description'], 'estado': 'ok' if hecho.get('ok', True) else 'error'})
+            # v12.6: 'verificada' ≠ 'enviada' ≠ 'bloqueada'; antes todo lo que no fallaba se informaba como 'ok'.
+            resultados.append({'description': a['description'],
+                               'estado': {'verificada': 'ok', 'enviada': 'enviada'}.get(estado, estado if estado == 'bloqueada' else 'error')})
     if _nivel == 0 and any(r['estado'] == 'pendiente' for r in resultados):
         frases.append('Dejé algunas acciones pendientes de tu confirmación.')
+    if _nivel == 0 and any(r['estado'] == 'bloqueada' for r in resultados):
+        frases.append('Algunas acciones esperan tu PIN: SKY estaba bloqueada.')
     if _nivel == 0 and any(r['estado'] == 'no_ejecutada' for r in resultados):
         frases.append('Hay órdenes de la casa que no ejecuté porque necesitan tu confirmación en el momento.')
     return {'mensaje': ' '.join(f for f in frases if f), 'acciones': resultados}
