@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 import sqlite3
 import time
+from contextlib import closing
 import unicodedata
 from pathlib import Path
 
@@ -62,7 +63,7 @@ def publish(request: dict) -> int:
         "mini","normal","max","fullscreen","minimized","close"
     ):
         raise ValueError("Orden HUD no permitida")
-    with _connect() as db:
+    with closing(_connect()) as db, db:
         cursor = db.execute("INSERT INTO requests(kind,target,mode,query,created) VALUES(?,?,?,?,?)",
             (request["kind"],request.get("target",request.get("provider","")),
              request["mode"],request.get("query","")[:120],time.time()))
@@ -71,13 +72,13 @@ def publish(request: dict) -> int:
 
 
 def latest() -> int:
-    with _connect() as db:
+    with closing(_connect()) as db, db:
         row = db.execute("SELECT COALESCE(MAX(id),0) FROM requests").fetchone()
         return int(row[0])
 
 
 def since(cursor: int) -> list[dict]:
-    with _connect() as db:
+    with closing(_connect()) as db, db:
         rows = db.execute("SELECT id,kind,target,mode,query FROM requests WHERE id>? AND created>? ORDER BY id LIMIT 20",
             (max(0, cursor),time.time() - 180)).fetchall()
         return [{"id":i,"kind":kind,"target":target,"mode":mode,"query":query} for i,kind,target,mode,query in rows]
