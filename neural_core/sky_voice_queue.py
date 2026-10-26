@@ -42,10 +42,11 @@ class VoiceWorkQueue:
     """Una tarea activa + hasta dos pendientes; sin acceso al micrófono."""
 
     def __init__(self, handle_command: Callable[[str], None], *,
-                 tts_factory=None, rate_factory=None, capacity: int = 2):
+                 tts_factory=None, rate_factory=None, speech_state=None, capacity: int = 2):
         self._handle = handle_command
         self._tts_factory = tts_factory
         self._rate_factory = rate_factory or (lambda: 180)
+        self._speech_state = speech_state
         self._queue: queue.Queue[tuple[str, str]] = queue.Queue(maxsize=capacity)
         self._stop = threading.Event()
         self._cancel_speech = threading.Event()
@@ -78,6 +79,11 @@ class VoiceWorkQueue:
             self._speaking.clear()
         with self._epoch_lock:
             self._speech_epoch += 1
+        if self._speech_state:
+            try:
+                self._speech_state(value)
+            except Exception as exc:
+                print('SKY: no se pudo actualizar estado TTS:', type(exc).__name__)
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
