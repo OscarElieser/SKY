@@ -3,8 +3,10 @@
 Sin micrófono, solicitudes externas ni acciones de Windows.
 """
 import threading
+import time
 from neural_core.sky_voice_queue import (
-    VoiceWorkQueue, interrupt_during_speech, wake_during_speech
+    VoiceWorkQueue, interrupt_during_speech, wake_during_speech,
+    parada_emergencia_voz
 )
 
 
@@ -72,3 +74,67 @@ def test_audio_solo_en_hilo_trabajador_y_cancelacion():
 def test_normalizacion_de_frases():
     assert interrupt_during_speech("¡Hey SKY! ¡Silencio!")
     assert not wake_during_speech("Ya le dije a SKY que abriera Word")
+
+
+def test_parada_emergencia_tiene_prioridad_sobre_trabajador():
+    assert parada_emergencia_voz("SKY, para todo", exigir_activacion=True)
+    assert parada_emergencia_voz("oye sky parada de emergencia", exigir_activacion=True)
+    assert parada_emergencia_voz("para todo", exigir_activacion=False)
+    assert not parada_emergencia_voz("para todo", exigir_activacion=True)
+    assert not parada_emergencia_voz("sky abre word", exigir_activacion=True)
+
+
+def test_emergencia_descarta_pendientes_y_no_lee_respuesta_vieja():
+    running, release = threading.Event(), threading.Event()
+    finished = []
+    worker = None
+
+    def handle(command):
+        if command == "consulta larga":
+            running.set()
+            assert release.wait(2)
+            worker.say("Mensaje obsoleto")
+        finished.append(command)
+
+    worker = VoiceWorkQueue(handle, tts_factory=lambda: None)
+    worker.start()
+    assert worker.submit("consulta larga")
+    assert running.wait(2)
+    assert worker.submit("abre word")
+    assert worker.submit("reproduce musica")
+    assert worker.cancel_pending() == 2
+    release.set()
+    worker._queue.join()
+    # El cálculo que ya estaba en progreso puede terminar; las órdenes
+    # pendientes no se ejecutan, y su respuesta no debe pronunciarse.
+    assert finished == ["consulta larga"]
+    worker.stop()
+
+
+def test_cancelacion_durante_tts_por_callback_en_mismo_hilo():
+    class InterruptibleTTS(FakeTTS):
+        def __init__(self):
+            super().__init__()
+            self.playing = threading.Event()
+
+        def runAndWait(self):
+            self.playing.set()
+            for _ in range(100):
+                if self.callback:
+                    self.callback("utterance", 0, 1)
+                if self.stopped:
+                    return
+                time.sleep(0.01)
+            raise AssertionError("TTS no recibió cancelación")
+
+    engine = InterruptibleTTS()
+    worker = VoiceWorkQueue(lambda _: None, tts_factory=lambda: engine)
+    worker.start()
+    assert worker.announce("Hola, estoy hablando con el usuario de SKY.")
+    assert engine.playing.wait(2)
+    assert worker.speaking
+    assert worker.interrupt_speech()
+    worker._queue.join()
+    assert engine.stopped
+    assert not worker.speaking
+    worker.stop()
