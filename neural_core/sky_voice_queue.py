@@ -38,6 +38,21 @@ def interrupt_during_speech(text: str) -> bool:
     return bool(match and match.group(1) in _INTERRUPT)
 
 
+_EMERGENCIA = frozenset({
+    "para todo", "parada de emergencia", "cancela todo", "alto total",
+    "frena todo", "modo emergencia",
+})
+
+
+def parada_emergencia_voz(text: str, *, exigir_activacion: bool = False) -> bool:
+    """La parada debe procesarse por el hilo del micrófono, aun si Ollama está ocupado."""
+    clean = _normalize(text)
+    match = re.fullmatch(_WAKE + r" (.+)", clean)
+    if match:
+        return match.group(1) in _EMERGENCIA
+    return not exigir_activacion and clean in _EMERGENCIA
+
+
 class VoiceWorkQueue:
     """Una tarea activa + hasta dos pendientes; sin acceso al micrófono."""
 
@@ -50,6 +65,7 @@ class VoiceWorkQueue:
         self._queue: queue.Queue[tuple[str, str]] = queue.Queue(maxsize=capacity)
         self._stop = threading.Event()
         self._cancel_speech = threading.Event()
+        self._cancel_current = threading.Event()
         self._speaking = threading.Event()
         self._busy = threading.Event()
         self._thread: threading.Thread | None = None
@@ -110,6 +126,21 @@ class VoiceWorkQueue:
         except queue.Full:
             return False
 
+    def cancel_pending(self) -> int:
+        """Parada de emergencia: suprimir salida pendiente y vaciar órdenes futuras."""
+        self._cancel_current.set()
+        self._cancel_speech.set()
+        discarded = 0
+        while True:
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
+            else:
+                discarded += 1
+                self._queue.task_done()
+        return discarded
+
     def interrupt_speech(self) -> bool:
         """Solicita detener TTS. Nunca intenta llamar COM/pyttsx3 desde el hilo del micrófono."""
         if not self.speaking:
@@ -142,7 +173,7 @@ class VoiceWorkQueue:
     def say(self, message: str) -> None:
         """Solo debe invocarse desde el trabajador; texto no se encola como orden."""
         message = str(message or "")
-        if not message:
+        if not message or self._stop.is_set() or self._cancel_current.is_set():
             return
         print("SKY-IA:", message)
         if self._engine is None:
@@ -183,6 +214,7 @@ class VoiceWorkQueue:
             except queue.Empty:
                 continue
             self._busy.set()
+            self._cancel_current.clear()
             try:
                 if kind == "command":
                     self._handle(value)
@@ -196,6 +228,7 @@ class VoiceWorkQueue:
 
     def stop(self) -> None:
         self._stop.set()
+        self._cancel_current.set()
         self._cancel_speech.set()
         if self._thread is not None and self._thread is not threading.current_thread():
             self._thread.join(timeout=2.0)
