@@ -1,0 +1,195 @@
+"""Cola independiente del micrófono para consultas y reproducción de voz de SKY.
+
+El hilo principal de Vosk sigue capturando audio aunque un proveedor de IA se
+demore. Únicamente el trabajador serial accede a pyttsx3 y a las acciones del
+agente; la cola tiene capacidad limitada, sin órdenes paralelas no autorizadas.
+"""
+from __future__ import annotations
+
+import queue
+import re
+import threading
+import unicodedata
+from typing import Callable
+
+
+def _normalize(text: str) -> str:
+    folded = unicodedata.normalize("NFKD", str(text or "").casefold())
+    plain = "".join(c for c in folded if not unicodedata.combining(c))
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", plain).split())
+
+
+_WAKE = r"(?:oye |hey )?(?:sky|esquai|es kay|es cai|escai)"
+_INTERRUPT = frozenset({
+    "callate", "silencio", "para de hablar", "deja de hablar", "deja de responder",
+    "detente", "para", "basta",
+})
+
+
+def wake_during_speech(text: str) -> bool:
+    """Durante el TTS, reconocer una petición a SKY sólo para callar, nunca ejecutar."""
+    clean = _normalize(text)
+    return bool(re.fullmatch(_WAKE + r"(?: .+)", clean))
+
+
+def interrupt_during_speech(text: str) -> bool:
+    clean = _normalize(text)
+    match = re.fullmatch(_WAKE + r" (.+)", clean)
+    return bool(match and match.group(1) in _INTERRUPT)
+
+
+class VoiceWorkQueue:
+    """Una tarea activa + hasta dos pendientes; sin acceso al micrófono."""
+
+    def __init__(self, handle_command: Callable[[str], None], *,
+                 tts_factory=None, rate_factory=None, capacity: int = 2):
+        self._handle = handle_command
+        self._tts_factory = tts_factory
+        self._rate_factory = rate_factory or (lambda: 180)
+        self._queue: queue.Queue[tuple[str, str]] = queue.Queue(maxsize=capacity)
+        self._stop = threading.Event()
+        self._cancel_speech = threading.Event()
+        self._speaking = threading.Event()
+        self._busy = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._engine = None
+        self._speech_epoch = 0
+        self._epoch_lock = threading.Lock()
+
+    @property
+    def speaking(self) -> bool:
+        return self._speaking.is_set()
+
+    @property
+    def busy(self) -> bool:
+        return self._busy.is_set()
+
+    @property
+    def speech_epoch(self) -> int:
+        with self._epoch_lock:
+            return self._speech_epoch
+
+    def _transition_speech(self, value: bool) -> None:
+        if self._speaking.is_set() == value:
+            return
+        if value:
+            self._speaking.set()
+        else:
+            self._speaking.clear()
+        with self._epoch_lock:
+            self._speech_epoch += 1
+
+    def start(self) -> None:
+        if self._thread is not None and self._thread.is_alive():
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._worker, name="sky-voice-worker", daemon=True)
+        self._thread.start()
+
+    def submit(self, command: str) -> bool:
+        if not isinstance(command, str) or not command.strip() or self._stop.is_set():
+            return False
+        try:
+            self._queue.put_nowait(("command", command))
+            return True
+        except queue.Full:
+            return False
+
+    def announce(self, message: str) -> bool:
+        if not message or self._stop.is_set():
+            return False
+        try:
+            self._queue.put_nowait(("speech", message))
+            return True
+        except queue.Full:
+            return False
+
+    def interrupt_speech(self) -> bool:
+        """Solicita detener TTS. Nunca intenta llamar COM/pyttsx3 desde el hilo del micrófono."""
+        if not self.speaking:
+            return False
+        self._cancel_speech.set()
+        return True
+
+    def _init_tts(self):
+        if self._tts_factory is None:
+            try:
+                import pyttsx3
+                factory = pyttsx3.init
+            except ImportError:
+                return None
+        else:
+            factory = self._tts_factory
+        try:
+            engine = factory()
+            # pyttsx3 dispara callbacks desde su propio loop del hilo trabajador.
+            # Es seguro solicitar stop() desde ese callback, nunca desde Vosk.
+            def on_word(name, location, length):
+                if self._cancel_speech.is_set():
+                    engine.stop()
+            engine.connect("started-word", on_word)
+            return engine
+        except Exception as exc:
+            print("SKY: TTS local no disponible:", type(exc).__name__)
+            return None
+
+    def say(self, message: str) -> None:
+        """Solo debe invocarse desde el trabajador; texto no se encola como orden."""
+        message = str(message or "")
+        if not message:
+            return
+        print("SKY-IA:", message)
+        if self._engine is None:
+            return
+        self._cancel_speech.clear()
+        self._transition_speech(True)
+        try:
+            try:
+                self._engine.setProperty("rate", int(self._rate_factory()))
+            except (TypeError, ValueError, RuntimeError):
+                pass
+            # Frases breves permiten interrupción aun si un backend no entrega
+            # eventos por palabra. La voz nunca se ejecuta en el hilo de Vosk.
+            words = message[:1000].split()
+            chunk = []
+            for word in words:
+                if self._cancel_speech.is_set() or self._stop.is_set():
+                    break
+                chunk.append(word)
+                if len(" ".join(chunk)) >= 100 or word.endswith((".", "!", "?", ":", ";")):
+                    self._engine.say(" ".join(chunk))
+                    self._engine.runAndWait()
+                    chunk.clear()
+            if chunk and not self._cancel_speech.is_set() and not self._stop.is_set():
+                self._engine.say(" ".join(chunk))
+                self._engine.runAndWait()
+        except Exception as exc:
+            print("SKY: error de reproducción local:", type(exc).__name__)
+        finally:
+            self._transition_speech(False)
+            self._cancel_speech.clear()
+
+    def _worker(self) -> None:
+        self._engine = self._init_tts()
+        while not self._stop.is_set():
+            try:
+                kind, value = self._queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            self._busy.set()
+            try:
+                if kind == "command":
+                    self._handle(value)
+                elif kind == "speech":
+                    self.say(value)
+            except Exception as exc:
+                print("SKY: error procesando turno de voz:", type(exc).__name__, str(exc)[:200])
+            finally:
+                self._busy.clear()
+                self._queue.task_done()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._cancel_speech.set()
+        if self._thread is not None and self._thread is not threading.current_thread():
+            self._thread.join(timeout=2.0)
