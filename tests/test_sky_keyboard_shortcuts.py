@@ -18,6 +18,8 @@ class ShortcutTests(unittest.TestCase):
             "Presioná Ctrl+F4",
             "SKY, pulsa Control+F4 en Word",
             "Enviá la combinación Ctrl + F4",
+            "Envía la combinación Ctrl + F4",
+            "Envia la combinación Ctrl + F4",
         ):
             with self.subTest(sentence=sentence):
                 result = solicitud(sentence)
