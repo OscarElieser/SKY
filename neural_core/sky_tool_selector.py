@@ -34,6 +34,9 @@ _GROUPS: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = tuple(
          ("multimedia", "reproductor_sky")),
         (r"\b(?:sube|subi|baja|baji|reduce|aumenta|ajusta|pon|pone|silencia|quita)\b.{0,45}\b(?:volumen|sonido|audio)\b|\bvolumen\b|\b(?:mas fuerte|menos fuerte|mas alto|mas bajo)$",
          ("volumen",)),
+        # Órdenes coloquiales comprobadas en el asistente anterior.
+        (r"\b(?:me esta dejando sordo|me dejas sordo|esta muy fuerte|no escucho nada|muy bajito el sonido)\b",
+         ("volumen",)),
         (r"\b(?:busca|buscar|buscame|investiga|consulta|navega)\b.{0,100}\b(?:internet|web|google|youtube|wikipedia|mapas|sitio|en linea|en la red)\b|\b(?:busca en google|busca en internet|busca en youtube)\b",
          ("buscar_web", "aprender_sobre")),
         (r"\b(?:abre|abri|abrir|visita|ingresa|navega)\b.{0,70}\b(?:web|pagina|sitio|https?://|www\.)",
@@ -46,6 +49,8 @@ _GROUPS: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = tuple(
          ("nota",)),
         (r"\b(?:prepara|preparar|crea|crear|haz|hace|genera|generar)\b.{0,70}\b(?:presentacion|diapositivas|documento|informe)\b",
          ("tarea",)),
+        (r"\b(?:necesito|quiero|voy|tengo que)\s+(?:escribir|redactar|crear)\s+(?:(?:un|una)\s+)?(?:informe|documento|texto)\b",
+         ("abrir_app", "tarea")),
         (r"\b(?:recuerdame|recordame|avisame|notificame|pon|pone|crea|crear|programa)\b.{0,75}\b(?:recordatorio|alarma|en [0-9]+ minutos|manana|a las [0-9])\b",
          ("recordatorio", "notificacion")),
         (r"\b(?:captura|capturame|screenshot|pantallazo|captura de pantalla)\b",
