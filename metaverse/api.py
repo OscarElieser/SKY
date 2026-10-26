@@ -173,6 +173,10 @@ async def lifespan(app):
 app=FastAPI(title='SKY Engine API',version='10.5.0',description='Interfaz local de SKY: mundos 3D, herramientas y motores autorizados.',lifespan=lifespan)
 app.mount('/static',StaticFiles(directory=STATIC),name='static')
 
+# Catálogo central: Streamlit heredado sólo se inicia tras una orden del dueño.
+from .sky_modules_api import router as sky_modules_router
+app.include_router(sky_modules_router, dependencies=[Depends(require_key)])
+
 # Installable SKY client for Windows browsers and Android; same SKY API and HUD.
 from .mobile_pwa_api import router as mobile_pwa_router
 app.include_router(mobile_pwa_router)
