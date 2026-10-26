@@ -25,8 +25,25 @@ class InstallerTests(unittest.TestCase):
             for name, patches in installer.EDITS.items():
                 dst = root / name
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                # Mimic a valid file while retaining custom comments.
-                content = "# custom owner lines\n" + "\n".join(a for a,b in patches)
+                # Each snippet must be surrounded by its original Python
+                # lexical scope, so compile() really validates modifications.
+                if name.endswith("sky_asistente_personal.py"):
+                    content = ("# custom owner lines\ndef interpretar(texto):\n"
+                               + installer.CHAT_ORIGINAL
+                               + "\ndef reglas(texto):\n" + installer.RULE_ORIGINAL)
+                elif name.endswith("sky_capacidades.py"):
+                    content = ("# custom owner lines\nCAPACIDADES = [\n"
+                               + installer.CAP_ORIGINAL
+                               + "\n]\nDESCRIPCION_ACCIONES = {\n"
+                               + installer.CAP_DESC_ORIGINAL
+                               + "\n}\n" + installer.CAP_LEVEL_ORIGINAL)
+                else:
+                    content = ("# custom owner lines\ndef _detalle_seguro(action, params):\n"
+                               + installer.AGENT_LOG_ORIGINAL
+                               + "\ndef _validar(action, params, politica):\n"
+                               + installer.AGENT_VALID_ORIGINAL
+                               + "\ndef _ejecutar(action, params, politica):\n"
+                               + installer.AGENT_EXEC_ORIGINAL)
                 dst.write_text(content + "\n", encoding="utf-8")
             with patch.object(installer, "download", side_effect=lambda p: b"# new file\n"):
                 updates, changes, issues = installer.plan(root)
