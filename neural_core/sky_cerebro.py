@@ -353,8 +353,15 @@ def _mensajes(texto: str, historial: list[dict], modo: str) -> list[dict]:
 
 
 def _llamar(msgs: list[dict], stream: bool):
-    cuerpo = json.dumps({'model': modelo(), 'messages': msgs, 'tools': herramientas(), 'stream': stream,
-                         'options': {'temperature': 0.2}, 'keep_alive': '30m'}).encode('utf-8')
+    from .sky_tool_selector import select_tools
+    # No enviar los 22+ esquemas de herramientas para charla normal.
+    # Si la orden es ambigua el selector preserva el catálogo completo.
+    seleccion = select_tools(msgs[-1]['content'] if msgs else '', herramientas())
+    payload = {'model': modelo(), 'messages': msgs, 'stream': stream,
+               'options': {'temperature': 0.2}, 'keep_alive': '30m'}
+    if seleccion:
+        payload['tools'] = seleccion
+    cuerpo = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(OLLAMA + '/api/chat', data=cuerpo, headers={'Content-Type': 'application/json'})
     return urllib.request.urlopen(req, timeout=120)
 
@@ -447,12 +454,15 @@ def _args(valor) -> dict:
 def _llamada_nube(proveedor: str, msgs: list[dict]) -> tuple[str | None, dict, str, int | None]:
     """Devuelve (herramienta, argumentos, texto, tokens) con la API oficial de cada proveedor."""
     clave, mod = _clave(proveedor), _modelo_nube(proveedor)
-    tools = herramientas()
+    from .sky_tool_selector import select_tools
+    tools = select_tools(msgs[-1]['content'] if msgs else '', herramientas())
     sistema = '\n\n'.join(m['content'] for m in msgs if m['role'] == 'system')
     turnos = [m for m in msgs if m['role'] in ('user', 'assistant')]
     if proveedor in COMPATIBLES_OPENAI:
-        d = _post(COMPATIBLES_OPENAI[proveedor], {'model': mod, 'messages': msgs, 'tools': tools, 'tool_choice': 'auto',
-                                                  'temperature': 0.2}, {'Authorization': 'Bearer ' + clave})
+        payload = {'model': mod, 'messages': msgs, 'temperature': 0.2}
+        if tools:
+            payload.update(tools=tools, tool_choice='auto')
+        d = _post(COMPATIBLES_OPENAI[proveedor], payload, {'Authorization': 'Bearer ' + clave})
         m = (d.get('choices') or [{}])[0].get('message') or {}
         llamadas = m.get('tool_calls') or []
         tokens = (d.get('usage') or {}).get('total_tokens')
@@ -470,10 +480,14 @@ def _llamada_nube(proveedor: str, msgs: list[dict]) -> tuple[str | None, dict, s
                 mensajes.append(dict(t))
         while mensajes and mensajes[0]['role'] != 'user':
             mensajes.pop(0)
-        d = _post('https://api.anthropic.com/v1/messages',
-                  {'model': mod, 'max_tokens': 800, 'system': sistema, 'messages': mensajes, 'temperature': 0.2,
-                   'tools': [{'name': t['function']['name'], 'description': t['function']['description'],
-                              'input_schema': t['function']['parameters']} for t in tools]},
+        payload = {'model': mod, 'max_tokens': 800, 'system': sistema,
+                   'messages': mensajes, 'temperature': 0.2}
+        if tools:
+            payload['tools'] = [
+                {'name': t['function']['name'], 'description': t['function']['description'],
+                 'input_schema': t['function']['parameters']} for t in tools
+            ]
+        d = _post('https://api.anthropic.com/v1/messages', payload,
                   {'x-api-key': clave, 'anthropic-version': '2023-06-01'})
         u = d.get('usage') or {}
         tokens = (u.get('input_tokens') or 0) + (u.get('output_tokens') or 0) or None
@@ -492,10 +506,12 @@ def _llamada_nube(proveedor: str, msgs: list[dict]) -> tuple[str | None, dict, s
                 f.pop('parameters')
             decl.append(f)
         contenidos = [{'role': 'model' if t['role'] == 'assistant' else 'user', 'parts': [{'text': t['content']}]} for t in turnos]
+        payload = {'systemInstruction': {'parts': [{'text': sistema}]},
+                   'contents': contenidos, 'generationConfig': {'temperature': 0.2}}
+        if decl:
+            payload['tools'] = [{'functionDeclarations': decl}]
         d = _post(f'https://generativelanguage.googleapis.com/v1beta/models/{quote_plus(mod)}:generateContent',
-                  {'systemInstruction': {'parts': [{'text': sistema}]}, 'contents': contenidos,
-                   'tools': [{'functionDeclarations': decl}], 'generationConfig': {'temperature': 0.2}},
-                  {'x-goog-api-key': clave})
+                  payload, {'x-goog-api-key': clave})
         tokens = (d.get('usageMetadata') or {}).get('totalTokenCount')
         partes = (((d.get('candidates') or [{}])[0].get('content') or {}).get('parts')) or []
         texto = ''
