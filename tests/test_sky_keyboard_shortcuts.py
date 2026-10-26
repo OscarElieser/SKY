@@ -7,7 +7,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from neural_core.sky_keyboard_shortcuts import solicitud, propuesta
+from neural_core.sky_keyboard_shortcuts import solicitud, propuesta, seleccionar_ventana_word
 from neural_core import sky_capacidades as caps
 
 
@@ -26,6 +26,13 @@ class ShortcutTests(unittest.TestCase):
                 self.assertEqual(result["propuesta"]["action"], "keyboard_shortcut")
                 self.assertEqual(result["propuesta"]["params"],
                                  {"shortcut": "ctrl+f4", "expected_app": "winword.exe"})
+
+    def test_word_window_must_be_unambiguous(self):
+        self.assertEqual(seleccionar_ventana_word([12345]), 12345)
+        with self.assertRaises(RuntimeError):
+            seleccionar_ventana_word([])
+        with self.assertRaises(RuntimeError):
+            seleccionar_ventana_word([12345, 54321])
 
     def test_ordinary_explanations_do_not_execute(self):
         for sentence in (
