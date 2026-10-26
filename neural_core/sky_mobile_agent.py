@@ -169,7 +169,7 @@ def command_status(device_id: str, command_id: str) -> dict:
 def parse_voice(text: str) -> str | None:
     normalized = unicodedata.normalize("NFKD", str(text).casefold())
     normalized = "".join(c for c in normalized if not unicodedata.combining(c))
-    normalized = re.sub(r"[^a-z0-9 ]+", " ", normalized).strip()
+    normalized = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", normalized)).strip()
     normalized = re.sub(r"^(?:(?:oye|hey) )?(?:sky )?", "", normalized)
     match = re.fullmatch(
         r"(?:abre|abri|abrir) (?:el )?(youtube|chrome|whatsapp|gmail) "
