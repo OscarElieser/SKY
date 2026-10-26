@@ -135,7 +135,7 @@ if "sky_ui_view_mode" not in st.session_state:
 if st.session_state["sky_ui_view_mode"] == "classic":
     with st.sidebar:
         st.markdown("### 🧠 SKY-IA")
-        st.caption("Asistente Central · 26 módulos internos")
+        st.caption("Asistente Central · 27 módulos registrados")
         
         modo_interfaz = st.radio(
             "Modo de Interfaz",
@@ -145,7 +145,7 @@ if st.session_state["sky_ui_view_mode"] == "classic":
         
         if modo_interfaz == "🎙️ Asistente Unificado (Voz & Chat)":
             seccion = "🎙️ Asistente Central"
-            st.caption("🟢 **26 módulos conectados internamente**")
+            st.caption("🟢 **27 módulos registrados (carga bajo demanda)**")
             ejecucion_dispositivo = st.checkbox("⚡ Ejecución directa en PC", value=True,
                                                 help="Permite a SKY abrir programas y páginas locales cuando se lo pidas.")
             proveedor_jarvis, modelo_jarvis = elegir_motor('motor_jarvis', 'General')
@@ -2125,11 +2125,11 @@ def render_asistente_holografico_3d(proveedor, modelo, ejecucion_dispositivo=Tru
     with col_hdr_c:
         col_m1, col_m2 = st.columns(2)
         with col_m1:
-            if st.button("✦ Módulos (26)", help="Abrir ventana holográfica con los 26 módulos del ecosistema"):
+            if st.button("✦ Módulos (27)", help="Abrir ventana holográfica con los 26 módulos del ecosistema"):
                 if gestor_ventanas.windows['modules'].is_open:
                     gestor_ventanas.close_window('modules')
                 else:
-                    gestor_ventanas.open_window('modules', win_type='modules', title='🧠 Ecosistema SKY-IA (26 Módulos)', position='center')
+                    gestor_ventanas.open_window('modules', win_type='modules', title='🧠 Ecosistema SKY-IA (27 Módulos)', position='center')
                 st.rerun()
         with col_m2:
             if st.button("📋 Modo Clásico", help="Regresar a la interfaz anterior de consola/tablero"):
@@ -2240,7 +2240,7 @@ def render_asistente_holografico_3d(proveedor, modelo, ejecucion_dispositivo=Tru
                 else:
                     st.info("No hay tareas en segundo plano en ejecución. Pídele a SKY crear una presentación o documento.")
             elif win.id == 'modules':
-                st.markdown("### 🧠 Ecosistema SKY-IA — Los 26 Módulos Reales")
+                st.markdown("### 🧠 Ecosistema SKY-IA — Los 27 Módulos Registrados")
                 st.caption("Acceso directo a cualquier módulo del sistema sin perder la sesión.")
                 cols_mod = st.columns(4)
                 for idx, mod in enumerate(SECCIONES_TECNICAS):
