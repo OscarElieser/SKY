@@ -67,9 +67,8 @@ def three_way(local: bytes, base: bytes, desired: bytes, workdir: Path):
     # git merge-file is a three-way content merge, *not* a git checkout.
     # A nonzero exit code with conflict markers is REFUSED (never installed).
     workdir.mkdir(exist_ok=True, parents=True)
-    files = [workdir / ("local_" + str(len(local))),
-             workdir / ("base_" + str(len(base))),
-             workdir / ("target_" + str(len(desired)))]
+    files = [workdir / "local.txt", workdir / "base.txt",
+             workdir / "target.txt"]
     for destination, contents in zip(files, (local, base, desired)):
         destination.write_bytes(normalized(contents))
     proc = subprocess.run(
