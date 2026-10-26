@@ -134,6 +134,17 @@ def main():
     def process_command(command):
         """Ejecutado por un solo trabajador; nunca bloquea el micrófono."""
         nonlocal history
+        # Acciones del HUD: no se ejecutan en el navegador de Windows.
+        from neural_core.sky_hud_window_requests import parse_window_request, publish as publish_window
+        ventana_hud = parse_window_request(command)
+        if ventana_hud:
+            try:
+                publish_window(ventana_hud)
+                voice_runtime.say("Preparé la ventana solicitada dentro de SKY. Verificala en el HUD.")
+            except Exception as exc:
+                print("SKY: error de ventana HUD:", type(exc).__name__, str(exc)[:120])
+                voice_runtime.say("No pude preparar la ventana del HUD.")
+            return
         # Las solicitudes de módulos usan el mismo catálogo que HUD, sin invocar Ollama.
         # El navegador autenticado recoge el evento y abre únicamente el módulo pedido.
         from neural_core.sky_module_registry import match_activation, publish_activation
