@@ -116,12 +116,18 @@ def elegir_motor(key, area='General'):
     return elegido, m
 
 
-SECCIONES_TECNICAS = [
-    "🏠 Tablero general (v8.0)", "🌐 SKY IA Universal v12.0", "🧠 IA universal", "🧬 Centro multi-IA", "👁️ SKY Visión", "🎨 SKY Studio 3D", "📁 SKY Office Studio", "🧬 SKY Evolución", "🧰 Herramientas SKY", "🔔 SKY Live", "🌐 SKY Metaverso y API", "🎙️ SKY y dispositivos", "💰 Finanzas personales", "🚀 Generar ingresos", "📈 Bolsa y Bitcoin",
-    "📰 Noticias e Internet", "📣 Redes sociales", "🎵 Música y películas", "🎞️ Imágenes y videos",
-    "🔐 Antivirus y hacking ético", "🎓 Educación e investigación", "📚 Biblioteca y memoria",
-    "🧭 BAQUEANO Control Center", "🧾 Transacciones", "📡 Engine Sensor MLP + GRU", "✅ Proyectos y tareas", "⚽ SKY Sports Madridista"
-]
+# Catálogo compartido: el HUD 8765 y el panel heredado 8501 describen los mismos módulos.
+from neural_core.sky_module_registry import MODULES as _SKY_MODULES
+SECCIONES_TECNICAS = [label for _, label, _ in _SKY_MODULES]
+_MODULOS_POR_ID = {slug: label for slug, label, _ in _SKY_MODULES}
+# Sólo usar el módulo indicado al abrir la ventana bajo demanda.
+_MODULO_SOLICITADO = str(getattr(st, "query_params", {}).get("sky_mod", ""))
+if _MODULO_SOLICITADO in _MODULOS_POR_ID:
+    if st.session_state.get("_sky_module_query_last") != _MODULO_SOLICITADO:
+        st.session_state["_sky_module_query_last"] = _MODULO_SOLICITADO
+        st.session_state["sky_selected_module"] = _MODULOS_POR_ID[_MODULO_SOLICITADO]
+        st.session_state["sky_modules_mode"] = "🛠️ Módulos Técnicos (Modo Dev)"
+    st.session_state["sky_ui_view_mode"] = "classic"
 
 if "sky_ui_view_mode" not in st.session_state:
     st.session_state["sky_ui_view_mode"] = "holographic"
@@ -134,7 +140,7 @@ if st.session_state["sky_ui_view_mode"] == "classic":
         modo_interfaz = st.radio(
             "Modo de Interfaz",
             ["🎙️ Asistente Unificado (Voz & Chat)", "🛠️ Módulos Técnicos (Modo Dev)"],
-            label_visibility="collapsed"
+            label_visibility="collapsed", key="sky_modules_mode"
         )
         
         if modo_interfaz == "🎙️ Asistente Unificado (Voz & Chat)":
@@ -145,7 +151,7 @@ if st.session_state["sky_ui_view_mode"] == "classic":
             proveedor_jarvis, modelo_jarvis = elegir_motor('motor_jarvis', 'General')
         else:
             st.caption("🛠️ **Explorador de Módulos (Dev):**")
-            seccion_elegida = st.radio("Módulos", SECCIONES_TECNICAS, label_visibility="collapsed")
+            seccion_elegida = st.radio("Módulos", SECCIONES_TECNICAS, label_visibility="collapsed", key="sky_selected_module")
             seccion = "🏠 Inicio" if seccion_elegida == "🏠 Tablero general (v8.0)" else seccion_elegida
             ejecucion_dispositivo = True
             proveedor_jarvis = 'auto'
