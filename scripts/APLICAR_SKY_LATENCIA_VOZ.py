@@ -71,8 +71,8 @@ def main():
 
     try:
         info = json.loads(get(f"{API}/pulls/{PR}", 100_000))
-        if info.get("state") != "open":
-            raise RuntimeError("PR #52 ya no esta abierto; revisa el nuevo procedimiento.")
+        if not (info.get("state") == "open" or info.get("merged") is True):
+            raise RuntimeError("PR #52 no esta disponible o fue cerrado sin integrar.")
         sha = info.get("head", {}).get("sha", "")
         if not sha:
             raise RuntimeError("GitHub no devolvio una revision de PR.")
@@ -80,7 +80,7 @@ def main():
             diff = json.loads(get(f"{API}/compare/{REVIEWED_BASE}...{sha}", 600_000))
             if diff.get("status") not in ("ahead", "identical") or diff.get("base_commit", {}).get("sha") != REVIEWED_BASE:
                 raise RuntimeError("La rama de GitHub no contiene la revision revisada.")
-        patch = get(f"https://github.com/{REPO}/pull/{PR}.patch", 850_000)
+        patch = get(f"https://github.com/{REPO}/pull/{PR}.diff", 850_000)
         if not patch.startswith((b"From ", b"diff --git ")):
             raise RuntimeError("GitHub no entrego un parche reconocible.")
         trial = git_apply(root, patch, check=True)
@@ -101,7 +101,7 @@ def main():
                 copy = folder / rel
                 copy.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(root / rel, copy)
-        (folder / "cambios_pr52.patch").write_bytes(patch)
+        (folder / "cambios_pr52.diff").write_bytes(patch)
         applied = git_apply(root, patch, check=False)
         if applied.returncode != 0:
             # A partially applied patch must be reverted without discarding edits.
