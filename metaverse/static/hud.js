@@ -524,7 +524,8 @@
     addMsg('user', texto); $('chat-input').value = '';
     S.tEnvio = performance.now();
     setState('thinking', modo === 'voz' ? 'Pensando…' : 'Procesando…');
-    if (modo === 'voz' && window.ReadableStream) { await enviarStream(texto); return; }
+    // SKY-PERF: voz Y chat reciben deltas de la API; mantener fallback antiguo.
+    if (window.ReadableStream) { await enviarStream(texto, modo); return; }
     try {
       const data = await api('/api/asistente/mensaje', { method: 'POST', body: JSON.stringify({
         texto, historial: S.historial.slice(-12), modo, dispositivo: 'local' }) });
@@ -534,7 +535,8 @@
       addMsg('sky', 'No pude contactar a SKY: ' + e.message, 'err'); setState('error', 'Sin conexión con SKY');
     }
   }
-  async function enviarStream(texto) {
+  async function enviarStream(texto, modo = 'voz') {
+    const voz = modo === 'voz';
     // SKY-STREAM-TIMEOUT: no dejar el HUD en PROCESANDO indefinidamente.
     const control = new AbortController();
     let finalizado = false;
@@ -544,6 +546,7 @@
     const limite = setTimeout(() => control.abort(), 90000);
     let acumulado = '', pendiente = '', resto = '', vivo = null;
     const soltarFrases = (forzar) => {
+      if (!voz) return;  // texto: nunca iniciar síntesis de voz por los deltas
       const m = pendiente.match(/^[\s\S]*[.!?…:;](?=\s|$)/);
       if (m && m[0].trim().length > 2) { encolar(limpiarParaVoz(m[0])); pendiente = pendiente.slice(m[0].length); }
       if (forzar && pendiente.trim()) { encolar(limpiarParaVoz(pendiente)); pendiente = ''; }
@@ -551,7 +554,7 @@
     try {
       const r = await fetch('/api/asistente/stream', {
         method: 'POST', headers: headers(), signal: control.signal,
-        body: JSON.stringify({ texto, historial: S.historial.slice(-12), modo: 'voz', dispositivo: 'local' })
+        body: JSON.stringify({ texto, historial: S.historial.slice(-12), modo, dispositivo: 'local' })
       });
       if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
       S.historial.push({ role: 'user', content: texto });
@@ -567,24 +570,24 @@
           let ev; try { ev = JSON.parse(linea); } catch { continue; }
           if (ev.delta) {
             if (!vivo) vivo = addMsg('sky', '', 'live');
-            acumulado += ev.delta; pendiente += ev.delta; vivo.textContent = acumulado; scroll();
-            soltarFrases(false);
+            acumulado += ev.delta; vivo.textContent = acumulado; scroll();
+            if (voz) { pendiente += ev.delta; soltarFrases(false); }
           }
           if (ev.final) {
             finalizado = true;
             if (vivo) vivo.classList.remove('live');
             if (ev.final.transmitido) {
-              soltarFrases(true);
+              if (voz) soltarFrases(true);
               const msg = ev.final.mensaje || acumulado;
               if (vivo) vivo.textContent = msg; else addMsg('sky', msg);
-              if (!acumulado && msg) encolar(limpiarParaVoz(msg));
+              if (voz && !acumulado && msg) encolar(limpiarParaVoz(msg));
               S.lastSky = msg;
               S.historial.push({ role: 'assistant', content: msg.slice(0, 4000) });
-              await speak(''); seguirConversacion();
+              if (voz) { await speak(''); seguirConversacion(); }
               if (!S.speaking) setState('idle', 'Listo.');
             } else {
               if (vivo && !acumulado.trim()) vivo.remove();
-              await responder(ev.final, 'voz');
+              await responder(ev.final, modo);
             }
             return;
           }
