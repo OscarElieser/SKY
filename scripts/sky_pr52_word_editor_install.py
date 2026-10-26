@@ -15,11 +15,12 @@ import shutil
 import urllib.request
 
 ROOT = Path.cwd()
-REF = "bd9dc4aea362f0baedd09eb41b58ee78224e28dc"
+REF = "bfca46b456e14512fdaa7634ee56209c770f9f8a"
 REPO = "OscarElieser/SKY"
 NEW = (
     "neural_core/sky_word_editor.py",
     "tests/test_sky_word_editor.py",
+    "tests/test_sky_pr52_word_editor_install.py",
 )
 
 CAP_CHANGES = [
