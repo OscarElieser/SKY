@@ -289,7 +289,9 @@ def _start_single_instance() -> None:
             print('SKY: ya hay un servicio de escucha Vosk activo. '
                   'No iniciaré otro micrófono. Usá la instancia existente.',
                   flush=True)
-            return
+            # 42 allows the SKY supervisor to retry later without a restart
+            # storm or consuming its ordinary crash-recovery allowance.
+            sys.exit(42)
         main()
 
 
