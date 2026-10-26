@@ -1,9 +1,15 @@
 """AST-based installer tests: preserve custom interpreter without executing Win32."""
 from __future__ import annotations
 
+from pathlib import Path
 import unittest
 
-from scripts.sky_pr52_ctrl_f4_ast_install import assistant_ast_patch
+# El propietario instala el reparador en la raíz del proyecto; GitHub CI
+# lo mantiene bajo scripts/. Admitir ambos sin copiar ni sobrescribir código.
+if (Path(__file__).resolve().parents[1] / "scripts" / "sky_pr52_ctrl_f4_ast_install.py").is_file():
+    from scripts.sky_pr52_ctrl_f4_ast_install import assistant_ast_patch
+else:
+    from sky_pr52_ctrl_f4_ast_install import assistant_ast_patch
 
 
 CUSTOM = '''from __future__ import annotations
