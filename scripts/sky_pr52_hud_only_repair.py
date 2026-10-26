@@ -25,26 +25,6 @@ EDITED = ("metaverse/static/hud.js", "neural_core/sky_asistente_personal.py")
 NEW = ("neural_core/sky_hud_intents.py", "tests/test_sky_hud_chat_voice_bridge.py")
 VOICE = "sky_manos_libres.py"
 
-# Limit the change in the customized listener to one exact statement boundary.
-VOICE_ANCHOR = "                intent=interpret_command(command)\n"
-VOICE_NEXT = "                if intent:\n"
-VOICE_BLOCK = """
-                # SKY-HUD-CHAT-BRIDGE: UI-only, never grants device permissions.
-                if (intent and intent.get('action') == 'holographic_window'
-                        and (intent.get('params') or {}).get('subaction') == 'open_chat'):
-                    try:
-                        add_inbox(command, intent)
-                        msg_chat = ('Envié la orden al HUD; el panel se abrirá '
-                                    'cuando la página de SKY esté disponible.')
-                    except (OSError, ValueError) as exc:
-                        msg_chat = 'No pude enviar la orden al HUD.'
-                        print('Fallo de bandeja de voz:', type(exc).__name__)
-                    coordinador_voz.record_turn(command, msg_chat)
-                    say(msg_chat)
-                    continue
-"""
-
-
 def root_dir() -> Path:
     cwd = Path.cwd().resolve()
     if (cwd / "SKY_INICIAR.bat").is_file():
@@ -79,32 +59,6 @@ def merge(existing: bytes, baseline: bytes, target: bytes, folder: Path) -> byte
     if proc.returncode != 0:
         raise RuntimeError("Hay cambios superpuestos; no se alterará este archivo.")
     return proc.stdout
-
-
-def surgically_prepare_voice(contents: bytes) -> tuple[bytes | None, str]:
-    """Never replace the listener: at most one minimal, parseable addition."""
-    text = contents.decode("utf-8-sig")
-    if ("'holographic_window'" in text and "'open_chat'" in text
-            and "add_inbox(command" in text):
-        return None, "PUENTE DE VOZ YA EXISTENTE"
-    lf = text.replace("\r\n", "\n")
-    if lf.count(VOICE_ANCHOR) != 1:
-        raise RuntimeError("No se encontró un único punto seguro para la voz.")
-    index = lf.index(VOICE_ANCHOR) + len(VOICE_ANCHOR)
-    next_lines = lf[index:].lstrip("\n").splitlines()
-    if not next_lines or next_lines[0] != VOICE_NEXT.rstrip("\n"):
-        raise RuntimeError("La estructura local del intérprete es diferente. Revisión manual.")
-    if "from neural_core.voz_inbox import add_inbox" not in lf:
-        raise RuntimeError("No existe importación de la bandeja de voz.")
-    if "from neural_core.sky_asistente_personal import interpretar as interpret_command" not in lf:
-        raise RuntimeError("La importación del intérprete cambió.")
-    if "coordinador_voz.record_turn" not in lf or "def say(" not in lf:
-        raise RuntimeError("No están disponibles los métodos de voz que necesitamos.")
-    proposed = lf[:index] + VOICE_BLOCK.lstrip("\n") + lf[index:]
-    compile(proposed, VOICE, "exec")
-    if b"\r\n" in contents:
-        proposed = proposed.replace("\n", "\r\n")
-    return proposed.encode("utf-8"), "INSERCIÓN MÍNIMA, SIN REEMPLAZAR VOZ"
 
 
 def build_plan(root: Path, workspace: Path):
