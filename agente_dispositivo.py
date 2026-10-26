@@ -106,6 +106,8 @@ def _detalle_seguro(action: str, params: dict) -> str:
         return str(params.get('key', ''))
     if action in ('window_action', 'task_action', 'player_control'):
         return str(params.get('subaction', ''))
+    if action == 'word_write':
+        return str(len(str(params.get('text', '')))) + ' caracteres a Word'
     if action == 'keyboard_shortcut':
         return str(params.get('shortcut', ''))[:30]
     if action == 'play_media':
@@ -188,6 +190,9 @@ def _validar(action: str, params: dict, politica: dict) -> None:
     if action == 'keyboard_shortcut':
         if params != {'shortcut': 'ctrl+f4', 'expected_app': 'winword.exe'}:
             raise ValueError('Atajo de teclado no autorizado: sólo Ctrl+F4 en Word.')
+    if action == 'word_write':
+        from neural_core.sky_word_editor import validar_parametros
+        validar_parametros(params)
     if not caps.accion_habilitada(action, politica, params):
         cap = caps.capacidad_para(action, params)
         raise Desactivada(f'La capacidad "{cap}" está desactivada. Activala en tu equipo con: '
@@ -239,6 +244,9 @@ def _ejecutar(action: str, params: dict, politica: dict) -> dict:
     if action == 'keyboard_shortcut':
         from neural_core.sky_keyboard_shortcuts import enviar_ctrl_f4_word
         return enviar_ctrl_f4_word()
+    if action == 'word_write':
+        from neural_core.sky_word_editor import escribir_en_word
+        return escribir_en_word(params)
     if action == 'window_action':
         sub = params.get('subaction', 'list')
         if sub == 'list':
