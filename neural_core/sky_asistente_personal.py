@@ -316,6 +316,13 @@ def reglas(texto: str) -> dict | None:
     research = sky_research_commands.interpretar(texto)
     if research:
         return research
+    # Preguntas públicas de actualidad: consultar noticias FECHADAS antes
+    # del cerebro local. Evita afirmar que en 2026 no existen resultados
+    # que una consulta online hubiera podido verificar.
+    from .sky_live_updates import maybe_answer as _live_public
+    live_result = _live_public(texto)
+    if live_result is not None:
+        return live_result
     from . import sky_skills, sky_perfil
     try:
         from . import sky_habilidades
