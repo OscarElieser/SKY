@@ -294,3 +294,7 @@ body.sky-cinematic{background:
 .sky-extra-modules{margin-top:12px;border-top:1px solid var(--line2);padding-top:10px}
 .sky-extra-modules summary{color:var(--cyan);font-size:12px;cursor:pointer;margin-bottom:8px}
 #p-mod .tiles + .sky-extra-modules .tiles{margin-top:8px}
+
+/* La fila de chips de adjuntos no desplaza el botón Enviar en miniventana. */
+.sky-cinematic .sky-mini-chat .composer{flex-wrap:wrap}
+.sky-cinematic .sky-mini-chat .sky-attached-chips{width:100%;flex:0 0 100%}
