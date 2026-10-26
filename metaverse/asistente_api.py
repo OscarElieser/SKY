@@ -228,6 +228,27 @@ def _guardar_turno_seguro(role: str, text: str, mode: str) -> None:
         pass
 
 
+def _atajo_rapido(texto: str, dispositivo: str, request: Request) -> dict | None:
+    """Órdenes frecuentes: sin pasar por los subagentes ni por Ollama.
+
+    Nunca ejecuta directamente. _completar y el agente comprueban la política,
+    autorización y parada de emergencia. Respetar primero alias enseñados.
+    """
+    from neural_core.sky_performance import accion_directa
+    propuesta = accion_directa(texto)
+    if propuesta is None:
+        return None
+    from neural_core.sky_asistente_personal import preparar
+    if preparar(texto) != texto:
+        return None
+    return _completar({
+        'tipo': 'accion',
+        'propuesta': propuesta,
+        'mensaje': propuesta['description'],
+        'proveedor': 'sky-rapido',
+    }, dispositivo, request)
+
+
 @router.post('/mensaje')
 def mensaje(body: Mensaje, request: Request):
     inicio = time.perf_counter()
@@ -236,6 +257,9 @@ def mensaje(body: Mensaje, request: Request):
         if isinstance(resultado,dict):
             _guardar_turno_seguro('assistant',str(resultado.get('mensaje') or ''),body.modo)
         return _medir_turno(resultado,inicio)
+    rapido = _atajo_rapido(body.texto, body.dispositivo, request)
+    if rapido is not None:
+        return terminar(rapido)
     from .academy_voice import class_command
     academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
     if academy is not None:
@@ -281,6 +305,10 @@ def mensaje_stream(body: Mensaje, request: Request):
             if isinstance(resultado,dict):
                 _guardar_turno_seguro('assistant',str(resultado.get('mensaje') or ''),body.modo)
             return linea({'final': _medir_turno(resultado, inicio)})
+        rapido = _atajo_rapido(body.texto, body.dispositivo, request)
+        if rapido is not None:
+            yield final(rapido)
+            return
         from .academy_voice import class_command
         academy = class_command(body.texto, lesson_id=body.lesson_id, source_text=body.source_text)
         if academy is not None:

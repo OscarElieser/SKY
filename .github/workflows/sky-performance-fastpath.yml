@@ -1,0 +1,35 @@
+name: SKY Performance - fast intents and streaming
+
+on:
+  pull_request:
+    paths:
+      - "neural_core/sky_performance.py"
+      - "metaverse/asistente_api.py"
+      - "metaverse/static/hud.js"
+      - "tests/test_sky_performance_fastpath.py"
+      - ".github/workflows/sky-performance-fastpath.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  performance-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Compile modified Python code
+        run: python -m py_compile neural_core/sky_performance.py metaverse/asistente_api.py tests/test_sky_performance_fastpath.py
+      - name: Validate HUD JavaScript syntax
+        run: node --check metaverse/static/hud.js
+      - name: Test direct-action allowlist
+        run: |
+          python -m pip install pytest
+          PYTHONPATH=. pytest -q tests/test_sky_performance_fastpath.py
