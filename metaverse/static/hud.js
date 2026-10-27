@@ -870,7 +870,7 @@
   async function accion(data, modo) {
     const p = data.propuesta;
     if (data.interfaz) { await interfaz(p); return; }
-    if (p.action === 'play_media' && (p.params.service || 'youtube') === 'youtube' && S.ytApi && !p.params.path) {
+    if (p.action === 'play_media' && (p.params.service || 'youtube') === 'youtube' && !p.params.path) {
       await reproductor(p.params.query); return;
     }
     // Las órdenes de navegación a YouTube usan la ventana propia de SKY.
@@ -2846,7 +2846,11 @@
       manual.addEventListener('submit', e => {
         e.preventDefault();
         try {
-          const u = new URL(urlInput.value.trim());
+          const enlace = urlInput.value.trim();
+          if (!enlace || !/^https:\/\//i.test(enlace)) {
+            throw Error('Pegá un enlace HTTPS completo de YouTube; no escribás el título de la canción aquí.');
+          }
+          const u = new URL(enlace);
           if (u.protocol !== 'https:') throw Error('Se requiere enlace HTTPS.');
           const host = u.hostname.toLowerCase();
           let id = '';
@@ -2859,7 +2863,7 @@
           if (!/^[A-Za-z0-9_-]{11}$/.test(id)) throw Error('Enlace de video no válido.');
           lista = [{id, titulo:'Video seleccionado'}]; indice = 0;
           mostrarVideo(); aplicarModoVentana('player', mode);
-        } catch(err) { errorVideo.textContent = 'No pude incorporar ese video: ' + err.message; }
+        } catch(err) { errorVideo.textContent = 'No pude incorporar ese video: ' + (err instanceof TypeError ? 'Revisá que el enlace de YouTube sea válido y completo.' : err.message); }
       });
       panel.append(manual, errorVideo);
       const link = el('a', 'btn', 'Buscar en YouTube fuera de SKY (opcional)');
