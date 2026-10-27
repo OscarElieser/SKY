@@ -77,7 +77,7 @@
   }
 
   /* ------------------------------------------------------------------ estado */
-  const TEXTO = { idle: 'EN ESPERA', listening: 'ESCUCHANDO', thinking: 'PROCESANDO', speaking: 'RESPONDIENDO',
+  const TEXTO = { idle: 'EN ESPERA', listening: 'ESCUCHANDO', thinking: 'UN MOMENTO', speaking: 'RESPONDIENDO',
     executing: 'EJECUTANDO', error: 'ATENCIÓN' };
   const COLOR = { idle: [0, 229, 255], listening: [0, 255, 170], thinking: [56, 214, 255], speaking: [235, 250, 255],
     executing: [255, 176, 32], error: [255, 51, 102] };
@@ -638,7 +638,7 @@
     const fileContext = modo === 'chat' ? contextoDeAdjuntos() : '';
     addMsg('user', texto); $('chat-input').value = '';
     S.tEnvio = performance.now();
-    setState('thinking', modo === 'voz' ? 'Pensando…' : 'Procesando…');
+    setState('thinking', 'Estoy preparando tu respuesta…');
     // SKY-PERF: voz Y chat reciben deltas de la API; mantener fallback antiguo.
     if (window.ReadableStream) { await enviarStream(texto, modo, fileContext); return; }
     try {
@@ -653,11 +653,11 @@
   }
   async function enviarStream(texto, modo = 'voz', fileContext = '') {
     const voz = modo === 'voz';
-    // SKY-STREAM-TIMEOUT: no dejar el HUD en PROCESANDO indefinidamente.
+    // SKY-STREAM-TIMEOUT: informar demoras sin exponer el motor usado.
     const control = new AbortController();
     let finalizado = false;
     const aviso = setTimeout(() => {
-      if (!finalizado && estado === 'thinking') setState('thinking', 'Ollama sigue procesando la respuesta…');
+      if (!finalizado && estado === 'thinking') setState('thinking', 'La respuesta está tardando más de lo normal…');
     }, 12000);
     const limite = setTimeout(() => control.abort(), 90000);
     let acumulado = '', pendiente = '', resto = '', vivo = null;
@@ -715,7 +715,7 @@
     } catch (e) {
       if (vivo) vivo.classList.remove('live');
       const mensaje = control.signal.aborted
-        ? 'Ollama tardó más de 90 segundos. Probá otra vez o revisá su uso de memoria con ollama ps.'
+        ? 'La respuesta tardó demasiado. Probá otra vez o abrí Diagnóstico para revisar el servicio.'
         : 'SKY no completó la respuesta: ' + e.message;
       addMsg('sky', mensaje, 'err');
       setState('error', 'No se completó la respuesta');
