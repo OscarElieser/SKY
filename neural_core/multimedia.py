@@ -73,33 +73,73 @@ KNOWN_EMBEDDING_BLOCKED = {
 
 
 def _search_youtube_api(query: str, api_key: str) -> list[dict]:
-    """Consulta la YouTube Data API v3 verificando videoEmbeddable=true."""
-    import json
-    params = parse.urlencode({
+    """Busca mediante YouTube Data API y filtra status.embeddable real.
+
+    search.list(videoEmbeddable=true) no sustituye videos.list(status).
+    Una marca positiva tampoco anula Content ID ni restricciones del reproductor.
+    """
+    import re
+
+    if not api_key or not str(query).strip():
+        return []
+
+    def consultar(recurso: str, params: dict) -> dict:
+        url = "https://www.googleapis.com/youtube/v3/" + recurso + "?" + parse.urlencode(params)
+        req = request.Request(url, headers={"User-Agent": "SKY-IA/12.6"})
+        with request.urlopen(req, timeout=7) as respuesta:
+            cuerpo = respuesta.read(1_000_001)
+        if len(cuerpo) > 1_000_000:
+            raise ValueError("YouTube devolvió una respuesta demasiado grande")
+        return json.loads(cuerpo.decode("utf-8"))
+
+    busqueda = consultar("search", {
         "part": "snippet",
         "type": "video",
         "videoEmbeddable": "true",
-        "maxResults": 6,
-        "q": query,
-        "key": api_key
+        "maxResults": 15,
+        "q": str(query).strip()[:120],
+        "key": api_key,
     })
-    api_url = f"https://www.googleapis.com/youtube/v3/search?{params}"
-    req = request.Request(api_url, headers={"User-Agent": "SKY-Universal/9.0"})
-    with request.urlopen(req, timeout=5) as r:
-        data = json.loads(r.read().decode("utf-8"))
-    
-    candidates = []
-    for item in data.get("items", []):
-        vid_id = item.get("id", {}).get("videoId")
-        title = item.get("snippet", {}).get("title", "")
-        if vid_id and vid_id not in KNOWN_EMBEDDING_BLOCKED:
-            candidates.append({
-                "id": vid_id,
-                "title": title,
+    candidatos = []
+    for item in busqueda.get("items", []):
+        vid = (item.get("id") or {}).get("videoId", "")
+        if (isinstance(vid, str) and re.fullmatch(r"[A-Za-z0-9_-]{11}", vid)
+                and vid not in KNOWN_EMBEDDING_BLOCKED and vid not in candidatos):
+            candidatos.append(vid)
+    if not candidatos:
+        return []
+
+    detalles = consultar("videos", {
+        "part": "status,snippet,contentDetails",
+        "id": ",".join(candidatos),
+        "key": api_key,
+    })
+    validados = {}
+    for item in detalles.get("items", []):
+        vid = item.get("id")
+        status = item.get("status") or {}
+        if (vid not in candidatos or status.get("embeddable") is not True
+                or status.get("privacyStatus") != "public"):
+            continue
+        restriccion = ((item.get("contentDetails") or {}).get("regionRestriction") or {})
+        import os
+        region = os.getenv("SKY_YOUTUBE_REGION", "NI").strip().upper()
+        if len(region) == 2 and region.isalpha():
+            if region in restriccion.get("blocked", []):
+                continue
+            if "allowed" in restriccion and region not in restriccion["allowed"]:
+                continue
+        snippet = item.get("snippet") or {}
+        titulo = str(snippet.get("title") or "").strip()
+        if titulo:
+            validados[vid] = {
+                "id": vid,
+                "title": titulo[:140],
+                "channel": str(snippet.get("channelTitle") or "")[:100],
                 "embeddable": True,
-                "url": f"https://www.youtube.com/watch?v={vid_id}"
-            })
-    return candidates
+                "url": f"https://www.youtube.com/watch?v={vid}",
+            }
+    return [validados[vid] for vid in candidatos if vid in validados][:6]
 
 
 def resolve_youtube_video(busqueda: str) -> dict:
