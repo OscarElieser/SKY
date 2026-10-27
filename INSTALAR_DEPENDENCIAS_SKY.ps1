@@ -70,6 +70,7 @@ if ($Herramientas) {
         Warn "winget no disponible. Instala App Installer y repeti el comando para herramientas externas."
     } else {
         $Tools = @(
+            @{ Name = "Python 3.12"; Command = "python"; Id = "Python.Python.3.12" },
             @{ Name = "Git"; Command = "git"; Id = "Git.Git" },
             @{ Name = "Node.js / npm"; Command = "node"; Id = "OpenJS.NodeJS.LTS" },
             @{ Name = "Java JDK 17"; Command = "javac"; Id = "EclipseAdoptium.Temurin.17.JDK" },
@@ -120,6 +121,20 @@ if (-not (Test-Path -LiteralPath $PythonVenv)) {
             & python -m venv (Join-Path $Root ".venv")
             Require-Exit "Crear entorno Python"
             $Created = $true
+        }
+    }
+    if (-not $Created) {
+        $Candidates = @(
+            (Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe"),
+            "C:\Program Files\Python312\python.exe"
+        )
+        foreach ($Candidate in $Candidates) {
+            if (Test-Path -LiteralPath $Candidate) {
+                & $Candidate -m venv (Join-Path $Root ".venv")
+                Require-Exit "Crear entorno Python con el ejecutable instalado"
+                $Created = $true
+                break
+            }
         }
     }
     if (-not $Created) {
