@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+# La API registra el router HUD. Importarla primero evita el ciclo
+# hud_api -> api -> hud_api durante la colección aislada de pytest.
+from metaverse import api as _sky_api  # noqa: F401
 from metaverse import hud_api
 
 
