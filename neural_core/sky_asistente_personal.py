@@ -60,6 +60,11 @@ _PRIORIDAD_JARVIS = frozenset({'player_control', 'holographic_window', 'voice_co
 
 def interpretar(texto: str) -> dict | None:
     """Une los dos intérpretes de SKY y devuelve una propuesta de acción, o None si es conversación."""
+    # SKY-CTRL-F4: intención explícita antes del reproductor/LLM.
+    from .sky_keyboard_shortcuts import propuesta as atajo_escritorio
+    atajo = atajo_escritorio(texto)
+    if atajo:
+        return atajo
     propio = _interpretar_propio(texto)
     if propio and propio['action'] == 'list_path':
         return propio
@@ -269,6 +274,11 @@ def reglas(texto: str) -> dict | None:
     stop = parada(_norm(texto))   # la parada de emergencia va antes que todo
     if stop:
         return stop
+    # SKY-CTRL-F4: orden sensible, requiere permiso y confirmación.
+    from .sky_keyboard_shortcuts import solicitud as atajo_local
+    atajo_seguro = atajo_local(texto)
+    if atajo_seguro is not None:
+        return atajo_seguro
     # SKY-SALUDO-INMEDIATO: no cargar Ollama para una bienvenida simple.
     # La parada de emergencia sigue evaluándose antes de este atajo.
     saludo = re.sub(r'[\s,;:.!¡?¿]+', ' ', _norm(texto)).strip()
