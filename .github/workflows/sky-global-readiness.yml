@@ -1,0 +1,48 @@
+name: SKY GLOBAL - verified accessibility and readiness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'neural_core/sky_global_readiness.py'
+      - 'metaverse/global_readiness_api.py'
+      - 'metaverse/api.py'
+      - 'metaverse/static/hud.html'
+      - 'metaverse/static/hud.css'
+      - 'metaverse/static/sky-global-i18n.js'
+      - 'tests/test_sky_global_readiness.py'
+      - '.github/workflows/sky-global-readiness.yml'
+  pull_request:
+    paths:
+      - 'neural_core/sky_global_readiness.py'
+      - 'metaverse/global_readiness_api.py'
+      - 'metaverse/api.py'
+      - 'metaverse/static/hud.html'
+      - 'metaverse/static/hud.css'
+      - 'metaverse/static/sky-global-i18n.js'
+      - 'tests/test_sky_global_readiness.py'
+      - '.github/workflows/sky-global-readiness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install tested SKY API dependencies
+        run: python -m pip install -r requirements_social.txt -r requirements_studio.txt pytest
+      - name: Compile new modules and existing API
+        run: python -m py_compile neural_core/sky_global_readiness.py metaverse/global_readiness_api.py metaverse/api.py
+      - name: Validate current HUD and localization JavaScript
+        run: |
+          node --check metaverse/static/hud.js
+          node --check metaverse/static/sky-global-i18n.js
+      - name: Verify real private global-readiness API and accessibility
+        run: PYTHONPATH=. python -m pytest -q tests/test_sky_global_readiness.py

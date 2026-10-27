@@ -297,6 +297,22 @@ Entrá a `GET /api/sky/verification/capabilities` con tus credenciales del dueñ
 
 **Pendiente:** conexión MCP conforme al protocolo oficial y ensayos completos de voz, Ollama, agentes, permisos y hardware en tu computadora. Los chequeos automáticos no sustituyen esas pruebas.
 
+## 🌐 SKY GLOBAL — comprobaciones reales e inclusión
+
+SKY incorporó un informe privado de preparación internacional en
+`GET /api/sky/global/readiness`, integrado al botón **DIAG**. Comprueba
+el arranque público, la disponibilidad efectiva de Redis y la cobertura de
+etiquetas traducidas; también muestra pruebas de seguridad, accesibilidad,
+rendimiento, protección de datos y despliegue internacional que aún **no han
+sido acreditadas**. La API no expone secretos y no altera los servicios actuales.
+
+El HUD principal incorpora cambio de idioma para las etiquetas revisadas,
+acceso con teclado, anuncios de estado y reducción voluntaria del movimiento.
+No debe confundirse la interfaz parcialmente traducida con conversación o voz
+validada en todos los idiomas.
+
+[Guía operativa, pruebas y requisitos de SKY GLOBAL](docs/api/SKY_GLOBAL_READINESS.md).
+
 ## 🗺️ Prioridades siguientes
 
 - Validar voz, Ollama, Piper, permisos y acciones reales en el equipo Windows de destino.
