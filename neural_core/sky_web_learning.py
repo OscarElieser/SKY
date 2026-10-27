@@ -85,7 +85,10 @@ def _valid(item: dict, *, now: datetime) -> dict | None:
     title = _plain(item.get("titular"), 210)
     source = _plain(item.get("fuente"), 75)
     url = str(item.get("enlace") or "")
-    parts = urlsplit(url)
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
     # Only the provider's Google News RSS links, not arbitrary article downloads.
     if (len(title) < 12 or _COMMAND.search(title) or _PRIVATE.search(title)
             or len(url) > 1100 or parts.scheme != "https"
