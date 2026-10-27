@@ -58,6 +58,24 @@ def revoke_device(device_id: str):
         _bad(exc)
 
 
+@agent.get("/devices/{device_id}/home-status")
+def device_home_status(device_id: str, x_sky_mobile_token: str = Header(default="", max_length=128)):
+    """Minimal health for a paired Android device, without SKY owner access."""
+    try:
+        mobile.device_status(device_id, x_sky_mobile_token)
+    except PermissionError as exc:
+        _bad(exc)
+    from .sky_home_api import _availability
+    local, cloud, only = _availability()
+    return {
+        "service": "SKY Home", "server_online": True,
+        "local_ollama_ready": local, "cloud_configured": bool(cloud),
+        "local_only": only, "chat_authorized": False,
+        "device_actions_authorized": False,
+        "note": "El token del agente solo permite funciones limitadas, no el chat del propietario.",
+    }
+
+
 @agent.post("/devices/{device_id}/revoke-self")
 def revoke_self(device_id: str, x_sky_mobile_token: str = Header(default="", max_length=128)):
     try:

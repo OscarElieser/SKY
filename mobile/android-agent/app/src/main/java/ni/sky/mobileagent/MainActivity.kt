@@ -89,6 +89,7 @@ class MainActivity : Activity() {
             })
         }
         content.addView(actionButton("Consultar órdenes ahora") { poll() })
+        content.addView(actionButton("Estado de mi servidor SKY") { checkHomeStatus() })
         content.addView(description("SKY consulta cada 6 segundos mientras la app está visible. Esta versión no funciona con pantalla bloqueada."))
     }
 
@@ -138,6 +139,27 @@ class MainActivity : Activity() {
                 result.getString("device_id"), result.getString("token"))
             runOnUiThread { codeInput.setText("") }
             setStatus("Vinculado: " + label + ". Elegí aplicaciones permitidas.")
+        }
+    }
+
+    private fun checkHomeStatus() {
+        val id = tokens.deviceId()
+        val token = tokens.token()
+        if (id.isEmpty() || token.isEmpty()) {
+            setStatus("Vinculá este teléfono antes de consultar el servidor SKY.")
+            return
+        }
+        execute {
+            val reply = SkyNetwork.request(
+                tokens.server(),
+                "/api/sky/mobile-agent/devices/" + id + "/home-status",
+                "GET", token
+            )
+            val local = if (reply.optBoolean("local_ollama_ready")) "Ollama disponible" else "Ollama no disponible"
+            val cloud = if (reply.optBoolean("cloud_configured")) "nube configurada" else "nube sin configurar"
+            val mode = if (reply.optBoolean("local_only")) "solo local" else "híbrido permitido"
+            setStatus("Servidor SKY conectado. " + local + " · " + cloud + " · modo " + mode +
+                ". Este agente aún no tiene permiso de chat.")
         }
     }
 

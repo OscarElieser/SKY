@@ -53,6 +53,21 @@ apertura; no demuestra que la aplicación terminara de cargar.
   Activity visible. No está diseñada para ejecución constante con pantalla
   apagada ni para iniciarse automáticamente tras un reinicio.
 
+## Consultar el servidor doméstico
+
+Desde la pantalla del agente Android, tocá **Estado de mi servidor SKY**.
+La app consulta `GET /api/sky/mobile-agent/devices/{id}/home-status` sobre HTTPS,
+con el token **del dispositivo** guardado en Android Keystore, no con la
+clave maestra del propietario. Devuelve únicamente si el servidor responde,
+si está disponible un modelo Ollama local y si hay proveedores remotos
+configurados, sin revelar secretos, conversaciones ni datos personales.
+Un teléfono no emparejado o revocado recibe HTTP 401. Esta comprobación no
+consume órdenes pendientes ni concede capacidades de chat, memoria o control
+del equipo de Windows. La app necesita estar visible para efectuar la consulta.
+
+Esto es un primer avance de la app móvil: el chat Android completo y
+las sesiones móviles con permisos granulares permanecen pendientes.
+
 ## API reutilizada
 
 Endpoints protegidos por autenticación de propietario (y MFA):
