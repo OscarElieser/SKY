@@ -64,6 +64,17 @@ def _intencion_youtube(frase: str, mode: str) -> dict | None:
         return None
     resto = accion.group(1)
     verbo = t[:accion.start(1)].strip()
+    # Las órdenes para alarmas, recordatorios, temporizadores y ajustes no
+    # constituyen peticiones de música, aunque comiencen por «pon/ponme».
+    # Comprobar ANTES de quitar «la canción»: una canción titulada «Alarma»
+    # sigue siendo una solicitud de YouTube cuando se pide explícitamente.
+    if re.match(
+        r"^(?:(?:la|el|las|los|una|un|unas|unos)\\s+)?"
+        r"(?:alarmas?|recordatorios?|temporizadores?|cronometros?|"
+        r"despertadores?|volumen|ajustes|configuracion|notificaciones?|"
+        r"calendario|citas|reuniones)\\b", resto
+    ):
+        return None
     # Consultas genéricas de búsqueda sólo van a YouTube con contexto explícito.
     if verbo in ("busca", "buscar", "buscame", "encuentra") and not (
         youtube_explicito or re.search(r"\b(?:cancion|tema|musica|video|videoclip)\b", resto)
