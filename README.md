@@ -40,7 +40,15 @@ SKY también mantiene el **metaverso 3D y la comunidad**, las automatizaciones, 
 
 ### 1. Instalación
 
-Descargá o cloná el repositorio y ejecutá en su carpeta:
+**Para instalar todas las dependencias declaradas en otra computadora Windows** (Python, voz, LoRA, Office, MCP, Node/Flutter y herramientas externas optativas), usá el archivo maestro `requirements_sky_all.txt` y el instalador de una sola ejecución:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\INSTALAR_DEPENDENCIAS_SKY.ps1" -Perfil Completo -Herramientas
+```
+
+En tu PC de casa con 8 GB RAM, empezá por `-Perfil Casa` en vez de instalar todos los módulos pesados. Documentación: [Instalación completa de SKY](docs/INSTALACION_COMPLETA_SKY.md).
+
+Para el instalador operativo tradicional, descargá o cloná el repositorio y ejecutá en su carpeta:
 
 ```bat
 INSTALAR_SKY_WINDOWS.bat
