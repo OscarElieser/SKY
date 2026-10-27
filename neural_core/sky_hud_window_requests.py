@@ -70,9 +70,9 @@ def _intencion_youtube(frase: str, mode: str) -> dict | None:
     # sigue siendo una solicitud de YouTube cuando se pide explícitamente.
     if re.match(
         r"^(?:(?:la|el|las|los|una|un|unas|unos)\s+)?"
-        r"(?:alarmas?|recordatorios?|temporizadores?|cronometros?|"
-        r"despertadores?|volumen|ajustes|configuracion|notificaciones?|"
-        r"calendario|citas|reuniones)\b", resto
+        r"(?:alarmas?|recordatorios?|temporizador(?:es)?|cronometros?|"
+        r"despertador(?:es)?|volumen|ajustes|configuracion|notificacion(?:es)?|"
+        r"calendario|citas?|reunion(?:es)?)\b", resto
     ):
         return None
     # Consultas genéricas de búsqueda sólo van a YouTube con contexto explícito.
