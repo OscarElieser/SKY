@@ -1,0 +1,31 @@
+name: SKY learning core - Windows SQLite regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "neural_core/sky_core_learning.py"
+      - "tests/test_sky_core_learning.py"
+      - ".github/workflows/sky-core-learning-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core-windows:
+    name: Test learning core on Windows Python 3.13
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run six regression tests with Windows SQLite file-lock semantics
+        shell: pwsh
+        run: python -m unittest discover -s tests -p "test_sky_core_learning.py" -v
