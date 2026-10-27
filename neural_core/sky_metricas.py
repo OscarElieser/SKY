@@ -373,6 +373,13 @@ def resumen(periodo: str = 'hoy', ahora: datetime | None = None) -> dict:
         'voz': {'primera_voz': _estad([f['ms'] for f in voz if f['nombre'] == 'primera_voz']),
                 'reconocimiento': {**_estad([f['ms'] for f in stt]), 'errores': sum(1 for f in stt if not f['ok'] or (f['codigo'] or 0) >= 400)},
                 'sintesis': {**_estad([f['ms'] for f in tts]), 'errores': sum(1 for f in tts if not f['ok'] or (f['codigo'] or 0) >= 400)},
+                # v12.6: escucha manos libres, etapa por etapa (interpretación, agente, modelo, voz) y turno completo.
+                'manos_libres': {**{etapa: _estad([f['ms'] for f in voz if f['nombre'] == 'ml_' + etapa])
+                                    for etapa in ('interpretar', 'ejecutar', 'modelo', 'tts', 'turno')},
+                                 'turnos': sum(1 for f in voz if f['nombre'] == 'ml_turno'),
+                                 'errores': sum(1 for f in voz if f['nombre'].startswith('ml_') and not f['ok']),
+                                 'acciones_verificadas': sum(1 for f in voz if f['nombre'] == 'ml_ejecutar' and f['detalle'] == 'verificada'),
+                                 'acciones_sin_comprobar': sum(1 for f in voz if f['nombre'] == 'ml_ejecutar' and f['detalle'] == 'enviada')},
                 'interrupciones': sum(1 for f in voz if f['nombre'] == 'interrupcion'),
                 'errores_audio': sum(1 for f in voz if f['nombre'] in ('error_microfono', 'error_reproduccion'))},
         'seguridad': {'autorizadas': len(ok), 'rechazadas': len(rechazos_agente),

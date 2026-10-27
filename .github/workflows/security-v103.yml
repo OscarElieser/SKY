@@ -17,8 +17,12 @@ jobs:
       - name: Install video and voice tools
         timeout-minutes: 8
         run: |
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends ffmpeg espeak
+          # Si los espejos de Ubuntu fallan, ffmpeg llega por pip (tests/conftest.py usa static_ffmpeg).
+          if ! (timeout 240 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update &&
+                timeout 240 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends ffmpeg espeak); then
+            echo "apt no disponible: uso static-ffmpeg"
+            python -m pip install static-ffmpeg
+          fi
       - name: Install scoped test dependencies
         run: |
           python -m pip install -U pip 'setuptools>=83'
@@ -42,5 +46,5 @@ jobs:
           tests/test_sky_v10_5_global.py
           tests/test_sky_devices.py tests/test_sky_jarvis_local.py
           tests/test_sky_public_secrets.py tests/test_sky_notes_local.py
-          tests/test_sky_v12_unificado.py tests/test_sky_v12_1_mejoras.py tests/test_sky_v12_2_aprendizaje_kpi.py tests/test_sky_kpi_pendientes.py tests/test_sky_v12_3_jarvis_completo.py tests/test_sky_v12_4_habilidades.py tests/test_sky_v12_5_sentinel.py tests/test_sky_v11_1_asistente.py
+          tests/test_sky_v12_unificado.py tests/test_sky_v12_1_mejoras.py tests/test_sky_v12_2_aprendizaje_kpi.py tests/test_sky_kpi_pendientes.py tests/test_sky_v12_3_jarvis_completo.py tests/test_sky_v12_4_habilidades.py tests/test_sky_v12_5_sentinel.py tests/test_sky_v12_6_fiabilidad.py tests/test_sky_v12_6_hermes.py tests/test_sky_v11_1_asistente.py
           tests/test_windows_desktop_control.py tests/test_sky_jarvis_fase1.py

@@ -23,6 +23,8 @@ def context(tmp_path, monkeypatch):
     monkeypatch.setattr(hub, "_config_path", lambda: tmp_path / "servers.json")
     monkeypatch.setattr(sentinel_identidad, "pin_configurado", lambda: True)
     monkeypatch.setattr(sentinel_identidad, "verificar_pin", lambda p: p == "848484")
+    # v12.6: con PIN configurado, la API exige además la sesión del dueño abierta (desbloqueada con el PIN).
+    monkeypatch.setattr(sentinel_identidad, "sesion_bloqueada", lambda: False)
     conf = {"servers": {
         "playwright": {"enabled": True, "command": sys.executable,
                        "args": [str(tmp_path / "installed_browser_server.py")],

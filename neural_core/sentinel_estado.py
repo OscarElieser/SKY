@@ -57,6 +57,7 @@ def estado() -> dict:
     tareas = [t for t in sky_skills.programadas() if t.get('activa', True)]
     datos = {
         'pin': ident.pin_configurado(), 'pin_bloqueado_s': ident.bloqueado_por(), 'mfa': mfa,
+        'sesion': ident.estado_sesion(),
         'solo_local': ident.solo_local(), 'parada': caps.parada_activa(),
         'modo': os.getenv('SKY_DEPLOYMENT_MODE', 'local'), 'local_only_ia': os.getenv('SKY_LOCAL_ONLY', '0') == '1',
         'comunidad_publica': os.getenv('SKY_COMUNIDAD_PUBLICA', '0') == '1',
@@ -83,6 +84,7 @@ def estado() -> dict:
 
 def describir(d: dict) -> str:
     partes = [f"PIN {'configurado' if d['pin'] else 'NO configurado'}",
+              'sesión ' + ('bloqueada' if d.get('sesion', {}).get('bloqueada') else 'abierta'),
               f"2FA {'activo' if d['mfa'] else 'inactivo'}",
               'sólo este equipo' if d['solo_local'] else 'acepta otros equipos con la llave',
               'parada de emergencia ACTIVA' if d['parada'] else 'sin parada']
@@ -125,9 +127,10 @@ def interpretar(texto: str) -> dict | None:
         return _resp('Listo: SKY sólo acepta conexiones de este equipo. Para volver a permitir otros equipos usá el Security Center con tu PIN.')
     if re.fullmatch(r'(?:permite|permiti|permitir|habilita|habilitar|desbloquea) (?:el )?acceso (?:desde|de) (?:otros|los demas) (?:dispositivos|equipos)', t):
         return _resp('Por seguridad, eso se hace en el Security Center con tu PIN.', modulo='sentinel')
-    if re.fullmatch(r'bloqueate|bloquea (?:a )?sky|bloquea la interfaz(?: de sky)?|bloquear sky', t):
-        from .sentinel_identidad import pin_configurado
-        if not pin_configurado():
+    if re.fullmatch(r'bloqueate|bloquea (?:a )?sky|bloquea la interfaz(?: de sky)?|bloquear sky|bloquea la sesion', t):
+        from .sentinel_identidad import bloquear_sesion
+        # v12.6: el bloqueo es del servidor y vale para todos los procesos (voz, HUD, WhatsApp, agente).
+        if not bloquear_sesion('pedido por orden', 'orden'):
             return _resp('Para bloquear SKY primero configurá un PIN en el Security Center.', modulo='sentinel')
-        return _resp('SKY bloqueada. Ingresá tu PIN para volver.', bloquear_hud=True)
+        return _resp('SKY bloqueada. Decí o escribí tu PIN para volver.', bloquear_hud=True)
     return None

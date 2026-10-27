@@ -22,7 +22,7 @@ def _base(tmp_path, monkeypatch):
     monkeypatch.setattr(sb, 'base', lambda: tmp_path / 'builder')
     monkeypatch.setattr(borr, 'ruta', lambda: tmp_path / 'borradores.json')
     monkeypatch.setattr(cerebro, '_ollama_ok', lambda: False)
-    monkeypatch.setattr(asis, 'ejecutar_local_si_autorizado', lambda p: None)
+    monkeypatch.setattr(asis, 'ejecutar_local_si_autorizado', lambda p, **k: None)
     for v in ('SKY_SOLO_LOCAL', 'SKY_COMUNIDAD_PUBLICA', 'SKY_TELEMETRIA_TOKEN'):
         monkeypatch.delenv(v, raising=False)
     from metaverse import sentinel
@@ -71,8 +71,10 @@ def test_rutas_publicas_son_las_minimas(monkeypatch):
     assert c.get('/api/health').status_code == 200
     assert c.get('/api/client/bootstrap').status_code == 200
     from metaverse.sentinel import PUBLICAS
+    # v12.6: + estado de la sesión (sólo dice si está bloqueada) y preparación de la API (sin datos personales).
     assert {r for _, r in PUBLICAS} <= {'/api/health', '/api/client/bootstrap', '/api/i18n/languages', '/api/i18n/phrases',
-                                         '/api/i18n/ui', '/api/security/owner-mfa/status', '/api/sentinel/desbloquear'}
+                                         '/api/i18n/ui', '/api/security/owner-mfa/status', '/api/sentinel/desbloquear',
+                                         '/api/sentinel/sesion', '/api/health/listo'}
 
 
 def test_5_dispositivo_desconocido_con_modo_solo_este_equipo(monkeypatch):
@@ -330,6 +332,9 @@ def test_security_center_y_voz(monkeypatch):
     assert 'Pausé 1' in asis.reglas('desactivá las automatizaciones')['mensaje']
     assert 'local' in asis.reglas('qué dispositivos están conectados')['mensaje']
     assert asis.reglas('bloquéate')['bloquear_hud'] is True
+    # v12.6: «bloquéate» bloquea la sesión en el servidor: la llave sola ya no alcanza hasta el PIN.
+    assert c.post('/api/sentinel/solo-local', headers=h, json={'activo': True}).status_code == 423
+    assert c.post('/api/sentinel/desbloquear', json={'pin': '482915'}).status_code == 200
     assert asis.reglas('bloquea la pantalla')['propuesta']['action'] == 'lock_screen'   # el bloqueo de Windows sigue igual
     assert c.post('/api/sentinel/solo-local', headers=h, json={'activo': True}).json() == {'solo_local': True}
     assert c.post('/api/sentinel/solo-local', headers=h, json={'activo': False}).status_code == 403   # aflojar pide PIN

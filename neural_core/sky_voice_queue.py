@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import queue
 import re
+import sys
 import threading
+import time
 import unicodedata
 from typing import Callable
 
@@ -53,6 +55,13 @@ def parada_emergencia_voz(text: str, *, exigir_activacion: bool = False) -> bool
     return not exigir_activacion and clean in _EMERGENCIA
 
 
+def _interactivo() -> bool:
+    try:
+        return bool(sys.stdout is not None and sys.stdout.isatty())
+    except (AttributeError, ValueError):
+        return False
+
+
 class VoiceWorkQueue:
     """Una tarea activa + hasta dos pendientes; sin acceso al micrófono."""
 
@@ -75,6 +84,11 @@ class VoiceWorkQueue:
         self._engine = None
         self._speech_epoch = 0
         self._epoch_lock = threading.Lock()
+        # v12.6: Vosk a veces entrega dos veces la misma frase (o el dueño la repite al no oír respuesta):
+        # una orden idéntica dentro de esta ventana no se vuelve a ejecutar.
+        self.dedupe_window = 3.0
+        self._last_command = ("", 0.0)
+        self.duplicates = 0
 
     @property
     def speaking(self) -> bool:
@@ -120,9 +134,15 @@ class VoiceWorkQueue:
     def submit(self, command: str) -> bool:
         if not isinstance(command, str) or not command.strip() or self._stop.is_set():
             return False
+        clave, ahora = _normalize(command), time.monotonic()
         with self._generation_lock:
+            ultima, cuando = self._last_command
+            if clave == ultima and ahora - cuando < self.dedupe_window:
+                self.duplicates += 1
+                return True   # ya está en curso: no duplicar la acción
             try:
                 self._queue.put_nowait(("command", command, self._generation))
+                self._last_command = (clave, ahora)
                 return True
             except queue.Full:
                 return False
@@ -190,7 +210,8 @@ class VoiceWorkQueue:
             vigente = self._active_generation == self._generation
         if not message or self._stop.is_set() or self._cancel_current.is_set() or not vigente:
             return
-        print("SKY-IA:", message)
+        # v12.6: con salida a registros (inicio con Windows) no se guardan las respuestas completas.
+        print("SKY-IA:", message if _interactivo() else f"(respuesta de {len(message)} caracteres)")
         if self._engine is None:
             return
         self._cancel_speech.clear()

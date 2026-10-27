@@ -94,6 +94,40 @@ def _pcm_mono_16khz(audio: bytes, filename: str = 'audio.wav') -> bytes:
         return out.read_bytes()
 
 
+_CACHE: dict = {}
+_CARGA = threading.Lock()
+
+
+def _modelo():
+    """v12.6: el modelo se carga UNA vez (bajo demanda) y se reutiliza. Antes se construía WhisperModel en cada
+    transcripción: segundos de disco y CPU por frase. `local_files_only` impide descargas implícitas."""
+    directorio = str(model_directory())
+    with _CARGA:
+        if _CACHE.get('dir') != directorio or _CACHE.get('model') is None:
+            from faster_whisper import WhisperModel
+            _CACHE['model'] = WhisperModel(directorio, device='cpu', compute_type='int8',
+                                           local_files_only=True, cpu_threads=2, num_workers=1)
+            _CACHE['dir'] = directorio
+        return _CACHE['model']
+
+
+def cargar() -> dict:
+    """Activación bajo demanda (registro de módulos): carga el modelo sin transcribir nada."""
+    if not capabilities()['available']:
+        raise RuntimeError('Instalá faster-whisper y un modelo local (SKY_STT_MODEL_DIR) antes de activarlo')
+    _modelo()
+    return {'cargado': True}
+
+
+def descargar() -> None:
+    with _CARGA:
+        _CACHE.clear()
+
+
+def cargado() -> bool:
+    return _CACHE.get('model') is not None
+
+
 def transcribe(audio: bytes, *, filename: str = 'audio.wav', language: str | None = None) -> dict:
     status = capabilities()
     if not status['available']:
@@ -109,9 +143,7 @@ def transcribe(audio: bytes, *, filename: str = 'audio.wav', language: str | Non
         with wave.open(io.BytesIO(pcm), 'rb') as wav:
             samples = wav.readframes(wav.getnframes())
         signal = frombuffer(samples, dtype=int16).astype(float32) / 32768.0
-        # `local_files_only` prevents implicit download even if path is invalid.
-        model = WhisperModel(str(model_directory()), device='cpu', compute_type='int8',
-                             local_files_only=True, cpu_threads=2, num_workers=1)
+        model = _modelo()
         segments, info = model.transcribe(signal, language=locale, beam_size=2,
                                           vad_filter=True, condition_on_previous_text=False)
         rows = [{'start': round(s.start, 3), 'end': round(s.end, 3), 'text': s.text.strip()}

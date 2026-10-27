@@ -8,13 +8,16 @@ from pathlib import Path
 from typing import Optional
 from contextlib import asynccontextmanager
 from fastapi import FastAPI,HTTPException,Depends,WebSocket,WebSocketDisconnect,Request,Query,File,UploadFile
-from fastapi.responses import FileResponse,Response
+from fastapi.responses import FileResponse,JSONResponse,Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel,Field
 from .engine import generate_scene,validate_object,KINDS
 from .store import get_world,create_world,list_worlds,save_scene,delete_world,demo_world
-from .export3d import export_scene_glb
+def export_scene_glb(scene):
+    # v12.6: trimesh + scipy tardaban ~1,7 s en cada arranque de la API; ahora se cargan al exportar el primer GLB.
+    from .export3d import export_scene_glb as _exportar
+    return _exportar(scene)
 
 ROOT=Path(__file__).resolve().parent.parent
 from dotenv import load_dotenv
@@ -61,23 +64,36 @@ async def _workflow_pump():
             pass
         await asyncio.sleep(2)
 
+def _ciclo_agenda():
+    """Un ciclo de recordatorios, rutinas y vigilancia (v12.6: función propia para poder probarla)."""
+    from datetime import datetime as _dt
+    from neural_core import sky_rutinas
+    tolerancia=float(os.getenv('SKY_RECORDATORIO_TOLERANCIA_MIN','30') or 30)*60
+    for r in sky_rutinas.vencidos():
+        texto=('⏰ ' if r.get('clase')=='alarma' else '🔔 ')+r.get('texto','Recordatorio')
+        try:atraso=(_dt.now()-_dt.fromisoformat(r['cuando'])).total_seconds()
+        except (KeyError,ValueError,TypeError):atraso=0
+        if atraso>tolerancia:
+            # v12.6: vencido mientras SKY estaba apagada: queda en el HUD, sin mandar WhatsApp ni avisos externos
+            # sólo porque SKY arrancó.
+            sky_rutinas.avisar('Perdido mientras SKY estaba apagada: '+texto,'recordatorio')
+            continue
+        sky_rutinas.avisar(texto,'recordatorio')
+        _avisar_fuera(r.get('texto','Recordatorio'))
+    for rutina in sky_rutinas.rutinas_programadas():
+        res=sky_rutinas.ejecutar_rutina(rutina)
+        if res['mensaje']:
+            sky_rutinas.avisar(res['mensaje'],'rutina')
+            _whatsapp(rutina.get('nombre','Tarea')+': '+res['mensaje'])
+    _vigilancia()
+
 async def _agenda_pump():
     # SKY v12.1: recordatorios, alarmas y rutinas programadas. Avisa al HUD, al escritorio
     # (si la capacidad notify es automática) y al celular (SKY_HA_NOTIFY), sin red externa.
-    from neural_core import sky_rutinas
-    def ciclo():
-        for r in sky_rutinas.vencidos():
-            texto=('⏰ ' if r.get('clase')=='alarma' else '🔔 ')+r.get('texto','Recordatorio')
-            sky_rutinas.avisar(texto,'recordatorio')
-            _avisar_fuera(r.get('texto','Recordatorio'))
-        for rutina in sky_rutinas.rutinas_programadas():
-            res=sky_rutinas.ejecutar_rutina(rutina)
-            if res['mensaje']:
-                sky_rutinas.avisar(res['mensaje'],'rutina')
-                _whatsapp(rutina.get('nombre','Tarea')+': '+res['mensaje'])
-        _vigilancia()
+    # Con la sesión del dueño bloqueada (v12.6) siguen los avisos; las acciones de equipo sólo si son
+    # automáticas y de nivel 1 (lo vuelve a comprobar el agente).
     while True:
-        try:await asyncio.to_thread(ciclo)
+        try:await asyncio.to_thread(_ciclo_agenda)
         except Exception:pass
         await asyncio.sleep(20)
 
@@ -115,7 +131,7 @@ def _avisar_fuera(texto:str):
     _whatsapp('🔔 '+texto)
     try:
         from neural_core.sky_asistente_personal import ejecutar_local_si_autorizado
-        ejecutar_local_si_autorizado({'action':'notify','params':{'title':'SKY','message':texto},'description':'Recordatorio'})
+        ejecutar_local_si_autorizado({'action':'notify','params':{'title':'SKY','message':texto},'description':'Recordatorio'},origen='programada')
     except Exception:pass
     try:
         from neural_core import sky_home_assistant
@@ -147,6 +163,10 @@ async def lifespan(app):
         from neural_core import sky_metricas
         sky_metricas.registrar('servicio','inicio',True,detalle='API iniciada')
     except Exception:pass
+    # v12.6: la vigilancia de KPIs (que puede avisar por WhatsApp) y la actualización de temas (internet) no corren
+    # al arrancar: la primera revisión es a los 5 minutos y a la hora, respectivamente.
+    import time as _t
+    _VIGILANCIA['kpi']=_VIGILANCIA['intereses']=_t.time()
     agenda_pump=asyncio.create_task(_agenda_pump()) if os.getenv('SKY_AGENDA_ENABLED','1')=='1' else None
     try:
         yield
@@ -323,7 +343,17 @@ def original_animated_avatar():
 
 
 @app.get('/api/health')
-def health():return {'service':'SKY Engine API','status':'ok','version':'10.4.0','private':'key required for data'}
+async def health():
+    # v12.6: async → la atiende el bucle de eventos aunque todos los hilos estén ocupados con inferencias lentas.
+    # Así el supervisor no confunde «modelo lento» con «API colgada».
+    return {'service':'SKY Engine API','status':'ok','version':'10.4.0','private':'key required for data'}
+
+@app.get('/api/health/listo')
+def health_listo():
+    """Preparación (readiness): comprueba lo que la API necesita para atender, sin datos personales."""
+    from neural_core.sky_modulos import preparacion_api
+    datos=preparacion_api()
+    return JSONResponse(datos,status_code=200 if datos['listo'] else 503)
 
 @app.get('/api/capabilities',dependencies=[Depends(require_key)])
 def capabilities():
@@ -826,13 +856,14 @@ def client_bootstrap(request: Request):
     # En despliegues públicos, una conexión interna del proxy no prueba que sea el dueño.
     reveal_owner_key = is_local and os.getenv('SKY_DEPLOYMENT_MODE', 'local').strip().lower() == 'local'
     # SENTINEL: con PIN configurado la llave nunca se entrega sin él (POST /api/sentinel/desbloquear).
-    from neural_core.sentinel_identidad import pin_configurado
+    from neural_core.sentinel_identidad import pin_configurado, sesion_bloqueada
     requiere_pin = pin_configurado()
     if requiere_pin:
         reveal_owner_key = False
     return {
         'key': api_token() if reveal_owner_key else '',
         'requiere_pin': requiere_pin,
+        'sesion_bloqueada': sesion_bloqueada(),
         'local': is_local,
         'ollama_active': True,
         'gemini_active': bool(os.getenv('GEMINI_API_KEY')),

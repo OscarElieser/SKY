@@ -14,6 +14,10 @@ Antes de v12.5, cada ruta tenía que acordarse de pedir la llave del dueño, y l
     desde una misma dirección se responde 429 a los intentos inválidos (la llave correcta siempre entra:
     adivinarla es inviable y así no se bloquea al dueño por una sospecha).
 
+v12.6 — sesión del dueño: con PIN configurado, aunque la llave sea correcta, mientras la sesión esté BLOQUEADA
+(al arrancar SKY, al pedir «bloquéate» o al caducar) la API responde 423 salvo salud, desbloqueo, consulta y bloqueo
+de la sesión y la parada de emergencia. La misma sesión la comprueban la voz, WhatsApp, Streamlit y el agente.
+
 Este control no depende del modelo de IA: es código que corre antes de cualquier ruta.
 """
 from __future__ import annotations
@@ -30,6 +34,12 @@ PUBLICAS = frozenset({
     ('GET', '/api/health'), ('GET', '/api/client/bootstrap'),
     ('GET', '/api/i18n/languages'), ('GET', '/api/i18n/phrases'), ('GET', '/api/i18n/ui'),
     ('GET', '/api/security/owner-mfa/status'), ('POST', '/api/sentinel/desbloquear'),
+    ('GET', '/api/sentinel/sesion'), ('GET', '/api/health/listo'),
+})
+# Con la sesión bloqueada (y llave válida) sólo esto sigue disponible: volver a bloquear y la parada de emergencia.
+CON_SESION_BLOQUEADA = frozenset({
+    ('POST', '/api/sentinel/bloquear'),
+    ('GET', '/api/asistente/emergencia'), ('POST', '/api/asistente/emergencia'),
 })
 LOCALES = frozenset({'127.0.0.1', '::1', 'localhost', 'testclient'})
 # Rutas que piden sólo la llave (son las que crean la sesión de 2FA).
@@ -94,6 +104,9 @@ def verificar(request: Request) -> tuple[bool, int, str]:
         from . import owner_mfa
         if owner_mfa.required() and not owner_mfa.valid(request.headers.get('X-SKY-SESSION')):
             return False, 401, 'falta la sesión de segundo factor'
+        from neural_core.sentinel_identidad import sesion_bloqueada
+        if (metodo, ruta) not in CON_SESION_BLOQUEADA and sesion_bloqueada():
+            return False, 423, 'sesión bloqueada: falta el PIN'
         return True, 200, ''
     except Exception:
         return False, 503, 'verificación de seguridad no disponible'
@@ -114,9 +127,12 @@ def install(app) -> None:
                                     headers={'Retry-After': '300'})
             _FALLOS[ip].append(ahora)
         _registrar_rechazo(request, request.url.path, codigo, motivo)
-        textos = {401: 'Credenciales inválidas', 403: 'SKY sólo acepta conexiones de este equipo.', 503: 'Seguridad no disponible'}
-        return JSONResponse({'detail': textos.get(codigo, 'Acceso denegado')},
-                            status_code=codigo, headers={'WWW-Authenticate': 'APIKey'} if codigo == 401 else {})
+        textos = {401: 'Credenciales inválidas', 403: 'SKY sólo acepta conexiones de este equipo.',
+                  423: 'SKY está bloqueada. Decí o escribí tu PIN.', 503: 'Seguridad no disponible'}
+        cuerpo = {'detail': textos.get(codigo, 'Acceso denegado')}
+        if codigo == 423:
+            cuerpo['bloqueada'] = True
+        return JSONResponse(cuerpo, status_code=codigo, headers={'WWW-Authenticate': 'APIKey'} if codigo == 401 else {})
 
 
 def exigir_pin(request: Request, que: str) -> None:

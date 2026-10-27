@@ -75,6 +75,10 @@ INTEGRACIONES = [
     ('n8n', 'n8n controlado', 'api', ['SKY_N8N_URL', 'SKY_N8N_API_KEY'],
      'Consultar flujos y ejecuciones sin datos confidenciales',
      'Para disparar un flujo se necesita PIN, allowlist y aprobación explícita.', 'https://docs.n8n.io/api/'),
+    ('hermes-agent', 'Hermes Agent (consultor)', 'local', ['SKY_HERMES_ENABLED', 'SKY_HERMES_KEY'],
+     'Investigar, analizar y planificar a pedido («SKY, preguntale a Hermes…»)',
+     'Corre aparte con hermes gateway; SKY sólo le pregunta y se niega si tiene herramientas que actúan sobre tu equipo.',
+     'docs/guias/SKY_HERMES.md'),
     ('mcp', 'Servidores MCP', 'mcp', [], 'Conectar herramientas a clientes de IA',
      'SKY no ejecuta servidores MCP de terceros: para eso está el Skill Builder con pruebas aisladas y tu aprobación.', 'https://modelcontextprotocol.io'),
 ]
@@ -93,6 +97,9 @@ def _estado_local(iid: str) -> bool:
             return bool(capabilities().get('available'))
         if iid == 'copilot':
             return bool(shutil.which('code'))
+        if iid == 'hermes-agent':
+            from .sky_hermes import requisitos
+            return not requisitos(probar_red=False)   # configurado; la conexión se comprueba al consultar
         if iid == 'agente':
             from .sky_asistente_personal import token_agente_local
             return len(token_agente_local()) >= 32

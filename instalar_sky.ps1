@@ -166,6 +166,16 @@ if ($Siempre) {
     Ok "SKY arranca sola al iniciar sesion y reinicia sus servicios si se caen"
 }
 
+# ------------------------------------------------------------------ 5c. PIN del dueno (v12.6)
+Paso "PIN del dueno"
+& $venvPy sky_pin.py estado
+$estadoPin = & $venvPy -c "from neural_core.sentinel_identidad import pin_configurado; print(int(pin_configurado()))"
+if ($estadoPin -ne "1") {
+    $r = Read-Host "   Configurar ahora el PIN que SKY te va a pedir al iniciar? (S/n)"
+    if ($r -ne "n" -and $r -ne "N") { & $venvPy sky_pin.py configurar }
+    else { Aviso "Sin PIN cualquiera frente a tu PC puede usar SKY. Configuralo luego: SKY_INICIAR.bat -> P" }
+} else { Ok "PIN configurado (se conserva)" }
+
 # ------------------------------------------------------------------ 6. Diagnostico
 Paso "Diagnostico final"
 & $venvPy sky_diagnostico.py

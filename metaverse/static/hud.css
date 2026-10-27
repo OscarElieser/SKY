@@ -190,6 +190,7 @@ button.chip.on{color:var(--amber);border-color:rgba(255,176,32,.6)}
 .kpi-ok{color:var(--green);font-size:12px}
 .kpi-prob{border-left:3px solid var(--amber);padding:6px 10px;margin:6px 0;background:rgba(255,176,32,.06)}
 .kpi-prob.bad{border-color:var(--red);background:rgba(255,51,102,.07)}
+.kpi-prob.ok{border-color:var(--green);background:rgba(0,255,170,.05)}.kpi-prob.neutro{border-color:var(--line2);background:rgba(0,229,255,.03)}
 .kpi-prob b{color:var(--white)}.kpi-prob small{display:block;color:var(--muted);margin-top:3px}
 .kpi-tab{width:100%;border-collapse:collapse;font-size:12px}
 .kpi-tab th{text-align:left;color:var(--muted);font-weight:500;font-size:11px;padding:4px 6px;border-bottom:1px solid var(--line2)}

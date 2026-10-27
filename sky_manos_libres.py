@@ -6,6 +6,10 @@ python sky_manos_libres.py --model ./modelos/vosk-model-es
 
 La voz sólo ejecuta al instante las capacidades que el dueño marcó como automáticas
 (agente_dispositivo.py --auto ...); el resto queda pendiente de confirmación en /asistente.
+
+v12.6: con PIN configurado, la escucha arranca preguntando «¿Cuál es tu PIN?» y no obedece nada (salvo la parada
+de emergencia) hasta que la sesión del dueño se abra. El PIN se reconoce localmente y nunca se imprime ni se guarda.
+«SKY, bloquéate» vuelve a bloquear todo SKY. Cada etapa del turno queda medida en los KPIs de voz.
 """
 from __future__ import annotations
 import argparse, json, os, queue, sys, re, time
@@ -13,11 +17,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent/'.env')
 from neural_core.dispositivos import norm
-from neural_core.sky_asistente_personal import interpretar as interpret_command, ejecutar_local_si_autorizado
+from neural_core.sky_asistente_personal import (interpretar as interpret_command, ejecutar_local_si_autorizado,
+                                               describir_resultado)
+from neural_core.sentinel_identidad import pin_configurado as _pin_configurado
 from neural_core.voz_inbox import add_inbox
 from neural_core.assistant import responder
 from neural_core.providers import choose_provider
 from neural_core.sky_voice_queue import VoiceWorkQueue, wake_during_speech, parada_emergencia_voz
+from neural_core.sky_voz_sesion import PuertaVoz
+from neural_core.sky_archivo_seguro import actualizar_json
+from neural_core import sky_metricas
 
 WAKE_WORDS=('sky','esquai','es kay','es cai','escai')
 
@@ -37,6 +46,20 @@ DIRECTED_START = re.compile(
 
 def is_directed_speech(text: str) -> bool:
     return bool(DIRECTED_START.match(norm(str(text or '')).strip()))
+
+
+def _privado() -> bool:
+    """Sin consola (inicio con Windows → registros en archivo) no se escriben las frases reconocidas."""
+    if os.getenv('SKY_VOZ_DEPURAR', '0') == '1':
+        return False
+    try:
+        return not (sys.stdout is not None and sys.stdout.isatty())
+    except (AttributeError, ValueError):
+        return True
+
+
+def _medir(nombre: str, inicio: float, ok: bool = True, detalle: str = '') -> None:
+    sky_metricas.registrar('voz', nombre, ok, (time.perf_counter() - inicio) * 1000, origen='manos_libres', detalle=detalle)
 
 
 def text_after_wake(text):
@@ -68,13 +91,18 @@ def main():
         args.no_wake_word or os.getenv('SKY_VOICE_ALWAYS_LISTEN', '0').lower()
         in ('1', 'true', 'yes'))
     wordless_active = allow_wordless
+    # v12.6: códigos de salida que el supervisor entiende: 2 = falta configuración (no reintentar en bucle),
+    # 3 = no hay micrófono (reintentar cada 5 minutos).
     if not args.model or not Path(args.model).is_dir():
-        sys.exit('No existe el modelo Vosk de español. Descargá uno y pasá --model carpeta.')
+        print('NO_CONFIGURADO: no existe el modelo Vosk de español. Descargá uno y pasá --model carpeta.', file=sys.stderr)
+        sys.exit(2)
     try:
         import sounddevice as sd
         from vosk import Model, KaldiRecognizer
-    except ImportError:
-        sys.exit('Instalá dependencias opcionales: pip install vosk sounddevice pyttsx3')
+    except (ImportError, OSError) as exc:
+        print(f'NO_CONFIGURADO: falta una dependencia de voz ({type(exc).__name__}: {str(exc)[:120]}). '
+              'Instalá: pip install vosk sounddevice pyttsx3', file=sys.stderr)
+        sys.exit(2)
     audio=queue.Queue(maxsize=50)
     voice_runtime = None
     last_audio = 0.0
@@ -121,7 +149,12 @@ def main():
         st = sd.RawInputStream(samplerate=args.rate, blocksize=8000, dtype='int16', channels=1, callback=callback)
         return st, rec
 
-    stream, recognizer = create_stream_and_recognizer()
+    try:
+        stream, recognizer = create_stream_and_recognizer()
+    except Exception as exc:
+        print(f'SIN_MICROFONO: no pude abrir ningún micrófono ({type(exc).__name__}: {str(exc)[:160]}). '
+              'Conectalo o habilitalo en Configuración > Privacidad > Micrófono.', file=sys.stderr)
+        sys.exit(3)
     if allow_wordless:
         print('SKY: escucha natural activada por el dueño; acepto órdenes directas sin decir “SKY”.')
         print('Para pausar: “pausa la conversación”; para volver: “reanuda la conversación”.')
@@ -134,6 +167,10 @@ def main():
     def process_command(command):
         """Ejecutado por un solo trabajador; nunca bloquea el micrófono."""
         nonlocal history
+        if puerta.bloqueada():   # la sesión pudo bloquearse mientras la orden esperaba en la cola
+            voice_runtime.say('SKY se bloqueó antes de ejecutar la orden. ¿Cuál es tu PIN?')
+            return
+        turno = time.perf_counter()
         # Acciones del HUD: no se ejecutan en el navegador de Windows.
         from neural_core.sky_hud_window_requests import parse_window_request, publish as publish_window
         ventana_hud = parse_window_request(command)
@@ -161,43 +198,71 @@ def main():
                 voice_runtime.say("No pude preparar ese módulo. Revisá el registro de SKY.")
             return
         coordinador_voz.set_state(VoiceState.PROCESANDO)
+        from neural_core import sky_hermes
+        if sky_hermes._ORDEN.match(sky_hermes._norm(command)):
+            # v12.6: Hermes como consultor; su respuesta es sólo texto y nunca se ejecuta.
+            voice_runtime.say('Le pregunto a Hermes; puede tardar un poco.')
+            t = time.perf_counter()
+            r = sky_hermes.interpretar(command)
+            _medir('ml_modelo', t, bool(r), 'hermes')
+            if r and not voice_runtime.current_turn_cancelled:
+                coordinador_voz.record_turn(command, r['mensaje'])
+                voice_runtime.say(r['mensaje'])
+            _medir('ml_turno', turno, bool(r), 'hermes')
+            return
+        t = time.perf_counter()
         intent = interpret_command(command)
+        _medir('ml_interpretar', t)
         if voice_runtime.current_turn_cancelled:
             return
         if intent:
             coordinador_voz.set_state(VoiceState.EJECUTANDO_HERRAMIENTA)
             hecho = None
+            t = time.perf_counter()
             if args.execute_safe:
                 try:
                     hecho = ejecutar_local_si_autorizado(intent)
                 except Exception as exc:
                     hecho = {'ok': False, 'message': 'No se pudo ejecutar la orden. Revisá el agente local.'}
-                    print('Detalle:', str(exc))
+                    print('Detalle:', type(exc).__name__, str(exc)[:160])
+            estado, frase = describir_resultado(hecho)
+            _medir('ml_ejecutar', t, estado in ('verificada', 'enviada', 'pendiente'), estado)
             if voice_runtime.current_turn_cancelled:
                 return
-            if hecho is not None:
-                mensaje = hecho.get('message') or (
-                    'Listo.' if hecho.get('ok', True) else 'No se pudo completar la orden.')
-            else:
+            if hecho is None:
                 add_inbox(command, intent)
                 mensaje = 'Preparé la orden: ' + intent.get('description', 'acción') + '. Confirmala en el panel de SKY.'
+            else:
+                # v12.6: «Listo» sólo si el agente comprobó el efecto; si no, se dice que se envió sin comprobar.
+                mensaje = frase
             coordinador_voz.record_turn(command, mensaje)
+            t = time.perf_counter()
             voice_runtime.say(mensaje)
+            _medir('ml_tts', t)
+            _medir('ml_turno', turno, estado != 'fallida', 'accion:' + estado)
             return
         try:
+            t = time.perf_counter()
             provider, modelo = choose_provider(os.getenv('SKY_VOICE_PROVIDER', 'auto'), 'SKY voz')
             answer, _ = responder(command, 'SKY voz local', history, modelo, proveedor=provider)
+            _medir('ml_modelo', t, True, str(provider)[:40])
             if voice_runtime.current_turn_cancelled:
                 return
             history.extend([{'role': 'user', 'content': command}, {'role': 'assistant', 'content': answer}])
             history = history[-10:]
             coordinador_voz.record_turn(command, answer)
+            t = time.perf_counter()
             voice_runtime.say(answer)
+            _medir('ml_tts', t)
+            _medir('ml_turno', turno, True, 'conversacion')
         except Exception as exc:
-            print('Detalle:', str(exc))
+            print('Detalle:', type(exc).__name__, str(exc)[:160])
+            _medir('ml_modelo', t, False, type(exc).__name__)
+            _medir('ml_turno', turno, False, 'conversacion')
             if not voice_runtime.current_turn_cancelled:
                 voice_runtime.say('No pude completar esta consulta. Revisá Ollama o el proveedor de IA.')
 
+    puerta = PuertaVoz()
     voice_runtime = VoiceWorkQueue(
         process_command,
         rate_factory=lambda: int(180 * coordinador_voz.get_speech_rate()),
@@ -211,15 +276,17 @@ def main():
             print('SKY: cola de voz llena; omitida notificación:', str(message)[:100])
 
     def sync_state(data):
+        # v12.6: escritura atómica con candado entre procesos (antes un lector podía ver JSON a medio escribir y
+        # creer que la escucha estaba apagada). Nunca se guardan frases: sólo marcas de tiempo y estados.
         try:
             st_path = Path(__file__).resolve().parent / 'local_data' / 'sky_session_state.json'
-            st_path.parent.mkdir(parents=True, exist_ok=True)
-            existing = {}
-            if st_path.exists():
-                try: existing = json.loads(st_path.read_text(encoding='utf-8'))
-                except Exception: pass
-            existing.update(data)
-            st_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8')
+            def mezclar(existente):
+                existente = existente if isinstance(existente, dict) else {}
+                existente.pop('last_command', None)
+                existente.update(data)
+                existente['pid'] = os.getpid()
+                return existente
+            actualizar_json(st_path, mezclar, {}, indent=2)
         except Exception:
             pass
 
@@ -228,6 +295,14 @@ def main():
     sync_state({'hands_free_listening': True, 'wordless_owner_enabled': allow_wordless,
                 'wordless_active': wordless_active, 'last_audio': last_audio,
                 'last_seen': time.time(), 'status': 'ready', 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
+
+    saludo = puerta.saludo_inicial()
+    if saludo:
+        say(saludo)
+    elif not puerta.bloqueada() and not _pin_configurado():
+        print('AVISO: SKY no tiene PIN. Cualquiera cerca del micrófono puede darle órdenes. '
+              'Configuralo con: python sky_pin.py configurar')
+    sync_state({'sesion_bloqueada': puerta.bloqueada()})
 
     ultimo_latido = time.monotonic()
     ultima_transicion_tts = voice_runtime.speech_epoch
@@ -251,7 +326,7 @@ def main():
                         except queue.Empty: break
                     packet = None
                 if time.monotonic() - ultimo_latido >= 5:
-                    sync_state({'last_seen': time.time(), 'last_audio': last_audio,
+                    sync_state({'last_seen': time.time(), 'last_audio': last_audio, 'sesion_bloqueada': puerta.bloqueada(),
                                 'hands_free_listening': True, 'wordless_active': wordless_active,
                                 'status': 'paused' if coordinador_voz.get_state() == VoiceState.PAUSADO else 'ready'})
                     ultimo_latido = time.monotonic()
@@ -287,6 +362,19 @@ def main():
                     if wake_during_speech(result):
                         voice_runtime.interrupt_speech()
                         print('SKY: interrumpiendo voz; repetí la orden cuando termine.')
+                    continue
+
+                # v12.6 — sesión del dueño: bloqueada, sólo se procesa el PIN (localmente y sin registrar nada).
+                control = puerta.evaluar(result, text_after_wake(result))
+                if control is not None:
+                    result = None
+                    recognizer.Reset()
+                    if control['desbloqueada']:
+                        active_until = time.time() + SESSION_TIMEOUT
+                        coordinador_voz.activate_session()
+                    sync_state({'sesion_bloqueada': control['bloqueada'], 'last_wake': time.time()})
+                    if control['decir']:
+                        say(control['decir'])
                     continue
 
                 # Verificar si el usuario está en modo C (texto) y no solicitó reactivar voz
@@ -341,8 +429,16 @@ def main():
                     say(msg)
                     continue
 
-                print('Escuchado:', command)
-                sync_state({'last_command': command, 'timestamp': now, 'coordinator_state': VoiceState.PROCESANDO.value})
+                bloqueo = puerta.bloquear_por_voz(command)
+                if bloqueo:
+                    voice_runtime.cancel_pending()
+                    active_until = 0.0
+                    sync_state({'sesion_bloqueada': puerta.bloqueada(), 'session_active': False})
+                    say(bloqueo['decir'])
+                    continue
+
+                print('Escuchado:', f'{len(command)} caracteres' if _privado() else command)
+                sync_state({'last_command_at': now, 'timestamp': now, 'coordinator_state': VoiceState.PROCESANDO.value})
                 if not voice_runtime.submit(command):
                     # Nunca ejecutar una acción concurrentemente ni perder el límite
                     # de seguridad de la cola: se solicita repetir cuando libere.
