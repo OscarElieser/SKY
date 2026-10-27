@@ -327,6 +327,13 @@ def contexto_aprendido(texto: str) -> str:
                           '\n'.join(f"[{d['nombre'][:80]}] {d['contenido'][:700]}" for d in docs))
     except Exception:
         pass
+    try:
+        from .sky_core_learning import contexto_para_cerebro
+        operacional = contexto_para_cerebro(texto)
+        if operacional:
+            partes.append(operacional)
+    except Exception:
+        pass  # Una auditoría no puede impedir responder al usuario.
     return '\n\n'.join(partes)[:5500]
 
 
