@@ -445,6 +445,35 @@ def interpretar(texto: str) -> dict | None:
             return _resp(explicar_estado(), aprendizaje='nucleo')
         except Exception:
             return {'tipo': 'error', 'mensaje': 'No pude leer la evolución del núcleo en este momento.'}
+    # Núcleo conectado a fuentes públicas, con consulta explícita y permisos existentes.
+    if re.fullmatch(r'(?:estado del (?:aprendizaje web|conocimiento web|nucleo en internet)|'
+                    r'como va tu aprendizaje en internet)', t):
+        try:
+            from .sky_web_learning import status
+            web = status()
+            return _resp(f"Aprendizaje web: {'activo' if web['enabled'] else 'desactivado'}. "
+                         f"Tengo {web['stored']} titulares públicos con fecha y fuente, "
+                         f"de {len(web['topics'])} temas configurados. "
+                         "Son referencias no verificadas, no entrenamiento del modelo.",
+                         aprendizaje='web_estado', web=web)
+        except Exception:
+            return {'tipo': 'error', 'mensaje': 'No pude consultar el aprendizaje web.'}
+    if re.fullmatch(r'(?:sincroniza|actualiza|alimenta)(?: el| tu)? '
+                    r'(?:nucleo|cerebro|aprendizaje)(?: de sky)? '
+                    r'(?:con |desde )?(?:internet|la web)', t):
+        try:
+            from .sky_web_learning import sync
+            result = sync()
+            if not result['enabled']:
+                return _resp('La conexión para aprendizaje está desactivada por la configuración local.',
+                             aprendizaje='web_desactivado')
+            return _resp(f"Revisé {result['attempted']} temas públicos; "
+                         f"incorporé {result['new']} referencias nuevas; "
+                         f"consultas fallidas: {result['errors']}. "
+                         "Los titulares no se convierten en instrucciones ni hechos comprobados.",
+                         aprendizaje='web_sync', web=result)
+        except Exception:
+            return {'tipo': 'error', 'mensaje': 'No pude sincronizar el aprendizaje web.'}
     suave = ' '.join(re.sub(r'[^\w\s,]', ' ', unicodedata.normalize('NFD', str(texto).lower())
                              .encode('ascii', 'ignore').decode()).split())
     suave = re.sub(r'^(?:oye |hey |ok )?sky[\s,]+', '', suave)
