@@ -42,7 +42,7 @@ def test_youtube_public_result_parser_rejects_missing_or_malformed_data():
 def test_youtube_api_is_preferred_and_verifies_embeddable():
     api = [{"id": "abcdefghijk", "title": "Reik - Te fuiste de aquí",
             "url": "https://www.youtube.com/watch?v=abcdefghijk"}]
-    with patch("neural_core.multimedia._search_youtube_api", return_value=api) as official, \\
+    with patch("neural_core.multimedia._search_youtube_api", return_value=api) as official, \
          patch.object(yt, "buscar_web_publica") as public:
         result = yt.buscar_videos("Reik Te fuiste de aquí", clave="fake-test-key")
     assert result["verificado"] is True
@@ -71,7 +71,7 @@ def test_youtube_offline_reports_error_instead_of_fake_video():
 
 
 def test_fallback_when_api_fails():
-    with patch("neural_core.multimedia._search_youtube_api", side_effect=TimeoutError), \\
+    with patch("neural_core.multimedia._search_youtube_api", side_effect=TimeoutError), \
          patch.object(yt, "buscar_web_publica", return_value=[
              {"id": "abcdefghijk", "title": "Reik - Te fuiste de aquí"}]):
         result = yt.buscar_videos("Reik", clave="test-key")
