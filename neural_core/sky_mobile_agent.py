@@ -90,6 +90,17 @@ def _authorized(conn: sqlite3.Connection, device_id: str, token: str) -> bool:
     return bool(found and not found[1] and hmac.compare_digest(found[0], _hash(token)))
 
 
+def device_status(device_id: str, token: str) -> dict:
+    """Read-only proof of an active, non-revoked Android token.
+
+    Does not poll or claim commands and never grants owner/API privileges.
+    """
+    with _db() as conn:
+        if not _authorized(conn, device_id, token):
+            raise PermissionError("Dispositivo no autorizado")
+    return {"authorized": True}
+
+
 def devices() -> list[dict]:
     with _db() as conn:
         rows = conn.execute("SELECT id,label,created FROM mobile_devices WHERE revoked=0 ORDER BY created").fetchall()
