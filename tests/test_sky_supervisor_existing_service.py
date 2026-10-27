@@ -58,5 +58,32 @@ class ExistingSKYProcessSafetyTests(unittest.TestCase):
         self.assertEqual(voz.primera_falla, 0.0)
         self.assertEqual(voz.fallas_sonda, 0)
 
+    def test_voice_watchdog_still_recovers_when_other_pid_has_no_heartbeat(self):
+        """A dead or stale alternate voice state must not disable recovery."""
+        import time
+        from types import SimpleNamespace
+
+        supervisor = launcher.SkySupervisor(with_voice=False, open_browser=False)
+        supervisor.intervalo_sonda = 0
+        voz = launcher.Servicio(
+            "voice", [], sonda=lambda: (False, "todavía no informó su estado"),
+            colgado_tras=90,
+        )
+        voz.proc = SimpleNamespace(pid=1111, poll=lambda: None)
+        voz.estado = "activo"
+        voz.primera_falla = time.time() - 120
+        supervisor.servicios["voice"] = voz
+        with patch.object(launcher, "_pid_escucha_vivo", return_value=2222), \
+             patch.object(launcher, "sonda_voz", return_value=(False, "sin latido")), \
+             patch.object(launcher, "_registrar_reinicio"), \
+             patch.object(supervisor, "_terminar") as terminate:
+            supervisor.revisar()
+            terminate.assert_called_once_with(voz)
+        self.assertIsNone(voz.proc)
+        self.assertEqual(voz.estado, "error")
+        self.assertIn("colgado", voz.causa)
+        self.assertGreater(voz.proximo_intento, time.time())
+
+
 if __name__ == '__main__':
     unittest.main()
