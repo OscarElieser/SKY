@@ -82,8 +82,10 @@ def interpretar(texto: str) -> dict | None:
     if ventana and ventana.get('kind') == 'youtube':
         consulta = str(ventana.get('query') or '').strip()
         if consulta:
-            return _p('play_media', {'query': consulta, 'service': 'youtube'},
-                      f'Reproducir "{consulta}" dentro de SKY (YouTube oficial)')
+            return _p('play_media', {
+                'query': consulta, 'service': 'youtube',
+                'mode': ventana.get('mode', 'normal')
+            }, f'Reproducir "{consulta}" dentro de SKY (YouTube oficial)')
     propio = _interpretar_propio(texto)
     if propio and propio['action'] == 'list_path':
         return propio
