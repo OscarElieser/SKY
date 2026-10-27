@@ -143,105 +143,47 @@ def _search_youtube_api(query: str, api_key: str) -> list[dict]:
 
 
 def resolve_youtube_video(busqueda: str) -> dict:
-    """Resuelve la consulta a un video real de YouTube verificando que admita incrustación externa."""
+    """Compatibilidad: resolver por Data API, nunca scraping ni videos sustitutos.
+
+    El catálogo histórico permanece disponible como datos legados, pero no
+    demuestra disponibilidad actual ni permiso para incrustar una canción.
+    """
     import os
-    import re
-    busqueda_limpia = (busqueda or "").strip()
-    norm_q = busqueda_limpia.lower()
 
-    if not busqueda_limpia:
-        return {
-            "url": "https://www.youtube.com",
-            "video_id": "vbvyNnw8Qjg",
-            "embed_url": "https://www.youtube-nocookie.com/embed/vbvyNnw8Qjg?autoplay=1&enablejsapi=1&playsinline=1",
-            "titulo": "Queen – Bohemian Rhapsody (Live Aid 1985)",
-            "candidates": VERIFIED_EMBEDDABLE_CATALOG["queen"],
-            "embeddable": True
-        }
-
-    # 1. Intentar YouTube Data API v3 si existe clave de API
-    api_key = os.getenv("YOUTUBE_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if api_key:
-        try:
-            api_candidates = _search_youtube_api(busqueda_limpia, api_key)
-            if api_candidates:
-                primero = api_candidates[0]
-                return {
-                    "url": primero["url"],
-                    "video_id": primero["id"],
-                    "embed_url": f"https://www.youtube-nocookie.com/embed/{primero['id']}?autoplay=1&enablejsapi=1&playsinline=1",
-                    "titulo": primero["title"],
-                    "candidates": api_candidates,
-                    "embeddable": True,
-                    "source": "youtube_api_v3"
-                }
-        except Exception:
-            pass
-
-    # 2. Catálogo verificado de incrustación garantizada para consultas frecuentes
-    for key, items in VERIFIED_EMBEDDABLE_CATALOG.items():
-        if key in norm_q or norm_q in key:
-            primero = items[0]
-            return {
-                "url": f"https://www.youtube.com/watch?v={primero['id']}",
-                "video_id": primero["id"],
-                "embed_url": f"https://www.youtube-nocookie.com/embed/{primero['id']}?autoplay=1&enablejsapi=1&playsinline=1",
-                "titulo": primero["title"],
-                "candidates": items,
-                "embeddable": True,
-                "source": "verified_catalog"
-            }
-
-    # 3. Búsqueda web real en YouTube extrayendo candidatos y filtrando bloqueados
-    query_codificada = parse.quote_plus(busqueda_limpia)
-    search_url = f"https://www.youtube.com/results?search_query={query_codificada}"
-    candidates = []
-
-    try:
-        req = request.Request(search_url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        })
-        with request.urlopen(req, timeout=5) as r:
-            html = r.read(450_000).decode("utf-8", errors="ignore")
-            # Extraer IDs de videos de la página de resultados
-            found_ids = []
-            for m in re.finditer(r'/watch\?v=([a-zA-Z0-9_-]{11})', html):
-                vid = m.group(1)
-                if vid not in found_ids and vid not in KNOWN_EMBEDDING_BLOCKED:
-                    found_ids.append(vid)
-
-            for vid in found_ids[:6]:
-                candidates.append({
-                    "id": vid,
-                    "title": f"{busqueda_limpia} (Opción {len(candidates)+1})",
-                    "embeddable": True,
-                    "url": f"https://www.youtube.com/watch?v={vid}"
-                })
-    except Exception:
-        pass
-
-    if candidates:
-        primero = candidates[0]
-        return {
-            "url": primero["url"],
-            "video_id": primero["id"],
-            "embed_url": f"https://www.youtube-nocookie.com/embed/{primero['id']}?autoplay=1&enablejsapi=1&playsinline=1",
-            "titulo": primero["title"],
-            "candidates": candidates,
-            "embeddable": True,
-            "source": "scraper_embeddable"
-        }
-
-    # Fallback predeterminado seguro y con incrustación garantizada
-    default_vid = "vbvyNnw8Qjg"
-    return {
-        "url": f"https://www.youtube.com/watch?v={default_vid}",
-        "video_id": default_vid,
-        "embed_url": f"https://www.youtube-nocookie.com/embed/{default_vid}?autoplay=1&enablejsapi=1&playsinline=1",
-        "titulo": f"{busqueda_limpia} (Queen en Vivo)",
-        "candidates": VERIFIED_EMBEDDABLE_CATALOG["queen"],
-        "embeddable": True,
-        "source": "default_embeddable"
+    q = str(busqueda or "").strip()[:120]
+    url_busqueda = "https://www.youtube.com/results?search_query=" + parse.quote_plus(q)
+    vacio = {
+        "url": url_busqueda,
+        "video_id": "",
+        "embed_url": "",
+        "titulo": q,
+        "candidates": [],
+        "embeddable": False,
+        "source": "youtube_api_required",
+        "motivo": "Para buscar videos desde SKY configurá YOUTUBE_API_KEY. "
+                  "Usá YouTube oficial si no permite incrustación.",
     }
-
-
+    if not q:
+        return {**vacio, "motivo": "Indicá el nombre del video o artista."}
+    api_key = os.getenv("YOUTUBE_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        return vacio
+    try:
+        encontrados = _search_youtube_api(q, api_key)
+    except Exception:
+        return {**vacio, "source": "youtube_api_error",
+                "motivo": "No respondió la YouTube Data API. Revisá cuota, red y clave."}
+    if not encontrados:
+        return {**vacio, "source": "youtube_no_embed",
+                "motivo": "Sin videos públicos incrustables autorizados en la región configurada."}
+    primero = encontrados[0]
+    vid = primero["id"]
+    return {
+        "url": primero["url"],
+        "video_id": vid,
+        "embed_url": f"https://www.youtube.com/embed/{vid}?playsinline=1&enablejsapi=1",
+        "titulo": primero["title"],
+        "candidates": encontrados,
+        "embeddable": True,
+        "source": "youtube_api_v3",
+    }
