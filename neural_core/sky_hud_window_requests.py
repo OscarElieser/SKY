@@ -69,10 +69,10 @@ def _intencion_youtube(frase: str, mode: str) -> dict | None:
     # Comprobar ANTES de quitar «la canción»: una canción titulada «Alarma»
     # sigue siendo una solicitud de YouTube cuando se pide explícitamente.
     if re.match(
-        r"^(?:(?:la|el|las|los|una|un|unas|unos)\\s+)?"
+        r"^(?:(?:la|el|las|los|una|un|unas|unos)\s+)?"
         r"(?:alarmas?|recordatorios?|temporizadores?|cronometros?|"
         r"despertadores?|volumen|ajustes|configuracion|notificaciones?|"
-        r"calendario|citas|reuniones)\\b", resto
+        r"calendario|citas|reuniones)\b", resto
     ):
         return None
     # Consultas genéricas de búsqueda sólo van a YouTube con contexto explícito.
