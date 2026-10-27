@@ -253,6 +253,7 @@ class MainActivity : Activity() {
                 val answer = reply.optString("respuesta", "SKY no devolvió texto.")
                 chatHistory.put(JSONObject().put("role", "user").put("content", message))
                 chatHistory.put(JSONObject().put("role", "assistant").put("content", answer.take(2000)))
+                while (chatHistory.length() > 8) chatHistory.remove(0)
                 runOnUiThread {
                     chatInput.setText("")
                     chatOutput.text = "SKY: " + answer + "\nMotor: " +
