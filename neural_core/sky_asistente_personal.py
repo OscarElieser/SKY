@@ -74,6 +74,16 @@ def interpretar(texto: str) -> dict | None:
     word = word_direct(texto)
     if word:
         return word
+    # Chat y voz comparten el mismo intérprete de solicitudes de YouTube.
+    # Sólo interpretamos órdenes explícitas de reproducción: no hay navegación
+    # automática ni se sobreescriben órdenes de Word, Spotify o Windows.
+    from .sky_hud_window_requests import parse_window_request
+    ventana = parse_window_request(texto)
+    if ventana and ventana.get('kind') == 'youtube':
+        consulta = str(ventana.get('query') or '').strip()
+        if consulta:
+            return _p('play_media', {'query': consulta, 'service': 'youtube'},
+                      f'Reproducir "{consulta}" dentro de SKY (YouTube oficial)')
     propio = _interpretar_propio(texto)
     if propio and propio['action'] == 'list_path':
         return propio
