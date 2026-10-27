@@ -474,6 +474,35 @@ def interpretar(texto: str) -> dict | None:
                          aprendizaje='web_sync', web=result)
         except Exception:
             return {'tipo': 'error', 'mensaje': 'No pude sincronizar el aprendizaje web.'}
+    if re.fullmatch(
+        r'(?:actualiza|sincroniza|alimenta)(?: tu| el)? '
+        r'(?:nucleo |cerebro )?(?:con )?'
+        r'(?:avances|novedades|actualizaciones)(?: de)? programacion', t
+    ):
+        try:
+            from .sky_programming_learning import sync
+            r = sync()
+            return _resp(
+                ('La alimentación externa está desactivada por la configuración.'
+                 if not r['enabled'] else
+                 f"Consulté {r['attempted']} proyectos oficiales; "
+                 f"guardé {r['new']} versiones nuevas. Fallos: {r['errors']}. "
+                 "Ninguna versión fue instalada."),
+                aprendizaje='programacion_sync', programacion=r)
+        except Exception:
+            return {'tipo': 'error', 'mensaje': 'No pude actualizar los avances de programación.'}
+    if re.fullmatch(
+        r'(?:estado (?:de|del) (?:aprendizaje de )?programacion|'
+        r'(?:ultimos|ultimas) (?:avances|novedades|versiones) (?:de )?programacion)', t
+    ):
+        try:
+            from .sky_programming_learning import status, describe
+            estado = status()
+            return _resp(f"Vigilo {estado['projects']} proyectos oficiales. "
+                         f"Versiones registradas: {estado['stored']}. "
+                         + describe(4), aprendizaje='programacion_estado')
+        except Exception:
+            return {'tipo': 'error', 'mensaje': 'No pude leer los avances de programación.'}
     suave = ' '.join(re.sub(r'[^\w\s,]', ' ', unicodedata.normalize('NFD', str(texto).lower())
                              .encode('ascii', 'ignore').decode()).split())
     suave = re.sub(r'^(?:oye |hey |ok )?sky[\s,]+', '', suave)
