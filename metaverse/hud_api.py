@@ -30,6 +30,24 @@ from neural_core.sky_asistente_personal import token_agente_local, url_agente_lo
 
 router = APIRouter(prefix='/api/hud', dependencies=[Depends(require_key)])
 VERSION_SKY = '12.5.0'
+# La API puede seguir en ejecución cuando el propietario edita .env.
+# No se envían valores de credenciales al HUD, sólo su disponibilidad.
+YOUTUBE_ENV_FILE = Path(__file__).resolve().parents[1] / '.env'
+
+
+def _youtube_clave() -> str:
+    """Resuelve la clave oficial desde el proceso o el .env local sin exponerla."""
+    clave = str(os.getenv('YOUTUBE_API_KEY') or '').strip()
+    if clave:
+        return clave
+    try:
+        from dotenv import dotenv_values
+        clave = str(dotenv_values(YOUTUBE_ENV_FILE).get('YOUTUBE_API_KEY') or '').strip()
+    except (OSError, UnicodeError, ValueError):
+        return ''
+    return clave
+
+
 
 
 def _credenciales() -> tuple[str, str]:
@@ -90,7 +108,7 @@ def estado():
     return {'version': VERSION_SKY, 'agente': agente, 'ia': ia, 'stt_local': stt,
             'tts_local': sky_tts.disponible(), 'correo': sky_correo.configurado(),
             'casa': {'configurado': casa.configurado()},
-            'youtube_api': bool(os.getenv('YOUTUBE_API_KEY') or os.getenv('GOOGLE_API_KEY'))}
+            'youtube_api': bool(_youtube_clave())}
 
 
 @router.get('/acciones')
@@ -143,7 +161,7 @@ def youtube(q: str):
         return {'embebible': False, 'videos': [], 'busqueda': busqueda, 'origen': 'solo_local',
                 'motivo': 'SKY está en modo solo local y no puede consultar YouTube.'}
     from neural_core.sky_youtube_search import buscar_videos
-    clave = os.getenv('YOUTUBE_API_KEY') or os.getenv('GOOGLE_API_KEY') or ''
+    clave = _youtube_clave()
     resultado = buscar_videos(q, clave=clave)
     videos = [{'id': v['id'],
                'titulo': str(v['title'])[:140],
