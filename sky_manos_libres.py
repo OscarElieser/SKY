@@ -76,8 +76,12 @@ def main():
     model_exists = default_model.is_dir()
     parser=argparse.ArgumentParser(description='Escucha privada con Vosk; activa con “SKY”.')
     parser.add_argument('--model', default=str(default_model) if model_exists else None,
-                        required=not model_exists, help='Carpeta descargada del modelo Vosk de español')
+                        required=False, help='Carpeta descargada del modelo Vosk de español')
     parser.add_argument('--rate',type=int,default=16000)
+    parser.add_argument('--input-device',default=os.getenv('SKY_MICROPHONE_DEVICE',''),
+                        help='Índice o nombre del micrófono; consultá --list-input-devices.')
+    parser.add_argument('--list-input-devices',action='store_true',
+                        help='Lista entradas de audio sin cargar el modelo Vosk.')
     parser.add_argument('--execute-safe',action='store_true',
                         default=os.getenv('SKY_EXECUTE_SAFE', '1') in ('1', 'true', 'yes'),
                         help='Ejecuta solo capacidades automáticas autorizadas por el dueño.')
@@ -87,6 +91,15 @@ def main():
     listen_group.add_argument('--require-wake', action='store_true',
                               help='Exige SKY incluso si la opción de escucha natural está configurada.')
     args=parser.parse_args()
+    if args.list_input_devices:
+        try:
+            import sounddevice as sd
+            from neural_core.sky_audio_devices import input_summary
+            for item in input_summary(sd.query_devices()):
+                print(f"{item['index']}: {item['name']}")
+        except Exception as exc:
+            print('No pude listar micrófonos:', type(exc).__name__)
+        return
     allow_wordless = not args.require_wake and (
         args.no_wake_word or os.getenv('SKY_VOICE_ALWAYS_LISTEN', '0').lower()
         in ('1', 'true', 'yes'))
@@ -114,40 +127,45 @@ def main():
         try: audio.put_nowait((speaking_at_capture, bytes(indata)))
         except queue.Full: pass
     def create_stream_and_recognizer():
-        # Cargar el modelo Vosk sólo una vez, no una vez por dispositivo/rate.
-        vosk_model = Model(args.model)
-        input_devices = [None]
+        # Sólo un modelo Vosk, incluso al probar múltiples tasas de muestreo.
+        from neural_core.sky_audio_devices import candidate_inputs
         try:
-            for idx, d in enumerate(sd.query_devices()):
-                if d.get('max_input_channels', 0) > 0:
-                    input_devices.append(idx)
-        except Exception:
-            pass
-
-        for dev_id in input_devices:
-            dev_sr = None
-            if dev_id is not None:
-                try:
-                    dev_sr = int(sd.query_devices(dev_id).get('default_samplerate', 0))
-                except Exception:
-                    pass
-            rates = [r for r in [args.rate, dev_sr, 48000, 44100, 16000] if r]
+            devices = sd.query_devices()
+            default_input = sd.default.device[0]
+            inputs = candidate_inputs(devices, default_input, args.input_device)
+        except ValueError as exc:
+            print('NO_CONFIGURADO: micrófono seleccionado no disponible: ' + str(exc), file=sys.stderr)
+            sys.exit(3)
+        except Exception as exc:
+            print('Sin entradas de micrófono:', type(exc).__name__, file=sys.stderr)
+            sys.exit(3)
+        if not inputs:
+            print('No hay micrófonos reconocidos.', file=sys.stderr)
+            sys.exit(3)
+        vosk_model = Model(args.model)
+        failures = []
+        for dev_id, name in inputs:
+            try:
+                dev_sr = int(devices[dev_id].get('default_samplerate', 0))
+            except (TypeError, ValueError):
+                dev_sr = 0
+            rates = list(dict.fromkeys(r for r in (args.rate, dev_sr, 48000, 44100, 16000) if r))
             for candidate_rate in rates:
+                st = None
                 try:
-                    st = sd.RawInputStream(device=dev_id, samplerate=candidate_rate, blocksize=8000, dtype='int16', channels=1, callback=callback)
+                    st = sd.RawInputStream(device=dev_id,samplerate=candidate_rate,
+                        blocksize=8000,dtype='int16',channels=1,callback=callback)
                     st.start()
                     rec = KaldiRecognizer(vosk_model, candidate_rate)
-                    return st, rec
-                except Exception:
-                    try:
-                        st.stop()
-                        st.close()
-                    except Exception:
-                        pass
-                    continue
-        rec = KaldiRecognizer(vosk_model, args.rate)
-        st = sd.RawInputStream(samplerate=args.rate, blocksize=8000, dtype='int16', channels=1, callback=callback)
-        return st, rec
+                    print(f'SKY micrófono: {name} (índice {dev_id}, {candidate_rate} Hz)',flush=True)
+                    return st,rec
+                except Exception as exc:
+                    failures.append((dev_id,candidate_rate,type(exc).__name__))
+                    if st is not None:
+                        try: st.close()
+                        except Exception: pass
+        print('No se pudo abrir el micrófono:',failures[:8],file=sys.stderr)
+        sys.exit(3)
 
     try:
         stream, recognizer = create_stream_and_recognizer()
@@ -451,4 +469,14 @@ def main():
         sync_state({'hands_free_listening': False, 'session_active': False, 'status': 'stopped',
                     'wordless_active': False, 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
 
-if __name__=='__main__': main()
+def _start_single_instance() -> None:
+    # Prevenir dos capturas Vosk del mismo micrófono antes de cargar el modelo.
+    from neural_core.sky_voice_single_instance import single_voice_instance
+    with single_voice_instance() as acquired:
+        if not acquired:
+            print('SKY: ya existe una escucha Vosk activa; no abriré otro micrófono.',flush=True)
+            sys.exit(42)
+        main()
+
+
+if __name__=='__main__': _start_single_instance()

@@ -31,6 +31,13 @@ def responder(pregunta, area, historial=None, modelo=None, fuentes_externas=None
         historial = contexto
     if len(pregunta) > 7000:
         raise ValueError('Pregunta demasiado larga (máximo 7000 caracteres)')
+    # El servicio de voz Vosk utiliza este motor directamente. Mantener la
+    # misma búsqueda real que en el HUD para preguntas públicas de actualidad.
+    if not fuentes_externas:
+        from .sky_live_updates import maybe_answer as _live_public
+        actualidad = _live_public(pregunta)
+        if actualidad is not None:
+            return actualidad['mensaje'], []
     from neural_core.sky_languages import normalize, get_preference, script_hint
     selected=normalize(idioma or get_preference())
     script=script_hint(pregunta)['hint']

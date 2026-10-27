@@ -60,6 +60,19 @@ _PRIORIDAD_JARVIS = frozenset({'player_control', 'holographic_window', 'voice_co
 
 def interpretar(texto: str) -> dict | None:
     """Une los dos intérpretes de SKY y devuelve una propuesta de acción, o None si es conversación."""
+    from .sky_hud_intents import panel_chat
+    hud_chat = panel_chat(texto)
+    if hud_chat:
+        return hud_chat
+    from .sky_keyboard_shortcuts import propuesta as atajo_escritorio
+    atajo = atajo_escritorio(texto)
+    if atajo:
+        return atajo
+    # Direct writing is an explicit Word action; do not infer from LLM prose.
+    from .sky_word_editor import propuesta as word_direct
+    word = word_direct(texto)
+    if word:
+        return word
     propio = _interpretar_propio(texto)
     if propio and propio['action'] == 'list_path':
         return propio
@@ -269,6 +282,23 @@ def reglas(texto: str) -> dict | None:
     stop = parada(_norm(texto))   # la parada de emergencia va antes que todo
     if stop:
         return stop
+    # Atajos de teclado peligrosos NO llegan al modelo generativo, y no se
+    # ejecutan como herramientas del reproductor. Siempre piden autorización.
+    from .sky_keyboard_shortcuts import solicitud as atajo_local
+    shortcut = atajo_local(texto)
+    if shortcut:
+        return shortcut
+    from .sky_word_editor import solicitud as word_local
+    word = word_local(texto)
+    if word:
+        return word
+    # HUD commands are local UI actions, not generative conversation.
+    # Keep this deterministic even when Ollama or the provider is unavailable.
+    from .sky_hud_intents import panel_chat
+    hud_chat = panel_chat(texto)
+    if hud_chat:
+        return {'tipo': 'accion', 'propuesta': hud_chat,
+                'mensaje': hud_chat['description']}
     # SKY-SALUDO-INMEDIATO: no cargar Ollama para una bienvenida simple.
     # La parada de emergencia sigue evaluándose antes de este atajo.
     saludo = re.sub(r'[\s,;:.!¡?¿]+', ' ', _norm(texto)).strip()
@@ -319,6 +349,13 @@ def reglas(texto: str) -> dict | None:
     research = sky_research_commands.interpretar(texto)
     if research:
         return research
+    # Preguntas públicas de actualidad: consultar noticias FECHADAS antes
+    # del cerebro local. Evita afirmar que en 2026 no existen resultados
+    # que una consulta online hubiera podido verificar.
+    from .sky_live_updates import maybe_answer as _live_public
+    live_result = _live_public(texto)
+    if live_result is not None:
+        return live_result
     from . import sky_skills, sky_perfil
     try:
         from . import sky_habilidades

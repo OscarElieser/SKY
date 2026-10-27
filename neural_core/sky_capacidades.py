@@ -58,9 +58,9 @@ CAPACIDADES: dict[str, Capacidad] = {c.id: c for c in [
     Capacidad('notify', 'Notificaciones', 'Mostrar avisos en el escritorio', ('notify',), 'bajo'),
     Capacidad('tasks', 'Tareas en segundo plano', 'Preparar presentaciones y documentos mientras seguís trabajando', ('task_action',), 'bajo'),
     Capacidad('files', 'Archivos y carpetas', 'Abrir tus carpetas (Documentos, Descargas… incluso en OneDrive) y documentos; listar y abrir dentro de las carpetas que autorices', ('open_path', 'list_path', 'open_file'), 'medio'),
-    Capacidad('windows', 'Ventanas del escritorio', 'Listar, enfocar, minimizar, restaurar, organizar y cerrar ventanas', ('window_action', 'organize_windows'), 'medio'),
+    Capacidad('windows', 'Ventanas del escritorio', 'Listar, enfocar, minimizar, restaurar, organizar y cerrar ventanas; atajo Ctrl+F4 en Word solo con confirmación', ('window_action', 'organize_windows', 'keyboard_shortcut'), 'medio'),
     Capacidad('notes', 'Notas locales', 'Crear notas, agregarles texto y enviarlas a una papelera recuperable (~/.neuralt/notes)', ('note_create', 'note_append', 'note_trash'), 'medio'),
-    Capacidad('type_text', 'Escribir en la app activa', 'Teclear un texto dictado dentro de la ventana que está al frente', ('type_text',), 'alto'),
+    Capacidad('type_text', 'Escribir en aplicaciones', 'Escritura en la app activa (legado) y en un documento Word abierto por automatización verificada', ('type_text', 'word_write'), 'alto'),
     Capacidad('screenshot', 'Capturas de pantalla', 'Guardar una captura en ~/.neuralt/capturas', ('screenshot',), 'medio'),
     Capacidad('clipboard', 'Portapapeles', 'Leer o escribir texto del portapapeles', ('clipboard_get', 'clipboard_set'), 'alto'),
     Capacidad('lock', 'Bloquear equipo', 'Bloquear la sesión de inmediato', ('lock_screen',), 'bajo'),
@@ -88,8 +88,10 @@ DESCRIPCION_ACCIONES = {
     'media_key': 'Enviar tecla multimedia (reproducir, pista, volumen)',
     'open_file': 'Abrir una carpeta del usuario o un documento',
     'window_action': 'Gestionar ventanas abiertas del escritorio',
+    'keyboard_shortcut': 'Enviar un atajo autorizado a Word en primer plano',
     'organize_windows': 'Organizar las ventanas lado a lado',
     'type_text': 'Escribir texto en la aplicación activa',
+    'word_write': 'Agregar texto y verificarlo en el único documento Word abierto',
     'note_create': 'Crear nota local',
     'note_append': 'Agregar texto a una nota local',
     'note_trash': 'Enviar una nota a la papelera recuperable',
@@ -296,7 +298,7 @@ def levantar_parada() -> bool:
 # Niveles de riesgo (prompt maestro §9): 1 consultar/borradores · 2 modificar o reversible · 3 irreversible/externo.
 NIVEL_1 = frozenset({'status', 'list_path', 'open_url', 'launch_app', 'media_control', 'media_key', 'volume', 'play_media',
                      'notify', 'open_file', 'open_path', 'lock_screen', 'player_control', 'voice_control', 'holographic_window'})
-NIVEL_3 = frozenset({'note_trash', 'social_action'})
+NIVEL_3 = frozenset({'note_trash', 'social_action', 'keyboard_shortcut'})
 NIVELES_TEXTO = {1: 'bajo riesgo', 2: 'riesgo moderado', 3: 'alto riesgo'}
 
 
@@ -312,6 +314,8 @@ def nivel_riesgo(accion: str, params: dict | None = None) -> int:
 
 
 def requiere_confirmacion(accion: str, params: dict, politica: dict) -> bool:
+    if accion == 'word_write':
+        return True  # El dueño confirma cada edición de su documento.
     if nivel_riesgo(accion, params) >= 3:
         return True   # alto riesgo: confirmación expresa por acción, siempre
     return capacidad_para(accion, params) not in politica.get('auto_confirm', [])

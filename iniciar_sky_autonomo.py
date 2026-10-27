@@ -809,6 +809,10 @@ class SkySupervisor:
         elif codigo == SALIDA_SIN_MICROFONO:
             s.estado, s.causa = "error", "no hay micrófono disponible; reintento en 5 minutos"
             s.proximo_intento = time.time() + 300
+        elif s.nombre == "voice" and codigo == 42:
+            # Otro Vosk ya captura el micrófono; conservarlo sin reinicios agresivos.
+            s.estado, s.causa = "degradado", "otra instancia Vosk activa; reintento sin cerrar la existente"
+            s.proximo_intento = time.time() + 30
         else:
             s.estado = "error"
             s.causa = f"terminó con código {codigo}" + (f": {cola}" if cola else "")
