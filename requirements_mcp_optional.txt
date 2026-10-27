@@ -1,3 +1,4 @@
-# Instalación opcional del cliente MCP oficial v2.
-# No instalar automáticamente en el inicio de SKY.
-mcp>=2.0,<3.0
+# Cliente MCP oficial opcional. CrewAI requiere MCP 1.x (>=1.30,<2).
+# El instalador completo permite que pip elija una version compatible.
+# No instalar automaticamente en el inicio de SKY.
+mcp>=1.30,<3
