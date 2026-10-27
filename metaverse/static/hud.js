@@ -1097,8 +1097,8 @@
             results.appendChild(el('p', 'res bad', data.motivo || 'YouTube no devolvió videos para esta búsqueda.'));
           } else {
             results.appendChild(el('p', 's', data.incrustacion_verificada
-              ? 'Resultados de YouTube listos para reproducirse dentro de SKY.'
-              : 'Resultados públicos de YouTube. Algunos videos pueden impedir la reproducción integrada por decisión del propietario.'));
+              ? 'Videos públicos con incrustación permitida según la API oficial; pueden existir restricciones adicionales.'
+              : 'Videos no verificados. La reproducción integrada depende de YouTube.'));
             videos.forEach((video, pos) => {
               const card = el('div', 'sky-search-result');
               const select = el('button', 'sky-youtube-select'); select.type = 'button';
@@ -1111,7 +1111,7 @@
               details.appendChild(el('span', 'sky-youtube-action', '▶ Reproducir en SKY'));
               select.append(thumb, details);
               select.addEventListener('click', () => {
-                lista = videos; indice = pos; ytVerificado = !!data.incrustacion_verificada;
+                lista = videos; indice = pos; ytVerificado = !!data.incrustacion_verificada; ytIntentos = new Set(); ytModoActual = mode;
                 mostrarVideo();
                 aplicarModoVentana('player', mode === 'minimized' ? 'normal' : mode);
                 setState('idle', 'Video seleccionado.');
@@ -2819,8 +2819,8 @@
   };
 
   /* ------------------------------------------------------------------ reproductor */
-  const YT = 'https://www.youtube-nocookie.com';
-  let lista = [], indice = 0, ytVerificado = false, ytApiPlayerPromise = null;
+  const YT = 'https://www.youtube.com';
+  let lista = [], indice = 0, ytVerificado = false, ytApiPlayerPromise = null, ytIntentos = new Set(), ytModoActual = 'normal';
   // Carga bajo demanda la API oficial: permite observar errores reales del iframe.
   function cargarIframePlayerApi() {
     if (window.YT && window.YT.Player) return Promise.resolve(true);
@@ -2834,9 +2834,9 @@
       const script = document.createElement('script');
       script.src = 'https://www.youtube.com/iframe_api';
       script.async = true;
-      script.onerror = () => resolve(false);
+      script.onerror = () => { ytApiPlayerPromise = null; resolve(false); };
       document.head.appendChild(script);
-      setTimeout(() => resolve(false), 8000);
+      setTimeout(() => { if (!(window.YT && window.YT.Player)) ytApiPlayerPromise = null; resolve(!!(window.YT && window.YT.Player)); }, 8000);
     });
     return ytApiPlayerPromise;
   }
@@ -2849,7 +2849,9 @@
         new window.YT.Player(iframe, {
           events: {
             onStateChange: evento => {
-              if (evento.data === 1) setState('idle', 'YouTube confirmó la reproducción.');
+              if (evento.data === 1 && lista[indice]?.id === videoId) {
+                setState('idle', 'YouTube confirmó la reproducción.');
+              }
             },
             onError: evento => {
               if (ventanas.get('player')?.el.querySelector('iframe') !== iframe) return;
@@ -2859,8 +2861,22 @@
                 : codigo === 153 ? 'YouTube no recibió la identificación necesaria del reproductor.'
                 : codigo === 100 ? 'El video fue eliminado, es privado o no está disponible.'
                 : 'YouTube no pudo reproducir este video (código ' + codigo + ').';
+              // Si el candidato está retirado o bloqueado para incrustación,
+              // probar a lo sumo una vez cada otro resultado de la API oficial.
+              // El error 153 exige corregir identidad/Referer: cambiar de video no ayuda.
+              if ([5, 100, 101, 150].includes(codigo)) {
+                const siguiente = lista.findIndex((v, pos) =>
+                  pos !== indice && v && !ytIntentos.has(v.id));
+                if (siguiente >= 0) {
+                  addMsg('sky', mensaje + ' Intento otra versión autorizada de la búsqueda.');
+                  indice = siguiente;
+                  mostrarVideo();
+                  aplicarModoVentana('player', ytModoActual);
+                  return;
+                }
+              }
               setState('error', 'Video no disponible en el reproductor');
-              addMsg('sky', mensaje + ' Usá Otro video o Ver en YouTube.');
+              addMsg('sky', mensaje + ' No existe otro candidato pendiente. Usá Ver en YouTube o realizá una nueva búsqueda.');
               if (barra) barra.title = mensaje;
             },
             onAutoplayBlocked: () => {
@@ -2877,6 +2893,7 @@
   }
   async function reproductor(consulta, mode = 'normal') {
     setState('thinking', 'Buscando “' + consulta + '”');
+    ytModoActual = mode; ytIntentos = new Set();
     let r;
     try { r = await api('/api/hud/youtube?q=' + encodeURIComponent(consulta)); } catch (e) { r = { embebible: false, motivo: e.message }; }
     if (!r.embebible) {
@@ -2912,7 +2929,7 @@
             id = u.searchParams.get('v') || u.pathname.match(/^\/(?:embed|shorts|live)\/([^/]+)/)?.[1] || '';
           }
           if (!/^[A-Za-z0-9_-]{11}$/.test(id)) throw Error('Enlace de video no válido.');
-          lista = [{id, titulo:'Video seleccionado'}]; indice = 0; ytVerificado = false;
+          lista = [{id, titulo:'Video seleccionado'}]; indice = 0; ytVerificado = false; ytIntentos = new Set();
           mostrarVideo(); aplicarModoVentana('player', mode);
         } catch(err) { errorVideo.textContent = 'No pude incorporar ese video: ' + (err instanceof TypeError ? 'Revisá que el enlace de YouTube sea válido y completo.' : err.message); }
       });
@@ -2933,6 +2950,7 @@
   }
   function mostrarVideo() {
     const v = lista[indice]; if (!v) return;
+    ytIntentos.add(v.id);
     cerrarVentana('player');
     const w = abrirVentana('player', '♪ ' + v.titulo, YT + '/embed/' + encodeURIComponent(v.id) + '?autoplay=1&playsinline=1&rel=0&enablejsapi=1&origin=' + encodeURIComponent(window.location.origin),
       { w: 760, h: 470, allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', referrer: 'strict-origin-when-cross-origin' });
@@ -2957,7 +2975,7 @@
       barra.insertBefore(original, primeraAccion);
       barra.title = ytVerificado
         ? 'La API filtró videos incrustables; aún puede haber restricciones.'
-        : 'Resultado público: incrustación no verificada.';
+        : 'Video manual: incrustación no verificada.';
     }
     if (iframe) vigilarReproductor(iframe, v.id, barra);
   }
