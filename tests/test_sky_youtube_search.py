@@ -167,6 +167,27 @@ def test_hud_observes_real_embed_player_errors_without_guessing():
     assert "vigilarReproductor(iframe, v.id, barra)" in script
     assert "encodeURIComponent(window.location.origin)" in script
 
+def test_hud_yt_blocked_iframe_shows_official_fallback_without_fake_success():
+    """If YouTube denies framing without an IFrame API error, users are not trapped."""
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    script = (root / "metaverse/static/hud.js").read_text(encoding="utf-8")
+    css = (root / "metaverse/static/hud.css").read_text(encoding="utf-8")
+    assert "function avisoIntegracionYT(videoId, mensaje)" in script
+    assert "if (sesion !== ytSesion || ytReproduccionConfirmada" in script
+    assert "}, 12000);" in script
+    assert "No pude confirmar que YouTube esté reproduciendo" in script
+    assert "const original = el('a', 'btn', 'Ver directamente en YouTube');" in script
+    assert "original.target = '_blank'; original.rel = 'noopener noreferrer';" in script
+    assert "ytReproduccionConfirmada = true" in script
+    assert "cancelarVigilanciaYT();" in script
+    assert "onError: evento =>" in script
+    assert "YouTube puede permitir verlo directamente" in script
+    assert ".win .sky-youtube-warning{" in css
+    # We never fetch protected streams, hide player permissions or bypass the owner.
+    assert "youtube.com/watch?v=" in script
+
+
 def test_player_automatic_fallback_has_no_bypass():
     from pathlib import Path
     script = (Path(__file__).resolve().parents[1] / "metaverse" / "static" / "hud.js").read_text(encoding="utf-8")
