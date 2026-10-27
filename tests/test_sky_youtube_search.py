@@ -96,3 +96,17 @@ def test_hud_invalid_youtube_url_is_reported_clearly():
     script = (Path(__file__).resolve().parents[1] / "metaverse" / "static" / "hud.js").read_text(encoding="utf-8")
     assert "const enlace = urlInput.value.trim();" in script
     assert "Pegá un enlace HTTPS completo de YouTube" in script
+
+
+def test_hud_youtube_blocked_embed_offers_alternative_and_original():
+    """La ventana interna ofrece una salida honesta sin eludir YouTube."""
+    from pathlib import Path
+
+    script = (Path(__file__).resolve().parents[1] / "metaverse" / "static" / "hud.js").read_text(encoding="utf-8")
+    assert "const otro = el('button', '', 'Otro video');" in script
+    assert "otro.addEventListener('click', () => controlReproductor('next'))" in script
+    assert "const original = el('a', '', 'Ver en YouTube');" in script
+    assert "original.href = 'https://www.youtube.com/watch?v='" in script
+    assert "ytVerificado = !!r.incrustacion_verificada" in script
+    assert "YouTube debe autorizar la reproducción" in script
+    assert "await decir('Cargué " not in script
