@@ -53,7 +53,7 @@ def _intencion_youtube(frase: str, mode: str) -> dict | None:
     t = re.sub(r"\s+(?:en|por|desde)\s+(?:el\s+)?youtube(?:\s+music)?$", "", t).strip()
 
     accion = re.match(
-        r"^(?:pon|pone|ponme|poneme|ponmela|ponmelo|toca|"
+        r"^(?:pon|pone|ponme|poneme|ponmela|ponmelo|pongas|ponga|toca|"
         r"reproduce|reproducir|reproduci|reproducime|reproduceme|"
         r"reproduzca|reproduzcas|escucha|escuchar|"
         r"quiero escuchar|quiero oir|quiero ver|quiero poner|"
@@ -62,7 +62,8 @@ def _intencion_youtube(frase: str, mode: str) -> dict | None:
         r"muestrame|mostrame)\s+(.+)$", t)
     if not accion:
         return None
-    verbo, resto = accion.group(0).split(" ", 1)
+    resto = accion.group(1)
+    verbo = t[:accion.start(1)].strip()
     # Consultas genéricas de búsqueda sólo van a YouTube con contexto explícito.
     if verbo in ("busca", "buscar", "buscame", "encuentra") and not (
         youtube_explicito or re.search(r"\b(?:cancion|tema|musica|video|videoclip)\b", resto)
