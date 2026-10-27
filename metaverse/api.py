@@ -205,6 +205,10 @@ app.include_router(mobile_pwa_router)
 from .mobile_agent_api import router as sky_mobile_agent_router
 app.include_router(sky_mobile_agent_router)
 
+# Owner-only SKY Home text API; does not grant the Android agent owner rights.
+from .sky_home_api import router as sky_home_router
+app.include_router(sky_home_router)
+
 # SKY Teléfono reuses the private SKY API, owner key and SENTINEL MFA.
 from .phone_api import router as sky_phone_router
 app.include_router(sky_phone_router)
