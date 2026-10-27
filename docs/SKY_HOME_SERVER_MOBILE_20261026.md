@@ -24,6 +24,8 @@ En el commit `ea4207c6a9cf15517756d6c10f2f2944c15f156a` había pruebas exitosas 
 
 1. `neural_core/sky_home_routing.py`: selector puro de proveedor. La nube solo se elige con autorización **por solicitud**; los datos privados requieren autorización adicional. `SKY_LOCAL_ONLY` impide la nube. No cambia de proveedor silenciosamente ante errores. Con autorización, prioriza nube para evitar cargar un modelo grande en la PC de 8 GB; sin ella, usa Ollama solo si responde localmente.
 2. `metaverse/sky_home_api.py`: rutas `GET /api/sky/home/status` y `POST /api/sky/home/chat`, integradas en la **API propia** mediante `metaverse/api.py`, protegidas por `require_key` (incluido MFA cuando esté activo). El chat es **solo texto** y usa `providers.reply` existente. No ejecuta herramientas, no lee archivos, no envía memorias ni concede derechos al Android Agent.
+**Límite de cobertura:** la nueva política de consentimiento protege **solo** `/api/sky/home/chat`. Las rutas históricas `/api/asistente/mensaje`, `/api/chat` y otros módulos mantienen su comportamiento previo y requieren una auditoría separada de privacidad antes de exponerlos a un cliente móvil. La nueva API no sustituye ni asegura automáticamente todas las integraciones existentes.
+
 3. `scripts/sky_home_preflight.py --json`: inspección local **solo lectura** de RAM (Windows), espacio libre, Python, puertos loopback, entorno virtual y presencia de Tailscale; no lee claves ni inicia servicios. Un puerto abierto no demuestra que SKY esté sano.
 4. `tests/test_sky_home_routing.py` y `.github/workflows/sky-home-server.yml`: pruebas de privacidad y de no-fallback, sintaxis y preflight en runner CI. El runner **no es la computadora del usuario**.
 
