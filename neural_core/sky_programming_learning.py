@@ -99,7 +99,7 @@ def _clean(value, maximum: int) -> str:
 def _notes(raw: object) -> str:
     """Extract a few short changes; never preserve code blocks or injected instructions."""
     text = str(raw or "")[:10000]
-    text = re.sub(r"(?s)" + r"\\x60{3}.*?\\x60{3}", " ", text)
+    text = re.sub(r'(?s)```.*?```', ' ', text)
     bullets = []
     for line in text.splitlines():
         line = line.strip()
