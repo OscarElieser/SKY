@@ -435,6 +435,16 @@ def interpretar(texto: str) -> dict | None:
     t = _norm(texto)
     if not t:
         return None
+    if re.fullmatch(
+        r'(?:como va (?:tu |el )?nucleo(?: de sky)?|estado del nucleo(?: de sky)?|'
+        r'que (?:ha|has) aprendido (?:tu nucleo|de tus modulos)|'
+        r'que tanto has evolucionado|reporte del nucleo evolutivo)', t
+    ):
+        try:
+            from .sky_core_learning import explicar_estado
+            return _resp(explicar_estado(), aprendizaje='nucleo')
+        except Exception:
+            return {'tipo': 'error', 'mensaje': 'No pude leer la evolución del núcleo en este momento.'}
     suave = ' '.join(re.sub(r'[^\w\s,]', ' ', unicodedata.normalize('NFD', str(texto).lower())
                              .encode('ascii', 'ignore').decode()).split())
     suave = re.sub(r'^(?:oye |hey |ok )?sky[\s,]+', '', suave)
