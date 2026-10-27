@@ -62,19 +62,12 @@ def extraer_resultados_web(pagina: str, limite: int = 6) -> list[dict]:
 
 
 def buscar_web_publica(consulta: str, limite: int = 6) -> list[dict]:
-    """Alternativa sin clave: lee metadatos públicos, sin descargas ni credenciales."""
-    url = "https://www.youtube.com/results?" + urlencode({
-        "search_query": consulta, "hl": "es"
-    })
-    req = Request(url, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
-        "Accept-Language": "es-ES,es;q=0.9",
-    })
-    with urlopen(req, timeout=7) as respuesta:
-        contenido = respuesta.read(1_500_001)
-    if len(contenido) > 1_500_000:
-        raise ValueError("La búsqueda de YouTube excedió el tamaño permitido.")
-    return extraer_resultados_web(contenido.decode("utf-8", errors="replace"), limite)
+    """Compatibilidad: desactivado para cumplir las políticas de YouTube.
+
+    SKY utiliza search.list y videos.list en su lugar. El parser de datos
+    permanece para tests de regresión, pero ya no consulta youtube.com HTML.
+    """
+    return []
 
 
 def buscar_videos(consulta: str, clave: str = "", limite: int = 6) -> dict:
