@@ -142,6 +142,27 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun checkHomeStatus() {
+        val id = tokens.deviceId()
+        val token = tokens.token()
+        if (id.isEmpty() || token.isEmpty()) {
+            setStatus("Vinculá este teléfono antes de consultar el servidor SKY.")
+            return
+        }
+        execute {
+            val reply = SkyNetwork.request(
+                tokens.server(),
+                "/api/sky/mobile-agent/devices/" + id + "/home-status",
+                "GET", token
+            )
+            val local = if (reply.optBoolean("local_ollama_ready")) "Ollama disponible" else "Ollama no disponible"
+            val cloud = if (reply.optBoolean("cloud_configured")) "nube configurada" else "nube sin configurar"
+            val mode = if (reply.optBoolean("local_only")) "solo local" else "híbrido permitido"
+            setStatus("Servidor SKY conectado. " + local + " · " + cloud + " · modo " + mode +
+                ". Este agente aún no tiene permiso de chat.")
+        }
+    }
+
     private fun poll() {
         val id = tokens.deviceId()
         val token = tokens.token()
