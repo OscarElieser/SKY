@@ -2820,7 +2820,58 @@
 
   /* ------------------------------------------------------------------ reproductor */
   const YT = 'https://www.youtube-nocookie.com';
-  let lista = [], indice = 0, ytVerificado = false;
+  let lista = [], indice = 0, ytVerificado = false, ytApiPlayerPromise = null;
+  // Carga bajo demanda la API oficial: permite observar errores reales del iframe.
+  function cargarIframePlayerApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve(true);
+    if (ytApiPlayerPromise) return ytApiPlayerPromise;
+    ytApiPlayerPromise = new Promise(resolve => {
+      const anterior = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        if (typeof anterior === 'function') anterior();
+        resolve(!!(window.YT && window.YT.Player));
+      };
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      script.async = true;
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+      setTimeout(() => resolve(false), 8000);
+    });
+    return ytApiPlayerPromise;
+  }
+  function vigilarReproductor(iframe, videoId, barra) {
+    cargarIframePlayerApi().then(disponible => {
+      if (!disponible || !iframe.isConnected || !window.YT || !window.YT.Player) return;
+      // La ventana puede haber cambiado mientras cargaba la API.
+      if (ventanas.get('player')?.el.querySelector('iframe') !== iframe) return;
+      try {
+        new window.YT.Player(iframe, {
+          events: {
+            onStateChange: evento => {
+              if (evento.data === 1) setState('idle', 'YouTube confirmó la reproducción.');
+            },
+            onError: evento => {
+              if (ventanas.get('player')?.el.querySelector('iframe') !== iframe) return;
+              const codigo = Number(evento.data);
+              const bloqueo = [101, 150].includes(codigo);
+              const mensaje = bloqueo ? 'El propietario no permite reproducir este video dentro de SKY.'
+                : codigo === 153 ? 'YouTube no recibió la identificación necesaria del reproductor.'
+                : codigo === 100 ? 'El video fue eliminado, es privado o no está disponible.'
+                : 'YouTube no pudo reproducir este video (código ' + codigo + ').';
+              setState('error', 'Video no disponible en el reproductor');
+              addMsg('sky', mensaje + ' Usá Otro video o Ver en YouTube.');
+              if (barra) barra.title = mensaje;
+            },
+            onAutoplayBlocked: () => {
+              if (ventanas.get('player')?.el.querySelector('iframe') === iframe)
+                addMsg('sky', 'El navegador bloqueó la reproducción automática. Presioná reproducir en la ventana.');
+            }
+          }
+        });
+      } catch (err) { /* El video permanece accesible en el iframe original. */ }
+    }).catch(() => { /* Sin API, continúan los controles manuales. */ });
+  }
   function preguntarReproducir() {
     const i = $('chat-input'); i.value = 'reproduce '; i.focus();
   }
@@ -2883,10 +2934,10 @@
   function mostrarVideo() {
     const v = lista[indice]; if (!v) return;
     cerrarVentana('player');
-    const w = abrirVentana('player', '♪ ' + v.titulo, YT + '/embed/' + encodeURIComponent(v.id) + '?autoplay=1&playsinline=1&rel=0&enablejsapi=1',
+    const w = abrirVentana('player', '♪ ' + v.titulo, YT + '/embed/' + encodeURIComponent(v.id) + '?autoplay=1&playsinline=1&rel=0&enablejsapi=1&origin=' + encodeURIComponent(window.location.origin),
       { w: 760, h: 470, allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', referrer: 'strict-origin-when-cross-origin' });
     const iframe = w.el.querySelector('iframe');
-    if (iframe) iframe.setAttribute('allowfullscreen', '');
+    if (iframe) { iframe.id = 'sky-youtube-player'; iframe.setAttribute('allowfullscreen', ''); }
     // La búsqueda pública no garantiza permiso para incrustar el video.
     const barra = w.el.querySelector('header');
     if (barra) {
@@ -2908,6 +2959,7 @@
         ? 'La API filtró videos incrustables; aún puede haber restricciones.'
         : 'Resultado público: incrustación no verificada.';
     }
+    if (iframe) vigilarReproductor(iframe, v.id, barra);
   }
   function ytCmd(func, args = []) {
     const w = ventanas.get('player'); if (!w) return;
