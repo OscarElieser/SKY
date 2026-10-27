@@ -228,14 +228,25 @@ def latest(*, topic: str = "", limit: int = 5) -> list[dict]:
         rows = db.execute("SELECT repo,project,version,title,summary,url,published FROM releases "
                           "ORDER BY published DESC LIMIT 180").fetchall()
     desired = _tokens(topic)
-    if not desired or desired.intersection(_GENERIC):
-        return [dict(r) for r in rows[:max(1, min(int(limit), 8))]]
+    count = max(1, min(int(limit), 8))
+    if not desired:
+        return [dict(r) for r in rows[:count]]
+    # "Novedades de programación TypeScript" debe priorizar TypeScript.
+    # Buscar primero términos concretos, ignorando los genéricos.
+    keywords = desired - _GENERIC - {"de", "del", "la", "las", "los", "el", "en",
+                                    "avances", "novedades", "ultimas", "ultimos",
+                                    "versiones", "actualizaciones", "que", "hay"}
     found = []
     for row in rows:
         item = dict(row)
-        if desired.intersection(_tokens(item["project"] + " " + OFFICIAL[item["repo"]][1])):
+        project_tokens = _tokens(item["project"] + " " + OFFICIAL[item["repo"]][1])
+        if keywords.intersection(project_tokens):
             found.append(item)
-    return found[:max(1, min(int(limit), 8))]
+    if found:
+        return found[:count]
+    if desired.intersection(_GENERIC):
+        return [dict(r) for r in rows[:count]]
+    return []
 
 
 def prompt_context(query: str) -> str:
