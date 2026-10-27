@@ -14,6 +14,7 @@ class SkyDesignApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
+        splashFactory: InkRipple.splashFactory,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(skyColorPrimary),
           brightness: Brightness.dark,
