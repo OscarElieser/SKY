@@ -126,7 +126,7 @@ def test_hud_youtube_playback_not_blocked_by_missing_api_key():
     script = (Path(__file__).resolve().parents[1] / "metaverse" / "static" / "hud.js").read_text(encoding="utf-8")
     assert "if (p.action === 'play_media' && (p.params.service || 'youtube') === 'youtube' && !p.params.path)" in script
     assert "&& S.ytApi && !p.params.path" not in script
-    assert "await reproductor(p.params.query); return;" in script
+    assert "await reproductor(p.params.query, ['mini', 'normal', 'max', 'fullscreen', 'minimized'].includes(p.params.mode)" in script
 
 
 def test_hud_invalid_youtube_url_is_reported_clearly():
