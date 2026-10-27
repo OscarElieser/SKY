@@ -147,7 +147,14 @@ def _interpretar_propio(texto: str) -> dict | None:
     # --- reproducir en YouTube / Spotify
     m = re.match(r'^(?:reproduce|reproducir|reproduci|pon|pone|ponme|toca|quiero escuchar|quiero ver|escuchar|ver)\s+(.+?)'
                  r'(?:\s+(?:en|por|desde)\s+(youtube music|youtube|spotify))?$', t)
-    if m and not re.match(r'^(la |el )?(volumen|alarma|recordatorio|temporizador)\b', m.group(1)):
+    # No convertir órdenes de agenda/equipo en reproducción musical.
+    # Evaluar antes de eliminar «la canción», para permitir títulos como «Alarma».
+    if m and not re.match(
+        r'^(?:(?:la|el|una|un|las|los)\s+)?'
+        r'(?:volumen|alarmas?|recordatorios?|temporizadores?|cronometros?|'
+        r'despertadores?|ajustes|configuracion|notificaciones?|calendario|'
+        r'citas|reuniones)\b', m.group(1)
+    ):
         consulta_norm = m.group(1).strip()
         servicio = (m.group(2) or 'youtube').replace(' ', '_')
         # recuperar la consulta con tildes/mayúsculas del texto original
