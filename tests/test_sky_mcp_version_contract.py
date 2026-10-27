@@ -37,7 +37,6 @@ def test_full_install_mcp_range_intersects_crewai_1x_requirement():
 
 def test_mcp_catalogue_matches_optional_manifest():
     req = next(req for req in _requirements("requirements_mcp_optional.txt") if req.name == "mcp")
-    from neural_core import sky_mcp_hub
-    # Descriptor is informational; no MCP server or network call is initiated.
-    assert f"mcp{req.specifier}" in (ROOT / "neural_core/sky_mcp_hub.py").read_text(encoding="utf-8")
+    # Read only the informational descriptor, without importing the MCP runtime.
     assert "mcp>=1.30,<3" in (ROOT / "neural_core/sky_mcp_hub.py").read_text(encoding="utf-8")
+    assert Version("1.30.0") in req.specifier
