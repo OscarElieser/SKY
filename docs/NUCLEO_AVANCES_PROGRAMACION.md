@@ -2,20 +2,20 @@
 
 ## Integración implementada
 
-La rama main incorpora neural_core/sky_programming_learning.py, un sistema aditivo que complementa sky_web_learning.py. Consulta datos públicos de **releases oficiales** de GitHub, los archiva en una base SQLite local y los ofrece al cerebro como REFERENCIAS. No sustituye al modelo local, ni a la API propia, ni a los sistemas de programación, voz, documentación, seguridad o memoria de SKY.
+La rama main incorpora neural_core/sky_programming_learning.py, un sistema aditivo que complementa sky_web_learning.py. Consulta datos públicos de **releases y etiquetas estables oficiales** de GitHub, los archiva en una base SQLite local y los ofrece al cerebro como REFERENCIAS. No sustituye al modelo local, ni a la API propia, ni a los sistemas de programación, voz, documentación, seguridad o memoria de SKY.
 
 ### Cobertura inicial (18 proyectos)
 
 Python (python/cpython), Node.js (nodejs/node), TypeScript (microsoft/TypeScript), Flutter (flutter/flutter), Dart (dart-lang/sdk), React (facebook/react), Next.js (vercel/next.js), Angular (angular/angular), Vue (vuejs/core), Rust (rust-lang/rust), Go (golang/go), Kotlin (JetBrains/kotlin), FastAPI (fastapi/fastapi), Django (django/django), Supabase (supabase/supabase), Prisma (prisma/prisma), PyTorch (pytorch/pytorch) y Vite (vitejs/vite).
 
-Este es un catálogo de repositorios de confianza *declarados*, no una garantía de que todos tengan un release estable reciente o de que su API siempre responda. Se descartan los borradores, las versiones prerelease y los releases sin fecha reciente válida.
+Este es un catálogo de repositorios de confianza *declarados*, no una garantía de que todos tengan un release estable reciente o de que su API siempre responda. Si no existe un release actual o es demasiado antiguo, SKY consulta etiquetas estables del repositorio. La fecha de una etiqueta corresponde al commit asociado: **NO equivale a una fecha de lanzamiento oficial**. Se descartan borradores y prereleases.
 
 ### Funcionamiento autónomo
 
 - El worker existente del aprendizaje web de SKY corre cuando la API está activa. Espera una hora tras el inicio; ejecuta el lector de noticias web existente y, a continuación, el nuevo lector de releases.
 - Hasta 4 repositorios oficiales por ciclo, no más de una consulta por repositorio cada 24 horas. Los 18 se reparten de forma equitativa entre ciclos.
-- Solo se aceptan URLs con dominio github.com y ruta oficial del repositorio autorizado. Las consultas se hacen exclusivamente al endpoint fijo api.github.com/repos/OWNER/REPO/releases/latest.
-- Conserva versión, título, fecha, URL y hasta dos resúmenes de cambios publicados. Nunca ejecuta fragmentos del release. Al cerebro se le pasan solo **versiones y enlaces**, no los textos de cambios.
+- Solo se aceptan URLs con dominio github.com y ruta oficial del repositorio autorizado. Se utiliza api.github.com/repos/OWNER/REPO/releases/latest y, para versiones faltantes o antiguas, las rutas oficiales de tags y commit correspondientes al repositorio autorizado.
+- Conserva versión, título, fecha, URL y hasta dos resúmenes de cambios publicados en releases. En etiquetas usa la fecha del commit y marca el origen como etiqueta; no afirma haber leído notas de lanzamiento. Nunca ejecuta fragmentos. Al cerebro se le pasan **versiones, tipo de referencia y enlaces**, no textos ejecutables.
 - Evita duplicados, guarda hasta 500 registros, elimina automáticamente metadatos antiguos tras 180 días y conserva los existentes si la red falla.
 - No manda preguntas del usuario, documentos, contraseñas, claves ni PIN a GitHub. No utiliza credenciales de GitHub para estas consultas públicas.
 
