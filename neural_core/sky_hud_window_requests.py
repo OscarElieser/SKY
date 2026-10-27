@@ -20,6 +20,68 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", t)).strip()
 
 
+def _intencion_youtube(frase: str, mode: str) -> dict | None:
+    """Reconoce variantes explícitas de escuchar/ver YouTube; no ejecuta acciones.
+
+    Evita reconocer conversaciones genéricas, órdenes a Spotify u operaciones
+    ajenas (volumen, alarmas, archivos) como reproducción de YouTube.
+    """
+    original = frase.strip()
+    t = original
+    for _ in range(4):
+        limpio = re.sub(
+            r"^(?:por favor|porfa|si puedes|si podes|podrias|puedes|podes|"
+            r"quiero que|quisiera que|necesito que|me ayudas a|"
+            r"te pido que|me gustaria que)\s+", "", t)
+        if limpio == t:
+            break
+        t = limpio.strip()
+
+    # La intención explícita "abre YouTube" no implica una canción particular.
+    entrada = re.match(
+        r"^(?:abre|abri|abrir|abreme|muestra|mostra|entra a|ve a)\s+"
+        r"(?:el\s+)?youtube\b(?:\s+(?:y|para|que)\s+)?", t)
+    youtube_explicito = entrada is not None
+    if entrada:
+        t = t[entrada.end():].strip()
+        if not t:
+            return {"kind": "search", "provider": "youtube", "mode": mode}
+
+    if re.search(r"\s+(?:en|por|desde)\s+(?:el\s+)?spotify$", t):
+        return None
+    youtube_explicito |= bool(re.search(r"\s+(?:en|por|desde)\s+(?:el\s+)?youtube(?:\s+music)?$", t))
+    t = re.sub(r"\s+(?:en|por|desde)\s+(?:el\s+)?youtube(?:\s+music)?$", "", t).strip()
+
+    accion = re.match(
+        r"^(?:pon|pone|ponme|poneme|ponmela|ponmelo|toca|"
+        r"reproduce|reproducir|reproduci|reproducime|reproduceme|"
+        r"reproduzca|reproduzcas|escucha|escuchar|"
+        r"quiero escuchar|quiero oir|quiero ver|quiero poner|"
+        r"me gustaria escuchar|me gustaria ver|"
+        r"busca|buscar|buscame|busca me|encuentra|"
+        r"muestrame|mostrame)\s+(.+)$", t)
+    if not accion:
+        return None
+    verbo, resto = accion.group(0).split(" ", 1)
+    # Consultas genéricas de búsqueda sólo van a YouTube con contexto explícito.
+    if verbo in ("busca", "buscar", "buscame", "encuentra") and not (
+        youtube_explicito or re.search(r"\b(?:cancion|tema|musica|video|videoclip)\b", resto)
+    ):
+        return None
+
+    # Extraer la solicitud sin conservar "la canción", "el video", etc.
+    resto = re.sub(
+        r"^(?:(?:la|el|un|una|los|las)\s+)?"
+        r"(?:(?:cancion|canciones|musica|tema|temas|video|videos|"
+        r"videoclip|videoclips|cancioncita)(?:\s+(?:de|del))?\s+)", "", resto).strip()
+    resto = re.sub(r"^(?:la|el)\s+de\s+", "", resto).strip()
+    if not resto or re.match(r"^(?:volumen|alarma|recordatorio|temporizador|"
+                           r"ajustes|configuracion)\b", resto):
+        return None
+    return {"kind": "youtube", "query": resto[:120], "mode": mode}
+
+
+
 def parse_window_request(text: str) -> dict | None:
     t = re.sub(r"^(?:(?:oye|hey|mira) )*(?:sky )?", "", normalize(text))
     mode = "normal"
@@ -31,17 +93,22 @@ def parse_window_request(text: str) -> dict | None:
                 "max" if v in ("maximizada", "maximizar", "grande") else
                 "fullscreen" if v == "pantalla completa" else "normal")
         t = t[:m.start()].strip()
+    # "en una miniventana flotante" y "en una ventana flotante"
+    # son preferencias de presentación, no parte del título de la canción.
+    mini = re.search(
+        r"\s+(?:(?:en|a|de)\s+)?(?:(?:una|la)\s+)?"
+        r"(?:mini\s*ventana|ventanita|ventana)(?:\s+flotante)?$", t)
+    if mini:
+        mode = "mini"
+        t = t[:mini.start()].strip()
     m = re.match(r"^(minimiza|minimizar|maximiza|maximizar|restaura|restaurar|normaliza|cierra|cerrar) (?:(?:(?:la|el) )?(?:(?:ventana|reproductor|modulo) )?(?:de )?)?(youtube|reproductor|video|buscador|busqueda|buscar)$", t)
     if m:
         verb = m.group(1)
         return {"kind":"window_control", "target":"player" if m.group(2) in ("youtube","reproductor","video") else "search",
                 "mode": ("minimized" if verb.startswith("minim") else "max" if verb.startswith("maxim") else "close" if verb.startswith("cierr") else "normal")}
-    m = re.match(r"^(?:(?:abre|abri|abrir|activa|muestra) (?:el )?youtube (?:y )?)?(?:pon|pone|ponme|reproduce|reproducir|reproduci|busca|buscame|quiero escuchar|quiero ver) (?:(?:(?:la|el|un) )?(?:musica|cancion|canciones|tema|temas|video|videos) (?:de )?)?(.+)$", t)
-    if m and m.group(1) and (
-        re.match(r"^(?:abre|abri|abrir|activa|muestra) (?:el )?youtube\b", t) or
-        re.match(r"^(?:pon|pone|ponme|reproduce|reproducir|reproduci|quiero escuchar|quiero ver) (?:la |el |un )?(?:musica|cancion|canciones|tema|temas|video|videos)\b", t)
-    ) and not re.match(r"^(?:volumen|alarma|recordatorio|temporizador)\b", m.group(1)):
-        return {"kind":"youtube","query":m.group(1)[:120],"mode":mode}
+    musica = _intencion_youtube(t, mode)
+    if musica:
+        return musica
     if re.match(r"^(?:abre|abri|abrir|activa|activar|inicia|iniciar|muestra|mostra)(?: (?:el|la))? (?:(?:modulo|panel|herramienta) (?:de )?)?(?:buscar|buscador|busqueda|search)(?: web)?$", t):
         return {"kind":"search","provider":"web","mode":mode}
     if re.match(r"^(?:abre|abri|abrir|muestra) (?:el )?youtube$", t):
