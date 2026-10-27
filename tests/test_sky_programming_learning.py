@@ -125,8 +125,55 @@ class TestSkyProgrammingLearning(unittest.TestCase):
         self.assertIn("TypeScript", context)
         self.assertIn("github.com", context)
         self.assertNotIn("Ignora", context)
-        self.assertIn("no implica que SKY las haya instalado", context)
+        self.assertIn("no implica instalación", context)
         self.assertEqual(prog.prompt_context("¿Cómo está el clima?"), "")
+
+    def test_official_tag_fallback_keeps_tag_distinct_from_release(self):
+        from urllib.error import HTTPError
+        repo = "python/cpython"
+        fake_tag = {"repo": repo, "project": "Python", "version": "v3.14.4",
+                    "title": "Etiqueta GitHub (no lanzamiento verificado)",
+                    "summary": "Fecha del commit etiquetado",
+                    "url": "https://github.com/python/cpython/tree/v3.14.4",
+                    "published": NOW.isoformat()}
+        with patch.dict(os.environ, {"SKY_PROGRAMMING_REPOS": repo}), \
+             patch.object(prog, "enabled", return_value=True), \
+             patch.object(prog, "_fetch", side_effect=HTTPError(
+                 "https://api.github.com/repos/python/cpython/releases/latest", 404, "Not Found", {}, None)), \
+             patch.object(prog, "_fetch_stable_tag", return_value=fake_tag) as lookup:
+            result = prog.sync(now=NOW)
+        self.assertEqual(result["new"], 1)
+        self.assertEqual(result["errors"], 0)
+        self.assertEqual(prog.status()["checks"][0]["result"], "accepted_tag")
+        self.assertIn("no lanzamiento verificado", prog.prompt_context("programación Python"))
+        lookup.assert_called_once_with(repo, NOW)
+
+    def test_stable_tag_checks_commit_date_and_never_calls_unknown_repos(self):
+        repo = "python/cpython"
+        sha = "a" * 40
+        items = [{"name": "v3.15.0a1", "commit": {"sha": sha}},
+                 {"name": "v3.14.4", "commit": {"sha": sha}}]
+        def get(repo_arg, suffix):
+            self.assertEqual(repo_arg, repo)
+            if suffix.startswith("tags?"):
+                return items
+            self.assertEqual(suffix, "commits/" + sha)
+            return {"commit": {"committer": {"date": NOW.isoformat()}}}
+        with patch.object(prog, "_api", side_effect=get):
+            found = prog._fetch_stable_tag(repo, NOW)
+        self.assertEqual(found["version"], "v3.14.4")
+        self.assertEqual(found["url"], "https://github.com/python/cpython/tree/v3.14.4")
+        self.assertIn("no lanzamiento", found["title"])
+
+    def test_stale_tag_not_falsely_classified_as_recent_release(self):
+        repo = "flutter/flutter"
+        sha = "b" * 40
+        def fetch(r, suffix):
+            if suffix.startswith("tags?"):
+                return [{"name": "3.19.0", "commit": {"sha": sha}}]
+            return {"commit": {"committer": {"date": (NOW - timedelta(days=200)).isoformat()}}}
+        with patch.object(prog, "_api", side_effect=fetch):
+            self.assertIsNone(prog._fetch_stable_tag(repo, NOW))
 
     def test_voice_requests_reuse_programming_sync(self):
         from neural_core import sky_aprendizaje
