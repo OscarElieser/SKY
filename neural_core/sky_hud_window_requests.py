@@ -53,8 +53,8 @@ def _intencion_youtube(frase: str, mode: str) -> dict | None:
     t = re.sub(r"\s+(?:en|por|desde)\s+(?:el\s+)?youtube(?:\s+music)?$", "", t).strip()
 
     accion = re.match(
-        r"^(?:pon|pone|ponme|poneme|ponmela|ponmelo|pongas|ponga|toca|"
-        r"reproduce|reproducir|reproduci|reproducime|reproduceme|"
+        r"^(?:pon|pone|ponme|poneme|ponmela|ponmelo|pongas|me pongas|ponga|toca|"
+        r"reproduce|reproducir|reproduci|reproducime|reproduceme|reproducirme|me reproduzcas|"
         r"reproduzca|reproduzcas|escucha|escuchar|"
         r"quiero escuchar|quiero oir|quiero ver|quiero poner|"
         r"me gustaria escuchar|me gustaria ver|"
