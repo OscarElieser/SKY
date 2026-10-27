@@ -871,7 +871,7 @@
     const p = data.propuesta;
     if (data.interfaz) { await interfaz(p); return; }
     if (p.action === 'play_media' && (p.params.service || 'youtube') === 'youtube' && !p.params.path) {
-      await reproductor(p.params.query); return;
+      await reproductor(p.params.query, ['mini', 'normal', 'max', 'fullscreen', 'minimized'].includes(p.params.mode) ? p.params.mode : 'normal'); return;
     }
     // Las órdenes de navegación a YouTube usan la ventana propia de SKY.
     // No se eluden permisos del agente para otras direcciones o acciones.
