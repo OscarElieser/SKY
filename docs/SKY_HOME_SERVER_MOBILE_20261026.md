@@ -46,7 +46,7 @@ En el commit `ea4207c6a9cf15517756d6c10f2f2944c15f156a` había pruebas exitosas 
 }
 ```
 
-La clasificación predeterminada es `datos: privados` y `autorizar_nube: false`. El cliente debe mostrar qué datos se compartirán y con qué proveedor antes de marcar la autorización; el servidor **no puede garantizar** que una frase clasificada erróneamente como general no contenga datos privados. Si no hay motor autorizado, responde 409; si el proveedor falla, responde 503 **sin fallback oculto**. No se deben guardar credenciales en el celular ni en URLs.
+La clasificación predeterminada es `datos: privados` y `autorizar_nube: false`. El cliente debe mostrar qué datos se compartirán y con qué proveedor antes de marcar la autorización; el servidor **no puede garantizar** que una frase clasificada erróneamente como general no contenga datos privados. Si no hay motor autorizado, responde 409. Si falla un proveedor remoto seleccionado por `auto` y el modelo Ollama configurado está disponible, puede responder localmente con `respaldo_local: true` y `proveedor: ollama` (sin cambiar a otro servicio remoto). Si tampoco funciona el respaldo, responde 503. La selección explícita de proveedor nunca cambia de motor. No se deben guardar credenciales en el celular ni en URLs.
 
 ## Instalación ligera en casa — procedimiento PENDIENTE de autorización y pruebas
 
