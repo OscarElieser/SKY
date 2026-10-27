@@ -46,7 +46,8 @@ DEFAULT_REPOS = (
     "python/cpython", "nodejs/node", "microsoft/TypeScript", "flutter/flutter",
     "dart-lang/sdk", "facebook/react", "vercel/next.js", "rust-lang/rust",
     "golang/go", "JetBrains/kotlin", "fastapi/fastapi", "supabase/supabase",
-    "pytorch/pytorch", "vitejs/vite",
+    "pytorch/pytorch", "vitejs/vite", "angular/angular", "vuejs/core",
+    "django/django", "prisma/prisma",
 )
 _WORDS = re.compile(r"[a-z0-9]+")
 _TAG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,79}\Z")
