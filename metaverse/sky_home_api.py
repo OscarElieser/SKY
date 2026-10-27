@@ -30,10 +30,25 @@ class HomeChat(BaseModel):
     autorizar_datos_privados: bool = False
 
 
+def _local_model_ready() -> bool:
+    """Check the exact Ollama model configured for the existing SKY provider."""
+    import json
+    from urllib import request
+    from neural_core import providers
+
+    model = providers.choose_provider("ollama")[1]
+    try:
+        with request.urlopen("http://127.0.0.1:11434/api/tags", timeout=0.8) as response:
+            models = json.load(response).get("models", [])
+        return any(item.get("name") == model for item in models)
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
 def _availability() -> tuple[bool, tuple[str, ...], bool]:
-    from neural_core import providers, sky_cerebro
+    from neural_core import providers
     cloud = tuple(name for name in CLOUD_ORDER if providers.provider_ready(name))
-    local = sky_cerebro._ollama_ok()  # localhost-only probe; no model load
+    local = _local_model_ready()  # loopback-only; never downloads a model
     return local, cloud, providers.local_only()
 
 
