@@ -119,10 +119,15 @@ def sync(*, max_topics: int = 3, now: datetime | None = None) -> dict:
     added = 0
     errors = 0
     with _LOCK, closing(_connect()) as db:
-        for topic in _topics()[:max(1, min(int(max_topics), 3))]:
+        # Rotate all configured topics fairly: no more than three network queries
+        # per cycle, but subjects 4 and 5 are not starved indefinitely.
+        due = []
+        for topic in _topics():
             check = db.execute("SELECT checked_at FROM web_checks WHERE topic=?", (topic,)).fetchone()
-            if check and now.timestamp() - check["checked_at"] < 24 * 3600:
-                continue
+            checked_at = int(check["checked_at"]) if check else 0
+            if now.timestamp() - checked_at >= 24 * 3600:
+                due.append((checked_at, topic))
+        for _, topic in sorted(due)[:max(1, min(int(max_topics), 3))]:
             # Persist the attempt first. Restarts/retries cannot flood the feed.
             db.execute("""INSERT INTO web_checks VALUES (?,?,?,?)
                 ON CONFLICT(topic) DO UPDATE SET checked_at=excluded.checked_at,
