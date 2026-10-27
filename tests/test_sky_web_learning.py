@@ -80,6 +80,21 @@ class TestSkyWebLearning(unittest.TestCase):
         self.assertIn('NO artículos completos', web.prompt_context('novedades agentes inteligencia artificial'))
         self.assertEqual(web.related('mi contraseña de agentes inteligencia artificial'), [])
 
+    def test_five_public_topics_rotate_in_two_cycles(self):
+        names = 'agentes de inteligencia artificial;seguridad de software;educación técnica;programación Python;accesibilidad digital'
+        def feed(topic, limite=8):
+            return [_item('Novedad reciente sobre ' + topic,
+                          url='https://news.google.com/rss/articles/' + topic.replace(' ', '-'))]
+        with patch.dict(os.environ, {'SKY_WEB_LEARNING_TOPICS': names}), \
+             patch.object(web, 'enabled', return_value=True), \
+             patch('neural_core.actualidad.noticias', side_effect=feed) as fn:
+            first = web.sync(now=NOW)
+            second = web.sync(now=NOW + timedelta(hours=1))
+        self.assertEqual(first['attempted'], 3)
+        self.assertEqual(second['attempted'], 2)
+        self.assertEqual(fn.call_count, 5)
+        self.assertEqual(web.status()['stored'], 5)
+
     def test_voice_status_and_manual_sync_route_to_same_nucleus(self):
         from neural_core import sky_aprendizaje
         fake = {'enabled': True, 'attempted': 2, 'new': 3, 'errors': 0}
