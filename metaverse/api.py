@@ -209,6 +209,10 @@ app.include_router(sky_mobile_agent_router)
 from .sky_home_api import router as sky_home_router
 app.include_router(sky_home_router)
 
+# Chat credentials are limited to an Android pairing and cannot execute tools.
+from .mobile_chat_api import router as sky_mobile_chat_router
+app.include_router(sky_mobile_chat_router)
+
 # SKY Teléfono reuses the private SKY API, owner key and SENTINEL MFA.
 from .phone_api import router as sky_phone_router
 app.include_router(sky_phone_router)
