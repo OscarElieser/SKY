@@ -33,3 +33,8 @@ templates/**/dist/
 build/
 mobile/**/.gradle/
 mobile/**/build/
+
+# Node dependencies and binary installers
+node_modules/
+*.exe
+
