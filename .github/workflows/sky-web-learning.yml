@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - "neural_core/sky_web_learning.py"
+      - "neural_core/sky_programming_learning.py"
       - "neural_core/sky_core_learning.py"
       - "neural_core/sky_cerebro.py"
       - "neural_core/sky_aprendizaje.py"
       - "metaverse/api.py"
       - "tests/test_sky_web_learning.py"
+      - "tests/test_sky_programming_learning.py"
       - "tests/test_sky_core_learning.py"
       - ".github/workflows/sky-web-learning.yml"
   workflow_dispatch:
@@ -31,8 +33,10 @@ jobs:
         with:
           python-version: "3.13"
       - name: Compile modified modules
-        run: python -m compileall -q neural_core/sky_web_learning.py neural_core/sky_core_learning.py neural_core/sky_aprendizaje.py neural_core/sky_cerebro.py metaverse/api.py
+        run: python -m compileall -q neural_core/sky_web_learning.py neural_core/sky_programming_learning.py neural_core/sky_core_learning.py neural_core/sky_aprendizaje.py neural_core/sky_cerebro.py metaverse/api.py
       - name: Run web learning tests (no live network)
         run: python -m unittest discover -s tests -p "test_sky_web_learning.py" -v
+      - name: Run official programming releases learning tests
+        run: python -m unittest discover -s tests -p "test_sky_programming_learning.py" -v
       - name: Run shared core learning tests
         run: python -m unittest discover -s tests -p "test_sky_core_learning.py" -v
