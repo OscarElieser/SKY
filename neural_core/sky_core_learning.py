@@ -92,9 +92,14 @@ def diagnostico() -> dict:
         web = estado_web()
     except Exception:
         web = {"enabled": False, "stored": 0, "last_ingestion_utc": None}
+    try:
+        from .sky_programming_learning import status as programming_status
+        programacion = programming_status()
+    except Exception:
+        programacion = {"enabled": False, "stored": 0, "projects": 0}
     return {"modulos_catalogados": len(modulos), "catalogo": modulos,
             "ejecuciones_verificadas": verificados, "valoraciones": calificaciones,
-            "telemetria": _telemetria(), "web": web, "modelo_reentrenado": False,
+            "telemetria": _telemetria(), "web": web, "programacion": programacion, "modelo_reentrenado": False,
             "politica": "Observaciones consultivas; ninguna capacidad o permiso se amplía automáticamente."}
 
 
@@ -154,6 +159,7 @@ def explicar_estado() -> str:
     v = datos["ejecuciones_verificadas"]
     t = datos["telemetria"]
     web = datos.get("web") or {}
+    programacion = datos.get("programacion") or {}
     conocimiento_web = (f" He guardado {web.get('stored', 0)} referencias públicas de internet, "
                         "con fecha y fuente; son titulares no verificados."
                         if web.get("stored") else "")
@@ -164,4 +170,7 @@ def explicar_estado() -> str:
             "Aprovecho estos resultados y tus correcciones para orientar mis respuestas, "
             "pero no modifico mi código, mis permisos ni los pesos del modelo por mi cuenta. "
             "No todos los módulos tienen todavía seguimiento individual de resultados."
-            + conocimiento_web)
+            + conocimiento_web
+            + f" También sigo {programacion.get('projects', 0)} proyectos oficiales de programación"
+              f" y tengo {programacion.get('stored', 0)} versiones registradas; "
+              "los lanzamientos no se instalan automáticamente.")
