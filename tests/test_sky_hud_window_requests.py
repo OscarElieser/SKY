@@ -16,6 +16,41 @@ class HUDWindowRequestTests(unittest.TestCase):
             "Abre youtube y pon la música de Joseph en una ventana minimizada"),
             {"kind":"youtube","query":"joseph","mode":"minimized"})
 
+    def test_youtube_natural_language_paraphrases(self):
+        ejemplos = [
+            ("SKY, abre YouTube y reproduce la canción Entre dos tierras de Héroes del Silencio en una miniventana flotante", "mini"),
+            ("Por favor, quiero que me pongas Entre dos tierras en YouTube", "normal"),
+            ("Podrías reproducirme Entre dos tierras en una ventana pequeña", "mini"),
+            ("Poneme la canción Entre dos tierras de Héroes del Silencio", "normal"),
+            ("Quiero escuchar la música de Héroes del Silencio en una ventana flotante", "mini"),
+            ("Quiero ver el video de Héroes del Silencio en YouTube", "normal"),
+        ]
+        for frase, modo in ejemplos:
+            with self.subTest(frase=frase):
+                resultado = w.parse_window_request(frase)
+                self.assertIsNotNone(resultado)
+                self.assertEqual(resultado["kind"], "youtube")
+                self.assertEqual(resultado["mode"], modo)
+                self.assertNotIn("miniventana", resultado["query"])
+
+    def test_youtube_intent_preserves_other_commands(self):
+        for frase in (
+            "abre Microsoft Word", "busca mis archivos en Windows",
+            "busca recetas en google", "pon la alarma mañana",
+            "reproduce música en Spotify", "sube el volumen",
+            "necesito que escribas una carta sobre videos",
+        ):
+            with self.subTest(frase=frase):
+                self.assertIsNone(w.parse_window_request(frase))
+
+    def test_chat_interpreter_uses_same_youtube_request_as_voice(self):
+        from neural_core.sky_asistente_personal import interpretar
+        orden = interpretar("Quiero que pongas Entre dos tierras en YouTube")
+        self.assertIsNotNone(orden)
+        self.assertEqual(orden["action"], "play_media")
+        self.assertEqual(orden["params"]["service"], "youtube")
+        self.assertIn("entre dos tierras", orden["params"]["query"])
+
     def test_internal_search(self):
         self.assertEqual(w.parse_window_request("Activa el módulo de buscar"),
             {"kind":"search","provider":"web","mode":"normal"})
