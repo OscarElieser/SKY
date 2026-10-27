@@ -9,6 +9,7 @@
 - Supervisor: `iniciar_sky_autonomo.py` con `--minimized`, `--status` y `--install-startup`; inicia con **sesión Windows**, no garantiza servicio antes de iniciar sesión.
 - Instalador: `instalar_sky.ps1` acepta `-SinOllama`, `-SinVoz` y `-Siempre`. La instalación normal incluye dependencias y descargas considerables: no usarla a ciegas en una PC con 8 GB.
 - HUD instalable: `metaverse/mobile_pwa_api.py`, `/mobile` y manifest PWA. **No equivale a una APK nativa.**
+- La rama `feature/sky-mobile-agent-android-20261026` ya es ancestro de `main` (comparación GitHub: **0 commits por delante y 338 por detrás** en el momento de la auditoría). No hace falta volver a fusionarla.
 - **Sí existe** un Android Agent nativo en Kotlin: `mobile/android-agent`, con emparejamiento temporal, token por dispositivo, lista blanca de apps y confirmación local. Es un agente de apertura de apps, **no un chat móvil completo**; consulta órdenes cada 6 s solo mientras la actividad está visible. No hereda permisos de propietario ni controla el teléfono en segundo plano.
 - `templates/sky_design_flutter` es una plantilla de diseños Flutter, no un cliente móvil SKY funcional.
 
