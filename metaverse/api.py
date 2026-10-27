@@ -87,6 +87,19 @@ def _ciclo_agenda():
             _whatsapp(rutina.get('nombre','Tarea')+': '+res['mensaje'])
     _vigilancia()
 
+async def _web_learning_pump():
+    """Internet feed: no arrancar consultas externas al iniciar SKY."""
+    await asyncio.sleep(3600)
+    while True:
+        try:
+            from neural_core.sky_web_learning import sync
+            await asyncio.to_thread(sync)
+        except Exception:
+            # Ningún error RSS impide usar SKY. Estado visible en aprendizaje web.
+            pass
+        await asyncio.sleep(3600)
+
+
 async def _agenda_pump():
     # SKY v12.1: recordatorios, alarmas y rutinas programadas. Avisa al HUD, al escritorio
     # (si la capacidad notify es automática) y al celular (SKY_HA_NOTIFY), sin red externa.
@@ -168,9 +181,14 @@ async def lifespan(app):
     import time as _t
     _VIGILANCIA['kpi']=_VIGILANCIA['intereses']=_t.time()
     agenda_pump=asyncio.create_task(_agenda_pump()) if os.getenv('SKY_AGENDA_ENABLED','1')=='1' else None
+    web_learning_pump=asyncio.create_task(_web_learning_pump()) if os.getenv('SKY_WEB_LEARNING','1')=='1' else None
     try:
         yield
     finally:
+        if web_learning_pump:
+            web_learning_pump.cancel()
+            try:await web_learning_pump
+            except asyncio.CancelledError:pass
         if agenda_pump:
             agenda_pump.cancel()
             try:await agenda_pump
