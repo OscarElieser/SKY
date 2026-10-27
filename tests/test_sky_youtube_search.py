@@ -77,3 +77,22 @@ def test_fallback_when_api_fails():
         result = yt.buscar_videos("Reik", clave="test-key")
     assert result["origen"] == "youtube_web_publica"
     assert result["verificado"] is False
+
+
+def test_hud_youtube_playback_not_blocked_by_missing_api_key():
+    """La ventana interna funciona aunque la búsqueda use resultados públicos."""
+    from pathlib import Path
+
+    script = (Path(__file__).resolve().parents[1] / "metaverse" / "static" / "hud.js").read_text(encoding="utf-8")
+    assert "if (p.action === 'play_media' && (p.params.service || 'youtube') === 'youtube' && !p.params.path)" in script
+    assert "&& S.ytApi && !p.params.path" not in script
+    assert "await reproductor(p.params.query); return;" in script
+
+
+def test_hud_invalid_youtube_url_is_reported_clearly():
+    """Un campo vacío no debe convertirse en un video ni mostrar un error técnico sin explicación."""
+    from pathlib import Path
+
+    script = (Path(__file__).resolve().parents[1] / "metaverse" / "static" / "hud.js").read_text(encoding="utf-8")
+    assert "const enlace = urlInput.value.trim();" in script
+    assert "Pegá un enlace HTTPS completo de YouTube" in script
