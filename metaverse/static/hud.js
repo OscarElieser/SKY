@@ -1884,8 +1884,11 @@
     const mobileControls=el('div','btns');
     const mobilePair=el('button','btn primary','Crear código para Android');mobilePair.type='button';
     const mobileRefresh=el('button','btn','Actualizar teléfonos');mobileRefresh.type='button';
-    mobileControls.append(mobilePair,mobileRefresh);
+    const mobileChatInvite=el('button','btn','Crear código de chat móvil');mobileChatInvite.type='button';
+    const mobileChatRevoke=el('button','btn','Revocar chat del teléfono');mobileChatRevoke.type='button';
+    mobileControls.append(mobilePair,mobileRefresh,mobileChatInvite,mobileChatRevoke);
     const mobileCode=el('pre','res','Sin código activo.');
+    const mobileChatCode=el('pre','res','Sin autorización de chat móvil.');
     const mobileSelect=el('select','hab-in');
     const mobileApps=el('select','hab-in');
     [['youtube','YouTube'],['chrome','Chrome'],['whatsapp','WhatsApp'],['gmail','Gmail']].forEach(([id,name])=>{
@@ -1895,7 +1898,7 @@
     const mobileState=el('div','res','No hay teléfonos consultados.');
     const mobileCheck=el('button','btn','Verificar última solicitud');mobileCheck.type='button';
     const mobileRevoke=el('button','btn','Revocar teléfono seleccionado');mobileRevoke.type='button';
-    mobilePanel.append(mobileControls,mobileCode,mobileSelect,mobileApps,mobileSend,mobileCheck,mobileRevoke,mobileState);
+    mobilePanel.append(mobileControls,mobileCode,mobileChatCode,mobileSelect,mobileApps,mobileSend,mobileCheck,mobileRevoke,mobileState);
     let lastMobileRequest=null;
     mobilePair.addEventListener('click',async()=>{
       mobilePair.disabled=true;
@@ -1904,6 +1907,29 @@
         mobileCode.textContent='Código: '+d.code+'\nVence en '+d.expires_seconds+' segundos. Ingresalo en SKY Mobile Agent.';
       }catch(e){mobileCode.textContent='No se pudo crear código: '+e.message;}
       finally{mobilePair.disabled=false;}
+    });
+    mobileChatInvite.addEventListener('click',async()=>{
+      if(!mobileSelect.value)return;
+      mobileChatInvite.disabled=true;
+      try{
+        const d=await api('/api/sky/mobile-chat/invite',{
+          method:'POST',body:JSON.stringify({device_id:mobileSelect.value})
+        });
+        mobileChatCode.textContent='Código de CHAT para el Android seleccionado: '+d.code+
+          '\nVence en '+d.expires_seconds+' segundos. Es de un solo uso y NO es la clave de SKY.';
+      }catch(e){mobileChatCode.textContent='No se pudo autorizar el chat: '+e.message;}
+      finally{mobileChatInvite.disabled=false;}
+    });
+    mobileChatRevoke.addEventListener('click',async()=>{
+      if(!mobileSelect.value)return;
+      mobileChatRevoke.disabled=true;
+      try{
+        await api('/api/sky/mobile-chat/revoke',{
+          method:'POST',body:JSON.stringify({device_id:mobileSelect.value})
+        });
+        mobileChatCode.textContent='Chat del teléfono revocado. El agente Android mantiene sus permisos anteriores.';
+      }catch(e){mobileChatCode.textContent='Error al revocar el chat: '+e.message;}
+      finally{mobileChatRevoke.disabled=false;}
     });
     async function updateMobile(){
       try{
@@ -1917,6 +1943,8 @@
           'Sin teléfonos vinculados. Primero generá e ingresá el código.';
         mobileSend.disabled=!mobileSelect.value;
         mobileRevoke.disabled=!mobileSelect.value;
+        mobileChatInvite.disabled=!mobileSelect.value;
+        mobileChatRevoke.disabled=!mobileSelect.value;
       }catch(e){mobileState.textContent='No se pudieron consultar los teléfonos: '+e.message;}
     }
     mobileRefresh.addEventListener('click',updateMobile);
