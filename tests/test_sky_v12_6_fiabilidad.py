@@ -670,9 +670,9 @@ def test_artefactos_de_flutter_en_la_plantilla_no_rompen_los_disenos(tmp_path, m
     from neural_core import sky_design_studio as studio
     destino = tmp_path / studio._ALLOWED['flutter']
     shutil.copytree(studio._ROOT / studio._ALLOWED['flutter'], destino)
-    (destino / 'build' / 'test_cache').mkdir(parents=True)
+    (destino / 'build' / 'test_cache').mkdir(parents=True, exist_ok=True)
     (destino / 'build' / 'test_cache' / 'cache.dill').write_bytes(b'0' * 200_000)
-    (destino / '.dart_tool').mkdir()
+    (destino / '.dart_tool').mkdir(exist_ok=True)
     (destino / '.dart_tool' / 'package_config.json').write_text('{}')
     monkeypatch.setattr(studio, '_ROOT', tmp_path)
     archivos = studio._file_set('flutter')

@@ -15,7 +15,7 @@ except ImportError:
 
 class InstallerTests(unittest.TestCase):
     def test_ast_preserves_custom_rules_and_emergency_stop(self):
-        src = b'''def interpretar(texto):
+        src = '''def interpretar(texto):
     """Mi intérprete."""
     custom = "owner logic"
     return None
@@ -27,7 +27,7 @@ def reglas(texto):
         return stop
     custom = "more local logic"
     return None
-'''
+'''.encode('utf-8')
         changed = installer.assistant_patch(src)
         self.assertIsNotNone(changed)
         self.assertIn(b"owner logic", changed)
