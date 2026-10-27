@@ -334,6 +334,13 @@ def contexto_aprendido(texto: str) -> str:
             partes.append(operacional)
     except Exception:
         pass  # Una auditoría no puede impedir responder al usuario.
+    try:
+        from .sky_web_learning import prompt_context
+        referencias_web = prompt_context(texto)
+        if referencias_web:
+            partes.append(referencias_web)
+    except Exception:
+        pass  # La red y su caché nunca bloquean el cerebro.
     return '\n\n'.join(partes)[:5500]
 
 
