@@ -110,7 +110,7 @@ def catalogue() -> dict:
         pass
     return {
         "enabled": _active(),
-        "sdk": "mcp>=2,<3 (opcional; importación diferida)",
+        "sdk": "mcp>=1.30,<3 (opcional; importación diferida)",
         "configuration_path": str(_config_path()),
         "servers": [
             {"id": key, "source": "https://github.com/" + row[0], "category": row[1],
