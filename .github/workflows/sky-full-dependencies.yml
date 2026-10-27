@@ -1,0 +1,58 @@
+name: SKY Full Dependencies Master Installer
+on:
+  pull_request:
+    paths:
+      - 'requirements_sky_all.txt'
+      - 'INSTALAR_DEPENDENCIAS_SKY.ps1'
+      - 'scripts/sky_dependencias_todas.py'
+      - 'tests/test_sky_all_dependencies.py'
+      - 'docs/INSTALACION_COMPLETA_SKY.md'
+      - '.github/workflows/sky-full-dependencies.yml'
+  push:
+    paths:
+      - 'requirements_sky_all.txt'
+      - 'INSTALAR_DEPENDENCIAS_SKY.ps1'
+      - 'scripts/sky_dependencias_todas.py'
+      - 'tests/test_sky_all_dependencies.py'
+      - 'docs/INSTALACION_COMPLETA_SKY.md'
+      - '.github/workflows/sky-full-dependencies.yml'
+permissions:
+  contents: read
+jobs:
+  manifest:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.12']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install isolated test runner (not SKY's giant dependency set)
+        run: python -m pip install 'pytest>=8,<10'
+      - name: Audit manifest parser and no-delete one-shot setup
+        run: |
+          python -m py_compile scripts/sky_dependencias_todas.py
+          python -m pytest -q tests/test_sky_all_dependencies.py
+  powershell-syntax:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Windows installer, no downloads or install
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD "INSTALAR_DEPENDENCIAS_SKY.ps1"), [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+          Write-Host "One-shot installer syntax OK; nothing installed."
