@@ -191,6 +191,22 @@
     if (res.ok === false) return res.error || res.message || 'No se pudo completar.';
     return res.message || 'Hecho.';
   }
+  // Las respuestas conversacionales no muestran códigos ni informes internos del agente.
+  // SENT significa orden enviada, no confirma que el navegador terminó de cargar.
+  function textoAccion(p, res) {
+    if (p && p.action === 'open_url' && res && res.ok !== false && res.status === 'SENT') {
+      return 'Envié la orden para abrir la página en tu navegador.';
+    }
+    return resultText(res);
+  }
+  function renderAccion(p, card, res) {
+    if (p && p.action === 'open_url' && res && res.ok !== false && res.status === 'SENT') {
+      card.appendChild(el('div', 'res', '✓ ' + textoAccion(p, res)));
+      scroll();
+      return;
+    }
+    renderResult(card, res);
+  }
   function renderResult(card, res) {
     const ok = res && res.ok !== false;
     card.appendChild(el('div', 'res' + (ok ? '' : ' bad'), (ok ? '✓ ' : '✗ ') + resultText(res)));
@@ -545,7 +561,16 @@
       if (NO.test(t)) { addMsg('user', texto); S.pending.cancel(); speak('Cancelado.'); return; }
     }
     // Prioridad a órdenes sobre ventanas del propio SKY; no abrir Windows.
-    const localWindow = window.SKYWindowIntents && window.SKYWindowIntents.parse(texto);
+    let localWindow = window.SKYWindowIntents && window.SKYWindowIntents.parse(texto);
+    // Respaldo para la orden más frecuente si el módulo de intents está en caché.
+    if (!localWindow) {
+      const s = String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[¡!¿?.,:;]+/g, ' ').toLowerCase().replace(/\s+/g, ' ').trim()
+        .replace(/^(?:(?:oye|hey) )?(?:sky )?/, '');
+      if (/^(?:abre|abri|abrir) (?:el )?youtube$/.test(s)) {
+        localWindow = {kind:'search', provider:'youtube', mode:'normal'};
+      }
+    }
     if (localWindow) {
       addMsg('user', texto); guardarConsulta('user', texto);
       gestionarSolicitudVentana(localWindow);
@@ -823,16 +848,31 @@
     if (p.action === 'play_media' && (p.params.service || 'youtube') === 'youtube' && S.ytApi && !p.params.path) {
       await reproductor(p.params.query); return;
     }
-    const card = addCard('▸ ' + p.description, 'acción · ' + p.action + (data.nivel_riesgo ? ' · nivel ' + data.nivel_riesgo + ' ' + ['', '(bajo)', '(moderado)', '(alto: confirmación obligatoria)'][data.nivel_riesgo] : ''));
-    if (data.ejecucion) {
-      renderResult(card, data.ejecucion); setState('idle', 'Listo.');
-      await speak(resultText(data.ejecucion)); refrescarLog(); seguirConversacion(); return;
+    // Las órdenes de navegación a YouTube usan la ventana propia de SKY.
+    // No se eluden permisos del agente para otras direcciones o acciones.
+    if (p.action === 'open_url' && (data.nivel_riesgo || 0) < 3) {
+      let destino = null;
+      try { destino = new URL(String((p.params || {}).url || '')); } catch { /* URL inválida */ }
+      if (destino && destino.protocol === 'https:' &&
+          ['youtube.com','www.youtube.com','m.youtube.com'].includes(destino.hostname) &&
+          (destino.pathname === '/' || destino.pathname === '/results')) {
+        abrirBuscador('normal', 'youtube');
+        await decir('Abrí el buscador de YouTube dentro de SKY.');
+        return;
+      }
     }
-    if (data.aviso) { card.appendChild(el('div', 'note', data.aviso)); setState('idle', 'Permiso desactivado');
+    const titulo = p.action === 'open_url' ? 'Abrir página web' : p.description;
+    const card = addCard('▸ ' + titulo,
+      (data.nivel_riesgo || 0) >= 3 ? 'Necesito tu autorización explícita para continuar.' : '');
+    if (data.ejecucion) {
+      renderAccion(p, card, data.ejecucion); setState('idle', 'Listo.');
+      await speak(textoAccion(p, data.ejecucion)); refrescarLog(); seguirConversacion(); return;
+    }
+    if (data.aviso) { card.appendChild(el('div', 'note', 'Esta función está desactivada. Revisá los permisos de SKY.')); setState('idle', 'Permiso desactivado');
       await speak('Esa función está desactivada en tu equipo. Te dejé cómo activarla.'); seguirConversacion(); return; }
-    confirmar(card, p.description, () => ejecutar(p, card, data.aprender), (data.nivel_riesgo || 0) >= 3);
+    confirmar(card, titulo, () => ejecutar(p, card, data.aprender), (data.nivel_riesgo || 0) >= 3);
     setState('idle', 'Esperando tu confirmación');
-    if (modo === 'voz') { await speak('¿Lo hago? ' + p.description + '.'); if (S.conv || modo === 'voz') escuchar(); }
+    if (modo === 'voz') { await speak('¿Lo hago? ' + titulo + '.'); if (S.conv || modo === 'voz') escuchar(); }
   }
   function tarjetaParada() {
     const card = addCard('⏹ Parada de emergencia activa', 'Ninguna acción se ejecuta en tus equipos ni en tu casa hasta que la levantes.');
@@ -861,20 +901,21 @@
     S.pending = pend;
   }
   async function ejecutar(p, card, frase) {
-    setState('executing', p.description);
+    setState('executing', p.action === 'open_url' ? 'Abriendo página…' : p.description);
     try {
       const cuerpo = { action: p.action, params: p.params, dispositivo: 'local' };
       if (frase) cuerpo.frase = String(frase).slice(0, 120);
       const res = await api('/api/asistente/ejecutar', { method: 'POST', body: JSON.stringify(cuerpo) });
-      renderResult(card, res); setState('idle', 'Listo.');
+      renderAccion(p, card, res); setState('idle', 'Listo.');
       if (res && res.aprendido_ahora) card.appendChild(el('div', 's', 'Aprendido: la próxima vez lo hago al instante.'));
-      await speak(resultText(res));
+      await speak(textoAccion(p, res));
     } catch (e) { renderResult(card, { ok: false, error: e.message }); setState('error', 'No se completó'); await speak('No se pudo: ' + e.message); }
     refrescarLog(); refrescarTareas(); refrescarNotas(); seguirConversacion();
   }
   async function casaOrden(data, modo) {
     const p = data.propuesta;
-    const card = addCard('▸ ' + p.description, 'casa · ' + p.service + (data.nivel_riesgo ? ' · nivel ' + data.nivel_riesgo : ''));
+    const card = addCard('▸ ' + p.description,
+      (data.nivel_riesgo || 0) >= 3 ? 'Esta operación necesita tu autorización explícita.' : '');
     const correr = async () => {
       setState('executing', p.description);
       try {
@@ -2969,7 +3010,7 @@
     } catch { S.historyPending = true; }
     const h = new Date().getHours();
     addMsg('sky', (h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches') +
-      ', Oscar. Sistemas en línea. Tocá el núcleo para hablar, o escribime.');
+      '. Estoy lista. ¿Qué querés hacer?');
     refrescarLog(); refrescarTareas(); refrescarNotas(); refrescarVoz(); refrescarCasa();
     setInterval(refrescarEstado, 10000); setInterval(refrescarLog, 8000); setInterval(refrescarTareas, 8000);
     setInterval(refrescarVoz, 15000); setInterval(refrescarNotas, 30000); setInterval(refrescarCasa, 20000);
