@@ -208,3 +208,10 @@ def test_legacy_youtube_resolver_only_returns_verified_api_candidates():
     assert resultado["video_id"] == "abcdefghijk"
     buscar.assert_called_once()
     remote.assert_not_called()
+
+
+def test_public_scraper_compatibility_is_disabled():
+    import neural_core.sky_youtube_search as yt
+    with patch.object(yt, "urlopen") as remote:
+        assert yt.buscar_web_publica("una cancion") == []
+        remote.assert_not_called()
