@@ -87,8 +87,18 @@ def home_chat(body: HomeChat):
     try:
         result = providers.reply(messages, provider=route.provider, max_output_tokens=1200)
     except (providers.ProviderError, ValueError) as exc:
+        # Only an AUTO cloud request may fall back to a verified local model.
+        # Never change silently to a different cloud service (cost/privacy).
+        if body.proveedor == "auto" and route.remote and local:
+            try:
+                result = providers.reply(messages, provider="ollama", max_output_tokens=1200)
+            except (providers.ProviderError, ValueError) as local_exc:
+                raise HTTPException(status_code=503, detail="Nube y respaldo local no disponibles") from local_exc
+            return {"respuesta": result, "proveedor": "ollama", "nube": False,
+                    "motivo": "La nube falló; se utilizó el respaldo local autorizado",
+                    "respaldo_local": True, "acciones_ejecutadas": False}
         # Do not return SDK exceptions, credentials, prompt text or raw responses.
-        raise HTTPException(status_code=503, detail="Motor seleccionado no disponible; no se cambió de proveedor") from exc
+        raise HTTPException(status_code=503, detail="Motor seleccionado no disponible; no se cambió a otro proveedor remoto") from exc
     return {"respuesta": result, "proveedor": route.provider,
             "nube": route.remote, "motivo": route.reason,
-            "acciones_ejecutadas": False}
+            "respaldo_local": False, "acciones_ejecutadas": False}
