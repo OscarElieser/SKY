@@ -341,6 +341,13 @@ def contexto_aprendido(texto: str) -> str:
             partes.append(referencias_web)
     except Exception:
         pass  # La red y su caché nunca bloquean el cerebro.
+    try:
+        from .sky_programming_learning import prompt_context as version_context
+        avances = version_context(texto)
+        if avances:
+            partes.append(avances)
+    except Exception:
+        pass  # Nunca sacrificar el asistente por una caché de lanzamientos.
     return '\n\n'.join(partes)[:5500]
 
 
