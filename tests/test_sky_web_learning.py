@@ -80,6 +80,29 @@ class TestSkyWebLearning(unittest.TestCase):
         self.assertIn('NO artículos completos', web.prompt_context('novedades agentes inteligencia artificial'))
         self.assertEqual(web.related('mi contraseña de agentes inteligencia artificial'), [])
 
+    def test_voice_status_and_manual_sync_route_to_same_nucleus(self):
+        from neural_core import sky_aprendizaje
+        fake = {'enabled': True, 'attempted': 2, 'new': 3, 'errors': 0}
+        with patch.object(web, 'sync', return_value=fake) as run:
+            answer = sky_aprendizaje.interpretar('SKY, alimenta tu núcleo con internet')
+        self.assertEqual(answer['aprendizaje'], 'web_sync')
+        self.assertIn('3 referencias', answer['mensaje'])
+        run.assert_called_once_with()
+        with patch.object(web, 'status', return_value={'enabled': True, 'stored': 3,
+                                                         'topics': ['tecnologia']}) as state:
+            answer = sky_aprendizaje.interpretar('SKY, estado del aprendizaje web')
+        self.assertEqual(answer['aprendizaje'], 'web_estado')
+        self.assertIn('3 titulares', answer['mensaje'])
+        state.assert_called_once_with()
+
+    def test_malformed_url_rejected_without_interrupting_feed(self):
+        items = [_item(url='https://[invalid'), _item(url='https://news.google.com/rss/articles/valid')]
+        with patch.object(web, 'enabled', return_value=True), \
+             patch('neural_core.actualidad.noticias', return_value=items):
+            result = web.sync(now=NOW)
+        self.assertEqual(result['new'], 1)
+        self.assertEqual(result['errors'], 0)
+
     def test_source_failure_does_not_erase_cache_and_backoff(self):
         with patch.object(web, 'enabled', return_value=True), \
              patch('neural_core.actualidad.noticias', return_value=[_item()]):
