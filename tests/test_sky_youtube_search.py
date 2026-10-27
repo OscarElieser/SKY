@@ -177,3 +177,34 @@ def test_player_automatic_fallback_has_no_bypass():
     assert "siguiente >= 0" in script
     assert "codigo === 153" in script
     assert "Ver en YouTube" in script
+
+
+def test_legacy_youtube_resolver_never_fakes_unrelated_video():
+    import neural_core.multimedia as multimedia
+    with patch.dict("os.environ", {"YOUTUBE_API_KEY": "", "GOOGLE_API_KEY": ""}), \
+         patch.object(multimedia.request, "urlopen") as remote:
+        resultado = multimedia.resolve_youtube_video("Heroes del Silencio Entre dos tierras")
+    assert resultado["embeddable"] is False
+    assert resultado["video_id"] == ""
+    assert resultado["candidates"] == []
+    assert resultado["source"] == "youtube_api_required"
+    assert "youtube.com/results?search_query=" in resultado["url"]
+    remote.assert_not_called()
+
+
+def test_legacy_youtube_resolver_only_returns_verified_api_candidates():
+    import neural_core.multimedia as multimedia
+    candidatos = [{
+        "id": "abcdefghijk", "title": "Video autorizado",
+        "channel": "Canal oficial", "embeddable": True,
+        "url": "https://www.youtube.com/watch?v=abcdefghijk",
+    }]
+    with patch.dict("os.environ", {"YOUTUBE_API_KEY": "test-key"}), \
+         patch.object(multimedia, "_search_youtube_api", return_value=candidatos) as buscar, \
+         patch.object(multimedia.request, "urlopen") as remote:
+        resultado = multimedia.resolve_youtube_video("Video autorizado")
+    assert resultado["embeddable"] is True
+    assert resultado["source"] == "youtube_api_v3"
+    assert resultado["video_id"] == "abcdefghijk"
+    buscar.assert_called_once()
+    remote.assert_not_called()
