@@ -87,9 +87,9 @@ def _intencion_youtube(frase: str, mode: str) -> dict | None:
         r"(?:(?:cancion|canciones|musica|tema|temas|video|videos|"
         r"videoclip|videoclips|cancioncita)(?:\s+(?:de|del))?\s+)", "", resto).strip()
     resto = re.sub(r"^(?:la|el)\s+de\s+", "", resto).strip()
-    sin_articulo = re.sub(r"^(?:(?:la|el|los|las|un|una|mi|mis)\s+)", "", resto)
-    if not resto or re.match(r"^(?:volumen|alarma|recordatorio|temporizador|"
-                           r"ajustes|configuracion)\b", sin_articulo):
+    # No descartar el título de una canción solo porque se llame "Alarma"
+    # o "Recordatorio": los objetos de agenda se filtraron ANTES del título.
+    if not resto:
         return None
     return {"kind": "youtube", "query": resto[:120], "mode": mode}
 
