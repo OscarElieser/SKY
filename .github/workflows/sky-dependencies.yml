@@ -1,0 +1,57 @@
+name: SKY Windows installer reuse and dependency audit
+on:
+  pull_request:
+    paths:
+      - 'instalar_sky.ps1'
+      - 'INSTALAR_SKY_WINDOWS.bat'
+      - 'scripts/sky_dependencias.py'
+      - 'tests/test_sky_dependencias.py'
+      - '.github/workflows/sky-dependencies.yml'
+  push:
+    paths:
+      - 'instalar_sky.ps1'
+      - 'INSTALAR_SKY_WINDOWS.bat'
+      - 'scripts/sky_dependencias.py'
+      - 'tests/test_sky_dependencias.py'
+      - '.github/workflows/sky-dependencies.yml'
+permissions:
+  contents: read
+jobs:
+  dependency-audit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated test runner
+        run: python -m pip install 'pytest>=8,<10'
+      - name: Compile and test no-download requirements checker
+        run: |
+          python -m py_compile scripts/sky_dependencias.py
+          python -m pytest -q tests/test_sky_dependencias.py
+      - name: Read-only check using current interpreter
+        run: python scripts/sky_dependencias.py --paquetes pip --json
+  installer-syntax-windows:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check PowerShell parser (does not run installer)
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD "instalar_sky.ps1"), [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+          Write-Host "Installer PowerShell syntax OK. No packages installed."

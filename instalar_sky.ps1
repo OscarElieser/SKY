@@ -8,6 +8,9 @@ param(
     [string]$Modelo = "",          # ej. qwen2.5:7b ; vacio = elegir segun la memoria del equipo
     [switch]$SinOllama,
     [switch]$SinVoz,
+    [switch]$SoloVerificarDependencias, # solo lectura, sin descargas
+    [switch]$SoloDependencias,          # no instala Ollama ni modelos
+    [switch]$ActualizarPip,            # sólo si se solicita explícitamente
     [switch]$Local,                # activa SKY_LOCAL_ONLY=1 (nada sale del equipo)
     [switch]$Siempre               # SKY 24/7: arranca con Windows y el equipo no se suspende enchufado
 )
@@ -17,7 +20,9 @@ $ProgressPreference = "SilentlyContinue"
 $Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Raiz
 $Neuralt = Join-Path $env:USERPROFILE ".neuralt"
-New-Item -ItemType Directory -Force -Path $Neuralt | Out-Null
+if (-not $SoloVerificarDependencias) {
+    New-Item -ItemType Directory -Force -Path $Neuralt | Out-Null
+}
 
 function Paso($t) { Write-Host ""; Write-Host "== $t" -ForegroundColor Cyan }
 function Ok($t)   { Write-Host "   [OK] $t" -ForegroundColor Green }
@@ -54,27 +59,74 @@ function Tiene($cmd) { return [bool](Get-Command $cmd -ErrorAction SilentlyConti
 
 # ------------------------------------------------------------------ 1. Python
 Paso "Python"
+$venvPy = Join-Path $Raiz ".venv\Scripts\python.exe"
 $py = $null
-foreach ($c in @("py -3.12", "py -3.11", "python")) {
-    try { $v = & cmd /c "$c --version 2>&1"; if ($v -match "Python 3\.(1[0-3])") { $py = $c; break } } catch {}
+if (Test-Path $venvPy) {
+    # Prioridad absoluta al Python de SKY (no depender del pip global).
+    & $venvPy --version
+    if ($LASTEXITCODE -ne 0) { throw "El Python de .venv no responde. No se borro ni reemplazo." }
+    Ok "Se conserva el Python de .venv"
+} else {
+    if ($SoloVerificarDependencias) {
+        throw "No existe .venv. La verificacion de solo lectura no crea entornos."
+    }
+    foreach ($c in @("py -3.12", "py -3.11", "python")) {
+        try { $v = & cmd /c "$c --version 2>&1"; if ($v -match "Python 3\.(1[0-3])") { $py = $c; break } } catch {}
+    }
+    if (-not $py) {
+        if (Tiene "winget") {
+            winget install -e --id Python.Python.3.12 --accept-package-agreements --accept-source-agreements --silent
+            $py = "py -3.12"
+        } else { throw "Instala Python 3.12 desde https://www.python.org/downloads/ y vuelve a ejecutar este instalador." }
+    }
+    Ok "Python para crear .venv: $py"
 }
-if (-not $py) {
-    if (Tiene "winget") {
-        winget install -e --id Python.Python.3.12 --accept-package-agreements --accept-source-agreements --silent
-        $py = "py -3.12"
-    } else { throw "Instala Python 3.12 desde https://www.python.org/downloads/ y vuelve a ejecutar este instalador." }
-}
-Ok "Usando: $py"
 
 # ------------------------------------------------------------------ 2. Entorno y dependencias
-Paso "Entorno virtual y dependencias (puede tardar varios minutos la primera vez)"
-$venvPy = Join-Path $Raiz ".venv\Scripts\python.exe"
-if (-not (Test-Path $venvPy)) { & cmd /c "$py -m venv .venv"; if ($LASTEXITCODE) { throw "No se pudo crear .venv" } }
-& $venvPy -m pip install --upgrade pip --quiet
-& $venvPy -m pip install -r requirements.txt --quiet
-if ($LASTEXITCODE) { throw "Fallo la instalacion de requirements.txt" }
-& $venvPy -m pip install --quiet faster-whisper vosk sounddevice pyttsx3 psutil pywin32
-if ($LASTEXITCODE) { Aviso "Alguna dependencia opcional de voz no se instalo; SKY seguira funcionando." } else { Ok "Dependencias instaladas" }
+Paso "Verificacion de dependencias (sin descargar si ya estan instaladas)"
+if (-not (Test-Path $venvPy)) {
+    & cmd /c "$py -m venv .venv"
+    if ($LASTEXITCODE -ne 0) { throw "No se pudo crear .venv" }
+}
+$auditor = Join-Path $Raiz "scripts\sky_dependencias.py"
+if (-not (Test-Path $auditor)) { throw "Falta scripts/sky_dependencias.py en esta version de SKY." }
+& $venvPy $auditor --requirements (Join-Path $Raiz "requirements.txt")
+$estadoRequisitos = $LASTEXITCODE
+if ($SoloVerificarDependencias) { exit $estadoRequisitos }
+if ($estadoRequisitos -eq 2) { throw "No fue posible auditar los requisitos. No se instala a ciegas." }
+if ($ActualizarPip) {
+    & $venvPy -m pip install --upgrade pip
+    if ($LASTEXITCODE -ne 0) { throw "No fue posible actualizar pip del entorno virtual." }
+}
+if ($estadoRequisitos -eq 1) {
+    Paso "Instalando requisitos ausentes o incompatibles"
+    & $venvPy -m pip install -r requirements.txt
+    if ($LASTEXITCODE -ne 0) { throw "Fallo la instalacion de requirements.txt" }
+} else { Ok "Requisitos declarados satisfechos: no se reinstalan" }
+
+# Las librerias opcionales de voz no deben descargarse con -SinVoz.
+if (-not $SinVoz) {
+    $vozPaquetes = @("faster-whisper", "vosk", "sounddevice", "pyttsx3", "psutil", "pywin32")
+    & $venvPy $auditor --paquetes $vozPaquetes
+    $estadoVoz = $LASTEXITCODE
+    if ($estadoVoz -eq 1) {
+        & $venvPy -m pip install $vozPaquetes
+        if ($LASTEXITCODE -ne 0) {
+            Aviso "Alguna dependencia opcional de voz no se instalo; SKY seguira funcionando."
+        }
+    } elseif ($estadoVoz -eq 2) {
+        Aviso "No se pudieron comprobar las dependencias opcionales de voz."
+    } else { Ok "Dependencias de voz existentes: no se reinstalan" }
+} else { Ok "SinVoz: se omiten las dependencias y los modelos locales de voz" }
+
+& $venvPy -m pip check
+if ($LASTEXITCODE -ne 0) {
+    throw "pip check detecto conflictos en .venv; revisar antes de activar SKY."
+}
+if ($SoloDependencias) {
+    Ok "Dependencias listas; sin instalar modelos ni modificar el arranque"
+    exit 0
+}
 
 # ------------------------------------------------------------------ 3. Ollama + modelo del cerebro
 if (-not $SinOllama) {
@@ -97,8 +149,23 @@ if (-not $SinOllama) {
         }
         try { Invoke-WebRequest -Uri "http://127.0.0.1:11434/api/tags" -UseBasicParsing -TimeoutSec 2 | Out-Null }
         catch { Start-Process -WindowStyle Hidden -FilePath $ollama -ArgumentList "serve"; Start-Sleep -Seconds 4 }
-        & $ollama pull $Modelo
-        if ($LASTEXITCODE) { Aviso "No se pudo descargar $Modelo. Ejecuta luego: ollama pull $Modelo" } else { Ok "Modelo $Modelo listo" }
+        # Consultar el inventario local antes de descargar un modelo ya existente.
+        $listaModelos = @(& $ollama list 2>$null)
+        $modeloPresente = $false
+        if ($LASTEXITCODE -eq 0) {
+            foreach ($linea in $listaModelos) {
+                $nombreLocal = (($linea.ToString().Trim()) -split '\s+')[0]
+                if ($nombreLocal -eq $Modelo) { $modeloPresente = $true; break }
+            }
+        }
+        if ($modeloPresente) {
+            Ok "Modelo $Modelo ya descargado: se conserva sin repetir ollama pull"
+        } else {
+            & $ollama pull $Modelo
+            if ($LASTEXITCODE -ne 0) {
+                Aviso "No se pudo descargar $Modelo. Ejecuta luego: ollama pull $Modelo"
+            } else { Ok "Modelo $Modelo listo" }
+        }
         Set-EnvValue "OLLAMA_MODEL" $Modelo
     } else { Aviso "Instala Ollama desde https://ollama.com/download y luego: ollama pull qwen2.5:7b" }
 }
