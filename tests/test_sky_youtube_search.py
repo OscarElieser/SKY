@@ -1,0 +1,79 @@
+"""Pruebas de metadatos YouTube sin red para la búsqueda integrada de SKY."""
+import json
+from unittest.mock import patch
+
+from neural_core import sky_youtube_search as yt
+
+
+def _pagina(videos):
+    return "<script>var ytInitialData = " + json.dumps({
+        "contents": {"sectionListRenderer": {"contents": [
+            {"itemSectionRenderer": {"contents": [
+                {"videoRenderer": video} for video in videos
+            ]}}
+        ]}}
+    }) + ";</script>"
+
+
+def test_youtube_public_results_have_real_ids_titles_and_channels():
+    pagina = _pagina([
+        {"videoId": "abcdefghijk", "title": {"runs": [{"text": "Reik - "},
+            {"text": "Te fuiste de aquí"}]}, "ownerText": {"runs": [{"text": "ReikVEVO"}]}},
+        {"videoId": "abcdefghijk", "title": {"simpleText": "Duplicado"}},
+        {"videoId": "NO", "title": {"simpleText": "Inválido"}},
+        {"videoId": "lmnopqrstuv", "title": {"simpleText": "Reik - En concierto"}},
+    ])
+    result = yt.extraer_resultados_web(pagina)
+    assert result == [
+        {"id": "abcdefghijk", "title": "Reik - Te fuiste de aquí", "channel": "ReikVEVO"},
+        {"id": "lmnopqrstuv", "title": "Reik - En concierto", "channel": ""}
+    ]
+
+
+def test_youtube_public_result_parser_rejects_missing_or_malformed_data():
+    assert yt.extraer_resultados_web("YouTube bloqueó el acceso") == []
+    assert yt.extraer_resultados_web("var ytInitialData = {malformed}") == []
+    assert yt.extraer_resultados_web(_pagina([
+        {"videoId": "11111111111", "title": {"runs": []}},
+        {"videoId": "http://evil", "title": {"simpleText": "X"}},
+    ])) == []
+
+
+def test_youtube_api_is_preferred_and_verifies_embeddable():
+    api = [{"id": "abcdefghijk", "title": "Reik - Te fuiste de aquí",
+            "url": "https://www.youtube.com/watch?v=abcdefghijk"}]
+    with patch("neural_core.multimedia._search_youtube_api", return_value=api) as official, \
+         patch.object(yt, "buscar_web_publica") as public:
+        result = yt.buscar_videos("Reik Te fuiste de aquí", clave="fake-test-key")
+    assert result["verificado"] is True
+    assert result["origen"] == "youtube_data_api"
+    assert result["videos"][0]["id"] == "abcdefghijk"
+    official.assert_called_once()
+    public.assert_not_called()
+
+
+def test_youtube_without_key_searches_public_page_without_substitution():
+    esperado = [{"id": "abcdefghijk", "title": "Reik - Te fuiste de aquí"}]
+    with patch.object(yt, "buscar_web_publica", return_value=esperado) as public:
+        result = yt.buscar_videos("Reik Te fuiste de aquí")
+    assert result["videos"] == esperado
+    assert result["verificado"] is False
+    public.assert_called_once_with("Reik Te fuiste de aquí", 6)
+
+
+def test_youtube_offline_reports_error_instead_of_fake_video():
+    with patch.object(yt, "buscar_web_publica", side_effect=TimeoutError):
+        result = yt.buscar_videos("Reik Te fuiste de aquí")
+    assert result["videos"] == []
+    assert result["origen"] == "sin_resultados"
+    assert "Queen" not in str(result)
+    assert result["motivo"]
+
+
+def test_fallback_when_api_fails():
+    with patch("neural_core.multimedia._search_youtube_api", side_effect=TimeoutError), \
+         patch.object(yt, "buscar_web_publica", return_value=[
+             {"id": "abcdefghijk", "title": "Reik - Te fuiste de aquí"}]):
+        result = yt.buscar_videos("Reik", clave="test-key")
+    assert result["origen"] == "youtube_web_publica"
+    assert result["verificado"] is False
