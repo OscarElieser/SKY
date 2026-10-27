@@ -41,7 +41,7 @@ def test_youtube_public_result_parser_rejects_missing_or_malformed_data():
 
 def test_youtube_api_is_preferred_and_verifies_embeddable():
     api = [{"id": "abcdefghijk", "title": "Reik - Te fuiste de aquí",
-            "url": "https://www.youtube.com/watch?v=abcdefghijk"}]
+            "embeddable": True, "url": "https://www.youtube.com/watch?v=abcdefghijk"}]
     with patch("neural_core.multimedia._search_youtube_api", return_value=api) as official, \
          patch.object(yt, "buscar_web_publica") as public:
         result = yt.buscar_videos("Reik Te fuiste de aquí", clave="fake-test-key")
@@ -52,31 +52,71 @@ def test_youtube_api_is_preferred_and_verifies_embeddable():
     public.assert_not_called()
 
 
-def test_youtube_without_key_searches_public_page_without_substitution():
-    esperado = [{"id": "abcdefghijk", "title": "Reik - Te fuiste de aquí"}]
-    with patch.object(yt, "buscar_web_publica", return_value=esperado) as public:
-        result = yt.buscar_videos("Reik Te fuiste de aquí")
-    assert result["videos"] == esperado
-    assert result["verificado"] is False
-    public.assert_called_once_with("Reik Te fuiste de aquí", 6)
+def test_without_key_never_scrapes_youtube():
+    with patch.object(yt, "buscar_web_publica") as legacy:
+        resultado = yt.buscar_videos("Heroes del Silencio Entre dos tierras")
+    assert resultado["videos"] == []
+    assert resultado["origen"] == "sin_api_oficial"
+    assert "YOUTUBE_API_KEY" in resultado["motivo"]
+    legacy.assert_not_called()
 
 
-def test_youtube_offline_reports_error_instead_of_fake_video():
-    with patch.object(yt, "buscar_web_publica", side_effect=TimeoutError):
-        result = yt.buscar_videos("Reik Te fuiste de aquí")
-    assert result["videos"] == []
-    assert result["origen"] == "sin_resultados"
-    assert "Queen" not in str(result)
-    assert result["motivo"]
-
-
-def test_fallback_when_api_fails():
+def test_official_api_failure_never_falls_back_to_scraping():
     with patch("neural_core.multimedia._search_youtube_api", side_effect=TimeoutError), \
-         patch.object(yt, "buscar_web_publica", return_value=[
-             {"id": "abcdefghijk", "title": "Reik - Te fuiste de aquí"}]):
-        result = yt.buscar_videos("Reik", clave="test-key")
-    assert result["origen"] == "youtube_web_publica"
-    assert result["verificado"] is False
+         patch.object(yt, "buscar_web_publica") as legacy:
+        resultado = yt.buscar_videos("Heroes del Silencio", clave="test-key")
+    assert resultado["videos"] == []
+    assert resultado["origen"] == "error_api_oficial"
+    legacy.assert_not_called()
+
+
+def test_youtube_official_search_filters_non_embeddable_videos():
+    import io
+    from urllib.parse import urlparse, parse_qs
+    from neural_core.multimedia import _search_youtube_api
+    import neural_core.multimedia as multimedia
+
+    urls = []
+    def mock_request(req, timeout=7):
+        urls.append(req.full_url)
+        if "/search?" in req.full_url:
+            data = {"items": [
+                {"id": {"videoId": "abcdefghijk"}},
+                {"id": {"videoId": "lmnopqrstuv"}},
+                {"id": {"videoId": "0123456789A"}},
+                {"id": {"videoId": "QWERTY12345"}},
+            ]}
+        else:
+            data = {"items": [
+                {"id": "abcdefghijk", "status": {"embeddable": True, "privacyStatus": "public"},
+                 "snippet": {"title": "Canción oficial", "channelTitle": "Artista"}},
+                {"id": "lmnopqrstuv", "status": {"embeddable": False, "privacyStatus": "public"},
+                 "snippet": {"title": "No incrustable"}},
+                {"id": "0123456789A", "status": {"embeddable": True, "privacyStatus": "private"},
+                 "snippet": {"title": "Video privado"}},
+                {"id": "QWERTY12345", "status": {"embeddable": True, "privacyStatus": "public"},
+                 "contentDetails": {"regionRestriction": {"blocked": ["NI"]}},
+                 "snippet": {"title": "Bloqueado en Nicaragua"}},
+            ]}
+        return io.BytesIO(json.dumps(data).encode("utf-8"))
+
+    with patch.object(multimedia.request, "urlopen", side_effect=mock_request), \
+         patch.dict("os.environ", {"SKY_YOUTUBE_REGION": "NI"}):
+        resultado = _search_youtube_api("Canción oficial", "test-key")
+
+    assert [x["id"] for x in resultado] == ["abcdefghijk"]
+    assert resultado[0]["channel"] == "Artista"
+    assert "videoEmbeddable=true" in urls[0]
+    assert "/videos?" in urls[1]
+    assert parse_qs(urlparse(urls[1]).query)["part"] == ["status,snippet,contentDetails"]
+
+
+def test_youtube_api_skips_when_no_key():
+    from neural_core.multimedia import _search_youtube_api
+    import neural_core.multimedia as multimedia
+    with patch.object(multimedia.request, "urlopen") as remote:
+        assert _search_youtube_api("Canción", "") == []
+        remote.assert_not_called()
 
 
 def test_hud_youtube_playback_not_blocked_by_missing_api_key():
@@ -126,3 +166,14 @@ def test_hud_observes_real_embed_player_errors_without_guessing():
     assert "codigo === 100" in script
     assert "vigilarReproductor(iframe, v.id, barra)" in script
     assert "encodeURIComponent(window.location.origin)" in script
+
+def test_player_automatic_fallback_has_no_bypass():
+    from pathlib import Path
+    script = (Path(__file__).resolve().parents[1] / "metaverse" / "static" / "hud.js").read_text(encoding="utf-8")
+    assert "const YT = 'https://www.youtube.com';" in script
+    assert "ytIntentos = new Set()" in script
+    assert "[5, 100, 101, 150].includes(codigo)" in script
+    assert "!ytIntentos.has(v.id)" in script
+    assert "siguiente >= 0" in script
+    assert "codigo === 153" in script
+    assert "Ver en YouTube" in script
