@@ -19,6 +19,42 @@ object SkyNetwork {
         }
         return value
     }
+    /** Chat endpoints are strictly allowlisted and never accept the owner API key. */
+    fun requestChat(server: String, path: String, token: String,
+                    data: JSONObject): JSONObject {
+        require(path == "/api/sky/mobile-chat/pair" ||
+                path == "/api/sky/mobile-chat/chat") { "Ruta móvil no permitida" }
+        val base = validateServer(server)
+        val conn = URL(base + path).openConnection() as HttpURLConnection
+        try {
+            conn.requestMethod = "POST"
+            conn.instanceFollowRedirects = false
+            conn.connectTimeout = 8000
+            conn.readTimeout = if (path.endsWith("/chat")) 90000 else 8000
+            conn.setRequestProperty("Accept", "application/json")
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            val header = if (path.endsWith("/pair")) "X-SKY-MOBILE-TOKEN" else "X-SKY-CHAT-TOKEN"
+            conn.setRequestProperty(header, token)
+            conn.doOutput = true
+            conn.outputStream.use { it.write(data.toString().toByteArray(Charsets.UTF_8)) }
+            val code = conn.responseCode
+            if (code !in 200..299) throw IllegalStateException("SKY Chat respondió HTTP " + code)
+            val output = ByteArrayOutputStream()
+            conn.inputStream.use { stream ->
+                val bytes = ByteArray(2048)
+                while (output.size() <= 32768) {
+                    val count = stream.read(bytes)
+                    if (count < 0) break
+                    output.write(bytes, 0, count)
+                }
+            }
+            require(output.size() <= 32768) { "Respuesta de chat demasiado grande" }
+            return JSONObject(output.toString("UTF-8"))
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     fun request(server: String, path: String, method: String,
                 token: String? = null, data: JSONObject? = null): JSONObject {
         val base = validateServer(server)

@@ -46,5 +46,28 @@ class PrivateTokenStore(context: Context) {
             String(c.doFinal(Base64.decode(encrypted, Base64.NO_WRAP)), Charsets.UTF_8)
         } catch (_: Exception) { "" }
     }
+    /** Independent chat credential, encrypted under a fresh AES-GCM IV. */
+    fun saveChat(token: String) {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key())
+        prefs.edit()
+            .putString("chat_iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            .putString("chat_token", Base64.encodeToString(
+                cipher.doFinal(token.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP))
+            .apply()
+    }
+    fun chatToken(): String {
+        val iv = prefs.getString("chat_iv", "") ?: ""
+        val encrypted = prefs.getString("chat_token", "") ?: ""
+        if (iv.isEmpty() || encrypted.isEmpty()) return ""
+        return try {
+            val c = Cipher.getInstance("AES/GCM/NoPadding")
+            c.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)))
+            String(c.doFinal(Base64.decode(encrypted, Base64.NO_WRAP)), Charsets.UTF_8)
+        } catch (_: Exception) { "" }
+    }
+    fun clearChat() {
+        prefs.edit().remove("chat_iv").remove("chat_token").apply()
+    }
     fun clear() { prefs.edit().clear().apply() }
 }
