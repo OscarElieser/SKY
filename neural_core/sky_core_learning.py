@@ -87,9 +87,14 @@ def diagnostico() -> dict:
         calificaciones = feedback_resumen()
     except (ImportError, OSError, sqlite3.Error, ValueError):
         calificaciones = []
+    try:
+        from .sky_web_learning import status as estado_web
+        web = estado_web()
+    except Exception:
+        web = {"enabled": False, "stored": 0, "last_ingestion_utc": None}
     return {"modulos_catalogados": len(modulos), "catalogo": modulos,
             "ejecuciones_verificadas": verificados, "valoraciones": calificaciones,
-            "telemetria": _telemetria(), "modelo_reentrenado": False,
+            "telemetria": _telemetria(), "web": web, "modelo_reentrenado": False,
             "politica": "Observaciones consultivas; ninguna capacidad o permiso se amplía automáticamente."}
 
 
@@ -148,10 +153,15 @@ def explicar_estado() -> str:
     datos = diagnostico()
     v = datos["ejecuciones_verificadas"]
     t = datos["telemetria"]
+    web = datos.get("web") or {}
+    conocimiento_web = (f" He guardado {web.get('stored', 0)} referencias públicas de internet, "
+                        "con fecha y fuente; son titulares no verificados."
+                        if web.get("stored") else "")
     return (f"Tengo {datos['modulos_catalogados']} componentes catalogados. "
             f"Registro {v.get('completed', 0)} ciclos completados con evidencia y "
             f"{v.get('failed', 0)} fallidos; además, {t['acciones_reportadas']} "
             f"acciones reportadas en los últimos 30 días. "
             "Aprovecho estos resultados y tus correcciones para orientar mis respuestas, "
             "pero no modifico mi código, mis permisos ni los pesos del modelo por mi cuenta. "
-            "No todos los módulos tienen todavía seguimiento individual de resultados.")
+            "No todos los módulos tienen todavía seguimiento individual de resultados."
+            + conocimiento_web)
