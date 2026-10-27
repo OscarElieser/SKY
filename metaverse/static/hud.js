@@ -1226,7 +1226,7 @@
   function arrastrable(w, asa) {
     let sx, sy, ox, oy, mov = false;
     asa.addEventListener('pointerdown', (e) => {
-      if (e.target.tagName === 'BUTTON' || w.classList.contains('max')) return;
+      if (['BUTTON', 'A'].includes(e.target.tagName) || w.classList.contains('max')) return;
       mov = true; sx = e.clientX; sy = e.clientY; ox = w.offsetLeft; oy = w.offsetTop; asa.setPointerCapture(e.pointerId);
     });
     asa.addEventListener('pointermove', (e) => {
