@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.InputFilter
 import android.text.InputType
 import android.widget.Button
 import android.widget.CheckBox
@@ -12,6 +13,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
@@ -27,6 +29,13 @@ class MainActivity : Activity() {
     private lateinit var deviceInput: EditText
     private lateinit var codeInput: EditText
     private lateinit var status: TextView
+    private lateinit var chatCodeInput: EditText
+    private lateinit var chatInput: EditText
+    private lateinit var chatOutput: TextView
+    private lateinit var cloudConsent: CheckBox
+    private lateinit var privateConsent: CheckBox
+    private val chatHistory = JSONArray()
+    @Volatile private var chatPending = false
     @Volatile private var pendingCommand: String? = null
     @Volatile private var polling = false
     private var visible = false
@@ -90,6 +99,31 @@ class MainActivity : Activity() {
         }
         content.addView(actionButton("Consultar órdenes ahora") { poll() })
         content.addView(actionButton("Estado de mi servidor SKY") { checkHomeStatus() })
+        content.addView(description("SKY CHAT — texto. Requiere permiso separado del propietario."))
+        chatCodeInput = input("Código temporal de chat autorizado por el dueño", true)
+        content.addView(chatCodeInput)
+        content.addView(actionButton("Activar chat por 24 horas") { pairChat() })
+        chatInput = EditText(this).apply {
+            hint = "Escribí a SKY..."
+            setSingleLine(false)
+            minLines = 2
+            maxLines = 5
+            filters = arrayOf(InputFilter.LengthFilter(4000))
+        }
+        content.addView(chatInput)
+        cloudConsent = CheckBox(this).apply {
+            text = "Permito usar la nube para ESTE mensaje (incluye historial enviado)"
+            isChecked = false
+        }
+        privateConsent = CheckBox(this).apply {
+            text = "Permito transmitir datos privados de ESTE mensaje e historial a la nube"
+            isChecked = false
+        }
+        content.addView(cloudConsent)
+        content.addView(privateConsent)
+        content.addView(actionButton("Enviar mensaje a SKY") { sendChat() })
+        chatOutput = description("Chat limitado a texto. No controla dispositivos ni accede a archivos.")
+        content.addView(chatOutput)
         content.addView(description("SKY consulta cada 6 segundos mientras la app está visible. Esta versión no funciona con pantalla bloqueada."))
     }
 
@@ -160,6 +194,73 @@ class MainActivity : Activity() {
             val mode = if (reply.optBoolean("local_only")) "solo local" else "híbrido permitido"
             setStatus("Servidor SKY conectado. " + local + " · " + cloud + " · modo " + mode +
                 ". Este agente aún no tiene permiso de chat.")
+        }
+    }
+
+    private fun pairChat() {
+        val id = tokens.deviceId()
+        val agentToken = tokens.token()
+        val code = chatCodeInput.text.toString().trim()
+        if (id.isEmpty() || agentToken.isEmpty()) {
+            setStatus("Primero vinculá el agente Android con SKY.")
+            return
+        }
+        if (code.isEmpty()) {
+            setStatus("Generá el código de chat desde el servidor con sesión de propietario y MFA.")
+            return
+        }
+        execute {
+            val result = SkyNetwork.requestChat(tokens.server(), "/api/sky/mobile-chat/pair",
+                agentToken, JSONObject().put("device_id", id).put("code", code))
+            tokens.saveChat(result.getString("token"))
+            runOnUiThread { chatCodeInput.setText("") }
+            setStatus("Chat autorizado durante 24 horas. No incluye control de dispositivos.")
+        }
+    }
+
+    private fun sendChat() {
+        val id = tokens.deviceId()
+        val token = tokens.chatToken()
+        val message = chatInput.text.toString().trim()
+        if (id.isEmpty() || token.isEmpty()) {
+            setStatus("Antes de conversar activá el chat con autorización del propietario.")
+            return
+        }
+        if (message.isEmpty() || chatPending) return
+        // Each request requires fresh opt-in; checkboxes are reset immediately.
+        val cloud = cloudConsent.isChecked
+        val privateData = privateConsent.isChecked
+        cloudConsent.isChecked = false
+        privateConsent.isChecked = false
+        chatPending = true
+        execute {
+            try {
+                val history = JSONArray()
+                val begin = maxOf(0, chatHistory.length() - 8)
+                for (i in begin until chatHistory.length()) {
+                    history.put(chatHistory.getJSONObject(i))
+                }
+                val payload = JSONObject()
+                    .put("device_id", id)
+                    .put("texto", message)
+                    .put("historial", history)
+                    .put("proveedor", "auto")
+                    .put("datos", "privados")
+                    .put("autorizar_nube", cloud)
+                    .put("autorizar_datos_privados", privateData)
+                val reply = SkyNetwork.requestChat(tokens.server(), "/api/sky/mobile-chat/chat",
+                    token, payload)
+                val answer = reply.optString("respuesta", "SKY no devolvió texto.")
+                chatHistory.put(JSONObject().put("role", "user").put("content", message))
+                chatHistory.put(JSONObject().put("role", "assistant").put("content", answer.take(2000)))
+                runOnUiThread {
+                    chatInput.setText("")
+                    chatOutput.text = "SKY: " + answer + "\nMotor: " +
+                        reply.optString("proveedor", "desconocido")
+                }
+            } finally {
+                chatPending = false
+            }
         }
     }
 
