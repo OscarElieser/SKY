@@ -36,6 +36,23 @@ def test_pair_one_time_and_revocation(isolated_db):
         m.poll(device["device_id"], device["token"])
 
 
+def test_home_status_is_readonly_and_respects_revocation(isolated_db):
+    code = m.pairing_code()["code"]
+    paired = m.pair(code, "Android Personal")
+    device_id, token = paired["device_id"], paired["token"]
+    assert m.device_status(device_id, token) == {"authorized": True}
+    with pytest.raises(PermissionError):
+        m.device_status(device_id, "incorrect")
+    # A status request must not consume a queued command.
+    command = m.queue(device_id, "youtube")
+    m.device_status(device_id, token)
+    polled = m.poll(device_id, token)["command"]
+    assert polled["id"] == command["command_id"]
+    m.revoke(device_id, token)
+    with pytest.raises(PermissionError):
+        m.device_status(device_id, token)
+
+
 def test_strict_allowlist_and_voice(isolated_db):
     assert m.parse_voice("SKY, abrí WhatsApp en mi teléfono") == "whatsapp"
     assert m.parse_voice("Abre YouTube en el celular") == "youtube"
