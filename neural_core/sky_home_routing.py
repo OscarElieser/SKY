@@ -32,8 +32,8 @@ def choose_home_route(
     """Select a provider without contacting it or silently changing services.
 
     A cloud key alone is NOT consent. Private data is the safe default.
-    There is no fallback after a selected provider fails; the caller must
-    request another attempt with new, explicit approval.
+    This pure selector never retries. The API may use a disclosed LOCAL-only
+    backup for an authorized AUTO cloud request; never another cloud service.
     """
     if requested not in ALLOWED:
         raise ValueError("Proveedor no permitido para SKY Home.")
