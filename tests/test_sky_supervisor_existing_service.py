@@ -31,5 +31,32 @@ class ExistingSKYProcessSafetyTests(unittest.TestCase):
             spawn.assert_not_called()
 
 
+    def test_voice_mismatched_pid_does_not_kill_a_healthy_other_listener(self):
+        """A live SKY Vosk listener must not be killed for another PID's state."""
+        import time
+        from types import SimpleNamespace
+
+        supervisor = launcher.SkySupervisor(with_voice=False, open_browser=False)
+        supervisor.intervalo_sonda = 0
+        voz = launcher.Servicio(
+            "voice", [], sonda=lambda: (False, "todavía no informó su estado"),
+            colgado_tras=90,
+        )
+        voz.proc = SimpleNamespace(pid=1111, poll=lambda: None)
+        voz.estado = "activo"
+        voz.primera_falla = time.time() - 120
+        supervisor.servicios["voice"] = voz
+        with patch.object(launcher, "_pid_escucha_vivo", return_value=2222), \
+             patch.object(launcher, "sonda_voz", return_value=(True, "escuchando")) as probe, \
+             patch.object(supervisor, "_terminar") as terminate:
+            supervisor.revisar()
+            terminate.assert_not_called()
+            probe.assert_called_once_with(2222)
+        self.assertIsNotNone(voz.proc)
+        self.assertEqual(voz.estado, "degradado")
+        self.assertIn("otro PID (2222)", voz.causa)
+        self.assertEqual(voz.primera_falla, 0.0)
+        self.assertEqual(voz.fallas_sonda, 0)
+
 if __name__ == '__main__':
     unittest.main()
