@@ -94,6 +94,8 @@ async def _web_learning_pump():
         try:
             from neural_core.sky_web_learning import sync
             await asyncio.to_thread(sync)
+            from neural_core.sky_programming_learning import sync as sync_programming
+            await asyncio.to_thread(sync_programming)
         except Exception:
             # Ningún error RSS impide usar SKY. Estado visible en aprendizaje web.
             pass
