@@ -1161,6 +1161,7 @@
   // Solo accesos internos conocidos. No abrir enlaces arbitrarios por un texto.
   function ordenVentanaLocal(sentence) {
     const s = String(sentence || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()
+      .replace(/[.!?]+$/g,'').trim()
       .replace(/^(oye|hey)\s+/,'').replace(/^sky[,.:\s-]+/,'');
     if (!/^(abre|abri|abrir|mostra|muestra|mostrar)\s+/.test(s)) return null;
     const target=s.replace(/^(abre|abri|abrir|mostra|muestra|mostrar)\s+/,'')
