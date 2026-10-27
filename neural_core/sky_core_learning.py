@@ -113,6 +113,21 @@ def contexto_para_cerebro(texto: str) -> str:
                       f"{verificados.get('completed', 0)} ciclos completados y "
                       f"{verificados.get('failed', 0)} fallidos. "
                       "Esto no demuestra competencia en una tarea distinta.")
+    # Solo medias y cantidad de evaluaciones del propietario, jamás comentarios libres.
+    # El feedback orienta precauciones; no modifica código, herramientas ni permisos.
+    valoraciones = {str(v.get("module", "")).casefold(): v
+                   for v in datos.get("valoraciones", []) if isinstance(v, dict)}
+    for modulo in coincidencias[:3]:
+        valor = valoraciones.get(modulo.casefold())
+        if valor:
+            try:
+                total = int(valor.get("evaluaciones") or 0)
+                media = float(valor.get("promedio") or 0)
+                if total >= 2 and 1 <= media <= 5:
+                    partes.append(f"Valoración declarada de {modulo}: {media:.1f}/5 "
+                                  f"en {total} evaluaciones; no verifica ejecución.")
+            except (ValueError, TypeError):
+                pass
     activaciones = datos["telemetria"]["activaciones"]
     for modulo in coincidencias[:3]:
         item = activaciones.get(modulo)
