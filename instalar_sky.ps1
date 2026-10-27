@@ -149,8 +149,23 @@ if (-not $SinOllama) {
         }
         try { Invoke-WebRequest -Uri "http://127.0.0.1:11434/api/tags" -UseBasicParsing -TimeoutSec 2 | Out-Null }
         catch { Start-Process -WindowStyle Hidden -FilePath $ollama -ArgumentList "serve"; Start-Sleep -Seconds 4 }
-        & $ollama pull $Modelo
-        if ($LASTEXITCODE) { Aviso "No se pudo descargar $Modelo. Ejecuta luego: ollama pull $Modelo" } else { Ok "Modelo $Modelo listo" }
+        # Consultar el inventario local antes de descargar un modelo ya existente.
+        $listaModelos = @(& $ollama list 2>$null)
+        $modeloPresente = $false
+        if ($LASTEXITCODE -eq 0) {
+            foreach ($linea in $listaModelos) {
+                $nombreLocal = (($linea.ToString().Trim()) -split '\s+')[0]
+                if ($nombreLocal -eq $Modelo) { $modeloPresente = $true; break }
+            }
+        }
+        if ($modeloPresente) {
+            Ok "Modelo $Modelo ya descargado: se conserva sin repetir ollama pull"
+        } else {
+            & $ollama pull $Modelo
+            if ($LASTEXITCODE -ne 0) {
+                Aviso "No se pudo descargar $Modelo. Ejecuta luego: ollama pull $Modelo"
+            } else { Ok "Modelo $Modelo listo" }
+        }
         Set-EnvValue "OLLAMA_MODEL" $Modelo
     } else { Aviso "Instala Ollama desde https://ollama.com/download y luego: ollama pull qwen2.5:7b" }
 }
