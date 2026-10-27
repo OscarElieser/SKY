@@ -1,0 +1,41 @@
+name: SKY Home - safe routing and preflight
+on:
+  pull_request:
+    paths:
+      - 'neural_core/sky_home_routing.py'
+      - 'metaverse/sky_home_api.py'
+      - 'metaverse/api.py'
+      - 'scripts/sky_home_preflight.py'
+      - 'tests/test_sky_home_routing.py'
+      - 'tests/test_sky_home_api.py'
+      - '.github/workflows/sky-home-server.yml'
+  push:
+    paths:
+      - 'neural_core/sky_home_routing.py'
+      - 'metaverse/sky_home_api.py'
+      - 'metaverse/api.py'
+      - 'scripts/sky_home_preflight.py'
+      - 'tests/test_sky_home_routing.py'
+      - '.github/workflows/sky-home-server.yml'
+permissions:
+  contents: read
+jobs:
+  safe-routing:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install 'pytest>=8,<10' 'fastapi>=0.115,<1'
+      - name: Compile routing, API and preflight
+        run: python -m py_compile neural_core/sky_home_routing.py metaverse/sky_home_api.py metaverse/api.py scripts/sky_home_preflight.py
+      - name: Check safe routing decisions
+        run: python -m pytest -q tests/test_sky_home_routing.py tests/test_sky_home_api.py
+      - name: Read-only preflight on CI runner (not owner's PC)
+        run: python scripts/sky_home_preflight.py --json

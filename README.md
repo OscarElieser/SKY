@@ -1,6 +1,6 @@
 # 🌌 SKY IA — Asistente personal, docente y plataforma modular
 
-**Versión base:** `12.5.0` · **Rama oficial:** [`main`](https://github.com/OscarElieser/SKY/tree/main) · **Estado:** desarrollo activo, con pruebas automatizadas y validaciones de hardware e integraciones aún pendientes.
+**Versión base:** `12.6.0` · **Rama oficial:** [`main`](https://github.com/OscarElieser/SKY/tree/main) · **Estado:** desarrollo activo, con pruebas automatizadas y validaciones de hardware e integraciones aún pendientes.
 
 **Visión y autoría conceptual:** Oscar Elieser Chamorro Guzmán.
 
@@ -40,7 +40,15 @@ SKY también mantiene el **metaverso 3D y la comunidad**, las automatizaciones, 
 
 ### 1. Instalación
 
-Descargá o cloná el repositorio y ejecutá en su carpeta:
+**Para instalar todas las dependencias declaradas en otra computadora Windows** (Python, voz, LoRA, Office, MCP, Node/Flutter y herramientas externas optativas), usá el archivo maestro `requirements_sky_all.txt` y el instalador de una sola ejecución:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\INSTALAR_DEPENDENCIAS_SKY.ps1" -Perfil Completo -Herramientas
+```
+
+En tu PC de casa con 8 GB RAM, empezá por `-Perfil Casa` en vez de instalar todos los módulos pesados. Documentación: [Instalación completa de SKY](docs/INSTALACION_COMPLETA_SKY.md).
+
+Para el instalador operativo tradicional, descargá o cloná el repositorio y ejecutá en su carpeta:
 
 ```bat
 INSTALAR_SKY_WINDOWS.bat
@@ -297,6 +305,22 @@ Entrá a `GET /api/sky/verification/capabilities` con tus credenciales del dueñ
 
 **Pendiente:** conexión MCP conforme al protocolo oficial y ensayos completos de voz, Ollama, agentes, permisos y hardware en tu computadora. Los chequeos automáticos no sustituyen esas pruebas.
 
+## 🌐 SKY GLOBAL — comprobaciones reales e inclusión
+
+SKY incorporó un informe privado de preparación internacional en
+`GET /api/sky/global/readiness`, integrado al botón **DIAG**. Comprueba
+el arranque público, la disponibilidad efectiva de Redis y la cobertura de
+etiquetas traducidas; también muestra pruebas de seguridad, accesibilidad,
+rendimiento, protección de datos y despliegue internacional que aún **no han
+sido acreditadas**. La API no expone secretos y no altera los servicios actuales.
+
+El HUD principal incorpora cambio de idioma para las etiquetas revisadas,
+acceso con teclado, anuncios de estado y reducción voluntaria del movimiento.
+No debe confundirse la interfaz parcialmente traducida con conversación o voz
+validada en todos los idiomas.
+
+[Guía operativa, pruebas y requisitos de SKY GLOBAL](docs/api/SKY_GLOBAL_READINESS.md).
+
 ## 🗺️ Prioridades siguientes
 
 - Validar voz, Ollama, Piper, permisos y acciones reales en el equipo Windows de destino.
@@ -312,6 +336,9 @@ Entrá a `GET /api/sky/verification/capabilities` con tus credenciales del dueñ
 | --- | --- |
 | [Inicio v12](README_V12_INICIO.md) | Instalación, voz y uso |
 | [Estado real de capacidades](docs/ESTADO_REAL_SKY.md) | Funciones, requisitos y limitaciones (incluye estado histórico v12.5) |
+| [Auditoría v12.6](docs/AUDITORIA_V12_6.md) | Hallazgos con evidencia, correcciones, pruebas y pendientes en Windows |
+| [Windows v12.6 (PowerShell)](docs/guias/SKY_WINDOWS_V12_6.md) | PIN, arranque único, estado, detener e inicio automático; cómo volver atrás |
+| [Hermes Agent como consultor](docs/guias/SKY_HERMES.md) | Instalar Hermes, dejarlo sin herramientas que actúen y preguntarle desde SKY |
 | [Arquitectura](docs/api/ARQUITECTURA_SKY.md) | Diseño y evolución del sistema |
 | [SKY Aula](docs/api/SKY_AULA_INNOVACION_INVESTIGACION.md) | Enseñanza, innovación y API |
 | [SKY Impacto / Scholar](docs/guias/SKY_IMPACTO_EDUCACION_INNOVACION.md) | Investigación académica, fuentes y skills |

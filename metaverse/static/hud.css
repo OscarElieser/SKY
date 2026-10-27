@@ -190,6 +190,7 @@ button.chip.on{color:var(--amber);border-color:rgba(255,176,32,.6)}
 .kpi-ok{color:var(--green);font-size:12px}
 .kpi-prob{border-left:3px solid var(--amber);padding:6px 10px;margin:6px 0;background:rgba(255,176,32,.06)}
 .kpi-prob.bad{border-color:var(--red);background:rgba(255,51,102,.07)}
+.kpi-prob.ok{border-color:var(--green);background:rgba(0,255,170,.05)}.kpi-prob.neutro{border-color:var(--line2);background:rgba(0,229,255,.03)}
 .kpi-prob b{color:var(--white)}.kpi-prob small{display:block;color:var(--muted);margin-top:3px}
 .kpi-tab{width:100%;border-collapse:collapse;font-size:12px}
 .kpi-tab th{text-align:left;color:var(--muted);font-weight:500;font-size:11px;padding:4px 6px;border-bottom:1px solid var(--line2)}
@@ -224,6 +225,23 @@ button.chip.on{color:var(--amber);border-color:rgba(255,176,32,.6)}
 .pin-caja b{letter-spacing:.2em;color:var(--cyan)}
 .pin-caja .hab-in{font-size:22px;letter-spacing:.4em;text-align:center}
 .btn.peligro{border-color:var(--red);color:var(--red)}
+
+/* Accesibilidad del HUD principal: no cambia las animaciones por defecto. */
+.skip-link{
+  position:fixed;z-index:10000;top:8px;left:12px;
+  transform:translateY(-180%);padding:10px 14px;background:#041d2e;
+  color:#fff;border:2px solid var(--cyan);font-weight:700
+}
+.skip-link:focus{transform:translateY(0)}
+:where(button,input,select,a,[tabindex="0"]):focus-visible{
+  outline:2px solid var(--cyan);outline-offset:3px
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto!important;animation-duration:.01ms!important;
+    animation-iteration-count:1!important;transition-duration:.01ms!important
+  }
+}
 
 
 /* SKY Core-only premium HUD: nothing is deleted; modules appear on demand. */
@@ -308,3 +326,14 @@ body.sky-cinematic{background:
 .sky-search-result{border:1px solid rgba(0,229,255,.25);padding:9px;word-break:break-word}
 .sky-search-result p{font-size:12px;color:#a9cddd;white-space:pre-wrap}
 .sky-search-result a{color:#53e5ff;font-size:12px}
+
+
+/* SKY HUD · Resultados de YouTube integrados */
+.sky-youtube-select{display:flex;width:100%;gap:12px;align-items:center;text-align:left;cursor:pointer;border:0;background:transparent;color:inherit;padding:2px;font:inherit}
+.sky-youtube-select:hover,.sky-youtube-select:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;background:rgba(0,229,255,.06)}
+.sky-youtube-thumb{width:140px;max-width:36%;aspect-ratio:16/9;object-fit:cover;border-radius:5px;flex-shrink:0}
+.sky-youtube-details{display:flex;flex-direction:column;gap:6px;min-width:0}
+.sky-youtube-details b{font-size:13px;line-height:1.35}
+.sky-youtube-details small{font-size:11px;color:#a9cddd}
+.sky-youtube-action{font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:.04em}
+@media(max-width:520px){.sky-youtube-thumb{width:105px}.sky-youtube-select{gap:8px}}

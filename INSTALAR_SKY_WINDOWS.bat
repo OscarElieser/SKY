@@ -7,6 +7,8 @@ echo   SKY IA - Instalador (Python, IA local, voz natural, escucha)
 echo ==============================================================
 echo  Opciones: INSTALAR_SKY_WINDOWS.bat -Local     (100%% local)
 echo            INSTALAR_SKY_WINDOWS.bat -Modelo qwen2.5:7b
+echo            INSTALAR_SKY_WINDOWS.bat -SoloVerificarDependencias
+echo            INSTALAR_SKY_WINDOWS.bat -SoloDependencias -SinVoz -SinOllama
 echo.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0instalar_sky.ps1" %*
 if errorlevel 1 (

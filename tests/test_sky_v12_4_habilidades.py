@@ -28,7 +28,7 @@ def _base(tmp_path, monkeypatch):
     monkeypatch.setattr(cre, 'carpeta', lambda tipo: (tmp_path / 'creaciones' / tipo).mkdir(parents=True, exist_ok=True) or tmp_path / 'creaciones' / tipo
                         if tipo in ('imagenes', 'musica', 'presentaciones') else (_ for _ in ()).throw(ValueError('Tipo de creación inválido.')))
     monkeypatch.setattr(cerebro, '_ollama_ok', lambda: False)
-    monkeypatch.setattr(asis, 'ejecutar_local_si_autorizado', lambda p: None)
+    monkeypatch.setattr(asis, 'ejecutar_local_si_autorizado', lambda p, **k: None)
     for v in ('OPENAI_API_KEY', 'FIREFLY_CLIENT_ID', 'FIREFLY_CLIENT_SECRET', 'GAMMA_API_KEY', 'SKY_LOCAL_ONLY', 'SKY_CEREBRO',
               'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'SKY_HA_URL', 'SKY_HA_TOKEN'):
         monkeypatch.delenv(v, raising=False)

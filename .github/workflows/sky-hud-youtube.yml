@@ -1,0 +1,37 @@
+name: SKY HUD YouTube internal search
+
+on:
+  push:
+    paths:
+      - "neural_core/sky_youtube_search.py"
+      - "metaverse/hud_api.py"
+      - "metaverse/static/hud.js"
+      - "metaverse/static/hud.css"
+      - "tests/test_sky_youtube_search.py"
+      - ".github/workflows/sky-hud-youtube.yml"
+  pull_request:
+    paths:
+      - "neural_core/sky_youtube_search.py"
+      - "metaverse/hud_api.py"
+      - "metaverse/static/hud.js"
+      - "metaverse/static/hud.css"
+      - "tests/test_sky_youtube_search.py"
+      - ".github/workflows/sky-hud-youtube.yml"
+
+jobs:
+  youtube-internal-search:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --disable-pip-version-check pytest
+      - name: Test search without network
+        run: python -m pytest -q tests/test_sky_youtube_search.py
+      - name: Verify API and metadata Python syntax
+        run: python -m py_compile metaverse/hud_api.py neural_core/sky_youtube_search.py
+      - name: Verify HUD JavaScript
+        run: node --check metaverse/static/hud.js
+      - name: Verify existing window intents
+        run: node --test tests/test_sky_hud_window_intents.js

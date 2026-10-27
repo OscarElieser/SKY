@@ -26,6 +26,8 @@ echo  [8] Iniciar SKY automaticamente con Windows
 echo  [9] Ejecutar pruebas (pytest)
 echo  [I] SKY Interprete: codigo en tu PC con Open Interpreter (confirma cada paso)
 echo  [W] WhatsApp: puente para hablarle a SKY desde tu celular (ver docs\guias\SKY_WHATSAPP.md)
+echo  [P] PIN del dueno: configurar, ver estado, bloquear o restablecer
+echo  [S] Detener SKY limpiamente
 echo  [X] Salir
 echo.
 echo ==============================================================
@@ -45,6 +47,8 @@ if "%opt%"=="8" goto opt_startup
 if "%opt%"=="9" goto opt_tests
 if /i "%opt%"=="i" goto opt_interprete
 if /i "%opt%"=="w" goto opt_whatsapp
+if /i "%opt%"=="p" goto opt_pin
+if /i "%opt%"=="s" goto opt_detener
 if /i "%opt%"=="x" goto opt_salir
 goto menu
 
@@ -117,7 +121,16 @@ pause
 goto menu
 
 :opt_tests
-".venv\Scripts\python.exe" -m pytest tests
+".venv\Scripts\python.exe" -c "import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('pytest') else 1)"
+if errorlevel 1 (
+    echo [SKY] pytest no esta instalado. Ejecutando pruebas de regresion con unittest, sin instalar paquetes...
+    ".venv\Scripts\python.exe" -m unittest discover -s tests -p "test_sky_latency_and_wordless_voice.py" -v
+    ".venv\Scripts\python.exe" -m unittest discover -s tests -p "test_sky_hud_chat_voice_bridge.py" -v
+    ".venv\Scripts\python.exe" -m unittest discover -s tests -p "test_sky_voice_single_instance.py" -v
+    ".venv\Scripts\python.exe" -m unittest discover -s tests -p "test_sky_runtime_full_audit.py" -v
+) else (
+    ".venv\Scripts\python.exe" -m pytest tests
+)
 pause
 goto menu
 
@@ -130,6 +143,23 @@ goto menu
 :opt_whatsapp
 echo [SKY] Puente de WhatsApp en 127.0.0.1:8770. En otra ventana publicalo con:  tailscale funnel --bg 8770
 ".venv\Scripts\python.exe" sky_whatsapp_puente.py
+pause
+goto menu
+
+:opt_pin
+".venv\Scripts\python.exe" sky_pin.py estado
+echo.
+echo  [c] configurar o cambiar   [b] bloquear ahora   [r] restablecer (olvide el PIN)
+set "acc="
+set /p acc="Accion (Enter para volver): "
+if /i "%acc%"=="c" ".venv\Scripts\python.exe" sky_pin.py configurar
+if /i "%acc%"=="b" ".venv\Scripts\python.exe" sky_pin.py bloquear
+if /i "%acc%"=="r" ".venv\Scripts\python.exe" sky_pin.py restablecer
+pause
+goto menu
+
+:opt_detener
+".venv\Scripts\python.exe" iniciar_sky_autonomo.py --stop
 pause
 goto menu
 

@@ -43,6 +43,26 @@ from neural_core.sky_agent import SKILLS, execute_skill, interpret_local_command
 from neural_core.sky_live import historial as sky_live_historial, ejecutar_ciclo as sky_live_check
 
 st.set_page_config(page_title="SKY-IA · Asistente Universal", page_icon="⚡", layout="wide", initial_sidebar_state="collapsed")
+
+
+# v12.6 — el panel clásico usa el núcleo directamente (sin la API), así que pide el mismo PIN de la sesión del dueño.
+def _puerta_sesion_sky():
+    from neural_core import sentinel_identidad as _ident
+    if not _ident.sesion_bloqueada():
+        return
+    st.title("🔒 SKY está bloqueada")
+    st.caption("Ingresá tu PIN (o decilo en voz alta a SKY manos libres). Conocer el PIN no identifica a la persona.")
+    with st.form("sky_pin"):
+        pin = st.text_input("PIN", type="password", max_chars=12)
+        if st.form_submit_button("Desbloquear"):
+            r = _ident.desbloquear_sesion(pin, "streamlit")
+            if r["ok"]:
+                st.rerun()
+            st.error(r["mensaje"])
+    st.stop()
+
+
+_puerta_sesion_sky()
 # Si se desea abrir el panel desde otro dispositivo mediante Tailscale, definir
 # SKY_DASHBOARD_PASSWORD de al menos 12 caracteres en .env.
 clave_panel=(os.getenv('SKY_DASHBOARD_PASSWORD') or os.getenv('NEURALT_DASHBOARD_PASSWORD','')).strip()

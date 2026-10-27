@@ -24,12 +24,30 @@ def desbloquear(body: Pin, request: Request):
         raise HTTPException(403, 'El desbloqueo con PIN sólo funciona en este equipo.')
     if not ident.pin_configurado():
         raise HTTPException(409, 'No hay PIN configurado.')
-    espera = ident.bloqueado_por()
-    if espera:
-        raise HTTPException(429, f'Demasiados intentos. Esperá {espera // 60 + 1} minutos.')
-    if not ident.verificar_pin(body.pin):
-        raise HTTPException(401, 'PIN incorrecto.')
+    # v12.6: la misma puerta que usa la voz; abre la sesión compartida de todos los procesos de SKY.
+    r = ident.desbloquear_sesion(body.pin, 'hud')
+    if not r['ok']:
+        if r.get('espera_s'):
+            raise HTTPException(429, r['mensaje'], headers={'Retry-After': str(r['espera_s'])})
+        raise HTTPException(401, r['mensaje'] + (f" Te quedan {r['restantes']} intentos." if 'restantes' in r else ''))
     return {'key': api_token()}
+
+
+@router.get('/sesion')
+def sesion():
+    """Pública: sólo dice si SKY está bloqueada (no revela nada más). La interfaz la usa para pedir el PIN."""
+    from neural_core import sentinel_identidad as ident
+    e = ident.estado_sesion()
+    return {'pin': e['pin'], 'bloqueada': e['bloqueada'], 'espera_s': e.get('pin_bloqueado_s', 0)}
+
+
+@router.post('/bloquear')
+def bloquear():
+    """Vuelve a bloquear SKY en todos sus procesos (voz, HUD, WhatsApp, agente) hasta el próximo PIN."""
+    from neural_core import sentinel_identidad as ident
+    if not ident.bloquear_sesion('pedido desde la interfaz', 'hud'):
+        raise HTTPException(409, 'Para bloquear SKY primero configurá un PIN.')
+    return {'bloqueada': True}
 
 
 class CambioPin(BaseModel):

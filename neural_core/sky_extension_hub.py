@@ -11,8 +11,9 @@ from . import sky_integraciones
 _ROWS = (
     ("openclaw","OpenClaw","agentes","reference","https://github.com/openclaw/openclaw",
      "Estudiar arquitectura de asistentes y herramientas sin delegar control.", "review_only"),
-    ("hermes-agent","Hermes Agent","aprendizaje","reference","https://github.com/NousResearch/hermes-agent",
-     "Revisar patrones de skills y memoria; no ejecutar actualizaciones automáticas.","review_only"),
+    ("hermes-agent","Hermes Agent","aprendizaje","api","https://github.com/NousResearch/hermes-agent",
+     "Consultor local por su API (127.0.0.1:8642): investiga y planifica; SKY se niega si Hermes tiene terminal, "
+     "archivos, código, navegador o MCP activos, y nunca ejecuta acciones desde su respuesta.","configured_not_verified"),
     ("opencode","OpenCode","programación","sidecar","https://github.com/anomalyco/opencode",
      "Agente opcional de código en entorno aislado y repositorio de pruebas.","optional_not_installed"),
     ("n8n","n8n","automatización","api","https://github.com/n8n-io/n8n",

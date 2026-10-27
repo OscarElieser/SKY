@@ -26,10 +26,12 @@
     if (window.SKYOwnerAuth) Object.assign(h, window.SKYOwnerAuth.headers());
     return h;
   }
-  async function api(path, opts = {}, conPin = false) {
+  async function api(path, opts = {}, conPin = false, reintento = false) {
     const r = await fetch(path, { ...opts, headers: headers(opts.headers, !(opts.body instanceof FormData)) });
     let data = {};
     try { data = await r.json(); } catch { /* vacío */ }
+    // v12.6: la sesión del dueño se bloqueó (por voz, por otra pestaña o al caducar): pedir el PIN y reintentar una vez.
+    if (r.status === 423 && !reintento) { await desbloquear(); return api(path, opts, conPin, true); }
     // SENTINEL: lo crítico pide el PIN en ese momento; lo valida el servidor.
     if (r.status === 403 && !conPin && typeof data.detail === 'string' && data.detail.startsWith('Se requiere tu PIN')) {
       const pin = await pedirPin(data.detail.replace('Se requiere tu PIN para ', 'Tu PIN para '));
@@ -55,7 +57,12 @@
       no.addEventListener('click', () => fin(null));
     });
   }
-  async function desbloquear() {
+  function desbloquear() {
+    // Una sola ventana de PIN aunque varias llamadas reciban 423 a la vez.
+    if (!S.desbloqueando) S.desbloqueando = pedirDesbloqueo().finally(() => { S.desbloqueando = null; });
+    return S.desbloqueando;
+  }
+  async function pedirDesbloqueo() {
     callar(); S.key = ''; store.set('sky-owner-key', '');
     for (;;) {
       const pin = await pedirPin('SKY está bloqueada. Ingresá tu PIN para desbloquearla.');
@@ -230,11 +237,24 @@
   let voces = [];
   function cargarVoces() { voces = ('speechSynthesis' in window) ? speechSynthesis.getVoices() : []; }
   if ('speechSynthesis' in window) { cargarVoces(); speechSynthesis.onvoiceschanged = cargarVoces; }
+  // Respect the explicitly chosen SKY interface language for supported OS voices.
+  // The browser/installed model still decides which voices and accents exist.
+  function idiomaVoz() {
+    const lang = String(window.SKYGlobalI18N?.locale() || document.documentElement.lang || 'es')
+      .trim().replace('_', '-').toLowerCase();
+    const defaults = { es:'es-419', en:'en-US', pt:'pt-BR', fr:'fr-FR',
+      de:'de-DE', it:'it-IT', ar:'ar-SA', zh:'zh-CN', ja:'ja-JP',
+      ko:'ko-KR', hi:'hi-IN', ru:'ru-RU', sw:'sw-KE' };
+    return lang.includes('-') ? lang : (defaults[lang] || lang || 'es-419');
+  }
   function vozLocal() {
-    const es = voces.filter(v => /^es/i.test(v.lang));
-    const pref = ['es-419', 'es-MX', 'es-US', 'es-NI', 'es-ES'];
-    const ordenar = (lst) => lst.sort((a, b) => (pref.indexOf(a.lang) + 99) % 99 - (pref.indexOf(b.lang) + 99) % 99);
-    return ordenar(es.filter(v => v.localService))[0] || ordenar(es)[0] || null;
+    const locale = idiomaVoz().toLowerCase(), root = locale.split('-')[0];
+    const disponibles = voces.filter(v => String(v.lang || '').toLowerCase().split('-')[0] === root);
+    disponibles.sort((a, b) => {
+      const score = v => (v.localService ? 0 : 10) + (v.lang.toLowerCase() === locale ? 0 : 1);
+      return score(a) - score(b);
+    });
+    return disponibles[0] || null;
   }
   function limpiarParaVoz(t) {
     return String(t || '').replace(/```[\s\S]*?```/g, ' (código en pantalla) ').replace(/\$\$?[^$]*\$\$?/g, ' ')
@@ -268,7 +288,9 @@
   }
   function encolar(texto) {
     if (!S.voz || !texto) return;
-    const item = { texto, audio: S.ttsLocal ? prepararPiper(texto) : null };
+    // Current Piper voice is Spanish. Never force it onto other selected languages.
+    const localPiper = S.ttsLocal && idiomaVoz().split('-')[0] === 'es';
+    const item = { texto, audio: localPiper ? prepararPiper(texto) : null };
     cola.push(item);
     if (!hablando) procesarCola();
   }
@@ -286,7 +308,7 @@
     return new Promise((resolve) => {
       if (!('speechSynthesis' in window)) { resolve(); return; }
       const u = new SpeechSynthesisUtterance(texto);
-      const v = vozLocal(); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'es-419';
+      const v = vozLocal(); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = idiomaVoz();
       u.rate = S.rate; u.onboundary = () => { S.pulse = 1; };
       u.onend = resolve; u.onerror = resolve;
       speechSynthesis.speak(u);
@@ -294,7 +316,8 @@
   }
   async function procesarCola() {
     hablando = true; S.speaking = true;
-    setState('speaking', S.ttsLocal ? 'Voz local (Piper)' : (vozLocal() && vozLocal().localService ? 'Voz local' : 'Voz del sistema'));
+    const piperSeleccionado = S.ttsLocal && idiomaVoz().split('-')[0] === 'es';
+    setState('speaking', piperSeleccionado ? 'Voz local (Piper)' : (vozLocal() && vozLocal().localService ? 'Voz local' : 'Voz del sistema'));
     while (cola.length) {
       const item = cola.shift();
       const blob = item.audio ? await item.audio : null;
@@ -378,7 +401,7 @@
       if (!hablo || !partes.length) { setState('idle', 'No escuché nada.'); return; }
       setState('thinking', 'Transcribiendo en tu equipo…');
       const ext = (rec.mimeType || '').includes('mp4') ? 'm4a' : 'webm';
-      const fd = new FormData(); fd.append('file', new Blob(partes, { type: rec.mimeType }), 'voz.' + ext); fd.append('language', 'es');
+      const fd = new FormData(); fd.append('file', new Blob(partes, { type: rec.mimeType }), 'voz.' + ext); fd.append('language', idiomaVoz().split('-')[0]);
       try {
         const r = await api('/api/global-media/stt/transcribe', { method: 'POST', body: fd });
         const texto = String(r.text || '').trim();
@@ -394,7 +417,7 @@
     if (!SR) throw new Error('sin reconocimiento de voz (usá Chrome/Edge o instalá faster-whisper)');
     try { await micAnalyser(); } catch { /* sólo visual */ }
     const rec = new SR(); S.recognition = rec;
-    rec.lang = 'es-419'; rec.interimResults = true; rec.maxAlternatives = 1;
+    rec.lang = idiomaVoz(); rec.interimResults = true; rec.maxAlternatives = 1;
     setState('listening', 'Dictado del navegador (puede usar la nube)');
     let final = '';
     rec.onresult = (ev) => {
@@ -460,7 +483,7 @@
     W.ocupado = true;
     try {
       const fd = new FormData(); fd.append('file', new Blob(partes, { type: mime }), (mime || '').includes('mp4') ? 'w.m4a' : 'w.webm');
-      fd.append('language', 'es');
+      fd.append('language', idiomaVoz().split('-')[0]);
       const r = await api('/api/global-media/stt/transcribe', { method: 'POST', body: fd });
       // CONV + listening are both explicit owner controls. When both are on,
       // recognize direct speech without the 'SKY' prefix, as the browser
@@ -478,7 +501,7 @@
   function vigilarNavegador() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) throw new Error('el navegador no tiene reconocimiento de voz; instalá faster-whisper');
-    const sr = new SR(); W.sr = sr; sr.lang = 'es-419'; sr.continuous = true; sr.interimResults = false;
+    const sr = new SR(); W.sr = sr; sr.lang = idiomaVoz(); sr.continuous = true; sr.interimResults = false;
     sr.onresult = (ev) => {
       const txt = ev.results[ev.results.length - 1][0].transcript;
       const orden = ordenDespertador(txt);
@@ -649,6 +672,7 @@
         method: 'POST', headers: headers(), signal: control.signal,
         body: JSON.stringify({ texto, historial: S.historial.slice(-12), modo, dispositivo: 'local', file_context: fileContext })
       });
+      if (r.status === 423) { await desbloquear(); throw new Error('SKY estaba bloqueada. Ya la desbloqueaste: repetí tu pedido.'); }
       if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
       S.historial.push({ role: 'user', content: texto });
       const lector = r.body.getReader(), dec = new TextDecoder();
@@ -826,6 +850,7 @@
       if (data.modulo === 'kpi') abrirKPI(data.kpi);
       if (data.modulo === 'perfil') abrirPerfil();
       if (data.modulo === 'sentinel') abrirSentinel();
+      if (data.modulo === 'modulos') abrirModulos();
       if (data.bloquear_hud) { await decir(data.mensaje || ''); await desbloquear(); return; }
       if (data.modulo === 'habilidades') abrirHabilidades(); else if (ventanas.has('habilidades')) HAB.cargar();
       if (data.imagen) mostrarImagen(data.imagen);
@@ -845,7 +870,7 @@
   async function accion(data, modo) {
     const p = data.propuesta;
     if (data.interfaz) { await interfaz(p); return; }
-    if (p.action === 'play_media' && (p.params.service || 'youtube') === 'youtube' && S.ytApi && !p.params.path) {
+    if (p.action === 'play_media' && (p.params.service || 'youtube') === 'youtube' && !p.params.path) {
       await reproductor(p.params.query); return;
     }
     // Las órdenes de navegación a YouTube usan la ventana propia de SKY.
@@ -1040,9 +1065,14 @@
       }
     }
   }
+  let proveedorBuscador = null;
   function abrirBuscador(mode = 'normal', provider = 'web') {
     const id = 'sky-buscador';
-    if (ventanas.has(id)) { aplicarModoVentana(id, mode); return; }
+    if (ventanas.has(id)) {
+      if (proveedorBuscador === provider) { aplicarModoVentana(id, mode); return; }
+      cerrarVentana(id);
+    }
+    proveedorBuscador = provider;
     const root = el('div', 'sky-search-panel');
     const info = el('div', 's', 'Buscá dentro de SKY. Los resultados se muestran aquí y los enlaces externos sólo se abren cuando vos los elegís.');
     const form = el('form', 'sky-search-form');
@@ -1058,8 +1088,38 @@
       results.textContent = 'Buscando fuentes…'; send.disabled = true;
       try {
         if (provider === 'youtube') {
-          await reproductor(q, mode);
-          results.textContent = 'Revisá la ventana del reproductor para continuar.';
+          const data = await api('/api/hud/youtube?q=' + encodeURIComponent(q));
+          results.replaceChildren();
+          const videos = (Array.isArray(data.videos) ? data.videos : [])
+            .filter(v => v && /^[A-Za-z0-9_-]{11}$/.test(String(v.id || '')) && String(v.titulo || '').trim())
+            .slice(0, 6);
+          if (!videos.length) {
+            results.appendChild(el('p', 'res bad', data.motivo || 'YouTube no devolvió videos para esta búsqueda.'));
+          } else {
+            results.appendChild(el('p', 's', data.incrustacion_verificada
+              ? 'Resultados de YouTube listos para reproducirse dentro de SKY.'
+              : 'Resultados públicos de YouTube. Algunos videos pueden impedir la reproducción integrada por decisión del propietario.'));
+            videos.forEach((video, pos) => {
+              const card = el('div', 'sky-search-result');
+              const select = el('button', 'sky-youtube-select'); select.type = 'button';
+              const thumb = el('img', 'sky-youtube-thumb');
+              thumb.src = 'https://i.ytimg.com/vi/' + encodeURIComponent(video.id) + '/hqdefault.jpg';
+              thumb.alt = 'Miniatura de ' + video.titulo; thumb.loading = 'lazy';
+              const details = el('span', 'sky-youtube-details');
+              details.appendChild(el('b', '', video.titulo));
+              if (video.canal) details.appendChild(el('small', '', video.canal));
+              details.appendChild(el('span', 'sky-youtube-action', '▶ Reproducir en SKY'));
+              select.append(thumb, details);
+              select.addEventListener('click', () => {
+                lista = videos; indice = pos;
+                mostrarVideo();
+                aplicarModoVentana('player', mode === 'minimized' ? 'normal' : mode);
+                setState('idle', 'Video seleccionado.');
+              });
+              card.appendChild(select);
+              results.appendChild(card);
+            });
+          }
         } else {
           const data = await api('/api/tools/search', {method: 'POST', body: JSON.stringify({query: q})});
           results.replaceChildren();
@@ -1101,6 +1161,7 @@
   // Solo accesos internos conocidos. No abrir enlaces arbitrarios por un texto.
   function ordenVentanaLocal(sentence) {
     const s = String(sentence || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()
+      .replace(/[.!?]+$/g,'').trim()
       .replace(/^(oye|hey)\s+/,'').replace(/^sky[,.:\s-]+/,'');
     if (!/^(abre|abri|abrir|mostra|muestra|mostrar)\s+/.test(s)) return null;
     const target=s.replace(/^(abre|abri|abrir|mostra|muestra|mostrar)\s+/,'')
@@ -1184,6 +1245,7 @@
     });
   }
   function ventanasHolograficas(sub) {
+    if (sub === 'open_chat') { abrirCuadroTexto(); return; }
     if (sub === 'minimize_all' || sub === 'leave_only_core') ventanas.forEach(w => w.el.classList.add('hidden'));
     else if (sub === 'restore_all') ventanas.forEach(w => w.el.classList.remove('hidden'));
     else if (sub === 'close_multimedia') cerrarVentana('player');
@@ -1622,6 +1684,7 @@
     { id: 'perfil', t: 'Perfil', d: 'Quién sos: SKY lo lee en cada respuesta', accion: () => abrirPerfil() },
     { id: 'habilidades', t: 'Habilidades', d: 'Catálogo, Skill Builder e integraciones', accion: () => abrirHabilidades() },
     { id: 'sentinel', t: 'Seguridad', d: 'SKY SENTINEL: PIN, accesos, dispositivos y emergencia', accion: () => abrirSentinel() },
+    { id: 'modulos', t: 'Módulos', d: 'Estado real, qué falta y activación bajo demanda', accion: () => abrirModulos() },
     { id: 'streamlit', t: 'Panel técnico', d: 'Panel heredado dentro de SKY, únicamente al solicitarlo', accion: () => abrirModuloTecnico('tablero') },
   ];
   // Los 27 módulos heredados se presentan aquí, pero jamás se cargan al iniciar.
@@ -1813,6 +1876,109 @@
     nativeCall.addEventListener('click',()=>nativeHandoff('tel',nativeCall));
     nativeSMS.addEventListener('click',()=>nativeHandoff('sms',nativeSMS));
     actionSection.append(el('div','s','La llamada primero suena en tu teléfono verificado; al contestar se conecta el destinatario. No usa el micrófono del navegador. Una llamada puede cobrar dos tramos.'));
+    // SKY Mobile Agent: usa la autenticación SKY ya activa, sin pedir ni
+    // copiar la clave maestra al teléfono.
+    const mobilePanel=seccion(root,'SKY Mobile Agent · Android');
+    mobilePanel.append(el('div','s',
+      'Conectá un Android con código temporal. Abrir aplicaciones requiere un permiso en el teléfono y una confirmación por cada orden.'));
+    const mobileControls=el('div','btns');
+    const mobilePair=el('button','btn primary','Crear código para Android');mobilePair.type='button';
+    const mobileRefresh=el('button','btn','Actualizar teléfonos');mobileRefresh.type='button';
+    const mobileChatInvite=el('button','btn','Crear código de chat móvil');mobileChatInvite.type='button';
+    const mobileChatRevoke=el('button','btn','Revocar chat del teléfono');mobileChatRevoke.type='button';
+    mobileControls.append(mobilePair,mobileRefresh,mobileChatInvite,mobileChatRevoke);
+    const mobileCode=el('pre','res','Sin código activo.');
+    const mobileChatCode=el('pre','res','Sin autorización de chat móvil.');
+    const mobileSelect=el('select','hab-in');
+    const mobileApps=el('select','hab-in');
+    [['youtube','YouTube'],['chrome','Chrome'],['whatsapp','WhatsApp'],['gmail','Gmail']].forEach(([id,name])=>{
+      const option=el('option','',name); option.value=id; mobileApps.appendChild(option);
+    });
+    const mobileSend=el('button','btn','Enviar solicitud al teléfono');mobileSend.type='button';
+    const mobileState=el('div','res','No hay teléfonos consultados.');
+    const mobileCheck=el('button','btn','Verificar última solicitud');mobileCheck.type='button';
+    const mobileRevoke=el('button','btn','Revocar teléfono seleccionado');mobileRevoke.type='button';
+    mobilePanel.append(mobileControls,mobileCode,mobileChatCode,mobileSelect,mobileApps,mobileSend,mobileCheck,mobileRevoke,mobileState);
+    let lastMobileRequest=null;
+    mobilePair.addEventListener('click',async()=>{
+      mobilePair.disabled=true;
+      try{
+        const d=await api('/api/sky/mobile-agent/pair/start',{method:'POST',body:'{}'});
+        mobileCode.textContent='Código: '+d.code+'\nVence en '+d.expires_seconds+' segundos. Ingresalo en SKY Mobile Agent.';
+      }catch(e){mobileCode.textContent='No se pudo crear código: '+e.message;}
+      finally{mobilePair.disabled=false;}
+    });
+    mobileChatInvite.addEventListener('click',async()=>{
+      if(!mobileSelect.value)return;
+      mobileChatInvite.disabled=true;
+      try{
+        const d=await api('/api/sky/mobile-chat/invite',{
+          method:'POST',body:JSON.stringify({device_id:mobileSelect.value})
+        });
+        mobileChatCode.textContent='Código de CHAT para el Android seleccionado: '+d.code+
+          '\nVence en '+d.expires_seconds+' segundos. Es de un solo uso y NO es la clave de SKY.';
+      }catch(e){mobileChatCode.textContent='No se pudo autorizar el chat: '+e.message;}
+      finally{mobileChatInvite.disabled=false;}
+    });
+    mobileChatRevoke.addEventListener('click',async()=>{
+      if(!mobileSelect.value)return;
+      mobileChatRevoke.disabled=true;
+      try{
+        await api('/api/sky/mobile-chat/revoke',{
+          method:'POST',body:JSON.stringify({device_id:mobileSelect.value})
+        });
+        mobileChatCode.textContent='Chat del teléfono revocado. El agente Android mantiene sus permisos anteriores.';
+      }catch(e){mobileChatCode.textContent='Error al revocar el chat: '+e.message;}
+      finally{mobileChatRevoke.disabled=false;}
+    });
+    async function updateMobile(){
+      try{
+        const d=await api('/api/sky/mobile-agent/devices');
+        mobileSelect.replaceChildren();
+        for(const device of (d.devices||[])){
+          const op=el('option','',device.label);op.value=device.id;mobileSelect.append(op);
+        }
+        mobileState.textContent=(d.devices||[]).length?
+          'Teléfonos vinculados: '+d.devices.length+'. Todas las aperturas necesitan aprobación local.':
+          'Sin teléfonos vinculados. Primero generá e ingresá el código.';
+        mobileSend.disabled=!mobileSelect.value;
+        mobileRevoke.disabled=!mobileSelect.value;
+        mobileChatInvite.disabled=!mobileSelect.value;
+        mobileChatRevoke.disabled=!mobileSelect.value;
+      }catch(e){mobileState.textContent='No se pudieron consultar los teléfonos: '+e.message;}
+    }
+    mobileRefresh.addEventListener('click',updateMobile);
+    mobileSend.addEventListener('click',async()=>{
+      if(!mobileSelect.value)return;
+      mobileSend.disabled=true;
+      try{
+        const id=encodeURIComponent(mobileSelect.value);
+        const d=await api('/api/sky/mobile-agent/devices/'+id+'/commands',{
+          method:'POST',body:JSON.stringify({target:mobileApps.value})
+        });
+        lastMobileRequest={device:id,command:d.command_id};
+        mobileState.textContent='Solicitud enviada. Ahora aprobala dentro de SKY Mobile Agent en tu Android.';
+      }catch(e){mobileState.textContent='No se pudo enviar la orden: '+e.message;}
+      finally{mobileSend.disabled=false;}
+    });
+    mobileCheck.addEventListener('click',async()=>{
+      if(!lastMobileRequest){mobileState.textContent='Todavía no hay una solicitud enviada desde este panel.';return;}
+      try{
+        const d=await api('/api/sky/mobile-agent/devices/'+lastMobileRequest.device+
+          '/commands/'+encodeURIComponent(lastMobileRequest.command));
+        mobileState.textContent='Estado: '+d.state+
+          (d.message?' · '+d.message:'')+
+          (d.state==='SENT'?' (se solicitó abrir; carga no verificada)':'');
+      }catch(e){mobileState.textContent='No se pudo verificar: '+e.message;}
+    });
+    mobileRevoke.addEventListener('click',async()=>{
+      if(!mobileSelect.value || !confirm('¿Revocar este teléfono y cancelar sus órdenes pendientes?'))return;
+      try{
+        await api('/api/sky/mobile-agent/devices/'+encodeURIComponent(mobileSelect.value),{method:'DELETE'});
+        lastMobileRequest=null;await updateMobile();
+      }catch(e){mobileState.textContent='No se pudo revocar: '+e.message;}
+    });
+    updateMobile();
     const blockSection=seccion(root,'3. Bloquear y desbloquear en SKY');
     blockSection.append(el('div','s','El bloqueo impide llamadas y SMS salientes por SKY hacia esos números; no bloquea llamadas de la SIM, Android, iOS ni de la compañía.'));
     const block=el('button','btn','Bloquear destinatario');block.type='button';
@@ -2565,6 +2731,7 @@
     c.textContent = '';
     const tiles = el('div', 'kpi-tiles');
     tiles.appendChild(tarjeta('PIN', d.pin ? 'Activo' : 'Sin PIN', d.pin ? 'lo crítico lo pide' : 'configuralo abajo', d.pin ? 'ok' : 'bad'));
+    if (d.sesion) tiles.appendChild(tarjeta('Sesión', d.sesion.bloqueada ? 'Bloqueada' : 'Abierta', d.sesion.pin ? 'voz, HUD, WhatsApp y agente' : 'sin PIN no se bloquea', d.sesion.bloqueada ? 'warn' : (d.sesion.pin ? 'ok' : 'bad')));
     tiles.appendChild(tarjeta('Acceso', d.solo_local ? 'Sólo este equipo' : 'Con llave', d.solo_local ? 'otros equipos rechazados' : 'celular/Tailscale con llave', d.solo_local ? 'ok' : ''));
     tiles.appendChild(tarjeta('2FA', d.mfa ? 'Activo' : 'Inactivo', 'segundo factor del creador', d.mfa ? 'ok' : ''));
     tiles.appendChild(tarjeta('Emergencia', d.parada ? 'PARADA' : 'Normal', d.parada ? 'nada se ejecuta' : 'acciones según permisos', d.parada ? 'bad' : 'ok'));
@@ -2597,13 +2764,58 @@
       SEN.cargar(); refrescarEstado();
     });
     const bLock = el('button', 'btn', 'Bloquear SKY'); bLock.type = 'button'; bLock.disabled = !d.pin;
-    bLock.addEventListener('click', () => desbloquear());
+    bLock.addEventListener('click', async () => {
+      // v12.6: el bloqueo es del servidor: también deja de obedecer la voz manos libres, WhatsApp y el agente.
+      try { await api('/api/sentinel/bloquear', { method: 'POST' }); } catch (e) { addMsg('sky', e.message, 'err'); return; }
+      await desbloquear(); SEN.cargar();
+    });
     bx.append(bPin, bLoc, bAut, bEm, bLock); sc.appendChild(bx);
     seccion(c, 'Dispositivos').appendChild(tabla(['Nombre', 'Tipo', 'Dirección'], d.dispositivos.map(x => [x.nombre, x.tipo, x.url])));
     if (d.habilidades_instaladas.length) seccion(c, 'Habilidades instaladas y sus permisos').appendChild(tabla(['Habilidad', 'Permisos'], d.habilidades_instaladas.map(x => [x.nombre, x.permisos.join(', ') || 'ninguno'])));
     seccion(c, 'Eventos de seguridad (7 días)').appendChild(d.accesos_recientes.length ? tabla(['Hora', 'Evento', 'Código', 'Detalle'], d.accesos_recientes.map(a => [a.hora, a.que, a.codigo || '', a.detalle])) : el('div', 'kpi-ok', 'Sin eventos.'));
     const sh = seccion(c, 'Auditoría');
     d.hallazgos.forEach(h => { const b = el('div', 'kpi-prob ' + (h.nivel === 'alta' ? 'bad' : h.nivel === 'media' ? 'warn' : '')); b.appendChild(el('b', '', '[' + h.nivel + '] ' + h.texto)); if (h.accion) b.appendChild(el('small', '', '→ ' + h.accion)); sh.appendChild(b); });
+  };
+
+  /* ------------------------------------------------------------------ v12.6 — registro de módulos */
+  const MOD = { raiz: null };
+  const MOD_ESTADO = { disponible: ['Disponible', 'neutro'], no_configurado: ['Sin configurar', 'warn'], cargando: ['Cargando…', 'neutro'],
+    activo: ['Activo', 'ok'], degradado: ['Degradado', 'warn'], error: ['Error', 'bad'] };
+  function abrirModulos() {
+    if (!MOD.raiz || !ventanas.has('modulos')) MOD.raiz = el('div', 'kpi');
+    abrirVentana('modulos', 'Módulos de SKY', MOD.raiz, { w: 900, h: 620 });
+    MOD.cargar();
+  }
+  MOD.cargar = async function () {
+    if (!MOD.raiz) return;
+    const c = MOD.raiz; let d;
+    try { d = await api('/api/hud/modulos'); } catch (e) { c.textContent = ''; c.appendChild(el('div', 'note', 'No pude leer los módulos: ' + e.message)); return; }
+    c.textContent = '';
+    const tiles = el('div', 'kpi-tiles');
+    Object.entries(MOD_ESTADO).forEach(([k, v]) => tiles.appendChild(tarjeta(v[0], String(d.resumen[k] || 0), 'módulos', d.resumen[k] && (k === 'error') ? 'bad' : '')));
+    c.appendChild(tiles);
+    const grupos = { servicio: 'Servicios', motor: 'Motores (se cargan sólo cuando los pedís)', integracion: 'Integraciones' };
+    Object.entries(grupos).forEach(([tipo, titulo]) => {
+      const s = seccion(c, titulo);
+      d.modulos.filter(m => m.tipo === tipo).forEach(m => {
+        const [txt, cls] = MOD_ESTADO[m.estado] || [m.estado, ''];
+        const fila = el('div', 'kpi-prob ' + cls);
+        fila.appendChild(el('b', '', m.nombre + ' — ' + txt));
+        const det = (m.falta && m.falta.length) ? 'Falta: ' + m.falta.join('; ') : (m.detalle || '');
+        if (det) fila.appendChild(el('small', '', det));
+        if (m.puede_activar && (m.estado === 'disponible' || m.estado === 'error' || m.estado === 'degradado')) {
+          const b = el('button', 'btn', 'Activar'); b.type = 'button';
+          b.addEventListener('click', async () => { b.disabled = true; try { const r = await api('/api/hud/modulos/' + m.id + '/activar', { method: 'POST' }); addMsg('sky', r.mensaje || ''); } catch (e) { addMsg('sky', e.message, 'err'); } setTimeout(() => MOD.cargar(), 1500); });
+          fila.appendChild(b);
+        } else if (m.puede_activar && m.estado === 'activo') {
+          const b = el('button', 'btn', 'Liberar'); b.type = 'button';
+          b.addEventListener('click', async () => { try { const r = await api('/api/hud/modulos/' + m.id + '/liberar', { method: 'POST' }); addMsg('sky', r.mensaje || ''); } catch (e) { addMsg('sky', e.message, 'err'); } MOD.cargar(); });
+          fila.appendChild(b);
+        }
+        s.appendChild(fila);
+      });
+    });
+    if (d.modulos.some(m => m.estado === 'cargando')) setTimeout(() => { if (ventanas.has('modulos')) MOD.cargar(); }, 3000);
   };
 
   /* ------------------------------------------------------------------ reproductor */
@@ -2622,7 +2834,7 @@
       const panel = el('div', 'sky-search-panel');
       panel.append(el('b', '', 'YouTube dentro de SKY'), el('p', '',
         r.motivo || 'No hay un video incrustable disponible.'));
-      panel.appendChild(el('p', '', 'SKY conserva esta ventana. Podés configurar YOUTUBE_API_KEY o pegar un enlace de YouTube con un video permitido.'));
+      panel.appendChild(el('p', '', 'SKY conserva esta ventana. Podés intentar otra búsqueda, configurar la API oficial o pegar un enlace de un video permitido.'));
       const manual = el('form', 'sky-search-form');
       const urlInput = el('input', 'hab-in'); urlInput.type = 'url';
       urlInput.placeholder = 'https://www.youtube.com/watch?v=...';
@@ -2634,7 +2846,11 @@
       manual.addEventListener('submit', e => {
         e.preventDefault();
         try {
-          const u = new URL(urlInput.value.trim());
+          const enlace = urlInput.value.trim();
+          if (!enlace || !/^https:\/\//i.test(enlace)) {
+            throw Error('Pegá un enlace HTTPS completo de YouTube; no escribás el título de la canción aquí.');
+          }
+          const u = new URL(enlace);
           if (u.protocol !== 'https:') throw Error('Se requiere enlace HTTPS.');
           const host = u.hostname.toLowerCase();
           let id = '';
@@ -2647,7 +2863,7 @@
           if (!/^[A-Za-z0-9_-]{11}$/.test(id)) throw Error('Enlace de video no válido.');
           lista = [{id, titulo:'Video seleccionado'}]; indice = 0;
           mostrarVideo(); aplicarModoVentana('player', mode);
-        } catch(err) { errorVideo.textContent = 'No pude incorporar ese video: ' + err.message; }
+        } catch(err) { errorVideo.textContent = 'No pude incorporar ese video: ' + (err instanceof TypeError ? 'Revisá que el enlace de YouTube sea válido y completo.' : err.message); }
       });
       panel.append(manual, errorVideo);
       const link = el('a', 'btn', 'Buscar en YouTube fuera de SKY (opcional)');
@@ -2656,12 +2872,12 @@
       panel.appendChild(link);
       abrirVentana('player', '♪ YouTube · ' + consulta, panel, {w:760,h:460});
       aplicarModoVentana('player', mode);
-      setState('idle', 'YouTube requiere configuración');
+      setState('error', 'Búsqueda de YouTube no disponible');
       addMsg('sky', 'Abrí el panel de YouTube dentro de SKY, pero no puedo reproducir sin un video incrustable. ' + (r.motivo || ''));
       return;
     }
     lista = r.videos; indice = 0; mostrarVideo(); aplicarModoVentana('player', mode);
-    await decir('Reproduciendo ' + lista[0].titulo + '.');
+    await decir('Cargué ' + lista[0].titulo + ' en el reproductor de SKY.');
   }
   function mostrarVideo() {
     const v = lista[indice]; if (!v) return;
@@ -2780,6 +2996,37 @@
       });
     } catch { /* sin acceso */ }
   }
+  // The Vosk service is independent from Chrome: its local voice inbox is the
+  // existing authenticated bridge to the HUD. Only this exact allowlisted
+  // UI-only action can run without a confirmation click. NEVER auto-execute
+  // device, file, social, or arbitrary holographic actions from this queue.
+  const hudVoiceHandled = new Set();
+  let hudVoicePolling = false;
+  async function atenderPanelSolicitadoPorVoz() {
+    if (hudVoicePolling || document.visibilityState === 'hidden') return;
+    hudVoicePolling = true;
+    try {
+      const r = await api('/api/asistente/voz');
+      for (const item of (r.pendientes || [])) {
+        if (item.action !== 'holographic_window' ||
+            !item.params || item.params.subaction !== 'open_chat') continue;
+        if (hudVoiceHandled.has(item.id)) continue;
+        const age = Date.now() - Date.parse(item.timestamp || '');
+        if (!Number.isFinite(age) || age < -5000 || age > 60000) continue;
+        // Acknowledgement first: do not report a successful open until the
+        // authenticated delete succeeds and the HUD window actually opens.
+        await api('/api/asistente/voz/' + encodeURIComponent(item.id),
+                  { method: 'DELETE' });
+        hudVoiceHandled.add(item.id);
+        if (hudVoiceHandled.size > 80) hudVoiceHandled.clear();
+        abrirCuadroTexto();
+        $('transcript').textContent = '“' + String(item.text || '').slice(0, 200) + '”';
+        setState('idle', 'Panel de conversación abierto.');
+        refrescarVoz();
+      }
+    } catch { /* no se duplica la ejecución si el servidor no responde */ }
+    finally { hudVoicePolling = false; }
+  }
   async function refrescarCasa() {
     let r; try { r = await api('/api/hud/casa'); } catch { return; }
     const box = $('casa-list'); box.textContent = '';
@@ -2841,6 +3088,26 @@
         ul.appendChild(li);
       });
       cont.appendChild(ul);
+      // Real-time global deployment readiness; this does not claim certification.
+      try {
+        const global = await api('/api/sky/global/readiness');
+        cont.appendChild(el('h3', '', 'SKY GLOBAL · comprobación operativa'));
+        cont.appendChild(el('p', 'muted',
+          global.global_ready ? 'Comprobaciones registradas como superadas' :
+          'Despliegue mundial todavía NO acreditado · verificá las alertas siguientes'));
+        const checks = el('ul', 'diag-list');
+        global.checks.forEach(item => {
+          const ok = item.status === 'pass';
+          const pending = item.status === 'unverified';
+          const li = el('li', ok ? 'ok' : (pending ? 'opt' : 'bad'));
+          li.appendChild(el('b', '', (ok ? '✔ ' : pending ? '· ' : '✖ ') + item.id));
+          li.appendChild(el('small', '', item.detail));
+          checks.appendChild(li);
+        });
+        cont.appendChild(checks);
+      } catch (globalError) {
+        cont.appendChild(el('p', 'muted', 'Diagnóstico mundial no disponible: ' + globalError.message));
+      }
     } catch (e) { cont.textContent = 'No se pudo revisar: ' + e.message; }
   }
 
@@ -2872,9 +3139,17 @@
   document.querySelectorAll('.mobile-tabs button').forEach(b => b.addEventListener('click', () => mostrarPanel(b.dataset.panel)));
   function reloj() {
     const d = new Date();
-    $('clock-time').textContent = d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
-    $('clock-date').textContent = d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+    const locale = idiomaVoz();
+    $('clock-time').textContent = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    $('clock-date').textContent = d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
   }
+
+  window.addEventListener('sky:languagechange', () => {
+    reloj();
+    // Recognition inherits this language for new sessions; changing browser support
+    // is not evidence that STT or TTS has been verified for the language.
+    if (W.sr) W.sr.lang = idiomaVoz();
+  });
 
   /* ------------------------------------------------------------------ inicio */
   async function iniciar() {
@@ -2902,8 +3177,10 @@
     addMsg('sky', (h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches') +
       '. Estoy lista. ¿Qué querés hacer?');
     refrescarLog(); refrescarTareas(); refrescarNotas(); refrescarVoz(); refrescarCasa();
+    atenderPanelSolicitadoPorVoz();
     setInterval(refrescarEstado, 10000); setInterval(refrescarLog, 8000); setInterval(refrescarTareas, 8000);
-    setInterval(refrescarVoz, 15000); setInterval(refrescarNotas, 30000); setInterval(refrescarCasa, 20000);
+    setInterval(refrescarVoz, 15000); setInterval(atenderPanelSolicitadoPorVoz, 2500);
+    setInterval(refrescarNotas, 30000); setInterval(refrescarCasa, 20000);
     refrescarAgenda(); setInterval(refrescarAgenda, 30000); setInterval(refrescarAvisos, 8000);
     if (store.lget('sky-wake', '0') === '1') activarEscucha(true);
   }

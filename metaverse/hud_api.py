@@ -138,21 +138,25 @@ def youtube(q: str):
     q = ' '.join(str(q).split())[:120]
     if not q:
         raise HTTPException(400, 'Consulta vacía')
-    clave = os.getenv('YOUTUBE_API_KEY') or os.getenv('GOOGLE_API_KEY')
     busqueda = 'https://www.youtube.com/results?search_query=' + urllib.request.quote(q)
-    if not clave:
-        return {'embebible': False, 'busqueda': busqueda,
-                'motivo': 'Agregá YOUTUBE_API_KEY en .env para reproducir dentro de SKY.'}
-    from neural_core.multimedia import _search_youtube_api
-    try:
-        candidatos = _search_youtube_api(q, clave)
-    except Exception:
-        candidatos = []
-    candidatos = [c for c in candidatos if re.fullmatch(r'[A-Za-z0-9_-]{11}', c.get('id', ''))]
-    if not candidatos:
-        return {'embebible': False, 'busqueda': busqueda, 'motivo': 'Sin resultados incrustables.'}
-    return {'embebible': True, 'busqueda': busqueda,
-            'videos': [{'id': c['id'], 'titulo': str(c.get('title', ''))[:140]} for c in candidatos[:6]]}
+    if os.getenv('SKY_LOCAL_ONLY', '').strip().lower() in ('1', 'true', 'yes', 'on'):
+        return {'embebible': False, 'videos': [], 'busqueda': busqueda, 'origen': 'solo_local',
+                'motivo': 'SKY está en modo solo local y no puede consultar YouTube.'}
+    from neural_core.sky_youtube_search import buscar_videos
+    clave = os.getenv('YOUTUBE_API_KEY') or os.getenv('GOOGLE_API_KEY') or ''
+    resultado = buscar_videos(q, clave=clave)
+    videos = [{'id': v['id'],
+               'titulo': str(v['title'])[:140],
+               'canal': str(v.get('channel', ''))[:100]}
+              for v in resultado.get('videos', [])]
+    return {
+        'embebible': bool(videos),
+        'videos': videos,
+        'busqueda': busqueda,
+        'origen': resultado.get('origen', 'sin_resultados'),
+        'incrustacion_verificada': bool(resultado.get('verificado')),
+        'motivo': resultado.get('motivo', '') if not videos else '',
+    }
 
 
 class TextoVoz(BaseModel):
@@ -226,6 +230,42 @@ def kpi(periodo: str = 'hoy'):
         raise HTTPException(400, 'periodo debe ser hoy o semana')
     datos = sky_metricas.resumen(periodo)
     return {**datos, 'texto': sky_metricas.describir(datos)}
+
+
+@router.get('/modulos')
+def modulos():
+    """v12.6: registro de módulos con su estado real (disponible, no configurado, cargando, activo, degradado, error)
+    y lo que falta exactamente para cada uno."""
+    from neural_core import sky_modulos
+    return sky_modulos.listar()
+
+
+@router.get('/modulos/{mid}')
+def modulo(mid: str):
+    from neural_core import sky_modulos
+    try:
+        return sky_modulos.estado(mid)
+    except KeyError:
+        raise HTTPException(404, 'Módulo desconocido.')
+
+
+@router.post('/modulos/{mid}/activar')
+def modulo_activar(mid: str):
+    """Carga bajo demanda (en segundo plano, con límite de memoria y de concurrencia). No ejecuta acciones externas."""
+    from neural_core import sky_modulos, sky_rutinas
+    try:
+        return sky_modulos.activar(mid, aviso=lambda t: sky_rutinas.avisar(t, 'modulos'))
+    except KeyError:
+        raise HTTPException(404, 'Módulo desconocido.')
+
+
+@router.post('/modulos/{mid}/liberar')
+def modulo_liberar(mid: str):
+    from neural_core import sky_modulos
+    try:
+        return sky_modulos.descargar(mid)
+    except KeyError:
+        raise HTTPException(404, 'Módulo desconocido.')
 
 
 @router.get('/aprendizaje')

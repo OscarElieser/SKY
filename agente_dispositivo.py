@@ -106,6 +106,8 @@ def _detalle_seguro(action: str, params: dict) -> str:
         return str(params.get('key', ''))
     if action in ('window_action', 'task_action', 'player_control'):
         return str(params.get('subaction', ''))
+    if action == 'word_write':
+        return str(len(str(params.get('text', '')))) + ' caracteres a Word'
     if action == 'keyboard_shortcut':
         return str(params.get('shortcut', ''))[:30]
     if action == 'play_media':
@@ -188,6 +190,9 @@ def _validar(action: str, params: dict, politica: dict) -> None:
     if action == 'keyboard_shortcut':
         if params != {'shortcut': 'ctrl+f4', 'expected_app': 'winword.exe'}:
             raise ValueError('Atajo de teclado no autorizado: sólo Ctrl+F4 en Word.')
+    if action == 'word_write':
+        from neural_core.sky_word_editor import validar_parametros
+        validar_parametros(params)
     if not caps.accion_habilitada(action, politica, params):
         cap = caps.capacidad_para(action, params)
         raise Desactivada(f'La capacidad "{cap}" está desactivada. Activala en tu equipo con: '
@@ -239,6 +244,9 @@ def _ejecutar(action: str, params: dict, politica: dict) -> dict:
     if action == 'keyboard_shortcut':
         from neural_core.sky_keyboard_shortcuts import enviar_ctrl_f4_word
         return enviar_ctrl_f4_word()
+    if action == 'word_write':
+        from neural_core.sky_word_editor import escribir_en_word
+        return escribir_en_word(params)
     if action == 'window_action':
         sub = params.get('subaction', 'list')
         if sub == 'list':
@@ -321,6 +329,29 @@ def execute_action(action: str, params: dict, politica: dict | None = None) -> d
     return res
 
 
+BLOQUEADA = 'SKY está bloqueada: decí o escribí tu PIN para volver a usarla.'
+
+
+def _sesion_bloqueada() -> bool:
+    try:
+        from neural_core.sentinel_identidad import sesion_bloqueada
+        return sesion_bloqueada()
+    except Exception:
+        return True   # falla cerrado
+
+
+def permitido_con_sesion(action: str, params: dict, origen: str, politica: dict | None = None) -> bool:
+    """v12.6 — última barrera común a voz, HUD, WhatsApp, rutinas y Streamlit: con la sesión del dueño bloqueada,
+    sólo pasan las tareas programadas que ya estaban autorizadas como automáticas y son de nivel 1 (avisos, música,
+    volumen…). Lo demás espera al PIN. La política por herramienta no cambia al desbloquear."""
+    if not _sesion_bloqueada():
+        return True
+    if origen != 'programada':
+        return False
+    politica = politica or caps.cargar_politica()
+    return caps.nivel_riesgo(action, params) == 1 and not caps.requiere_confirmacion(action, params, politica)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = 'SKY-Desktop-Agent/' + VERSION
 
@@ -345,6 +376,8 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(split.query)
         if split.path == '/status':
             return self.reply(200, status())
+        if _sesion_bloqueada():
+            return self.reply(423, {'ok': False, 'error': BLOQUEADA})
         if split.path == '/verify_action':
             cid = query.get('command_id', [''])[0][:80]
             if not cid:
@@ -390,6 +423,10 @@ class Handler(BaseHTTPRequestHandler):
             params = body.get('params', {})
             if action not in caps.ACCION_A_CAPACIDAD and action not in caps.ACCIONES_INTERFAZ:
                 raise ValueError(f"Acción '{action}' no permitida en esta versión.")
+            if not permitido_con_sesion(action, params if isinstance(params, dict) else {},
+                                        self.headers.get('X-SKY-ORIGEN', '')):
+                audit(action, 'sesion_bloqueada')
+                return self.reply(423, {'ok': False, 'error': BLOQUEADA})
             result = execute_action(action, params)
             audit(action, 'ok', _detalle_seguro(action, params if isinstance(params, dict) else {}))
             return self.reply(200, result)
@@ -475,6 +512,7 @@ def main(argv=None):
     p.add_argument('--carpeta', action='append', help='carpeta autorizada para archivos (repetible)')
     p.add_argument('--ver-politica', action='store_true')
     p.add_argument('--solo-config', action='store_true', help='guardar la política sin iniciar el agente')
+    p.add_argument('--mostrar-token', action='store_true', help='mostrar el token de emparejamiento en pantalla')
     args = p.parse_args(argv)
     cambios = configurar(args)
     if cambios or args.ver_politica:
@@ -487,7 +525,11 @@ def main(argv=None):
     if port != PORT:
         print(f'[SKY] El puerto {PORT} estaba ocupado; usando {port}. Fijá SKY_DEVICE_PORT={port} en SKY.')
     print(f'{AGENT_NAME} {VERSION} activo en http://127.0.0.1:{port}')
-    print('Token para emparejar (NO compartir):', secret)
+    # v12.6: el token nunca va a los registros. Sólo se muestra en una consola interactiva o con --mostrar-token.
+    if args.mostrar_token or (sys.stdout is not None and sys.stdout.isatty()):
+        print('Token para emparejar (NO compartir):', secret)
+    else:
+        print('Token de emparejamiento oculto (está en ~/.neuralt/device_agent.token; usá --mostrar-token).')
     print('Capacidades activas:', ', '.join(caps.cargar_politica()['enabled']),
           '— cambiá con --perfil / --activar (ver --help)')
     print('Para acceso desde otro equipo, instalá Tailscale y usá: tailscale serve ' + str(port))

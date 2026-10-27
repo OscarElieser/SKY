@@ -24,3 +24,16 @@ security_reports/
 .streamlit/
 modelos/vosk*
 modelos/*.zip
+# Artefactos de Flutter/Node generados dentro de las plantillas de SKY Design Studio
+templates/**/build/
+templates/**/.dart_tool/
+templates/**/node_modules/
+templates/**/dist/
+.dart_tool/
+build/
+mobile/**/.gradle/
+mobile/**/build/
+
+# Node dependencies and binary installers
+node_modules/
+*.exe

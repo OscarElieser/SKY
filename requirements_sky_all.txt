@@ -1,0 +1,40 @@
+# SKY IA | Inventario maestro de TODAS las dependencias Python declaradas en GitHub.
+# Reinstalacion en otra computadora: python -m pip install -r requirements_sky_all.txt
+# Solo para perfil COMPLETO: la instalacion puede ocupar muchos GB, tardar
+# bastante y contener integraciones que requieren licencias, APIs o GPU.
+# Python recomendado: 3.12 en Windows. Usar SIEMPRE .venv y no Python global.
+# pip resuelve los requisitos y omite distribuciones compatibles ya instaladas.
+#
+# NUCLEO, HUD, API, 3D, multimedia, seguridad, Office y clientes IA:
+-r requirements.txt
+# Metaverso, oficina, laboratorio creativo y entorno de servidor:
+-r requirements_social.txt
+-r requirements_office.txt
+-r requirements_studio.txt
+# Redis y servicios opcion de produccion (Redis SERVER no viene con pip):
+-r requirements_production.txt
+# Habilidades, conectividad privada, MCP, gestores de agentes y utilidades:
+-r requirements_connectivity_optional.txt
+-r requirements_mcp_optional.txt
+-r requirements_sky_optional_integrations.txt
+# Transformacion avanzada de documentos (extra PDF/DOCX/PPTX/XLSX):
+-r requirements_markitdown_optional.txt
+# Ajuste fino LoRA / Transformers (GPU CUDA requiere instalacion propia):
+-r requirements_sky_training.txt
+# Voz local: bibliotecas, NO modelos binarios de Whisper, Vosk ni Piper:
+faster-whisper>=1.1,<2
+vosk>=0.3,<1
+sounddevice>=0.4,<1
+pyttsx3>=2,<3
+pywin32>=306; sys_platform == "win32"
+# Herramientas de pruebas y verificacion:
+pytest>=8,<10
+#
+# IMPORTANTE: requirements_verified_v110.txt es una FOTOGRAFIA fijada para
+# pruebas Python 3.11. NO se incluye porque forzar sus pines en una computadora
+# nueva podria cambiar versiones del stack principal. Queda conservado en GitHub.
+#
+# No son librerias pip: Git, Node/npm, FFmpeg, JDK/Gradle, Android SDK,
+# Flutter/Dart, Docker/Redis, Ollama, modelos locales Piper/Vosk/Whisper,
+# Tailscale, API keys y permisos. Para inventariarlos/instalarlos en Windows:
+# usar INSTALAR_DEPENDENCIAS_SKY.ps1 y docs/INSTALACION_COMPLETA_SKY.md.

@@ -80,7 +80,8 @@ class VoiceCoordinator:
         self._lock = threading.Lock()
         self._context = ConversationalContext()
         self._state_file = Path(__file__).resolve().parent.parent / "local_data" / "voice_coordinator_state.json"
-        self._persist_state()
+        # v12.6: no se escribe al importar. Antes, cada proceso que importaba este módulo (API, Streamlit, voz)
+        # reescribía el archivo con el estado inicial y borraba el estado real de la escucha.
 
     def set_mode(self, mode: InteractionMode) -> None:
         with self._lock:
@@ -268,9 +269,13 @@ class VoiceCoordinator:
         return None
 
     def _persist_state(self) -> None:
+        # v12.6: escritura atómica y SIN frases (lo que dijiste y lo que respondió SKY quedan sólo en memoria).
         try:
-            self._state_file.parent.mkdir(parents=True, exist_ok=True)
-            self._state_file.write_text(json.dumps(self._context.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+            from .sky_archivo_seguro import escribir_json
+            datos = self._context.to_dict()
+            datos.pop("last_user_utterance", None)
+            datos.pop("last_assistant_response", None)
+            escribir_json(self._state_file, datos, indent=2)
         except Exception:
             pass
 

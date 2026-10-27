@@ -1,0 +1,31 @@
+name: SKY KPI - acciones pendientes y alertas
+
+on:
+  pull_request:
+    paths:
+      - 'neural_core/dispositivos.py'
+      - 'neural_core/sky_metricas.py'
+      - 'tests/test_sky_kpi_pendientes.py'
+      - '.github/workflows/sky-kpi-pendientes.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'neural_core/dispositivos.py'
+      - 'neural_core/sky_metricas.py'
+      - 'tests/test_sky_kpi_pendientes.py'
+      - '.github/workflows/sky-kpi-pendientes.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  comprobar-alertas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pytest
+      - run: PYTHONPATH=. python -m pytest -q tests/test_sky_kpi_pendientes.py
