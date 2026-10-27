@@ -89,6 +89,7 @@ class MainActivity : Activity() {
             })
         }
         content.addView(actionButton("Consultar órdenes ahora") { poll() })
+        content.addView(actionButton("Estado de mi servidor SKY") { checkHomeStatus() })
         content.addView(description("SKY consulta cada 6 segundos mientras la app está visible. Esta versión no funciona con pantalla bloqueada."))
     }
 
