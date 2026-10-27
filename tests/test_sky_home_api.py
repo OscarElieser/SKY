@@ -49,6 +49,24 @@ home._availability = lambda: (True, ('openai',), True)
 blocked({'texto': 'privado', 'proveedor': 'openai', 'autorizar_nube': True, 'autorizar_datos_privados': True})
 response = home.home_chat(home.HomeChat(texto='privado'))
 assert response['proveedor'] == 'ollama' and response['nube'] is False
+
+# An authorized AUTO cloud error may fall back to local, but must say so.
+home._availability = lambda: (True, ('openai',), False)
+def cloud_fails(messages, provider, max_output_tokens):
+    if provider == 'openai':
+        raise providers.ProviderError('Simulated network failure')
+    return 'Respuesta local'
+providers.reply = cloud_fails
+response = home.home_chat(home.HomeChat(texto='explica SSD', datos='generales', autorizar_nube=True))
+assert response['proveedor'] == 'ollama' and response['respaldo_local'] is True
+assert response['nube'] is False
+# An explicit cloud selection never changes to a local model.
+try:
+    home.home_chat(home.HomeChat(texto='explica SSD', datos='generales', proveedor='openai', autorizar_nube=True))
+except HTTPException as exc:
+    assert exc.status_code == 503
+else:
+    raise AssertionError('Explicit cloud provider unexpectedly changed')
 '''
     completed = subprocess.run([sys.executable, '-c', script], cwd=ROOT,
                                capture_output=True, text=True, timeout=20)
