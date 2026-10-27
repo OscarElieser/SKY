@@ -110,3 +110,19 @@ def test_hud_youtube_blocked_embed_offers_alternative_and_original():
     assert "ytVerificado = !!r.incrustacion_verificada" in script
     assert "YouTube debe autorizar la reproducción" in script
     assert "await decir('Cargué " not in script
+
+
+def test_hud_observes_real_embed_player_errors_without_guessing():
+    """The official iframe API reports actual errors, not simulated availability."""
+    from pathlib import Path
+
+    script = (Path(__file__).resolve().parents[1] / "metaverse" / "static" / "hud.js").read_text(encoding="utf-8")
+    assert "https://www.youtube.com/iframe_api" in script
+    assert "onError: evento =>" in script
+    assert "onStateChange: evento =>" in script
+    assert "onAutoplayBlocked:" in script
+    assert "[101, 150].includes(codigo)" in script
+    assert "codigo === 153" in script
+    assert "codigo === 100" in script
+    assert "vigilarReproductor(iframe, v.id, barra)" in script
+    assert "encodeURIComponent(window.location.origin)" in script
