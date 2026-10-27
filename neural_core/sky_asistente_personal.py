@@ -153,7 +153,7 @@ def _interpretar_propio(texto: str) -> dict | None:
         r'^(?:(?:la|el|una|un|las|los)\s+)?'
         r'(?:volumen|alarmas?|recordatorios?|temporizador(?:es)?|cronometros?|'
         r'despertador(?:es)?|ajustes|configuracion|notificacion(?:es)?|calendario|'
-        r'citas|reuniones)\b', m.group(1)
+        r'citas?|reunion(?:es)?)\b', m.group(1)
     ):
         consulta_norm = m.group(1).strip()
         servicio = (m.group(2) or 'youtube').replace(' ', '_')
