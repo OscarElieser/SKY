@@ -865,6 +865,23 @@ class SkySupervisor:
                 s.estado = "externo" if s.externo else "activo"
                 s.causa, s.fallas_sonda, s.primera_falla = det, 0, 0.0
                 continue
+            # La voz informa su identidad por PID. Si un segundo listener real
+            # mantiene el micrófono y publica latidos recientes, el PID de este
+            # subproceso no coincidirá. Eso es una discrepancia de propietarios,
+            # NO prueba que el proceso esté colgado: nunca matar por ese motivo
+            # a ciegas, ni reiniciar en bucle mientras el otro listener está sano.
+            if s.nombre == "voice" and s.proc is not None and not s.externo:
+                otro_pid = _pid_escucha_vivo()
+                if otro_pid and otro_pid != s.proc.pid:
+                    otro_ok, _ = sonda_voz(otro_pid)
+                    if otro_ok:
+                        s.estado = "degradado"
+                        s.causa = (
+                            f"escucha SKY activa en otro PID ({otro_pid}); "
+                            f"el proceso supervisado ({s.proc.pid}) no informa estado propio"
+                        )
+                        s.fallas_sonda, s.primera_falla = 0, 0.0
+                        continue
             s.fallas_sonda += 1
             s.primera_falla = s.primera_falla or ahora
             if s.externo:
