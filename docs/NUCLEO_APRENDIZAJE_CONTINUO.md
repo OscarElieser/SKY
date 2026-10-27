@@ -29,7 +29,7 @@ Para consultar directamente desde PowerShell en el directorio del proyecto, con 
 
 ~~~powershell
 .\.venv\Scripts\python.exe -c "from neural_core.sky_core_learning import explicar_estado; print(explicar_estado())"
-.\.venv\Scripts\python.exe -m unittest tests.test_sky_core_learning -v
+.\.venv\Scripts\python.exe -m unittest discover -s tests -p test_sky_core_learning.py -v
 ~~~
 
 La configuración desactiva solo la inclusión del contexto en el cerebro; las funciones de lectura y consulta siguen disponibles. No incluya el PIN ni ninguna credencial en comandos o registros.
