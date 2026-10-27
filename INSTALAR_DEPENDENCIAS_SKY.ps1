@@ -29,7 +29,6 @@ $ProgressPreference = "SilentlyContinue"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location -LiteralPath $Root
 $PythonVenv = Join-Path $Root ".venv\Scripts\python.exe"
-$Issues = New-Object 'System.Collections.Generic.List[string]'
 $Pending = New-Object 'System.Collections.Generic.List[string]'
 
 function Notice([string]$Text) { Write-Host "[SKY] $Text" -ForegroundColor Cyan }
@@ -151,11 +150,17 @@ if ($Perfil -eq "Completo" -and -not $OmitirNode) {
             if (-not (Test-Path -LiteralPath (Join-Path $Project "package.json"))) {
                 throw "Falta package.json en $Folder; no se borran modulos."
             }
+            $NpmPath = $Npm.Source
+            $NodeReady = $false
             if (Test-Path -LiteralPath (Join-Path $Project "node_modules")) {
-                Notice "Node: $Folder tiene node_modules; sin volver a instalar."
+                & $NpmPath --prefix $Project ls --depth=0 --silent 2>$null
+                $NodeReady = ($LASTEXITCODE -eq 0)
+            }
+            if ($NodeReady) {
+                Notice "Node: $Folder validado, no requiere instalar otra vez."
             } else {
-                Notice "Node: instalando dependencias en $Folder"
-                & $Npm.Source --prefix $Project install --no-save --no-package-lock --no-audit --no-fund
+                Notice "Node: instalando requisitos ausentes en $Folder"
+                & $NpmPath --prefix $Project install --no-save --no-package-lock --no-audit --no-fund
                 if ($LASTEXITCODE -ne 0) { Warn "npm fallo en $Folder; revisar ese modulo." }
             }
         }
