@@ -37,11 +37,40 @@ class HUDWindowRequestTests(unittest.TestCase):
         for frase in (
             "abre Microsoft Word", "busca mis archivos en Windows",
             "busca recetas en google", "pon la alarma mañana",
+            "pon una alarma a las ocho", "pon el temporizador diez minutos",
+            "pon un recordatorio para mañana", "ponme la alarma temprano",
+            "quiero que pongas el despertador", "pon las notificaciones",
+            "pon el volumen al 50 por ciento", "pon una reunión mañana",
             "reproduce música en Spotify", "sube el volumen",
             "necesito que escribas una carta sobre videos",
         ):
             with self.subTest(frase=frase):
                 self.assertIsNone(w.parse_window_request(frase))
+
+    def test_musical_titles_with_nonmedia_words_remain_playable(self):
+        for frase in (
+            "Pon la canción Alarma de Prueba",
+            "Reproduce el tema Recordatorio de Prueba",
+            "Quiero escuchar la canción Temporizador de Prueba",
+        ):
+            with self.subTest(frase=frase):
+                pedido = w.parse_window_request(frase)
+                self.assertIsNotNone(pedido)
+                self.assertEqual(pedido["kind"], "youtube")
+
+    def test_nonmedia_commands_never_become_youtube_in_assistant(self):
+        from neural_core.sky_asistente_personal import interpretar
+        for frase in (
+            "pon la alarma mañana",
+            "pon una alarma a las ocho",
+            "pon un recordatorio para mañana",
+            "pon el temporizador diez minutos",
+            "pon el volumen al 50 por ciento",
+        ):
+            with self.subTest(frase=frase):
+                pedido = interpretar(frase)
+                if pedido is not None:
+                    self.assertNotEqual(pedido.get("action"), "play_media")
 
     def test_chat_interpreter_uses_same_youtube_request_as_voice(self):
         from neural_core.sky_asistente_personal import interpretar
