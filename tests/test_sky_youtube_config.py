@@ -11,6 +11,7 @@ def test_api_reads_local_dotenv_even_if_process_started_before_key(monkeypatch, 
     archivo.write_text("YOUTUBE_API_KEY=clave_ficticia_para_pruebas\n", encoding="utf-8")
     monkeypatch.setattr(hud_api, "YOUTUBE_ENV_FILE", archivo)
     monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
+    monkeypatch.delenv("SKY_LOCAL_ONLY", raising=False)
     assert hud_api._youtube_clave() == "clave_ficticia_para_pruebas"
 
     with patch("neural_core.sky_youtube_search.buscar_videos", return_value={
