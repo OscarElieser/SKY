@@ -11,6 +11,7 @@ import re
 import sqlite3
 import time
 import unicodedata
+from contextlib import closing
 from pathlib import Path
 
 
@@ -44,7 +45,9 @@ def _telemetria(dias: int = 30) -> dict:
         ruta = Path(_ruta_db())
         if not ruta.is_file():
             return vacio
-        with sqlite3.connect(ruta.as_uri() + "?mode=ro", uri=True, timeout=0.3) as db:
+        # El context manager de sqlite3 hace commit/rollback, pero NO cierra la conexión.
+        # Windows bloquea el archivo hasta db.close(); closing evita WinError 32.
+        with closing(sqlite3.connect(ruta.as_uri() + "?mode=ro", uri=True, timeout=0.3)) as db:
             filas = db.execute("""SELECT tipo,nombre,COUNT(*),SUM(CASE WHEN ok=1 THEN 1 ELSE 0 END)
                 FROM eventos WHERE ts>=? AND
                 (tipo IN ('accion','modelo') OR (tipo='servicio' AND nombre LIKE 'modulo_%'))
