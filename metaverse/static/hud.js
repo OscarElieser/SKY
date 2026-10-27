@@ -1807,6 +1807,81 @@
     nativeCall.addEventListener('click',()=>nativeHandoff('tel',nativeCall));
     nativeSMS.addEventListener('click',()=>nativeHandoff('sms',nativeSMS));
     actionSection.append(el('div','s','La llamada primero suena en tu teléfono verificado; al contestar se conecta el destinatario. No usa el micrófono del navegador. Una llamada puede cobrar dos tramos.'));
+    // SKY Mobile Agent: usa la autenticación SKY ya activa, sin pedir ni
+    // copiar la clave maestra al teléfono.
+    const mobilePanel=seccion(root,'SKY Mobile Agent · Android');
+    mobilePanel.append(el('div','s',
+      'Conectá un Android con código temporal. Abrir aplicaciones requiere un permiso en el teléfono y una confirmación por cada orden.'));
+    const mobileControls=el('div','btns');
+    const mobilePair=el('button','btn primary','Crear código para Android');mobilePair.type='button';
+    const mobileRefresh=el('button','btn','Actualizar teléfonos');mobileRefresh.type='button';
+    mobileControls.append(mobilePair,mobileRefresh);
+    const mobileCode=el('pre','res','Sin código activo.');
+    const mobileSelect=el('select','hab-in');
+    const mobileApps=el('select','hab-in');
+    [['youtube','YouTube'],['chrome','Chrome'],['whatsapp','WhatsApp'],['gmail','Gmail']].forEach(([id,name])=>{
+      const option=el('option','',name); option.value=id; mobileApps.appendChild(option);
+    });
+    const mobileSend=el('button','btn','Enviar solicitud al teléfono');mobileSend.type='button';
+    const mobileState=el('div','res','No hay teléfonos consultados.');
+    const mobileCheck=el('button','btn','Verificar última solicitud');mobileCheck.type='button';
+    const mobileRevoke=el('button','btn','Revocar teléfono seleccionado');mobileRevoke.type='button';
+    mobilePanel.append(mobileControls,mobileCode,mobileSelect,mobileApps,mobileSend,mobileCheck,mobileRevoke,mobileState);
+    let lastMobileRequest=null;
+    mobilePair.addEventListener('click',async()=>{
+      mobilePair.disabled=true;
+      try{
+        const d=await api('/api/sky/mobile-agent/pair/start',{method:'POST',body:'{}'});
+        mobileCode.textContent='Código: '+d.code+'\nVence en '+d.expires_seconds+' segundos. Ingresalo en SKY Mobile Agent.';
+      }catch(e){mobileCode.textContent='No se pudo crear código: '+e.message;}
+      finally{mobilePair.disabled=false;}
+    });
+    async function updateMobile(){
+      try{
+        const d=await api('/api/sky/mobile-agent/devices');
+        mobileSelect.replaceChildren();
+        for(const device of (d.devices||[])){
+          const op=el('option','',device.label);op.value=device.id;mobileSelect.append(op);
+        }
+        mobileState.textContent=(d.devices||[]).length?
+          'Teléfonos vinculados: '+d.devices.length+'. Todas las aperturas necesitan aprobación local.':
+          'Sin teléfonos vinculados. Primero generá e ingresá el código.';
+        mobileSend.disabled=!mobileSelect.value;
+        mobileRevoke.disabled=!mobileSelect.value;
+      }catch(e){mobileState.textContent='No se pudieron consultar los teléfonos: '+e.message;}
+    }
+    mobileRefresh.addEventListener('click',updateMobile);
+    mobileSend.addEventListener('click',async()=>{
+      if(!mobileSelect.value)return;
+      mobileSend.disabled=true;
+      try{
+        const id=encodeURIComponent(mobileSelect.value);
+        const d=await api('/api/sky/mobile-agent/devices/'+id+'/commands',{
+          method:'POST',body:JSON.stringify({target:mobileApps.value})
+        });
+        lastMobileRequest={device:id,command:d.command_id};
+        mobileState.textContent='Solicitud enviada. Ahora aprobala dentro de SKY Mobile Agent en tu Android.';
+      }catch(e){mobileState.textContent='No se pudo enviar la orden: '+e.message;}
+      finally{mobileSend.disabled=false;}
+    });
+    mobileCheck.addEventListener('click',async()=>{
+      if(!lastMobileRequest){mobileState.textContent='Todavía no hay una solicitud enviada desde este panel.';return;}
+      try{
+        const d=await api('/api/sky/mobile-agent/devices/'+lastMobileRequest.device+
+          '/commands/'+encodeURIComponent(lastMobileRequest.command));
+        mobileState.textContent='Estado: '+d.state+
+          (d.message?' · '+d.message:'')+
+          (d.state==='SENT'?' (se solicitó abrir; carga no verificada)':'');
+      }catch(e){mobileState.textContent='No se pudo verificar: '+e.message;}
+    });
+    mobileRevoke.addEventListener('click',async()=>{
+      if(!mobileSelect.value || !confirm('¿Revocar este teléfono y cancelar sus órdenes pendientes?'))return;
+      try{
+        await api('/api/sky/mobile-agent/devices/'+encodeURIComponent(mobileSelect.value),{method:'DELETE'});
+        lastMobileRequest=null;await updateMobile();
+      }catch(e){mobileState.textContent='No se pudo revocar: '+e.message;}
+    });
+    updateMobile();
     const blockSection=seccion(root,'3. Bloquear y desbloquear en SKY');
     blockSection.append(el('div','s','El bloqueo impide llamadas y SMS salientes por SKY hacia esos números; no bloquea llamadas de la SIM, Android, iOS ni de la compañía.'));
     const block=el('button','btn','Bloquear destinatario');block.type='button';

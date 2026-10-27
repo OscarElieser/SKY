@@ -181,6 +181,10 @@ app.include_router(sky_modules_router, dependencies=[Depends(require_key)])
 from .mobile_pwa_api import router as mobile_pwa_router
 app.include_router(mobile_pwa_router)
 
+# Native Android Agent: owner-protected commands plus device-only token routes.
+from .mobile_agent_api import router as sky_mobile_agent_router
+app.include_router(sky_mobile_agent_router)
+
 # SKY Teléfono reuses the private SKY API, owner key and SENTINEL MFA.
 from .phone_api import router as sky_phone_router
 app.include_router(sky_phone_router)
