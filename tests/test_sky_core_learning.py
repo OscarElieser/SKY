@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 import time
 import unittest
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,7 +15,8 @@ class TestSkyCoreLearning(unittest.TestCase):
     def test_telemetria_distingue_pendiente_y_reportada(self):
         with tempfile.TemporaryDirectory() as folder:
             ruta = Path(folder) / "metricas.sqlite3"
-            with sqlite3.connect(ruta) as db:
+            # Cerrar explícitamente: 'with sqlite3.connect' no libera el archivo en Windows.
+            with closing(sqlite3.connect(ruta)) as db, db:
                 db.execute("CREATE TABLE eventos (ts REAL, tipo TEXT, nombre TEXT, ok INTEGER, origen TEXT)")
                 db.executemany("INSERT INTO eventos VALUES (?,?,?,?,?)", [
                     (time.time(), "accion", "launch_app", 1, "VERIFIED"),
