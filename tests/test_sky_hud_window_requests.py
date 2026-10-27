@@ -50,6 +50,8 @@ class HUDWindowRequestTests(unittest.TestCase):
         self.assertEqual(orden["action"], "play_media")
         self.assertEqual(orden["params"]["service"], "youtube")
         self.assertIn("entre dos tierras", orden["params"]["query"])
+        mini = interpretar("Reproduce Entre dos tierras de Heroes del Silencio en una miniventana")
+        self.assertEqual(mini["params"]["mode"], "mini")
 
     def test_internal_search(self):
         self.assertEqual(w.parse_window_request("Activa el módulo de buscar"),
