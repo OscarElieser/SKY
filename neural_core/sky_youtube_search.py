@@ -1,8 +1,8 @@
 """Búsqueda de metadatos de YouTube para el HUD de SKY.
 
-Usa la API oficial cuando está configurada y, en ausencia de clave,
-intenta leer los resultados públicos de YouTube. No descarga vídeos ni
-declara reproducible un video que no haya sido verificado por la API.
+Usa exclusivamente la API oficial para buscar en tiempo de ejecución.
+Sin clave ofrece opciones manuales; el parser de HTML se conserva para pruebas
+heredadas, pero nunca se invoca automáticamente. No descarga videos.
 """
 from __future__ import annotations
 
@@ -83,23 +83,26 @@ def buscar_videos(consulta: str, clave: str = "", limite: int = 6) -> dict:
     if not consulta:
         return {"videos": [], "origen": "vacio", "verificado": False,
                 "motivo": "Escribí una canción, artista o tema para buscar."}
-    errores: list[str] = []
-    if clave:
-        try:
-            from neural_core.multimedia import _search_youtube_api
-            datos = _search_youtube_api(consulta, clave)
-            videos = [v for v in datos if isinstance(v, dict) and
-                      VIDEO_ID.fullmatch(str(v.get("id", ""))) and v.get("title")][:limite]
-            if videos:
-                return {"videos": videos, "origen": "youtube_data_api", "verificado": True}
-        except Exception:
-            errores.append("No respondió la API oficial de YouTube.")
+    # La política oficial de YouTube prohíbe extraer sus páginas mediante scraping.
+    # Se conserva el parser antiguo sólo para pruebas/compatibilidad, pero la
+    # ejecución de SKY ya no consulta páginas HTML públicas automáticamente.
+    if not clave:
+        return {"videos": [], "origen": "sin_api_oficial", "verificado": False,
+                "motivo": "Para buscar y filtrar videos reproducibles dentro de SKY configurá YOUTUBE_API_KEY "
+                          "(YouTube Data API v3) en tu .env. Mientras tanto, podés pegar un enlace "
+                          "de YouTube en el reproductor o abrir la búsqueda oficial."}
     try:
-        videos = buscar_web_publica(consulta, limite)
+        from neural_core.multimedia import _search_youtube_api
+        datos = _search_youtube_api(consulta, clave)
+        videos = [v for v in datos if isinstance(v, dict) and
+                  VIDEO_ID.fullmatch(str(v.get("id", ""))) and v.get("title")
+                  and v.get("embeddable") is True][:limite]
         if videos:
-            return {"videos": videos, "origen": "youtube_web_publica", "verificado": False}
+            return {"videos": videos, "origen": "youtube_data_api", "verificado": True}
+        return {"videos": [], "origen": "sin_resultados", "verificado": False,
+                "motivo": "YouTube no devolvió videos públicos incrustables para esta búsqueda. "
+                          "Probá otra versión o utilizá el enlace oficial de YouTube."}
     except Exception:
-        errores.append("La página pública de YouTube no permitió obtener resultados.")
-    return {"videos": [], "origen": "sin_resultados", "verificado": False,
-            "motivo": " ".join(errores) or
-                      "YouTube no devolvió resultados. Revisá tu conexión o configurá YOUTUBE_API_KEY."}
+        return {"videos": [], "origen": "error_api_oficial", "verificado": False,
+                "motivo": "La YouTube Data API no respondió correctamente. Revisá su habilitación, "
+                          "cuota y clave local; podés abrir la búsqueda oficial mientras tanto."}
