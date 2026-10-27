@@ -1111,7 +1111,7 @@
               details.appendChild(el('span', 'sky-youtube-action', '▶ Reproducir en SKY'));
               select.append(thumb, details);
               select.addEventListener('click', () => {
-                lista = videos; indice = pos;
+                lista = videos; indice = pos; ytVerificado = !!data.incrustacion_verificada;
                 mostrarVideo();
                 aplicarModoVentana('player', mode === 'minimized' ? 'normal' : mode);
                 setState('idle', 'Video seleccionado.');
@@ -2820,7 +2820,7 @@
 
   /* ------------------------------------------------------------------ reproductor */
   const YT = 'https://www.youtube-nocookie.com';
-  let lista = [], indice = 0;
+  let lista = [], indice = 0, ytVerificado = false;
   function preguntarReproducir() {
     const i = $('chat-input'); i.value = 'reproduce '; i.focus();
   }
@@ -2861,7 +2861,7 @@
             id = u.searchParams.get('v') || u.pathname.match(/^\/(?:embed|shorts|live)\/([^/]+)/)?.[1] || '';
           }
           if (!/^[A-Za-z0-9_-]{11}$/.test(id)) throw Error('Enlace de video no válido.');
-          lista = [{id, titulo:'Video seleccionado'}]; indice = 0;
+          lista = [{id, titulo:'Video seleccionado'}]; indice = 0; ytVerificado = false;
           mostrarVideo(); aplicarModoVentana('player', mode);
         } catch(err) { errorVideo.textContent = 'No pude incorporar ese video: ' + (err instanceof TypeError ? 'Revisá que el enlace de YouTube sea válido y completo.' : err.message); }
       });
@@ -2876,15 +2876,38 @@
       addMsg('sky', 'Abrí el panel de YouTube dentro de SKY, pero no puedo reproducir sin un video incrustable. ' + (r.motivo || ''));
       return;
     }
-    lista = r.videos; indice = 0; mostrarVideo(); aplicarModoVentana('player', mode);
-    await decir('Cargué ' + lista[0].titulo + ' en el reproductor de SKY.');
+    lista = r.videos; indice = 0; ytVerificado = !!r.incrustacion_verificada;
+    mostrarVideo(); aplicarModoVentana('player', mode);
+    await decir('Encontré ' + lista[0].titulo + '. Intenté abrir el reproductor; YouTube debe autorizar la reproducción. Si no está disponible, elegí Otro video o Ver en YouTube.');
   }
   function mostrarVideo() {
     const v = lista[indice]; if (!v) return;
     cerrarVentana('player');
     const w = abrirVentana('player', '♪ ' + v.titulo, YT + '/embed/' + encodeURIComponent(v.id) + '?autoplay=1&playsinline=1&rel=0&enablejsapi=1',
       { w: 760, h: 470, allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', referrer: 'strict-origin-when-cross-origin' });
-    w.el.querySelector('iframe').setAttribute('allowfullscreen', '');
+    const iframe = w.el.querySelector('iframe');
+    if (iframe) iframe.setAttribute('allowfullscreen', '');
+    // La búsqueda pública no garantiza permiso para incrustar el video.
+    const barra = w.el.querySelector('header');
+    if (barra) {
+      const otro = el('button', '', 'Otro video');
+      otro.type = 'button';
+      otro.title = 'Probar otro resultado cuando YouTube indica que no está disponible';
+      otro.style.width = 'auto'; otro.style.padding = '0 7px';
+      otro.disabled = lista.length < 2;
+      otro.addEventListener('click', () => controlReproductor('next'));
+      const original = el('a', '', 'Ver en YouTube');
+      original.href = 'https://www.youtube.com/watch?v=' + encodeURIComponent(v.id);
+      original.target = '_blank'; original.rel = 'noopener noreferrer';
+      original.title = 'Abrir el video original si no admite reproducción integrada';
+      original.style.cssText = 'white-space:nowrap;color:inherit;font-size:10px;letter-spacing:0;text-transform:none;';
+      const primeraAccion = barra.querySelector('button');
+      barra.insertBefore(otro, primeraAccion);
+      barra.insertBefore(original, primeraAccion);
+      barra.title = ytVerificado
+        ? 'La API filtró videos incrustables; aún puede haber restricciones.'
+        : 'Resultado público: incrustación no verificada.';
+    }
   }
   function ytCmd(func, args = []) {
     const w = ventanas.get('player'); if (!w) return;
