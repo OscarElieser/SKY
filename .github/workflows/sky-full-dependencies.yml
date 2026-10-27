@@ -3,6 +3,10 @@ on:
   pull_request:
     paths:
       - 'requirements_sky_all.txt'
+      - 'requirements_mcp_optional.txt'
+      - 'requirements_sky_optional_integrations.txt'
+      - 'neural_core/sky_mcp_hub.py'
+      - 'tests/test_sky_mcp_version_contract.py'
       - 'INSTALAR_DEPENDENCIAS_SKY.ps1'
       - 'scripts/sky_dependencias_todas.py'
       - 'tests/test_sky_all_dependencies.py'
@@ -11,6 +15,10 @@ on:
   push:
     paths:
       - 'requirements_sky_all.txt'
+      - 'requirements_mcp_optional.txt'
+      - 'requirements_sky_optional_integrations.txt'
+      - 'neural_core/sky_mcp_hub.py'
+      - 'tests/test_sky_mcp_version_contract.py'
       - 'INSTALAR_DEPENDENCIAS_SKY.ps1'
       - 'scripts/sky_dependencias_todas.py'
       - 'tests/test_sky_all_dependencies.py'
@@ -37,7 +45,7 @@ jobs:
       - name: Audit manifest parser and no-delete one-shot setup
         run: |
           python -m py_compile scripts/sky_dependencias_todas.py
-          python -m pytest -q tests/test_sky_all_dependencies.py
+          python -m pytest -q tests/test_sky_all_dependencies.py tests/test_sky_mcp_version_contract.py
   powershell-syntax:
     runs-on: windows-latest
     timeout-minutes: 5
