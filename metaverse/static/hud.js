@@ -2821,6 +2821,43 @@
   /* ------------------------------------------------------------------ reproductor */
   const YT = 'https://www.youtube.com';
   let lista = [], indice = 0, ytVerificado = false, ytApiPlayerPromise = null, ytIntentos = new Set(), ytModoActual = 'normal';
+  let ytSesion = 0, ytVigilanciaTimer = null, ytReproduccionConfirmada = false;
+  function cancelarVigilanciaYT() {
+    if (ytVigilanciaTimer !== null) clearTimeout(ytVigilanciaTimer);
+    ytVigilanciaTimer = null;
+  }
+  function avisoIntegracionYT(videoId, mensaje) {
+    const actual = ventanas.get('player');
+    if (!actual || lista[indice]?.id !== videoId) return;
+    actual.el.querySelector('.sky-youtube-warning')?.remove();
+    const aviso = el('div', 'sky-youtube-warning');
+    aviso.setAttribute('role', 'status');
+    aviso.appendChild(el('p', '', mensaje));
+    const acciones = el('div', 'sky-youtube-warning-actions');
+    const original = el('a', 'btn', 'Ver directamente en YouTube');
+    original.href = 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId);
+    original.target = '_blank'; original.rel = 'noopener noreferrer';
+    acciones.appendChild(original);
+    if (lista.length > 1) {
+      const otro = el('button', 'btn', 'Probar otro video');
+      otro.type = 'button';
+      otro.addEventListener('click', () => {
+        const siguiente = lista.findIndex((v, pos) => pos !== indice && v && !ytIntentos.has(v.id));
+        if (siguiente < 0) {
+          aviso.querySelector('p').textContent = 'Ya probé los otros resultados de esta búsqueda. Podés ver el original en YouTube.';
+          return;
+        }
+        indice = siguiente; mostrarVideo(); aplicarModoVentana('player', ytModoActual);
+      });
+      acciones.appendChild(otro);
+    }
+    const cerrarAviso = el('button', 'btn', 'Ocultar aviso');
+    cerrarAviso.type = 'button';
+    cerrarAviso.addEventListener('click', () => aviso.remove());
+    acciones.appendChild(cerrarAviso);
+    aviso.appendChild(acciones);
+    actual.el.appendChild(aviso);
+  }
   // Carga bajo demanda la API oficial: permite observar errores reales del iframe.
   function cargarIframePlayerApi() {
     if (window.YT && window.YT.Player) return Promise.resolve(true);
@@ -2841,20 +2878,25 @@
     return ytApiPlayerPromise;
   }
   function vigilarReproductor(iframe, videoId, barra) {
+    const sesion = ytSesion;
     cargarIframePlayerApi().then(disponible => {
       if (!disponible || !iframe.isConnected || !window.YT || !window.YT.Player) return;
       // La ventana puede haber cambiado mientras cargaba la API.
-      if (ventanas.get('player')?.el.querySelector('iframe') !== iframe) return;
+      if (sesion !== ytSesion || ventanas.get('player')?.el.querySelector('iframe') !== iframe) return;
       try {
         new window.YT.Player(iframe, {
           events: {
             onStateChange: evento => {
-              if (evento.data === 1 && lista[indice]?.id === videoId) {
+              if (sesion === ytSesion && evento.data === 1 && lista[indice]?.id === videoId) {
+                ytReproduccionConfirmada = true;
+                cancelarVigilanciaYT();
+                ventanas.get('player')?.el.querySelector('.sky-youtube-warning')?.remove();
                 setState('idle', 'YouTube confirmó la reproducción.');
               }
             },
             onError: evento => {
-              if (ventanas.get('player')?.el.querySelector('iframe') !== iframe) return;
+              if (sesion !== ytSesion || lista[indice]?.id !== videoId) return;
+              cancelarVigilanciaYT();
               const codigo = Number(evento.data);
               const bloqueo = [101, 150].includes(codigo);
               const mensaje = bloqueo ? 'El propietario no permite reproducir este video dentro de SKY.'
@@ -2876,6 +2918,7 @@
                 }
               }
               setState('error', 'Video no disponible en el reproductor');
+              avisoIntegracionYT(videoId, mensaje + ' YouTube puede permitir verlo directamente en su página.');
               addMsg('sky', mensaje + ' No existe otro candidato pendiente. Usá Ver en YouTube o realizá una nueva búsqueda.');
               if (barra) barra.title = mensaje;
             },
@@ -2950,6 +2993,10 @@
   }
   function mostrarVideo() {
     const v = lista[indice]; if (!v) return;
+    ytSesion += 1;
+    const sesion = ytSesion;
+    cancelarVigilanciaYT();
+    ytReproduccionConfirmada = false;
     ytIntentos.add(v.id);
     cerrarVentana('player');
     const w = abrirVentana('player', '♪ ' + v.titulo, YT + '/embed/' + encodeURIComponent(v.id) + '?autoplay=1&playsinline=1&rel=0&enablejsapi=1&origin=' + encodeURIComponent(window.location.origin),
@@ -2977,7 +3024,16 @@
         ? 'La API filtró videos incrustables; aún puede haber restricciones.'
         : 'Video manual: incrustación no verificada.';
     }
-    if (iframe) vigilarReproductor(iframe, v.id, barra);
+    if (iframe) {
+      // El navegador puede bloquear el iframe antes de que YouTube dispare onError.
+      // No interpretar el evento "load", ni status.embeddable, como reproducción.
+      ytVigilanciaTimer = setTimeout(() => {
+        if (sesion !== ytSesion || ytReproduccionConfirmada || !ventanas.has('player')) return;
+        avisoIntegracionYT(v.id, 'No pude confirmar que YouTube esté reproduciendo este video dentro de SKY. Si la pantalla aparece bloqueada, usá la página oficial o probá otra versión.');
+        setState('error', 'No se confirmó reproducción de YouTube.');
+      }, 12000);
+      vigilarReproductor(iframe, v.id, barra);
+    }
   }
   function ytCmd(func, args = []) {
     const w = ventanas.get('player'); if (!w) return;
