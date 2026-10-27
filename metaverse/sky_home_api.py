@@ -40,7 +40,8 @@ def _local_model_ready() -> bool:
     try:
         with request.urlopen("http://127.0.0.1:11434/api/tags", timeout=0.8) as response:
             models = json.load(response).get("models", [])
-        return any(item.get("name") == model for item in models)
+        accepted = {model, model + ":latest"} if ":" not in model else {model}
+        return any(item.get("name") in accepted for item in models)
     except (OSError, ValueError, KeyError, TypeError):
         return False
 
