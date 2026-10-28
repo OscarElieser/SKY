@@ -40,7 +40,9 @@ class MainActivity : Activity() {
     private val photoRequest = 1622
     private lateinit var installedApps: SkyInstalledApps
     private lateinit var socialStudio: SkySocialStudio
+    private lateinit var socialMetrics: SkySocialMetricsPanel
     @Volatile private var socialPending = false
+    @Volatile private var videoPending = false
     private lateinit var companionController: SkyCompanionController
     private lateinit var cloudConsent: CheckBox
     private lateinit var privateConsent: CheckBox
@@ -141,10 +143,18 @@ class MainActivity : Activity() {
             onAccessibilityHelp = { showTextAssistDisclosure() },
             installedApps = installedApps
         )
-        socialStudio = SkySocialStudio(this) { message ->
-            home.showMessage(message)
-            if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(message)
-        }
+        socialStudio = SkySocialStudio(this,
+            feedback = { message ->
+                home.showMessage(message)
+                if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(message)
+            },
+            renderVideo = { script -> generateCreativeVideo(script) }
+        )
+        socialMetrics = SkySocialMetricsPanel(
+            this, getSharedPreferences("sky_social_metrics", MODE_PRIVATE),
+            onImportClick = { socialMetrics.chooseCsv() },
+            feedback = { message -> home.showMessage(message) }
+        )
         musicLauncher = SkyMusicLauncher(
             this, getSharedPreferences("sky_mobile_music", MODE_PRIVATE)
         ) { message ->
@@ -325,6 +335,12 @@ class MainActivity : Activity() {
     @Deprecated("Uses the Android camera thumbnail; no image is stored.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 1640) {
+            if (resultCode == RESULT_OK) {
+                data?.data?.let { source -> socialMetrics.importCsv(source) }
+            }
+            return
+        }
         if (requestCode != photoRequest || resultCode != RESULT_OK) return
         @Suppress("DEPRECATION")
         val bitmap = data?.extras?.get("data") as? android.graphics.Bitmap
@@ -362,6 +378,67 @@ class MainActivity : Activity() {
                 }
             }
             .setNegativeButton("No enviar", null).show()
+    }
+
+    /**
+     * 10-second on-device silent H.264 animation. No external cloud for render.
+     * Exported only to the Android application selected by the user.
+     */
+    private fun generateCreativeVideo(script: String) {
+        if (videoPending) {
+            home.showMessage("El video anterior todavía se está generando.")
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Video vertical")
+            .setMessage("Generaré un MP4 de 10 segundos con cinco escenas de texto " +
+                "animado, sin música ni voz. Se crea en este teléfono. " +
+                "Podés añadir fotos, voz y música autorizada desde el editor " +
+                "de la red social. ¿Continuamos?")
+            .setPositiveButton("Crear MP4") { _, _ ->
+                videoPending = true
+                home.showMessage("Creando un video vertical en el teléfono…")
+                execute {
+                    try {
+                        val file = SkyVerticalVideo.generate(applicationContext, script)
+                        runOnUiThread {
+                            videoPending = false
+                            AlertDialog.Builder(this)
+                                .setTitle("Video MP4 generado")
+                                .setMessage("SKY creó un video vertical sin audio, " +
+                                    "de " + file.length() + " bytes. " +
+                                    "Elegí una app para revisarlo y editarlo " +
+                                    "antes de publicar. No se publicó automáticamente.")
+                                .setPositiveButton("Compartir video") { _, _ ->
+                                    val uri = SkyGeneratedVideoProvider.uri()
+                                    val share = android.content.Intent(
+                                        android.content.Intent.ACTION_SEND).apply {
+                                        type = "video/mp4"
+                                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                        clipData = android.content.ClipData.newUri(
+                                            contentResolver, "SKY video", uri)
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    try {
+                                        startActivity(android.content.Intent.createChooser(
+                                            share, "Compartir o editar video SKY"))
+                                    } catch (_: Exception) {
+                                        home.showMessage("No hay apps compatibles con video MP4.")
+                                    }
+                                }
+                                .setNegativeButton("Cerrar", null).show()
+                        }
+                    } catch (error: Exception) {
+                        runOnUiThread {
+                            videoPending = false
+                            home.showMessage("No pude crear el MP4 en este teléfono. " +
+                                "Revisá el espacio disponible y el codificador H.264. " +
+                                (error.message ?: "Error de renderizado."))
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("Cancelar", null).show()
     }
 
     /** Original social content, never automatic likes, followers or publishing. */
@@ -674,6 +751,10 @@ class MainActivity : Activity() {
                     companionController.handle(commands[index])
                 }
                 .setNegativeButton("Cerrar", null).show()
+        })
+        content.addView(actionButton("MÉTRICAS REALES · IMPORTAR ESTADÍSTICAS") {
+            settingsDialog?.dismiss()
+            socialMetrics.show()
         })
         content.addView(actionButton("ESTUDIO CREATIVO · MIS REDES SOCIALES") {
             settingsDialog?.dismiss()
