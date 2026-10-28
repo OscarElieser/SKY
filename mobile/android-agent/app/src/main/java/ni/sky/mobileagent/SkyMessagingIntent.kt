@@ -50,7 +50,7 @@ object SkyMessagingIntent {
         if (!draft.polish) return original
         val normalized = original.lowercase(java.util.Locale.ROOT)
         if ("triste" in normalized && ("extraño" in normalized || "extrano" in normalized)) {
-            return "Hola, \${draft.recipient.substringBefore(' ')}. Hoy me siento un poco triste y quería decirte que te extraño. Espero que estés bien. ¿Cómo has estado?"
+            return "Hola, ${draft.recipient.substringBefore(' ')}. Hoy me siento un poco triste y quería decirte que te extraño. Espero que estés bien. ¿Cómo has estado?"
         }
         return original.trimEnd('.', ' ').replaceFirstChar {
             if (it.isLowerCase()) it.titlecase() else it.toString()
