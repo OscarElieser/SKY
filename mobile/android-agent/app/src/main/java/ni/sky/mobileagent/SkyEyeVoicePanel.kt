@@ -128,6 +128,40 @@ class SkyEyeVoicePanel(
         })
     }
 
+    /** Amplía el personaje a toda el área disponible sin duplicar encabezados. */
+    fun setImmersive() {
+        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        setPadding(dp(0), dp(4), dp(0), dp(2))
+        if (childCount >= 7) {
+            getChildAt(0).visibility = View.GONE  // título: ya está en la cabecera SKY
+            getChildAt(2).visibility = View.GONE  // instrucciones repetidas
+            getChildAt(6).visibility = View.GONE  // nota técnica: disponible en Ajustes
+            eye.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
+            message.setTextColor(Color.rgb(242, 237, 255))
+            message.gravity = android.view.Gravity.CENTER
+            message.textSize = 15f
+            val controls = getChildAt(4) as LinearLayout
+            for (i in 0 until controls.childCount) {
+                val button = controls.getChildAt(i) as? Button ?: continue
+                val color = if (i == 0) Color.rgb(117, 93, 235) else Color.rgb(52, 62, 112)
+                button.background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(color)
+                    cornerRadius = dp(22).toFloat()
+                }
+                button.setTextColor(Color.WHITE)
+                button.textSize = 13f
+                button.isAllCaps = false
+                val p = button.layoutParams as LinearLayout.LayoutParams
+                p.marginStart = dp(4)
+                p.marginEnd = dp(4)
+                p.height = dp(48)
+                button.layoutParams = p
+            }
+            readAloud.setTextColor(Color.rgb(219, 218, 246))
+            readAloud.textSize = 13f
+        }
+    }
+
     private fun dp(value: Int) = (value * resources.displayMetrics.density + 0.5f).toInt()
 
     private fun setMode(mode: EyeMode, label: String) {
