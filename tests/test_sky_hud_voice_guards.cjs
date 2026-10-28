@@ -45,6 +45,6 @@ test('la conversación activa se puede cancelar sin una solicitud al modelo', ()
 test('el guard del navegador carga antes del HUD y con version nueva', () => {
   const html = fs.readFileSync(path.join(__dirname, '../metaverse/static/hud.html'), 'utf8');
   const guard = html.indexOf('sky-hud-voice-guards.js?v=1.0');
-  const hud = html.indexOf('hud.js?v=14.5');
+  const hud = html.search(/\/static\/hud\.js\?v=[0-9.]+/);
   assert.ok(guard >= 0 && hud > guard);
 });
