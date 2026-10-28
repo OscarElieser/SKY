@@ -36,6 +36,25 @@ class TestSkyAiDiagnostics(unittest.TestCase):
         self.assertIn('saldo agotado', value)
         self.assertNotIn('NEVER_SHOW', value)
 
+    def test_groq_restricted_model_code_without_raw_message(self):
+        err = urllib.error.HTTPError(
+            'https://host.invalid/?key=NEVER_SHOW', 403, 'private', {},
+            io.BytesIO(b'{"error":{"code":"model_permission_blocked_project",'
+                       b'"message":"NEVER_SHOW private content"}}'))
+        texto = sky_ai_diagnostics.error_seguro('groq', err)
+        self.assertIn('model_permission_blocked_project', texto)
+        self.assertIn('permisos', texto)
+        self.assertNotIn('NEVER_SHOW', texto)
+
+    def test_anthropic_400_spending_limit_classified_without_message(self):
+        err = urllib.error.HTTPError(
+            'https://host.invalid/', 400, 'private', {},
+            io.BytesIO(b'{"error":{"type":"invalid_request_error",'
+                       b'"message":"You have reached your organization spending limit. NEVER_SHOW"}}'))
+        texto = sky_ai_diagnostics.error_seguro('anthropic', err)
+        self.assertIn('posible limite de gasto', texto)
+        self.assertNotIn('NEVER_SHOW', texto)
+
     def test_http_404_model_and_nonjson_body(self):
         err = urllib.error.HTTPError(
             'https://host.test/key=SECRET', 404, 'bad', {},
