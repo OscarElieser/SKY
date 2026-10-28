@@ -22,8 +22,8 @@ android {
         applicationId = "ni.sky.mobileagent"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.6.2"
+        versionCode = 10
+        versionName = "0.6.3"
     }
     // El paquete distribuible no declara servicios de accesibilidad.
     // La variante assistive queda separada para revisión y pruebas explícitas.

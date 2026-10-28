@@ -19,7 +19,7 @@ object SkyPhoneCloud {
     private const val API = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
 
     /**
-     * Google API keys never contain whitespace or invisible Unicode formatting.
+     * Remove clipboard whitespace and invisible Unicode formatting before HTTPS.
      * Samsung/Android clipboard can insert them, even inside the pasted value.
      * Remove only whitespace/FORMAT marks; do not alter visible key characters.
      * No key contents should be logged, displayed, or committed.
@@ -51,12 +51,13 @@ object SkyPhoneCloud {
             value.all { it in '0'..'9' }) {
             return "Pegaste el identificador del proyecto, no la API key. Tocá «Copiar clave»."
         }
-        if (value.length !in 20..200) {
-            return "La longitud no corresponde a una clave Gemini. Usá «Copiar clave»; no copies el ID del proyecto."
+        // New Google AI Studio auth keys may use different formats from old AIza keys.
+        // Only enforce safe HTTP header encoding; Google alone checks validity.
+        if (value.length !in 8..2048) {
+            return "El texto copiado está vacío, incompleto o es demasiado largo. Copiá solamente la clave."
         }
-        if (value.any { !(it in 'A'..'Z' || it in 'a'..'z' ||
-                    it in '0'..'9' || it == '_' || it == '-') }) {
-            return "La clave tiene espacios o caracteres no permitidos. Copiala de nuevo desde «Copiar clave»."
+        if (value.any { it.code !in 33..126 }) {
+            return "La clave tiene caracteres que no se pueden enviar de forma segura por HTTPS. Copiala nuevamente."
         }
         return null
     }
@@ -99,7 +100,7 @@ object SkyPhoneCloud {
     }
 
     fun reply(personalKey: String, message: String, history: JSONArray): String {
-        require(validPersonalKey(personalKey)) { "Configurá una clave válida de Gemini en Ajustes." }
+        require(validPersonalKey(personalKey)) { "Configurá una clave de Gemini para probar con Google." }
         val payload = makePayload(message, history).toString()
         require(payload.toByteArray(Charsets.UTF_8).size < 36000) {
             "La conversación es demasiado larga; iniciá una sesión nueva."

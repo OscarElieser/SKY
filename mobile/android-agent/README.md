@@ -1,4 +1,18 @@
 # SKY IA Android 0.6 — modo independiente (prueba personal)
+## SKY Android 0.6.3 — aceptar claves de autorización de Google
+
+Google AI Studio emite **auth keys**, no solo claves antiguas con el
+alfabeto limitado de SKY 0.6.2. La app ya no presupone un formato
+específico: admite caracteres ASCII imprimibles para el encabezado
+`x-goog-api-key`, normaliza espacios invisibles del portapapeles y
+rechaza entradas de proyecto, prefijos, controles e inserciones Unicode
+peligrosas. **La autenticidad la verifica Google por HTTPS antes de
+guardar la clave cifrada.**
+
+Nunca copies ni pegues tu clave en un chat o un repositorio. Esta
+modalidad continúa siendo beta privada; una app publicada requiere
+backend autenticado y controles de cuota.
+
 ## SKY Android 0.6.2 — pegar claves sin espacios invisibles
 
 Esta actualización añade **PEGAR CLAVE COPIADA** en Ajustes. Lee el

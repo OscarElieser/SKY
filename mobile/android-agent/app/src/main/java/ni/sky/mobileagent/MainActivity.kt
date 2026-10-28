@@ -270,7 +270,7 @@ class MainActivity : Activity() {
             content.addView(description("Prueba privada de SKY Android con Gemini. " +
                 "Tu clave se cifra en el teléfono y NO se agrega a la APK. " +
                 "Puede generar consumo o costos. No distribuir públicamente este modo."))
-            val personalKey = input("Clave personal de Gemini API", true)
+            val personalKey = input("Clave de Gemini AI Studio", true)
             val permission = CheckBox(this).apply {
                 text = "Autorizo enviar mis mensajes y el contexto reciente a Google Gemini. " +
                     "Entiendo que puedo desactivar SKY Cloud y borrar la clave."
@@ -294,7 +294,7 @@ class MainActivity : Activity() {
                 } else {
                     personalKey.setText(normalized)
                     personalKey.setSelection(normalized.length)
-                    setStatus("Clave pegada sin espacios invisibles. Ahora verificá y activá SKY.")
+                    setStatus("Clave pegada de forma segura. Ahora verificá con Google.")
                 }
             })
             content.addView(permission)
@@ -313,7 +313,7 @@ class MainActivity : Activity() {
                         .setPositiveButton("Entendido", null).show()
                 } else if (problem != null) {
                     AlertDialog.Builder(this)
-                        .setTitle("La clave no tiene el formato esperado")
+                        .setTitle("Comprobación de seguridad de la clave")
                         .setMessage(problem)
                         .setPositiveButton("Entendido", null).show()
                 } else {

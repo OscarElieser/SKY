@@ -36,10 +36,16 @@ class SkyPhoneCloudTest {
         assertFalse(SkyPhoneCloud.validPersonalKey("GEMINI_API_KEY=" + key))
         assertFalse(SkyPhoneCloud.validPersonalKey("x-goog-api-key: " + key))
     }
-    @Test fun nonwhitespaceCharactersAreNeverRewritten() {
-        val key = "AIzaSyEXAMPLEonly-for-validation_12345"
-        assertFalse(SkyPhoneCloud.validPersonalKey(key + "."))
-        assertEquals(key + ".", SkyPhoneCloud.normalizePersonalKey(key + "."))
+    @Test fun newAuthKeyPunctuationIsAllowedButNeverChanged() {
+        val key = "auth.key+with/slashes=and:punctuation_12345678"
+        assertTrue(SkyPhoneCloud.validPersonalKey(key))
+        assertEquals(key, SkyPhoneCloud.normalizePersonalKey(key))
+        assertTrue(SkyPhoneCloud.validPersonalKey("AIzaSyEXAMPLEonly-for-validation_12345."))
+    }
+    @Test fun unsafeNonAsciiOrHeaderControlIsRejected() {
+        assertFalse(SkyPhoneCloud.validPersonalKey("abcdefghi" + '\u0000' + "jklmnopqrstuv"))
+        assertFalse(SkyPhoneCloud.validPersonalKey("abcdefghi" + '\u2022' + "jklmnopqrstuv"))
+        assertFalse(SkyPhoneCloud.validPersonalKey("projects/216507061862"))
     }
     @Test fun personalKeyRejectsDangerousCharactersAndMissingValues() {
         assertFalse(SkyPhoneCloud.validPersonalKey(""))
