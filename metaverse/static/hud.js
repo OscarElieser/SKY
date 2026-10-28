@@ -260,9 +260,9 @@
     return disponibles[0] || null;
   }
   function limpiarParaVoz(t) {
-    return String(t || '').replace(/```[\s\S]*?```/g, ' (código en pantalla) ').replace(/\$\$?[^$]*\$\$?/g, ' ')
-      .replace(/[#*_`>|~]/g, ' ').replace(/https?:\/\/\S+/g, ' enlace ')
-      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ').replace(/\s+/g, ' ').trim();
+    // La respuesta escrita NO cambia: este filtro trabaja solo en la cola TTS.
+    const clean = window.SKYSpokenText?.prepare(t);
+    return typeof clean === 'string' ? clean : String(t || '');
   }
   function frases(t) {
     const limpio = limpiarParaVoz(t);
