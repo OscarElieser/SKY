@@ -21,7 +21,8 @@ import android.widget.TextView
  */
 class SkySocialStudio(
     private val host: Activity,
-    private val feedback: (String) -> Unit
+    private val feedback: (String) -> Unit,
+    private val renderVideo: (String) -> Unit
 ) {
     private fun dp(value: Int) =
         (value * host.resources.displayMetrics.density + 0.5f).toInt()
@@ -99,7 +100,8 @@ class SkySocialStudio(
         container.addView(TextView(host).apply {
             text = "Revisá el borrador antes de compartir. Puede requerir video, " +
                 "fotos o audio que vos agregás dentro de " + request.platform + ". " +
-                "SKY no publica automáticamente ni garantiza viralidad."
+                "SKY no publica automáticamente ni garantiza viralidad. " + 
+                "También podés crear un MP4 vertical de 10 segundos: texto animado y sin audio."
             textSize = 13f
         })
         container.addView(editor, LinearLayout.LayoutParams(-1,
@@ -122,13 +124,17 @@ class SkySocialStudio(
                         "Usá «Copiar texto» y pegalo manualmente en la red elegida.")
                 }
             }
-            .setNeutralButton("Copiar texto") { _, _ ->
+            .setNeutralButton("Crear video MP4") { _, _ ->
+                val script = editor.text.toString().take(3500).trim()
+                if (script.length < 12) feedback("El guion es demasiado corto para generar un video.")
+                else renderVideo(script)
+            }
+            .setNegativeButton("Copiar texto") { _, _ ->
                 val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 clipboard.setPrimaryClip(ClipData.newPlainText(
                     "Borrador SKY · " + request.platform, editor.text.toString().take(5000)))
                 feedback("Borrador copiado. Pegalo donde vayas a publicar y revisalo primero.")
             }
-            .setNegativeButton("Cerrar", null)
             .show()
     }
 }
