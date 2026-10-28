@@ -64,77 +64,100 @@ class MainActivity : Activity() {
         setOnClickListener { action() }
     }
 
+    private lateinit var home: SkyMobileHome
+    private var settingsDialog: AlertDialog? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+        )
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         tokens = PrivateTokenStore(this)
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24, 24, 24, 24)
-        }
-        val scroll = ScrollView(this)
-        scroll.addView(content)
-        setContentView(scroll)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
             chatInput.setText(transcript)
             if (tokens.chatToken().isEmpty()) {
-                voicePanel.showError("Para hablar con SKY primero activá el chat autorizado.")
+                voicePanel.showError("Para conversar, activá el chat seguro en Ajustes.")
+                home.showMessage("Activá el chat desde Ajustes.")
+            } else sendChat()
+        }
+        home = SkyMobileHome(
+            this, voicePanel,
+            onSend = { sendChat() },
+            onSettings = { showSettings() },
+            onChatAccess = { showSettings() },
+            onDiagnostics = { checkHomeStatus() }
+        )
+        status = home.status
+        chatInput = home.chatInput
+        chatOutput = home.chatOutput
+        cloudConsent = home.cloudConsent
+        privateConsent = home.privateConsent
+        setContentView(home.root)
+        refreshConnection()
+        if (tokens.token().isEmpty()) {
+            home.root.post { if (!isFinishing) showSettings() }
+        }
+    }
+
+    private fun refreshConnection() {
+        home.setConnection(tokens.token().isNotEmpty(), tokens.chatToken().isNotEmpty())
+    }
+
+    /** La vinculación solo se muestra si aún no existe un token válido. */
+    private fun showSettings() {
+        if (isFinishing) return
+        settingsDialog?.dismiss()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(30, 18, 30, 18)
+        }
+        val linked = tokens.token().isNotEmpty() && tokens.deviceId().isNotEmpty()
+        content.addView(description(if (linked) "SKY · Ajustes y permisos"
+            else "Bienvenido a SKY · Primera configuración"))
+        if (!linked) {
+            content.addView(description("Conectá el celular con tu SKY Core mediante HTTPS privado."))
+            serverInput = input("URL HTTPS privada de SKY")
+            serverInput.setText(tokens.server())
+            deviceInput = input("Nombre del teléfono")
+            deviceInput.setText("Mi Android")
+            codeInput = input("Código temporal de vinculación", true)
+            content.addView(serverInput)
+            content.addView(deviceInput)
+            content.addView(codeInput)
+            content.addView(actionButton("Vincular teléfono") { pair() })
+        } else {
+            content.addView(description("Dispositivo vinculado. Las claves permanecen protegidas."))
+            if (tokens.chatToken().isEmpty()) {
+                content.addView(description("Chat: necesita autorización independiente del propietario."))
+                chatCodeInput = input("Código temporal del chat", true)
+                content.addView(chatCodeInput)
+                content.addView(actionButton("Activar chat por 24 horas") { pairChat() })
             } else {
-                sendChat()
+                content.addView(description("Chat autorizado. Renovalo cuando venza su sesión."))
             }
+            content.addView(description("Aplicaciones permitidas"))
+            for ((id, item) in apps) {
+                content.addView(CheckBox(this).apply {
+                    text = "Permitir " + item.first
+                    isChecked = permissions.getBoolean(id, false)
+                    setOnCheckedChangeListener { _, granted ->
+                        permissions.edit().putBoolean(id, granted).apply()
+                    }
+                })
+            }
+            content.addView(actionButton("Consultar órdenes") { poll() })
+            content.addView(actionButton("Estado del servidor") { checkHomeStatus() })
+            content.addView(actionButton("Revocar acceso del teléfono") { revoke() })
         }
-        content.addView(voicePanel)
-        content.addView(description("SKY MOBILE AGENT — control bajo tu autorización"))
-        content.addView(description("Permisos por aplicación. Cada orden requiere un toque de confirmación."))
-        serverInput = input("Servidor HTTPS privado de SKY")
-        serverInput.setText(tokens.server())
-        deviceInput = input("Nombre del teléfono")
-        deviceInput.setText("Mi Android")
-        codeInput = input("Código temporal de SKY", true)
-        content.addView(serverInput)
-        content.addView(deviceInput)
-        content.addView(codeInput)
-        content.addView(actionButton("Vincular teléfono") { pair() })
-        content.addView(actionButton("Revocar acceso") { revoke() })
-        status = description(if (tokens.token().isEmpty()) "Sin vincular" else "Vinculado: consultas habilitadas al abrir esta pantalla")
-        content.addView(status)
-        content.addView(description("Aplicaciones permitidas (ninguna activa por defecto):"))
-        for ((id, item) in apps) {
-            content.addView(CheckBox(this).apply {
-                text = "Permitir " + item.first
-                isChecked = permissions.getBoolean(id, false)
-                setOnCheckedChangeListener { _, granted ->
-                    permissions.edit().putBoolean(id, granted).apply()
-                }
-            })
-        }
-        content.addView(actionButton("Consultar órdenes ahora") { poll() })
-        content.addView(actionButton("Estado de mi servidor SKY") { checkHomeStatus() })
-        content.addView(description("SKY CHAT — texto. Requiere permiso separado del propietario."))
-        chatCodeInput = input("Código temporal de chat autorizado por el dueño", true)
-        content.addView(chatCodeInput)
-        content.addView(actionButton("Activar chat por 24 horas") { pairChat() })
-        chatInput = EditText(this).apply {
-            hint = "Escribí a SKY..."
-            setSingleLine(false)
-            minLines = 2
-            maxLines = 5
-            filters = arrayOf(InputFilter.LengthFilter(4000))
-        }
-        content.addView(chatInput)
-        cloudConsent = CheckBox(this).apply {
-            text = "Permito usar la nube para ESTE mensaje (incluye historial enviado)"
-            isChecked = false
-        }
-        privateConsent = CheckBox(this).apply {
-            text = "Permito transmitir datos privados de ESTE mensaje e historial a la nube"
-            isChecked = false
-        }
-        content.addView(cloudConsent)
-        content.addView(privateConsent)
-        content.addView(actionButton("Enviar mensaje a SKY") { sendChat() })
-        chatOutput = description("Chat limitado a texto. No controla dispositivos ni accede a archivos.")
-        content.addView(chatOutput)
-        content.addView(description("SKY consulta cada 6 segundos mientras la app está visible. Esta versión no funciona con pantalla bloqueada."))
+        content.addView(description("SKY solicita el micrófono solo al hablar y requiere confirmación para abrir otras aplicaciones."))
+        val scroll = ScrollView(this).apply { addView(content) }
+        settingsDialog = AlertDialog.Builder(this)
+            .setView(scroll)
+            .setNegativeButton("Cerrar", null)
+            .create()
+        settingsDialog?.show()
     }
 
     override fun onResume() {
@@ -188,7 +211,10 @@ class MainActivity : Activity() {
             }
         }
     }
-    private fun setStatus(value: String) = runOnUiThread { status.text = value }
+    private fun setStatus(value: String) = runOnUiThread {
+        if (::home.isInitialized) home.showMessage(value)
+        else status.text = value
+    }
 
     private fun pair() {
         if (tokens.deviceId().isNotEmpty()) {
@@ -203,8 +229,13 @@ class MainActivity : Activity() {
                 "POST", data = JSONObject().put("code", code).put("label", label))
             tokens.save(SkyNetwork.validateServer(server),
                 result.getString("device_id"), result.getString("token"))
-            runOnUiThread { codeInput.setText("") }
-            setStatus("Vinculado: " + label + ". Elegí aplicaciones permitidas.")
+            runOnUiThread {
+                codeInput.setText("")
+                settingsDialog?.dismiss()
+                refreshConnection()
+                showSettings()
+            }
+            setStatus("Teléfono vinculado. SKY está preparada.")
         }
     }
 
@@ -245,8 +276,12 @@ class MainActivity : Activity() {
             val result = SkyNetwork.requestChat(tokens.server(), "/api/sky/mobile-chat/pair",
                 agentToken, JSONObject().put("device_id", id).put("code", code))
             tokens.saveChat(result.getString("token"))
-            runOnUiThread { chatCodeInput.setText("") }
-            setStatus("Chat autorizado durante 24 horas. No incluye control de dispositivos.")
+            runOnUiThread {
+                chatCodeInput.setText("")
+                settingsDialog?.dismiss()
+                refreshConnection()
+            }
+            setStatus("Chat autorizado. ¡Ya podés conversar con SKY!")
         }
     }
 
@@ -255,7 +290,8 @@ class MainActivity : Activity() {
         val token = tokens.chatToken()
         val message = chatInput.text.toString().trim()
         if (id.isEmpty() || token.isEmpty()) {
-            setStatus("Antes de conversar activá el chat con autorización del propietario.")
+            setStatus("Activá el chat seguro desde Ajustes para conversar.")
+            showSettings()
             return
         }
         if (message.isEmpty() || chatPending) return
@@ -289,8 +325,7 @@ class MainActivity : Activity() {
                 while (chatHistory.length() > 8) chatHistory.remove(0)
                 runOnUiThread {
                     chatInput.setText("")
-                    chatOutput.text = "SKY: " + answer + "\nMotor: " +
-                        reply.optString("proveedor", "desconocido")
+                    home.addExchange(message, answer, reply.optString("proveedor", "desconocido"))
                     voicePanel.speakReply(answer)
                 }
             } finally {
@@ -373,7 +408,8 @@ class MainActivity : Activity() {
                         "/api/sky/mobile-agent/devices/" + id + "/revoke-self",
                         "POST", tokens.token(), JSONObject())
                     tokens.clear()
-                    setStatus("Acceso revocado. El teléfono quedó desconectado.")
+                    runOnUiThread { refreshConnection() }
+                    setStatus("Acceso revocado. Volvé a Ajustes para conectar.")
                 }
             }
             .setNegativeButton("Cancelar", null)
