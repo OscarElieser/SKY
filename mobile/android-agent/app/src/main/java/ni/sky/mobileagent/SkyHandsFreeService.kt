@@ -245,11 +245,72 @@ class SkyHandsFreeService : Service() {
 
     private fun say(message: String) {
         suspendForSpeech()
-        val result = tts?.speak(message, TextToSpeech.QUEUE_FLUSH, Bundle(),
+        val result = tts?.speak(SkySpokenText.prepare(message), TextToSpeech.QUEUE_FLUSH, Bundle(),
             "sky-service-" + SystemClock.uptimeMillis())
         if (result != TextToSpeech.SUCCESS) {
             handler.postDelayed({ resumeFromSpeech() }, 1500)
         }
+    }
+
+    /**
+     * El servicio puede seguir activo con la pantalla apagada. Las teclas
+     * multimedia son acciones Android; abrir apps requiere UI desbloqueada.
+     */
+    private fun handleWithoutVisibleUi(command: String) {
+        val quick = SkyQuickCommand.parse(command)
+        if (quick != null) {
+            if (quick == SkyQuickCommand.Action.REQUEST_UNLOCK) {
+                notifyState("Desbloqueo seguro pendiente · tocá aquí", command)
+                say("Para desbloquear el teléfono, usa tu huella o PIN de Android.")
+                return
+            }
+            try {
+                val audio = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+                if (quick == SkyQuickCommand.Action.VOLUME_UP ||
+                    quick == SkyQuickCommand.Action.VOLUME_DOWN) {
+                    if (audio.isVolumeFixed) {
+                        say("El volumen está fijado por Android.")
+                    } else {
+                        val direction = if (quick == SkyQuickCommand.Action.VOLUME_UP)
+                            android.media.AudioManager.ADJUST_RAISE
+                        else android.media.AudioManager.ADJUST_LOWER
+                        audio.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, direction, 0)
+                        say("Le pedí a Android que ajuste el volumen.")
+                    }
+                } else {
+                    val key = when (quick) {
+                        SkyQuickCommand.Action.NEXT -> android.view.KeyEvent.KEYCODE_MEDIA_NEXT
+                        SkyQuickCommand.Action.PREVIOUS -> android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS
+                        SkyQuickCommand.Action.RESTART -> android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS
+                        SkyQuickCommand.Action.PAUSE -> android.view.KeyEvent.KEYCODE_MEDIA_PAUSE
+                        SkyQuickCommand.Action.PLAY -> android.view.KeyEvent.KEYCODE_MEDIA_PLAY
+                        else -> null
+                    }
+                    if (key != null) {
+                        val now = SystemClock.uptimeMillis()
+                        audio.dispatchMediaKeyEvent(android.view.KeyEvent(now, now,
+                            android.view.KeyEvent.ACTION_DOWN, key, 0))
+                        audio.dispatchMediaKeyEvent(android.view.KeyEvent(now, now,
+                            android.view.KeyEvent.ACTION_UP, key, 0))
+                        say("Envié la orden al reproductor. Si no responde, revisa la aplicación.")
+                    }
+                }
+            } catch (_: Exception) {
+                say("Android no permitió controlar el reproductor en este momento.")
+            }
+            return
+        }
+        val music = SkyMusicCommand.parse(command)
+        val daily = SkyDailyCommandParser.parse(command)
+        if (music != null || daily is SkyDailyCommandParser.Command.OpenApp ||
+            daily is SkyDailyCommandParser.Command.WebSearch) {
+            notifyState("Orden pendiente · tocá para continuar", command)
+            say("Te escuché. Para abrir esa aplicación, desbloquea el teléfono " +
+                "y toca la notificación de SKY. La orden está preparada.")
+            return
+        }
+        notifyState("Consulta pendiente · tocá para continuar", command)
+        say("Te escuché. Abre SKY desde la notificación para continuar esa tarea.")
     }
 
     private fun process(heard: String) {
@@ -285,7 +346,7 @@ class SkyHandsFreeService : Service() {
                         awake = false
                         handler.removeCallbacks(fallAsleep)
                         notifyState("Orden pendiente: abrí SKY para continuar", decision.command)
-                        say("Te escuché. Abrí SKY desde la notificación para continuar.")
+                        handleWithoutVisibleUi(decision.command)
                     }
                 }
         }

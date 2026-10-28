@@ -871,7 +871,7 @@ class MainActivity : Activity() {
                     .edit().putBoolean("read_aloud", enabled).apply()
             }
         })
-        content.addView(description("Manos libres requiere Android 12 o posterior y reconocimiento de voz instalado en el dispositivo. Mientras está activa se muestra una notificación para apagarla. Puede consumir batería; si Android cierra el servicio, abrí SKY para reactivarlo. Fuera de la aplicación, una orden queda pendiente hasta que abras SKY. Las acciones sensibles siguen exigiendo aprobación."))
+        content.addView(description("Manos libres requiere Android 12 o posterior y reconocimiento de voz instalado en el dispositivo. Mientras está activa se muestra una notificación para apagarla. Puede consumir batería; si Android cierra el servicio, abrí SKY para reactivarlo. Con pantalla apagada puede ajustar volumen y enviar controles multimedia. Para abrir aplicaciones, Android puede exigir desbloquear el teléfono y tocar la notificación de SKY. Las acciones sensibles siguen exigiendo aprobación."))
         val scroll = ScrollView(this).apply { addView(content) }
         settingsDialog = AlertDialog.Builder(this)
             .setView(scroll)
