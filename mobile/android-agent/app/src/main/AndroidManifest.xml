@@ -14,6 +14,10 @@
         <package android:name="com.android.chrome" />
         <package android:name="com.whatsapp" />
         <package android:name="com.google.android.gm" />
+        <package android:name="com.spotify.music" />
+        <package android:name="com.google.android.apps.youtube.music" />
+        <intent><action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" /></intent>
+        <intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent>
     </queries>
     <application android:allowBackup="false" android:usesCleartextTraffic="false"
         android:label="SKY IA"
