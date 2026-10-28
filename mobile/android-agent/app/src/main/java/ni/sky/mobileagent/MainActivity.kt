@@ -41,6 +41,7 @@ class MainActivity : Activity() {
     private val photoRequest = 1622
     private lateinit var installedApps: SkyInstalledApps
     private lateinit var socialStudio: SkySocialStudio
+    private lateinit var socialAccounts: SkySocialAccounts
     private lateinit var socialMetrics: SkySocialMetricsPanel
     @Volatile private var socialPending = false
     @Volatile private var videoPending = false
@@ -151,6 +152,16 @@ class MainActivity : Activity() {
                 if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(message)
             },
             renderVideo = { script -> generateCreativeVideo(script) }
+        )
+        socialAccounts = SkySocialAccounts(
+            this, getSharedPreferences("sky_public_social_profiles", MODE_PRIVATE),
+            chooseImport = { socialAccounts.chooseJson() },
+            createContent = { platform ->
+                socialStudio.showCreatorMenu(initialPlatform = platform) {
+                    request -> createSocialContent(request)
+                }
+            },
+            feedback = { message -> home.showMessage(message) }
         )
         socialMetrics = SkySocialMetricsPanel(
             this, getSharedPreferences("sky_social_metrics", MODE_PRIVATE),
@@ -354,6 +365,12 @@ class MainActivity : Activity() {
         if (requestCode == 1640) {
             if (resultCode == RESULT_OK) {
                 data?.data?.let { source -> socialMetrics.importCsv(source) }
+            }
+            return
+        }
+        if (requestCode == 1655) {
+            if (resultCode == RESULT_OK) {
+                data?.data?.let { source -> socialAccounts.importJson(source) }
             }
             return
         }
@@ -782,6 +799,10 @@ class MainActivity : Activity() {
                     companionController.handle(commands[index])
                 }
                 .setNegativeButton("Cerrar", null).show()
+        })
+        content.addView(actionButton("MIS REDES · PERFIL Y ENLACES PÚBLICOS") {
+            settingsDialog?.dismiss()
+            socialAccounts.show()
         })
         content.addView(actionButton("MÉTRICAS REALES · IMPORTAR ESTADÍSTICAS") {
             settingsDialog?.dismiss()
