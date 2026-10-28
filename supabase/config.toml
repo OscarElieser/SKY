@@ -1,0 +1,4 @@
+# SKY Instagram handles a public Meta callback and signed webhooks.
+# Every state-changing owner endpoint verifies its own 32+ character owner key.
+[functions.sky-instagram]
+verify_jwt = false
