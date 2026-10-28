@@ -498,6 +498,16 @@ def _decidir_subasta(texto: str, historial: list[dict] | None, modo: str) -> Ite
         yield 'error', 'No hay un proveedor autorizado disponible para esta solicitud.'
         return
 
+    # Si el propietario activó explícitamente el contexto breve y la
+    # pregunta es pública, aislada y segura, Ollama debe ir PRIMERO.
+    # Evita esperar dos API cloud fallidas antes de probar el equipo local.
+    # La misma lista conserva las API como respaldo; historial, peticiones
+    # privadas, acciones, investigaciones y tareas complejas NO se alteran.
+    if contexto_local_breve(texto, historial):
+        local = next((p for p in propuestas if p['proveedor'] == 'ollama'), None)
+        if local is not None:
+            propuestas = [local] + [p for p in propuestas if p['proveedor'] != 'ollama']
+
     from .sky_ai_auction import registrar_fallo, registrar_exito
     errores: list[str] = []
     for propuesta in propuestas:
