@@ -21,6 +21,9 @@ _ESTADOS = frozenset({
     'model_not_found', 'invalid_request_error', 'invalid_request',
     'context_length_exceeded', 'unsupported_parameter',
     'billing_hard_limit_reached', 'model_not_supported',
+    'credit_balance_exhausted', 'organization_spend_limit_exceeded',
+    'project_spend_limit_exceeded', 'organization_usage_limit_exceeded',
+    'slow_down', 'too_many_requests', 'quota_exceeded',
 })
 
 _ORIENTACION = {
@@ -52,12 +55,21 @@ def error_seguro(proveedor: str, exc: BaseException) -> str:
             cuerpo = json.loads(exc.read(8192))
             datos = cuerpo.get('error', {}) if isinstance(cuerpo, dict) else {}
             if isinstance(datos, dict):
-                candidato = datos.get('status') or datos.get('code')
-                if isinstance(candidato, str) and candidato in _ESTADOS:
-                    estado = candidato
+                # OpenAI incluye el motivo útil en error.code. Google lo
+                # suele presentar en error.status. Ambos deben ser enumerados.
+                for candidato in (datos.get('code'), datos.get('status')):
+                    if isinstance(candidato, str) and candidato in _ESTADOS:
+                        estado = candidato
+                        break
         except (ValueError, TypeError, OSError, UnicodeError):
             pass
         razon = _ORIENTACION.get(codigo, 'consulta rechazada por el proveedor')
+        if codigo == 429 and estado in (
+            'credit_balance_exhausted', 'insufficient_quota',
+            'organization_spend_limit_exceeded', 'project_spend_limit_exceeded',
+            'organization_usage_limit_exceeded', 'billing_hard_limit_reached',
+        ):
+            razon = 'cuota o saldo agotado: revisa facturacion y limites; reintentar no repone el credito'
         return f'{nombre} HTTP {codigo}' + (f' ({estado})' if estado else '') + f': {razon}'
     if isinstance(exc, (TimeoutError,)):
         return f'{nombre}: tiempo de espera agotado'
