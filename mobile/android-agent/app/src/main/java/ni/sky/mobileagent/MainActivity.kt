@@ -33,6 +33,7 @@ class MainActivity : Activity() {
     private lateinit var chatInput: EditText
     private lateinit var chatOutput: TextView
     private lateinit var voicePanel: SkyEyeVoicePanel
+    private lateinit var dailyActions: SkyAndroidActions
     private lateinit var cloudConsent: CheckBox
     private lateinit var privateConsent: CheckBox
     private val chatHistory = JSONArray()
@@ -76,7 +77,8 @@ class MainActivity : Activity() {
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         tokens = PrivateTokenStore(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
-            if (!processLocalPanelCommand(transcript, spoken = true)) {
+            if (!processLocalPanelCommand(transcript, spoken = true) &&
+                !processDailyCommand(transcript)) {
                 home.openChat()
                 chatInput.setText(transcript)
                 if (tokens.chatToken().isEmpty()) {
@@ -103,11 +105,26 @@ class MainActivity : Activity() {
         chatOutput = home.chatOutput
         cloudConsent = home.cloudConsent
         privateConsent = home.privateConsent
+        dailyActions = SkyAndroidActions(
+            this,
+            getSharedPreferences("sky_private_notes", MODE_PRIVATE),
+            permissions
+        ) { feedback ->
+            home.showMessage(feedback)
+            if (!isFinishing && voicePanel.isVoiceEnabled()) voicePanel.speakReply(feedback)
+        }
         setContentView(home.root)
         refreshConnection()
         if (tokens.token().isEmpty()) {
             home.root.post { if (!isFinishing) showSettings() }
         }
+    }
+
+    /** Acción autorizada del teléfono, incluso si SKY Core está desconectado. */
+    private fun processDailyCommand(message: String): Boolean {
+        val command = SkyDailyCommandParser.parse(message) ?: return false
+        dailyActions.run(command)
+        return true
     }
 
     /** Las órdenes de interfaz se ejecutan localmente, incluso sin SKY Core. */
@@ -189,6 +206,18 @@ class MainActivity : Activity() {
             content.addView(actionButton("Consultar órdenes") { poll() })
             content.addView(actionButton("Estado del servidor") { checkHomeStatus() })
             content.addView(actionButton("Revocar acceso del teléfono") { revoke() })
+        }
+        if (!linked) {
+            content.addView(description("Aplicaciones locales autorizadas"))
+            for ((id, item) in apps) {
+                content.addView(CheckBox(this).apply {
+                    text = "Permitir " + item.first
+                    isChecked = permissions.getBoolean(id, false)
+                    setOnCheckedChangeListener { _, granted ->
+                        permissions.edit().putBoolean(id, granted).apply()
+                    }
+                })
+            }
         }
         content.addView(CheckBox(this).apply {
             text = "SKY responde con voz"
@@ -338,7 +367,8 @@ class MainActivity : Activity() {
         val token = tokens.chatToken()
         val message = chatInput.text.toString().trim()
         if (message.isEmpty()) return
-        if (processLocalPanelCommand(message, spoken = false)) {
+        if (processLocalPanelCommand(message, spoken = false) ||
+            processDailyCommand(message)) {
             chatInput.setText("")
             return
         }
