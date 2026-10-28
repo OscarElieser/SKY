@@ -1,4 +1,4 @@
-# SKY Android — Ojos & Voz 0.8.1
+# SKY Android — Asistente personal 0.8.2
 
 **Beta Android independiente de Windows.** Diseño con **solo ojos y boca animados**, sin máscara ni rostro. Órdenes del teléfono por texto y voz, supervisadas por el usuario.
 
@@ -24,6 +24,74 @@
 6. Preguntale algo a Gemini y comprobá la voz natural. **Conversación fluida** es opcional y solo funciona en primer plano, con límite de turnos.
 
 **Seguridad:** las claves Gemini no se publican en GitHub; se guardan cifradas en Android Keystore para esta beta personal. Para distribución pública es necesario un backend autenticado. No compartir credenciales en capturas ni mensajes.
+
+---
+
+## SKY Android 0.8.2 — conversación cotidiana, música y cámara voluntaria
+
+**Solo Android**. SKY Windows no fue modificado. La app puede entender órdenes
+durante una sesión de voz sin repetir «SKY» en cada frase.
+
+### Música con el servicio que elijas
+
+- En **Ajustes → MÚSICA** elegí Spotify, YouTube Music o YouTube como servicio
+  favorito. SKY recuerda esa preferencia.
+- Pedí **«Reproducí la canción [título] en Spotify»**, **«Pon la canción
+  [título] en YouTube Music»** o **«Pon la canción [título]»** sin prefijo.
+- El ejecutor usa `MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH`,
+  según la API oficial de Android. **Solo la aplicación receptora puede
+  confirmar si empezó a reproducir**; algunos servicios muestran resultados
+  de búsqueda en su lugar, y quizá debas tocar la canción. No utiliza APIs
+  privadas de Spotify/YouTube ni elude licencias.
+- En **Ajustes → Conversar sin decir SKY**, la escucha fluida es voluntaria,
+  únicamente mientras SKY está visible y por un máximo de ocho turnos.
+  La opción se conserva entre aperturas, pero el micrófono no se inicia
+  automáticamente: tocá **HABLAR** para comenzar.
+
+### Respuestas naturales para contactos elegidos
+
+- **Ajustes → RESPUESTAS NATURALES · CONTACTOS → Autorizar contacto**.
+  Escribí manualmente el nombre del contacto; se admite un máximo de
+  veinte nombres y podés retirarlos desde Ajustes.
+- Pegá un fragmento del mensaje recibido y aceptá su envío **solo esa vez**
+  a Gemini. SKY genera un **borrador editable**, pensado para el contexto
+  y sin fórmulas robóticas. Vos elegís el chat correcto y pulsás **Enviar**
+  en WhatsApp. También funciona con una orden explícita como:
+  **«Respondé a Ana: ¿Por qué no me escribís?»** si Ana fue autorizada.
+- **Esta beta NO lee conversaciones, no accede a contactos del sistema y NO
+  responde automáticamente en segundo plano.** El acceso a notificaciones,
+  a conversaciones de otras apps y el envío automatizado requieren permisos
+  adicionales, validación de identidad del remitente, pruebas, controles
+  de privacidad y cumplimiento de las reglas de la aplicación receptora.
+  La lista de nombres autoriza únicamente la creación de borradores.
+
+### Cámara y acompañamiento respetuoso
+
+- En **Ajustes → CÁMARA OPCIONAL · ¿CÓMO ME VEO?** o con la orden
+  «Mírame», SKY puede abrir la **cámara de Android** para una única foto.
+- Al regresar de la cámara, una **segunda confirmación** permite o impide
+  enviar una miniatura JPEG a Gemini. La app no guarda el archivo, no usa
+  cámara continua ni identifica a la persona. Según la cámara instalada,
+  la aplicación de cámara del dispositivo puede tener sus propias reglas
+  de almacenamiento.
+- SKY comenta solo rasgos **visibles**, no adivina emociones, diagnóstico
+  psicológico ni estados de ánimo a partir del rostro. Te preguntará
+  cómo te sentís y responderá de manera conversacional.
+- El uso de Gemini requiere internet y consentimiento; la clave personal
+  permanece en Android Keystore en esta beta privada. No subir claves a
+  GitHub, README ni chats.
+
+### Límites y verificación
+
+- SKY no posee «acceso total» e indiscriminado al celular: ejecuta acciones
+  disponibles con permisos de Android y confirmación cuando corresponde.
+  No puede afirmar que una canción, mensaje o publicación se completó
+  si la aplicación receptora no lo confirmó.
+- `versionCode=15`, `versionName=0.8.2`. Esta versión de código
+  necesita aprobar CI, compilación firmada y pruebas reales en el Samsung.
+  Consultá [GitHub Releases](https://github.com/OscarElieser/SKY/releases)
+  y no descargues un APK 0.8.2 antes de que aparezca allí con su SHA-256.
+- La instalación existente sigue siendo el respaldo hasta aprobar 0.8.2.
 
 ---
 
