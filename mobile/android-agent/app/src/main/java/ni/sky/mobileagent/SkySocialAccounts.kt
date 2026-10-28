@@ -121,7 +121,7 @@ class SkySocialAccounts(
         val platform = Spinner(host)
         platform.adapter = ArrayAdapter(host, android.R.layout.simple_spinner_dropdown_item,
             SkySocialProfileData.platforms)
-        platform.setSelection(SkySocialProfileData.platforms.indexOf(old?.platform)
+        platform.setSelection(SkySocialProfileData.platforms.indexOf(old?.platform ?: "Instagram")
             .coerceAtLeast(0))
         layout.addView(platform)
         val handle = EditText(host).apply {
