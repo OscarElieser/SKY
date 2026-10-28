@@ -62,7 +62,7 @@ class SkyEyeVoicePanel(
         eye.setOnClickListener {
             val reaction = eye.nextEmotion()
             message.text = reaction
-            if (readAloud.isChecked && !listening && !chatPending) {
+            if (readAloud.isChecked && !listening) {
                 speakReply(reaction)
             }
         }
