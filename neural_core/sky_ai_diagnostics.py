@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import time
 import urllib.error
 
@@ -24,6 +25,8 @@ _ESTADOS = frozenset({
     'credit_balance_exhausted', 'organization_spend_limit_exceeded',
     'project_spend_limit_exceeded', 'organization_usage_limit_exceeded',
     'slow_down', 'too_many_requests', 'quota_exceeded',
+    'model_permission_blocked_org', 'model_permission_blocked_project',
+    'permissions_error', 'rate_limit_error', 'authentication_error',
 })
 
 _ORIENTACION = {
@@ -51,19 +54,34 @@ def error_seguro(proveedor: str, exc: BaseException) -> str:
         except (TypeError, ValueError):
             codigo = 0
         estado = ''
+        pista = ''
         try:
             cuerpo = json.loads(exc.read(8192))
             datos = cuerpo.get('error', {}) if isinstance(cuerpo, dict) else {}
             if isinstance(datos, dict):
                 # OpenAI incluye el motivo útil en error.code. Google lo
                 # suele presentar en error.status. Ambos deben ser enumerados.
-                for candidato in (datos.get('code'), datos.get('status')):
+                for candidato in (datos.get('code'), datos.get('status'), datos.get('type')):
                     if isinstance(candidato, str) and candidato in _ESTADOS:
                         estado = candidato
                         break
+                # El campo message es potencialmente privado. No se muestra:
+                # sólo se identifican categorías delimitadas de problemas.
+                mensaje = datos.get('message')
+                if isinstance(mensaje, str) and nombre == 'ANTHROPIC' and codigo == 400:
+                    if re.search(r'(?:spend(?:ing)?\s+limit|spending\s+cap|usage\s+limit|credit\s+balance)', mensaje, re.I):
+                        pista = 'posible limite de gasto de la organizacion'
+                    elif re.search(r'(?:tool|input_schema|function_declaration)', mensaje, re.I):
+                        pista = 'revisar definicion de herramientas'
+                    elif re.search(r'(?:model.*(?:not found|invalid|unsupported)|(?:not found|invalid|unsupported).*model)', mensaje, re.I):
+                        pista = 'revisar identificador o acceso al modelo'
         except (ValueError, TypeError, OSError, UnicodeError):
             pass
         razon = _ORIENTACION.get(codigo, 'consulta rechazada por el proveedor')
+        if codigo == 403 and estado in ('model_permission_blocked_org', 'model_permission_blocked_project'):
+            razon = 'modelo bloqueado por permisos de organizacion o proyecto en Groq'
+        if codigo == 400 and pista:
+            razon = pista
         if codigo == 429 and estado in (
             'credit_balance_exhausted', 'insufficient_quota',
             'organization_spend_limit_exceeded', 'project_spend_limit_exceeded',
