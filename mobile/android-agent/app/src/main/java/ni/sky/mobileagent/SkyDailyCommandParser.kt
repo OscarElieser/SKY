@@ -10,6 +10,7 @@ import java.util.Locale
 object SkyDailyCommandParser {
     sealed class Command {
         data class Alarm(val hour: Int, val minute: Int, val label: String) : Command()
+        data class Timer(val seconds: Int) : Command()
         data class OpenApp(val app: String) : Command()
         data class Note(val value: String) : Command()
         object ShowNotes : Command()
@@ -36,6 +37,21 @@ object SkyDailyCommandParser {
         if (windowsTarget) {
             return Command.Unsupported("Este comando corresponde al agente de Windows. " +
                 "La app Android aún no tiene permiso para ejecutar herramientas remotas del PC.")
+        }
+
+        val timer = Regex("^(?:(?:pon|pone|ponme|crea|crear|activa|activar|configura|programa) (?:un |el )?)?(?:temporizador|timer|cuenta regresiva)(?: de| para)? (\\d{1,4}) (segundos?|minutos?|horas?)$")
+            .matchEntire(action)
+        if (timer != null) {
+            val n = timer.groupValues[1].toIntOrNull() ?: return null
+            val unit = timer.groupValues[2]
+            val seconds = when {
+                unit.startsWith("segundo") -> n
+                unit.startsWith("minuto") -> n * 60
+                else -> n * 3600
+            }
+            if (seconds !in 1..86400) return Command.Unsupported(
+                "El temporizador debe durar entre 1 segundo y 24 horas.")
+            return Command.Timer(seconds)
         }
 
         val clock = Regex("^(?:pon|ponme|crea|crear|activa|activar|configura|configurar|programa|programar|establece|establecer) (?:una |la )?alarma(?: para)? (.*)$")
