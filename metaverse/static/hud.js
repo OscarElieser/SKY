@@ -2821,7 +2821,7 @@
   /* ------------------------------------------------------------------ reproductor */
   const YT = 'https://www.youtube.com';
   let lista = [], indice = 0, ytVerificado = false, ytApiPlayerPromise = null, ytIntentos = new Set(), ytModoActual = 'normal';
-  let ytSesion = 0, ytVigilanciaTimer = null, ytReproduccionConfirmada = false, ytAvisosChat = new Set();
+  let ytSesion = 0, ytVigilanciaTimer = null, ytReproduccionConfirmada = false, ytAvisosChat = new Set(), ytPlayer = null, ytPlayerListo = false;
   function cancelarVigilanciaYT() {
     if (ytVigilanciaTimer !== null) clearTimeout(ytVigilanciaTimer);
     ytVigilanciaTimer = null;
@@ -2912,8 +2912,17 @@
       // La ventana puede haber cambiado mientras cargaba la API.
       if (sesion !== ytSesion || ventanas.get('player')?.el.querySelector('iframe') !== iframe) return;
       try {
-        new window.YT.Player(iframe, {
+        ytPlayer = new window.YT.Player(iframe, {
           events: {
+            onReady: () => {
+              if (sesion !== ytSesion) return;
+              ytPlayerListo = true;
+              const iniciar = ventanas.get('player')?.el.querySelector('.sky-youtube-play');
+              if (iniciar) {
+                iniciar.disabled = false;
+                iniciar.title = 'Reproducir video con una pulsación directa en SKY';
+              }
+            },
             onStateChange: evento => {
               if (sesion === ytSesion && evento.data === 1 && lista[indice]?.id === videoId) {
                 ytReproduccionConfirmada = true;
@@ -3025,6 +3034,8 @@
     const sesion = ytSesion;
     cancelarVigilanciaYT();
     ytReproduccionConfirmada = false;
+    ytPlayerListo = false;
+    ytPlayer = null;
     ytIntentos.add(v.id);
     cerrarVentana('player');
     const w = abrirVentana('player', '♪ ' + v.titulo, YT + '/embed/' + encodeURIComponent(v.id) + '?autoplay=1&playsinline=1&rel=0&enablejsapi=1&origin=' + encodeURIComponent(window.location.origin),
@@ -3034,6 +3045,15 @@
     // La búsqueda pública no garantiza permiso para incrustar el video.
     const barra = w.el.querySelector('header');
     if (barra) {
+      const iniciar = el('button', 'sky-youtube-play', '▶ Reproducir');
+      iniciar.type = 'button';
+      iniciar.title = 'Preparando controles de YouTube…';
+      iniciar.style.width = 'auto'; iniciar.style.padding = '0 7px';
+      iniciar.disabled = true;
+      iniciar.addEventListener('click', () => {
+        ytCmd('playVideo');
+        setState('idle', 'Solicité la reproducción; esperando confirmación de YouTube.');
+      });
       const otro = el('button', '', 'Otro video');
       otro.type = 'button';
       otro.title = 'Probar otro resultado cuando YouTube indica que no está disponible';
@@ -3046,6 +3066,7 @@
       original.title = 'Abrir el video original si no admite reproducción integrada';
       original.style.cssText = 'white-space:nowrap;color:inherit;font-size:10px;letter-spacing:0;text-transform:none;';
       const primeraAccion = barra.querySelector('button');
+      barra.insertBefore(iniciar, primeraAccion);
       barra.insertBefore(otro, primeraAccion);
       barra.insertBefore(original, primeraAccion);
       barra.title = ytVerificado
@@ -3057,7 +3078,9 @@
       // No interpretar el evento "load", ni status.embeddable, como reproducción.
       ytVigilanciaTimer = setTimeout(() => {
         if (sesion !== ytSesion || ytReproduccionConfirmada || !ventanas.has('player')) return;
-        avisoIntegracionYT(v.id, 'No pude confirmar que YouTube esté reproduciendo este video dentro de SKY. Si la pantalla aparece bloqueada, usá la página oficial o probá otra versión.');
+        avisoIntegracionYT(v.id, ytPlayerListo
+          ? 'YouTube está preparado, pero no confirmó reproducción. Probá ▶ Reproducir; Chrome puede bloquear el inicio automático con sonido.'
+          : 'El reproductor de YouTube no respondió dentro de SKY. Revisá si Chrome o una extensión bloquea los marcos de YouTube; también podés abrir el video oficial.');
         setState('error', 'No se confirmó reproducción de YouTube.');
       }, 12000);
       vigilarReproductor(iframe, v.id, barra);
@@ -3066,6 +3089,9 @@
   function ytCmd(func, args = []) {
     const w = ventanas.get('player'); if (!w) return;
     const f = w.el.querySelector('iframe');
+    if (ytPlayerListo && ytPlayer && typeof ytPlayer[func] === 'function') {
+      try { ytPlayer[func](...args); return; } catch (_) { /* conservar control por postMessage */ }
+    }
     if (f && f.contentWindow) f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), YT);
   }
   function controlReproductor(sub) {
