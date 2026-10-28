@@ -154,6 +154,39 @@ class MainActivity : Activity() {
             .show()
     }
 
+    /** Comprobaciones de capacidad local; no confundir con ejecución validada. */
+    private fun showDeviceDiagnostics() {
+        val pm = packageManager
+        val mic = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        val recognize = android.speech.SpeechRecognizer.isRecognitionAvailable(this)
+        val clock = android.content.Intent(android.provider.AlarmClock.ACTION_SET_ALARM)
+            .resolveActivity(pm) != null
+        val notes = runCatching {
+            org.json.JSONArray(getSharedPreferences("sky_private_notes", MODE_PRIVATE)
+                .getString("sky_notes_v1", "[]")).length()
+        }.getOrDefault(0)
+        val lines = listOf(
+            "Android: " + android.os.Build.VERSION.RELEASE,
+            "Micrófono autorizado: " + if (mic) "Sí" else "No",
+            "Reconocedor de voz disponible: " + if (recognize) "Sí" else "No",
+            "Motor de voz listo: " + if (voicePanel.isSpeechEngineReady()) "Sí" else "No",
+            "Reloj compatible con alarmas: " + if (clock) "Detectado" else "No detectado",
+            "Notas guardadas: " + notes,
+            "Escritura asistida conectada: " +
+                if (SkyTextAssistService.enabled()) "Sí" else "No",
+            "Vinculación SKY Core: " + if (tokens.token().isNotEmpty()) "Configurada" else "Pendiente",
+            "Chat: " + if (tokens.chatToken().isNotEmpty()) "Token almacenado" else "Sin autorizar"
+        ).joinToString("\\n")
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Autodiagnóstico Android")
+            .setMessage(lines + "\\n\\n" +
+                "Este chequeo verifica capacidades locales, no prueba conexiones remotas " +
+                "ni garantiza que una alarma haya sonado o un mensaje se haya enviado.")
+            .setPositiveButton("Cerrar", null)
+            .show()
+    }
+
     /** Acción autorizada del teléfono, incluso si SKY Core está desconectado. */
     private fun processDailyCommand(message: String): Boolean {
         val command = SkyDailyCommandParser.parse(message) ?: return false
@@ -253,6 +286,9 @@ class MainActivity : Activity() {
                 })
             }
         }
+        content.addView(actionButton("Autodiagnóstico Android") {
+            showDeviceDiagnostics()
+        })
         content.addView(actionButton("Escritura asistida en WhatsApp/Gmail") {
             showTextAssistDisclosure()
         })
