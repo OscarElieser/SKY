@@ -1,3 +1,43 @@
+# SKY IA Android 0.3 — ojos protagonistas y paneles bajo demanda
+
+La pantalla inicial ya no muestra la conversación, tarjetas, accesos rápidos
+o formularios técnicos: **solo SKY, sus ojos animados, el botón para hablar,
+un acceso al chat y Ajustes**. La configuración HTTPS se muestra durante el
+primer emparejamiento y luego queda guardada en Android Keystore.
+
+## Órdenes reales de la interfaz
+Con la aplicación abierta, tocá **Hablar** y decí:
+- «SKY, abre panel de conversación» → abre el panel de chat.
+- «SKY, cierra panel» → vuelve a los ojos animados.
+- «SKY, abre módulo de documentos» → presenta el panel de documentos.
+- «SKY, abre SKY Docente» → presenta el panel docente.
+- «SKY, abre programación» → presenta el panel de programación.
+
+También podés escribir esas órdenes en el panel de conversación. Los
+paneles incluidos son Investigación, Documentos, Programación, Docente,
+Creativa, Metaverso y Deportes. Se muestran **únicamente al solicitarlos**.
+Los ojos, la voz y la vinculación existentes se conservan.
+
+**Alcance verificado por código:** abrir o cerrar estos paneles ocurre en el
+teléfono y no exige autorización del chat remoto. Sin embargo, **abrir un
+panel no ejecuta automáticamente las herramientas del módulo en Windows**.
+El chat móvil sigue conectado a la ruta segura de SKY Core para consultas
+de texto, sin permiso genérico para ejecutar herramientas o controlar el PC.
+Para activar herramientas reales desde Android hará falta ampliar la API con
+autorización específica por módulo y dispositivo, pruebas y confirmaciones.
+
+La voz se inicia tocando el micrófono: no hay micrófono siempre activo ni
+activación de palabra clave con pantalla bloqueada. El ajuste para encender
+o apagar las respuestas habladas se encuentra en **Ajustes**. El historial
+visual del panel es temporal durante la sesión; no debe confundirse con la
+memoria persistente compartida entre PC y teléfono.
+
+Las pruebas del workflow Android incluyen compilación, pruebas de comandos
+de voz/texto y pruebas del backend; la experiencia completa aún requiere
+validación física de micrófono, audio, Android y conexión a SKY Core.
+
+---
+
 # SKY IA Android 0.2 — interfaz principal inmersiva
 
 **Interfaz actual:** abre a pantalla completa, con SKY y sus ojos animados como
