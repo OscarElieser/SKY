@@ -64,6 +64,25 @@ object SkyPhoneCloud {
 
     fun validPersonalKey(value: String): Boolean = personalKeyProblem(value) == null
 
+    /**
+     * Límite de salida según la complejidad expresada por el usuario.
+     * No recorta historial, archivos, herramientas ni solicitudes complejas.
+     * Menos tokens de SALIDA disminuyen el tiempo de generación máximo,
+     * aunque la latencia de red y del proveedor sigue sin control local.
+     */
+    fun responseTokenLimit(message: String): Int {
+        val text = message.trim().lowercase(java.util.Locale.ROOT)
+            .replace(Regex("""^sky[ ,.:!¿?]*"""), "")
+        if (text.length > 200 || text.isBlank()) return 1000
+        if (Regex("""\b(?:mi|mis|nuestro|archivo|documento|investiga|busca|redacta|escribe|programa|código|codigo|crea|genera|analiza|resume|lista|plan|proyecto|pasos|explica paso a paso)\b""")
+                .containsMatchIn(text)) return 1000
+        if (Regex("""\b(?:en (?:una|dos|tres|1|2|3) oraciones|en una frase)\b""")
+                .containsMatchIn(text)) return 300
+        if (Regex("""^(?:que|qué) es (?:la|el|un|una)?\s*[^?]{3,95}\??$""")
+                .matches(text)) return 400
+        return 1000
+    }
+
     fun makePayload(message: String, history: JSONArray): JSONObject {
         require(message.isNotBlank() && message.length <= 4000) { "Escribí una consulta de hasta 4000 caracteres." }
         val contents = JSONArray()
@@ -100,7 +119,7 @@ object SkyPhoneCloud {
                     "chats, cámara ni a Windows desde esta respuesta de Gemini."))))
             .put("contents", contents)
             .put("generationConfig", JSONObject()
-                .put("maxOutputTokens", 1000)
+                .put("maxOutputTokens", responseTokenLimit(message))
                 .put("temperature", 0.7))
     }
 
