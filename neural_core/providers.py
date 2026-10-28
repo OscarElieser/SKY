@@ -130,11 +130,11 @@ def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_
     if provider in ('subasta', 'auction') or (
         provider in ('auto', 'sky') and os.getenv('SKY_CEREBRO', 'auto').strip().lower() == 'subasta'
     ):
-        from .sky_ai_auction import ofertas, max_intentos, registrar_fallo, registrar_exito
+        from .sky_ai_auction import candidatos_con_respaldo, registrar_fallo, registrar_exito
         import time
         texto = next((str(m.get('content') or '') for m in reversed(mensajes)
                       if m.get('role') == 'user'), '')
-        candidatos = ofertas(texto)[:max_intentos()]
+        candidatos = candidatos_con_respaldo(texto)
         if not candidatos:
             raise ProviderError('No hay proveedores autorizados disponibles para la subasta.')
         for candidato in candidatos:
