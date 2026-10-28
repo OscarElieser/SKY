@@ -12,6 +12,7 @@ object SkyDailyCommandParser {
         data class Alarm(val hour: Int, val minute: Int, val label: String) : Command()
         data class Timer(val seconds: Int) : Command()
         data class OpenApp(val app: String) : Command()
+        object ShowApps : Command()
         data class Note(val value: String) : Command()
         data class WebSearch(val query: String) : Command()
         object ShowNotes : Command()
@@ -103,8 +104,26 @@ object SkyDailyCommandParser {
         val open = Regex("^(?:abre|abrir|abri|abreme|inicia|iniciar|lanza|lanzar) (?:la |el |aplicacion |app )?(youtube|chrome|whatsapp|gmail)(?: en (?:mi )?(?:telefono|celular|android))?\\.?$")
             .matchEntire(action)
         if (open != null) return Command.OpenApp(appWords.getValue(open.groupValues[1]))
+        // Descubrimiento dinámico: nuevas apps sin actualizar esta lista.
+        if (Regex("^(?:(?:muestra|mostra|mostrame|ensena|ver|lista|listar) (?:mis |las |todas las )?(?:aplicaciones|apps)|(?:abre|abrir) (?:el )?(?:catalogo|lista) de (?:aplicaciones|apps))$").matches(action)) {
+            return Command.ShowApps
+        }
         val notes = Regex("^(?:mostra|muestra|mostrar|mostrame|ensena|abre|abrir|ver) (?:mis |las )?(?:notas|apuntes|anotaciones)$")
         if (notes.matches(action)) return Command.ShowNotes
+        // El nombre proviene del teléfono, NO de un catálogo fijo.
+        val genericLaunch = Regex(
+            "^(?:abre|abrir|abri|abreme|inicia|iniciar|lanza|lanzar) " +
+            "(?:(?:la|el) )?(?:(?:aplicacion|app|juego) )?" +
+            "([a-z0-9][a-z0-9 ]{0,79}?)" +
+            "(?: en (?:mi )?(?:telefono|celular|android))?$"
+        ).matchEntire(action)
+        if (genericLaunch != null) {
+            val name = genericLaunch.groupValues[1].trim()
+            if (name !in setOf("panel", "chat", "conversacion", "modulo",
+                    "ajustes", "mis notas", "todas las aplicaciones", "aplicaciones")) {
+                return Command.OpenApp(name)
+            }
+        }
         val note = Regex("^(?:anota|anotar|apunta|apuntar|guarda (?:una )?nota|toma nota(?: de)?|recuerda que)[: ,]+(.+)$")
             .matchEntire(action)
         if (note != null) {
