@@ -1075,7 +1075,7 @@ class MainActivity : Activity() {
                     voiceReplyOnFace = false
                     val elapsedMs = android.os.SystemClock.elapsedRealtime() - started
                     home.addExchange(message, answer,
-                        provider + " · " + (elapsedMs / 1000.0).toString().take(5) + " s",
+                        provider + " · " + String.format(java.util.Locale.US, "%.1f s", elapsedMs / 1000.0),
                         revealPanel = !keepFace)
                     voicePanel.speakReply(answer)
                 }
@@ -1121,6 +1121,8 @@ class MainActivity : Activity() {
                 val command = response.optJSONObject("command") ?: return@execute
                 pendingCommand = command.getString("id")
                 runOnUiThread { approve(command) }
+            } catch (_: Exception) {
+                setStatus("SKY agente no pudo consultar nuevas órdenes.")
             } finally {
                 polling = false
             }
