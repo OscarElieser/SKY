@@ -34,6 +34,10 @@ class MainActivity : Activity() {
     private lateinit var chatOutput: TextView
     private lateinit var voicePanel: SkyEyeVoicePanel
     private lateinit var dailyActions: SkyAndroidActions
+    private lateinit var musicLauncher: SkyMusicLauncher
+    private lateinit var replyStudio: SkyReplyStudio
+    @Volatile private var replyPending = false
+    private val photoRequest = 1622
     private lateinit var installedApps: SkyInstalledApps
     private lateinit var socialStudio: SkySocialStudio
     @Volatile private var socialPending = false
@@ -87,7 +91,9 @@ class MainActivity : Activity() {
         }
         tokens = PrivateTokenStore(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
-            if (!processCreatorCommand(transcript) &&
+            if (!processMusicCommand(transcript) &&
+                !processReplyCommand(transcript) &&
+                !processCreatorCommand(transcript) &&
                 !processMessagingCommand(transcript) &&
                 !processLocalPanelCommand(transcript, spoken = true) &&
                 !processCompanionCommand(transcript) &&
@@ -136,6 +142,18 @@ class MainActivity : Activity() {
             installedApps = installedApps
         )
         socialStudio = SkySocialStudio(this) { message ->
+            home.showMessage(message)
+            if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(message)
+        }
+        musicLauncher = SkyMusicLauncher(
+            this, getSharedPreferences("sky_mobile_music", MODE_PRIVATE)
+        ) { message ->
+            home.showMessage(message)
+            if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(message)
+        }
+        replyStudio = SkyReplyStudio(
+            this, getSharedPreferences("sky_reply_contacts", MODE_PRIVATE)
+        ) { message ->
             home.showMessage(message)
             if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(message)
         }
@@ -225,6 +243,125 @@ class MainActivity : Activity() {
                 "ni garantiza que una alarma haya sonado o un mensaje se haya enviado.")
             .setPositiveButton("Cerrar", null)
             .show()
+    }
+
+    /** Music command works without a wake word. Android controls actual playback. */
+    private fun processMusicCommand(message: String): Boolean {
+        val request = SkyMusicCommand.parse(message) ?: return false
+        musicLauncher.play(request)
+        return true
+    }
+
+    /** Context is supplied by the user and only approved contacts are eligible. */
+    private fun processReplyCommand(message: String): Boolean {
+        val request = SkyContextReply.parse(message) ?: return false
+        if (!replyStudio.isApproved(request.contact)) {
+            home.showMessage("Todavía no autorizaste a «" + request.contact +
+                "». Abrí Ajustes → Respuestas por contacto.")
+            return true
+        }
+        createReplyDraft(request)
+        return true
+    }
+
+    private fun createReplyDraft(request: SkyContextReply.Request) {
+        if (!replyStudio.isApproved(request.contact)) {
+            home.showMessage("Ese contacto no está autorizado en SKY.")
+            return
+        }
+        if (!tokens.cloudEnabled()) {
+            home.showMessage("Activá Gemini en Ajustes para proponer respuestas naturales.")
+            return
+        }
+        if (replyPending) {
+            home.showMessage("Estoy preparando otro borrador de respuesta.")
+            return
+        }
+        replyPending = true
+        voicePanel.showThinking()
+        execute {
+            try {
+                val draft = SkyPhoneCloud.reply(tokens.personalCloudKey(),
+                    SkyContextReply.prompt(request.contact, request.incoming), JSONArray())
+                runOnUiThread {
+                    if (!isFinishing) {
+                        voicePanel.speakReply("Tengo una respuesta para " +
+                            request.contact + ". Revisala antes de enviarla.")
+                        replyStudio.preview(request, draft)
+                    }
+                }
+            } catch (_: Exception) {
+                runOnUiThread {
+                    home.showMessage("No pude preparar esa respuesta. Revisá tu conexión con Gemini.")
+                    voicePanel.showError("Error al preparar la respuesta.")
+                }
+            } finally { replyPending = false }
+        }
+    }
+
+    /** Camera is never running without the user opening Android's camera app. */
+    private fun startCameraReflection() {
+        if (!tokens.cloudEnabled()) {
+            home.showMessage("Activá Gemini en Ajustes para comentar una foto voluntaria.")
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Un momento frente a la cámara")
+            .setMessage("Abriremos la cámara del teléfono para una sola foto. " +
+                "Después podrás elegir si la enviás a Gemini. " +
+                "SKY no puede saber cómo te sentís por tu rostro: te preguntará.")
+            .setPositiveButton("Abrir cámara") { _, _ ->
+                try {
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(android.content.Intent(
+                        android.provider.MediaStore.ACTION_IMAGE_CAPTURE), photoRequest)
+                } catch (_: Exception) {
+                    home.showMessage("No hay una cámara compatible disponible.")
+                }
+            }
+            .setNegativeButton("Cancelar", null).show()
+    }
+
+    @Deprecated("Uses the Android camera thumbnail; no image is stored.")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != photoRequest || resultCode != RESULT_OK) return
+        @Suppress("DEPRECATION")
+        val bitmap = data?.extras?.get("data") as? android.graphics.Bitmap
+        if (bitmap == null) {
+            home.showMessage("La cámara no devolvió una fotografía. No se envió nada.")
+            return
+        }
+        val output = java.io.ByteArrayOutputStream()
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 74, output)
+        val bytes = output.toByteArray()
+        if (bytes.size > 360_000) {
+            home.showMessage("La foto es demasiado grande; no se envió nada.")
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("¿Compartir esta foto una sola vez?")
+            .setMessage("La imagen se enviará a Google Gemini únicamente si lo autorizás. " +
+                "SKY comentará elementos visibles y te preguntará cómo estás, " +
+                "sin diagnosticar emociones o salud mental. La app no guardará la foto.")
+            .setPositiveButton("Analizar con Gemini") { _, _ ->
+                voicePanel.showThinking()
+                execute {
+                    try {
+                        val response = SkyPhoneCloud.reflectOnPhoto(tokens.personalCloudKey(), bytes)
+                        runOnUiThread {
+                            home.showMessage(response)
+                            voicePanel.speakReply(response)
+                        }
+                    } catch (_: Exception) {
+                        runOnUiThread {
+                            home.showMessage("No pude revisar la foto con Gemini.")
+                            voicePanel.showError("No se pudo analizar la imagen.")
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("No enviar", null).show()
     }
 
     /** Original social content, never automatic likes, followers or publishing. */
@@ -489,6 +626,31 @@ class MainActivity : Activity() {
                 })
             }
         }
+        content.addView(actionButton("MÚSICA · Spotify / YouTube Music / YouTube") {
+            val choices = SkyMusicCommand.Service.entries.toTypedArray()
+            AlertDialog.Builder(this)
+                .setTitle("Elegí tu reproductor favorito")
+                .setSingleChoiceItems(choices.map(SkyMusicCommand::label).toTypedArray(),
+                    choices.indexOf(musicLauncher.preferred())) { dialog, position ->
+                    musicLauncher.savePreferred(choices[position])
+                    dialog.dismiss()
+                    home.showMessage("Ahora puedo buscar canciones en " +
+                        SkyMusicCommand.label(choices[position]) +
+                        ". Decime «Pon la canción ...» sin repetir SKY.")
+                }
+                .setNegativeButton("Cancelar", null).show()
+        })
+        content.addView(actionButton("RESPUESTAS NATURALES · CONTACTOS") {
+            settingsDialog?.dismiss()
+            replyStudio.showSettings { request -> createReplyDraft(request) }
+        })
+        content.addView(actionButton("Revisar / retirar contactos autorizados") {
+            replyStudio.manageContacts()
+        })
+        content.addView(actionButton("CÁMARA OPCIONAL · ¿CÓMO ME VEO?") {
+            settingsDialog?.dismiss()
+            startCameraReflection()
+        })
         content.addView(actionButton("Modo acompañante y diversión") {
             val labels = arrayOf(
                 "Acompañame", "Voy caminando", "Voy en bus",
@@ -696,7 +858,9 @@ class MainActivity : Activity() {
     private fun sendChat() {
         val message = chatInput.text.toString().trim()
         if (message.isEmpty()) return
-        if (processCreatorCommand(message) ||
+        if (processMusicCommand(message) ||
+            processReplyCommand(message) ||
+            processCreatorCommand(message) ||
             processMessagingCommand(message) ||
             processLocalPanelCommand(message, spoken = false) ||
             processCompanionCommand(message) || processDailyCommand(message)) {
