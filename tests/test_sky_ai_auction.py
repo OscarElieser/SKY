@@ -9,6 +9,8 @@ from neural_core import sky_ai_auction, sky_cerebro
 class TestSkyAuction(unittest.TestCase):
     def tearDown(self):
         sky_cerebro.preferir(None)
+        with sky_ai_auction._FALLOS_LOCK:
+            sky_ai_auction._FALLOS.clear()
 
     def test_auto_historico_sigue_siend_local(self):
         with patch.dict(os.environ, {"SKY_CEREBRO": "auto", "SKY_LOCAL_ONLY": "0",
@@ -47,7 +49,9 @@ class TestSkyAuction(unittest.TestCase):
 
     def test_limita_intentos(self):
         with patch.dict(os.environ, {"SKY_AUCTION_MAX_ATTEMPTS": "99"}, clear=False):
-            self.assertEqual(sky_ai_auction.max_intentos(), 3)
+            self.assertEqual(sky_ai_auction.max_intentos(), 7)
+        with patch.dict(os.environ, {"SKY_AUCTION_MAX_ATTEMPTS": "6"}, clear=False):
+            self.assertEqual(sky_ai_auction.max_intentos(), 6)
         with patch.dict(os.environ, {"SKY_AUCTION_MAX_ATTEMPTS": "cualquier cosa"}, clear=False):
             self.assertEqual(sky_ai_auction.max_intentos(), 2)
 
@@ -94,6 +98,30 @@ class TestSkyAuction(unittest.TestCase):
             eventos = list(sky_cerebro.decidir_eventos("explica"))
             self.assertEqual([e for e, _ in eventos], ["delta", "error"])
             self.assertEqual(llamada.call_count, 1)
+
+    def test_circuit_breaker_excludes_failed_gemini_but_keeps_others(self):
+        with patch.dict(os.environ, {"SKY_LOCAL_ONLY": "0"}, clear=False), \
+             patch("neural_core.providers.provider_ready", side_effect=lambda p: p in ("gemini", "openai", "anthropic")), \
+             patch("neural_core.sky_ai_auction._ollama_disponible", return_value=False), \
+             patch("neural_core.sky_ai_auction._telemetria", return_value={}):
+            sky_ai_auction.registrar_fallo("gemini", "GEMINI HTTP 503 (UNAVAILABLE): servicio sobrecargado")
+            self.assertIn("gemini", sky_ai_auction.en_espera())
+            nombres = [x["proveedor"] for x in sky_ai_auction.ofertas("investiga un estudio")]
+            self.assertEqual(nombres, ["openai", "anthropic"])
+            sky_ai_auction.registrar_exito("gemini")
+            self.assertEqual(sky_ai_auction.seleccionar("investiga un estudio"), "gemini")
+
+    def test_cooldown_distingue_429_temporal_de_saldo_agotado(self):
+        self.assertEqual(sky_ai_auction._segundos_espera("OPENAI HTTP 429: rate limit"), 90)
+        self.assertEqual(sky_ai_auction._segundos_espera(
+            "OPENAI HTTP 429 (credit_balance_exhausted): saldo"), 600)
+        self.assertEqual(sky_ai_auction._segundos_espera("GEMINI HTTP 503"), 45)
+        self.assertEqual(sky_ai_auction._segundos_espera("OPENAI HTTP 401"), 600)
+
+    def test_cooldown_caduca_sin_persistir_claves_o_conversaciones(self):
+        with patch("neural_core.sky_ai_auction.time.monotonic", side_effect=[100.0, 146.0]):
+            sky_ai_auction.registrar_fallo("gemini", "GEMINI HTTP 503")
+            self.assertEqual(sky_ai_auction.en_espera(), {})
 
 
 if __name__ == "__main__":
