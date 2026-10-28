@@ -54,3 +54,16 @@ controles de seguridad por velocidad.
 
 **Este PR solo añade diagnósticos; no demuestra ninguna mejora de
 latencia hasta ejecutar las pruebas en el equipo.**
+
+## Métricas de la inferencia real de SKY
+
+La utilidad también imprime **`Metricas Ollama en SKY`** (tokens del
+prompt, tokens generados y segundos de carga/evaluación/generación) extraídos
+de la respuesta streaming de la API local. **`Tamano seguro del contexto`**
+reporta los caracteres del prompt de sistema y el número de turnos de
+historial, pero no incluye su contenido. Estas métricas distinguen un
+modelo lento al generar de un prompt demasiado extenso.
+
+Si la respuesta se corta antes de la trama final de Ollama, los contadores
+pueden aparecer vacíos; no deben inventarse valores ni atribuirse a la nube.
+El diagnóstico no modifica reglas ni límites de respuesta del asistente.

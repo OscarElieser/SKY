@@ -42,6 +42,35 @@ class TestSkyLatencyProbe(unittest.TestCase):
         self.assertEqual(datos["prompt_s"], 0.5)
         self.assertNotIn("Respuesta", str(datos))
 
+    def test_cerebro_extrae_tiempos_locales_del_stream(self):
+        from neural_core import sky_cerebro
+        linea1 = {
+            "message": {"content": "Managua."},
+            "done": False,
+        }
+        linea2 = {
+            "message": {"content": ""},
+            "done": True,
+            "eval_count": 20,
+            "prompt_eval_count": 38,
+            "load_duration": 10000000,
+            "prompt_eval_duration": 800000000,
+            "eval_duration": 2000000000,
+        }
+        contenido = ("\n".join(json.dumps(x) for x in (linea1, linea2)) + "\n").encode("utf-8")
+        info = {"tokens": None}
+        with patch.object(sky_cerebro, "_mensajes",
+                          return_value=[{"role": "user", "content": "Pregunta publica"} ]), \
+             patch.object(sky_cerebro, "_llamar", return_value=io.BytesIO(contenido)):
+            eventos = list(sky_cerebro._eventos("Pregunta publica", [], "chat", info))
+        self.assertEqual(eventos, [("delta", "Managua."), ("fin", "Managua.")])
+        self.assertEqual(info["tokens"], 58)
+        self.assertEqual(info["prompt_tokens"], 38)
+        self.assertEqual(info["generated_tokens"], 20)
+        self.assertEqual(info["load_s"], 0.01)
+        self.assertEqual(info["prompt_s"], 0.8)
+        self.assertEqual(info["generation_s"], 2.0)
+
     def test_timing_asistente_preserva_etapas_y_resultado(self):
         from neural_core import sky_asistente_personal, sky_unified_agents, sky_cerebro
         def fake_atender(*args, **kwargs):

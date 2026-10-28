@@ -525,7 +525,21 @@ def _eventos(texto: str, historial: list[dict] | None, modo: str, info: dict) ->
                     completo += trozo
                     yield 'delta', trozo
                 if dato.get('done'):
-                    info['tokens'] = int(dato.get('eval_count') or 0) + int(dato.get('prompt_eval_count') or 0) or None
+                    # Contadores internos de Ollama, sin almacenar el texto
+                    # enviado ni la respuesta. El asistente puede medir el
+                    # tiempo de carga, el prompt y la generacion por separado.
+                    info['prompt_tokens'] = int(dato.get('prompt_eval_count') or 0)
+                    info['generated_tokens'] = int(dato.get('eval_count') or 0)
+                    info['tokens'] = (info['prompt_tokens'] + info['generated_tokens']) or None
+                    for campo, clave in (
+                        ('load_s', 'load_duration'),
+                        ('prompt_s', 'prompt_eval_duration'),
+                        ('generation_s', 'eval_duration'),
+                    ):
+                        try:
+                            info[campo] = round(max(0, int(dato.get(clave) or 0)) / 1e9, 3)
+                        except (TypeError, ValueError):
+                            info[campo] = 0.0
                     break
     except urllib.error.HTTPError as exc:
         yield 'error', f'Ollama respondió HTTP {exc.code}. ¿Está descargado el modelo {modelo()}? (ollama pull {modelo()})'
