@@ -16,6 +16,25 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 
 ---
 
+
+## 📱 SKY Android — APK separada, núcleo compartido
+
+El código del celular se mantiene independiente en
+[mobile/android-agent/](mobile/android-agent/), y la carpeta exclusiva para
+distribuir las APK es [mobile/android-agent/apk/](mobile/android-agent/apk/).
+El workflow [SKY Mobile Android Agent](.github/workflows/sky-mobile-agent.yml)
+compila la APK desde `main`, calcula un SHA-256 y publica ambos como
+**artefactos de GitHub Actions**; no agrega binarios debug al código fuente.
+
+Windows y Android **comparten SKY Core y la API propia**, pero conservan
+permisos e interfaces específicos. El teléfono necesita emparejamiento
+HTTPS privado y autorización de chat; no ejecuta automáticamente todas
+las capacidades locales de Windows.
+
+[Arquitectura Windows + Android](docs/SKY_PC_ANDROID_ARQUITECTURA.md) ·
+[Instrucciones de APK y actualización](mobile/android-agent/apk/README.md) ·
+[Compilaciones Android](https://github.com/OscarElieser/SKY/actions/workflows/sky-mobile-agent.yml)
+
 ## ✨ Capacidades del ecosistema
 
 | Componente | Función disponible en el repositorio | Alcance / requisitos |
