@@ -151,7 +151,16 @@ def main(argv: list[str] | None = None) -> int:
                         help="Nombres ya instalados en Ollama")
     parser.add_argument("--skip-full", action="store_true",
                         help="Solo mide Ollama directo, no el asistente completo")
+    parser.add_argument("--skip-direct", action="store_true",
+                        help="Solo mide SKY completo, sin llamada Ollama directa")
+    ruta = parser.add_mutually_exclusive_group()
+    ruta.add_argument("--fast-context", action="store_true",
+                      help="Habilita contexto breve seguro SOLO durante la medicion")
+    ruta.add_argument("--full-context", action="store_true",
+                      help="Fuerza contexto completo SOLO durante la medicion")
     args = parser.parse_args(argv)
+    if args.skip_full and args.skip_direct:
+        parser.error("--skip-full y --skip-direct no pueden combinarse")
     from dotenv import load_dotenv
     load_dotenv(".env", override=True)
 
@@ -159,6 +168,10 @@ def main(argv: list[str] | None = None) -> int:
     # a un proveedor cloud, sin guardar ninguna modificación en .env.
     os.environ["SKY_LOCAL_ONLY"] = "1"
     os.environ["SKY_CEREBRO"] = "subasta"
+    if args.fast_context:
+        os.environ["SKY_LOCAL_FAST_CONTEXT"] = "1"
+    elif args.full_context:
+        os.environ["SKY_LOCAL_FAST_CONTEXT"] = "0"
     from . import sky_cerebro
     base = sky_cerebro.OLLAMA
     try:
@@ -169,6 +182,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print("=== MEDICION LOCAL SKY ===")
     print("Nube desactivada durante esta prueba. .env permanece sin cambios.")
+    print("Modo contexto local breve:", os.getenv("SKY_LOCAL_FAST_CONTEXT", "0"))
     print("Modelos instalados:", ", ".join(sorted(disponibles)))
     pendientes = 0
     for mod in args.models:
@@ -179,13 +193,14 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["OLLAMA_MODEL"] = mod
         print(f"\n=== MODELO {mod} ===")
         try:
-            directo = prueba_ollama(base, mod)
-            print("Ollama directo (s):", directo["segundos"])
-            print("Carga / prompt / generacion (s):",
-                  directo["carga_s"], directo["prompt_s"], directo["generacion_s"])
-            print("Tokens entrada / salida:", directo["tokens_entrada"],
-                  directo["tokens_salida"])
-            print("Generacion (tokens/s):", directo["tokens_segundo"])
+            if not args.skip_direct:
+                directo = prueba_ollama(base, mod)
+                print("Ollama directo (s):", directo["segundos"])
+                print("Carga / prompt / generacion (s):",
+                      directo["carga_s"], directo["prompt_s"], directo["generacion_s"])
+                print("Tokens entrada / salida:", directo["tokens_entrada"],
+                      directo["tokens_salida"])
+                print("Generacion (tokens/s):", directo["tokens_segundo"])
             if not args.skip_full:
                 completo = prueba_asistente(mod)
                 print("SKY completo (s):", completo["segundos"])
