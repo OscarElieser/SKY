@@ -74,6 +74,8 @@ jobs:
           "$build_tools/apksigner" verify --print-certs SKY-IA-Android-standard-release.apk |
             grep -F 'Signer #1 certificate SHA-256 digest:' > signer-fingerprint.txt
           test -s signer-fingerprint.txt
+          "$build_tools/aapt" dump badging "$apk" | sed -n "s/^package:.*versionName='\\([^']*\\)'.*/\\1/p" > version.txt
+          test -s version.txt
       - name: Attach signed release candidate for device tests (not Play certified)
         uses: actions/upload-artifact@v4
         with:
@@ -82,5 +84,57 @@ jobs:
             mobile/android-agent/apk/SKY-IA-Android-standard-release.apk
             mobile/android-agent/apk/SKY-IA-Android-standard-release.apk.sha256
             mobile/android-agent/apk/signer-fingerprint.txt
+            mobile/android-agent/apk/version.txt
           if-no-files-found: error
           retention-days: 30
+
+  # Only this isolated job can write GitHub Releases.
+  # Neither the Windows services nor other project workflows are altered.
+  publish-android-download:
+    name: Publish directly downloadable SKY Android beta
+    needs: signed-release
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified Android release package
+        uses: actions/download-artifact@v4
+        with:
+          name: sky-mobile-standard-signed-release
+          path: dist
+      - name: Verify artifact integrity and prepare versioned APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum --check SKY-IA-Android-standard-release.apk.sha256
+          test -s signer-fingerprint.txt
+          version="$(cat version.txt)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid Android version"; exit 1; }
+          apk="SKY-IA-Android-v${version}-firmada.apk"
+          mv SKY-IA-Android-standard-release.apk "$apk"
+          sha256sum "$apk" > "$apk.sha256"
+          echo "SKY_ANDROID_VERSION=$version" >> "$GITHUB_ENV"
+          echo "SKY_ANDROID_APK=$apk" >> "$GITHUB_ENV"
+      - name: Publish direct download in GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="sky-android-v${SKY_ANDROID_VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists. Bump app versionCode/versionName before publishing a new APK."
+            exit 0
+          fi
+          gh release create "$tag" \
+            "dist/${SKY_ANDROID_APK}" \
+            "dist/${SKY_ANDROID_APK}.sha256" \
+            "dist/signer-fingerprint.txt" \
+            --target "$GITHUB_SHA" \
+            --title "SKY Android v${SKY_ANDROID_VERSION} — beta personal" \
+            --prerelease \
+            --latest=false \
+            --notes "SKY Android independiente de Windows y Tailscale. Compilación release firmada y verificada. APK para pruebas personales, no certificada por Google Play. El acceso a Gemini se configura desde Android con la clave personal del usuario; no se integra ninguna clave en la APK. No instales APKs si Play Protect señala riesgos: revisá el aviso. Para distribuir públicamente, migrar las claves del cliente a un backend autenticado. Este lanzamiento NO modifica SKY Windows."
