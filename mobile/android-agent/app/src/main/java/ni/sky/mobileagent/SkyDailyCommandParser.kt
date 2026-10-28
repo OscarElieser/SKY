@@ -13,6 +13,7 @@ object SkyDailyCommandParser {
         data class Timer(val seconds: Int) : Command()
         data class OpenApp(val app: String) : Command()
         data class Note(val value: String) : Command()
+        data class WebSearch(val query: String) : Command()
         object ShowNotes : Command()
         data class Share(val app: String, val value: String) : Command()
         data class Unsupported(val reason: String) : Command()
@@ -89,6 +90,12 @@ object SkyDailyCommandParser {
         }
         if (alarmStarts) return Command.Unsupported(
             "Decime la hora de la alarma, por ejemplo: SKY pon una alarma a las 5:30.")
+        val search = Regex("^(?:busca|buscar|buscame|investiga|investigar) (?:en (?:google|internet|la web))[: ,]+(.+)$")
+            .matchEntire(action)
+        if (search != null) {
+            val q = search.groupValues[1].trim().take(220)
+            if (q.isNotBlank()) return Command.WebSearch(q)
+        }
         val appWords = linkedMapOf(
             "youtube" to "youtube", "chrome" to "chrome",
             "whatsapp" to "whatsapp", "gmail" to "gmail"
