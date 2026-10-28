@@ -50,3 +50,21 @@ Referencias oficiales:
 - https://developers.google.com/youtube/data/reference/rest/v3/videos/list
 - https://developers.google.com/youtube/terms/required-minimum-functionality
 - https://developers.google.com/youtube/terms/developer-policies
+
+
+## Diagnóstico de búsqueda y reproducción (Windows)
+
+Desde la raíz de SKY, sin imprimir la clave privada:
+
+    & .\.venv\Scripts\python.exe -m scripts.sky_diagnostico_youtube "Los Enanitos Verdes Mi primer día sin ti"
+
+El reporte indica si SKY encuentra la clave local, si recibe resultados mediante la API oficial y qué URLs/IDs se consideran incrustables conforme a los metadatos. No hay que importar manualmente hud_api para analizarlo.
+
+Interpretación:
+- api_configurada=true significa que SKY encuentra la clave en su entorno o archivo .env; **no** prueba autorización ni cuota.
+- origen=youtube_data_api significa que la API produjo resultados mediante videos.list. La marca metadatos_de_incrustacion no equivale a reproducción efectiva.
+- reproduccion_confirmada=false es intencional: solo el navegador puede confirmar el comienzo mediante onStateChange del IFrame Player.
+- Cuando el iframe queda bloqueado sin emitir onError, SKY muestra tras doce segundos una alternativa con enlace oficial y otro candidato pendiente. La opción también aparece en la conversación.
+- Los errores 101/150 señalan inserción denegada por el propietario; el 153 indica falta de identificación Referer. Son situaciones distintas y no deben confundirse con una API key inválida.
+
+SKY no debe burlar restricciones, copiar el video ni retransmitir su audio como mecanismo alternativo. Si YouTube impide la inserción, la página original es la alternativa autorizada.
