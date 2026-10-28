@@ -35,6 +35,7 @@ class MainActivity : Activity() {
     private lateinit var voicePanel: SkyEyeVoicePanel
     private lateinit var dailyActions: SkyAndroidActions
     private lateinit var musicLauncher: SkyMusicLauncher
+    private lateinit var quickActions: SkyQuickActions
     private lateinit var replyStudio: SkyReplyStudio
     @Volatile private var replyPending = false
     private val photoRequest = 1622
@@ -93,7 +94,8 @@ class MainActivity : Activity() {
         }
         tokens = PrivateTokenStore(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
-            if (!processMusicCommand(transcript) &&
+            if (!processQuickCommand(transcript) &&
+                !processMusicCommand(transcript) &&
                 !processReplyCommand(transcript) &&
                 !processCreatorCommand(transcript) &&
                 !processMessagingCommand(transcript) &&
@@ -160,6 +162,10 @@ class MainActivity : Activity() {
         ) { message ->
             home.showMessage(message)
             if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(message)
+        }
+        quickActions = SkyQuickActions(this) { message ->
+            // Music commands must not talk over and interrupt the playing track.
+            home.showMessage(message)
         }
         replyStudio = SkyReplyStudio(
             this, getSharedPreferences("sky_reply_contacts", MODE_PRIVATE)
@@ -253,6 +259,16 @@ class MainActivity : Activity() {
                 "ni garantiza que una alarma haya sonado o un mensaje se haya enviado.")
             .setPositiveButton("Cerrar", null)
             .show()
+    }
+
+    /**
+     * Media buttons and system volume require no repetition of the wake word.
+     * Only works while the SKY UI can hear an explicitly authorized voice turn.
+     */
+    private fun processQuickCommand(message: String): Boolean {
+        val command = SkyQuickCommand.parse(message) ?: return false
+        quickActions.execute(command)
+        return true
     }
 
     /** Music command works without a wake word. Android controls actual playback. */
@@ -711,6 +727,21 @@ class MainActivity : Activity() {
                 })
             }
         }
+        content.addView(actionButton("CONTROL MUSICAL · SIGUIENTE / ATRÁS / VOLUMEN") {
+            val labels = arrayOf("Siguiente canción", "Canción anterior",
+                "Repetir / reiniciar pista", "Subir volumen", "Bajar volumen",
+                "Pausar", "Reanudar", "Mostrar desbloqueo seguro")
+            val commands = arrayOf(
+                SkyQuickCommand.Action.NEXT, SkyQuickCommand.Action.PREVIOUS,
+                SkyQuickCommand.Action.RESTART, SkyQuickCommand.Action.VOLUME_UP,
+                SkyQuickCommand.Action.VOLUME_DOWN, SkyQuickCommand.Action.PAUSE,
+                SkyQuickCommand.Action.PLAY, SkyQuickCommand.Action.REQUEST_UNLOCK)
+            AlertDialog.Builder(this)
+                .setTitle("SKY · Controles de Android")
+                .setItems(labels) { _, index -> quickActions.execute(commands[index]) }
+                .setNegativeButton("Cerrar", null)
+                .show()
+        })
         content.addView(actionButton("MÚSICA · Spotify / YouTube Music / YouTube") {
             val choices = SkyMusicCommand.Service.entries.toTypedArray()
             AlertDialog.Builder(this)
@@ -954,7 +985,8 @@ class MainActivity : Activity() {
     private fun sendChat() {
         val message = chatInput.text.toString().trim()
         if (message.isEmpty()) return
-        if (processMusicCommand(message) ||
+        if (processQuickCommand(message) ||
+            processMusicCommand(message) ||
             processReplyCommand(message) ||
             processCreatorCommand(message) ||
             processMessagingCommand(message) ||
