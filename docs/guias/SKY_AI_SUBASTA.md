@@ -117,3 +117,38 @@ El enrutador muestra ahora los errores seguros de **cada intento**, en
 vez del mensaje genérico que ocultaba si el problema era Gemini, OpenAI
 o ambos. En caso de error, `ultimo_proveedor()` indica el último
 proveedor **intentado**, no uno que respondiera correctamente.
+
+
+## Continuidad del servicio al fallar una API
+
+Con `SKY_AUCTION_MAX_ATTEMPTS=2` SKY intenta como máximo dos motores
+por solicitud. Si ambos fallan, no alcanza a consultar a los demás.
+
+Para permitir hasta cuatro alternativas:
+
+```dotenv
+SKY_AUCTION_MAX_ATTEMPTS=4
+```
+
+Se permite configurar entre **1 y 7** motores. Siete es el máximo
+posible (seis API cloud y Ollama), pero no se consultan todos si uno
+responde. Cada solicitud real puede consumir cuota, aun cuando falla.
+
+Los errores HTTP 503 suspenden el proveedor temporalmente por 45 s;
+HTTP 429 sin causa específica por 90 s. Fallos 401/402/403/404 y
+errores 429 asociados a saldo o cuota quedan en espera 600 s, para
+evitar repetir solicitudes improductivas. Son suspensiones **en memoria
+del proceso**: no sobreviven a un reinicio del servidor y no sustituyen
+la gestión de facturación ni un circuit breaker distribuido.
+
+El operador puede inspeccionar la espera actual con:
+
+```python
+from neural_core.sky_ai_auction import en_espera
+print(en_espera())
+```
+
+Si Google devuelve `503 UNAVAILABLE`, comprobar estado del servicio y
+esperar a que se recupere. Si OpenAI devuelve `429`, revisar el
+código de error seguro para distinguir límite de solicitudes de saldo,
+uso o gasto. No repetir automáticamente un error de facturación.
