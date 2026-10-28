@@ -40,6 +40,7 @@ class SkyHandsFreeService : Service() {
         @Volatile var onPhrase: ((String) -> Unit)? = null
         @Volatile var onWake: (() -> Unit)? = null
         @Volatile var onStatus: ((Boolean) -> Unit)? = null
+        @Volatile var onStopped: (() -> Unit)? = null
         fun pauseForReply() { current?.handler?.post { current?.suspendForSpeech() } }
         fun resumeAfterReply() { current?.handler?.post { current?.resumeFromSpeech() } }
         fun stop(context: android.content.Context) {
@@ -107,6 +108,7 @@ class SkyHandsFreeService : Service() {
             !SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
             getSharedPreferences("sky_voice_settings", MODE_PRIVATE)
                 .edit().putBoolean("hands_free_opt_in", false).apply()
+            onStopped?.invoke()
             stopSelf()
             return START_NOT_STICKY
         }
@@ -174,6 +176,7 @@ class SkyHandsFreeService : Service() {
                 override fun onEvent(eventType: Int, params: Bundle?) {}
 
                 override fun onError(error: Int) {
+                    if (!listening) return
                     stopRecognizer()
                     if (!running) return
                     if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ||
@@ -182,6 +185,7 @@ class SkyHandsFreeService : Service() {
                         notifyState("Reconocimiento local no disponible. Revisá idioma y permisos.")
                         getSharedPreferences("sky_voice_settings", MODE_PRIVATE)
                             .edit().putBoolean("hands_free_opt_in", false).apply()
+                        onStopped?.invoke()
                         stopSelf()
                         return
                     }
@@ -192,6 +196,7 @@ class SkyHandsFreeService : Service() {
                 }
 
                 override fun onResults(results: Bundle?) {
+                    if (!listening) return
                     val heard = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         ?.firstOrNull().orEmpty()
                     stopRecognizer()
@@ -242,13 +247,15 @@ class SkyHandsFreeService : Service() {
         suspendForSpeech()
         val result = tts?.speak(message, TextToSpeech.QUEUE_FLUSH, Bundle(),
             "sky-service-" + SystemClock.uptimeMillis())
-        if (result != TextToSpeech.SUCCESS) schedule(1500)
+        if (result != TextToSpeech.SUCCESS) {
+            handler.postDelayed({ resumeFromSpeech() }, 1500)
+        }
     }
 
     private fun process(heard: String) {
         if (!running) return
-        when (val decision = SkyWakePhrase.decide(heard, awake)) {
-            is SkyWakePhrase.Decision -> when (decision.kind) {
+        val decision = SkyWakePhrase.decide(heard, awake)
+        when (decision.kind) {
                 SkyWakePhrase.Kind.IGNORE -> schedule(650)
                 SkyWakePhrase.Kind.SLEEP -> {
                     awake = false
@@ -281,7 +288,6 @@ class SkyHandsFreeService : Service() {
                         say("Te escuché. Abrí SKY desde la notificación para continuar.")
                     }
                 }
-            }
         }
     }
 

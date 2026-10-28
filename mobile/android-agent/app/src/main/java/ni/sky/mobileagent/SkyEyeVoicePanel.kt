@@ -301,10 +301,12 @@ class SkyEyeVoicePanel(
 
     fun speakReply(text: String) {
         if (!readAloud.isChecked) {
+            onSpeechFinished?.invoke()
             setMode(EyeMode.IDLE, "Respuesta disponible en el chat.")
             return
         }
         if (!speechReady) {
+            onSpeechFinished?.invoke()
             setMode(EyeMode.IDLE, "Respuesta recibida. El motor de voz no está listo.")
             return
         }
@@ -312,6 +314,7 @@ class SkyEyeVoicePanel(
         val clean = SkySpokenText.prepare(text)
             .take(min(3500, TextToSpeech.getMaxSpeechInputLength() - 1))
         if (clean.isBlank()) {
+            onSpeechFinished?.invoke()
             setMode(EyeMode.IDLE, "Respuesta vacía.")
             return
         }

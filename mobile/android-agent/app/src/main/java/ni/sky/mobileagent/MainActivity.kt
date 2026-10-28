@@ -198,6 +198,7 @@ class MainActivity : Activity() {
             voicePanel.speakReply(message)
         }
         setContentView(home.root)
+        handler.post { acceptPendingVoiceIntent(intent) }
         home.root.setOnApplyWindowInsetsListener { _, insets ->
             val bottom = if (android.os.Build.VERSION.SDK_INT >= 30) {
                 insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
@@ -882,8 +883,6 @@ class MainActivity : Activity() {
     private fun setHandsFreeEnabled(enabled: Boolean) {
         handsFreePrefs.edit().putBoolean("hands_free_opt_in", enabled).apply()
         if (!enabled) {
-            stopService(android.content.Intent(this, SkyHandsFreeService::class.java)
-                .setAction(SkyHandsFreeService.ACTION_STOP))
             SkyHandsFreeService.stop(this)
             home.setHandsFreeActive(false)
             voicePanel.showHandsFreeState("Manos libres apagadas.")
@@ -911,6 +910,13 @@ class MainActivity : Activity() {
             voicePanel.setConversationMode(false)
             home.setHandsFreeActive(true)
             voicePanel.showHandsFreeState("SKY duerme hasta que digás su nombre.")
+            if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                    android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                !handsFreePrefs.getBoolean("notification_permission_asked", false)) {
+                handsFreePrefs.edit().putBoolean("notification_permission_asked", true).apply()
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1616)
+            }
         } catch (_: Exception) {
             handsFreePrefs.edit().putBoolean("hands_free_opt_in", false).apply()
             home.setHandsFreeActive(false)
@@ -918,13 +924,17 @@ class MainActivity : Activity() {
         }
     }
 
-    override fun onNewIntent(intent: android.content.Intent?) {
-        super.onNewIntent(intent)
-        val pending = intent?.getStringExtra(SkyHandsFreeService.EXTRA_COMMAND)
+    private fun acceptPendingVoiceIntent(openIntent: android.content.Intent?) {
+        val pending = openIntent?.getStringExtra(SkyHandsFreeService.EXTRA_COMMAND)
         if (!pending.isNullOrBlank() && ::voicePanel.isInitialized) {
-            intent.removeExtra(SkyHandsFreeService.EXTRA_COMMAND)
+            openIntent?.removeExtra(SkyHandsFreeService.EXTRA_COMMAND)
             voicePanel.acceptHandsFreeTranscript(pending)
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        handler.post { acceptPendingVoiceIntent(intent) }
     }
 
     override fun onResume() {
@@ -940,6 +950,12 @@ class MainActivity : Activity() {
         }
         SkyHandsFreeService.onWake = {
             if (visible && ::voicePanel.isInitialized) voicePanel.speakReply("¡Aquí estoy! Decime.")
+        }
+        SkyHandsFreeService.onStopped = {
+            if (visible && ::home.isInitialized) {
+                home.setHandsFreeActive(false)
+                voicePanel.showError("Manos libres detenidas. Revisá permisos o idioma sin conexión.")
+            }
         }
         SkyHandsFreeService.onStatus = { asleep ->
             if (visible && ::voicePanel.isInitialized) {
@@ -958,6 +974,7 @@ class MainActivity : Activity() {
         SkyHandsFreeService.onPhrase = null
         SkyHandsFreeService.onWake = null
         SkyHandsFreeService.onStatus = null
+        SkyHandsFreeService.onStopped = null
         visible = false
         if (::companionController.isInitialized) companionController.onPause()
         if (::voicePanel.isInitialized) voicePanel.onPausePanel()
