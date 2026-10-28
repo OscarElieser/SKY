@@ -254,7 +254,15 @@
     const locale = idiomaVoz().toLowerCase(), root = locale.split('-')[0];
     const disponibles = voces.filter(v => String(v.lang || '').toLowerCase().split('-')[0] === root);
     disponibles.sort((a, b) => {
-      const score = v => (v.localService ? 0 : 10) + (v.lang.toLowerCase() === locale ? 0 : 1);
+      const score = v => {
+        const language = String(v.lang || '').toLowerCase();
+        // Si el idioma elegido es español genérico, preferir Nicaragua
+        // cuando Windows/Chrome tiene esa voz instalada, luego es-MX.
+        const region = locale === 'es-419'
+          ? (language === 'es-ni' ? -4 : language === 'es-mx' ? -2 : 0)
+          : 0;
+        return (v.localService ? 0 : 10) + (language === locale ? -1 : 0) + region;
+      };
       return score(a) - score(b);
     });
     return disponibles[0] || null;
