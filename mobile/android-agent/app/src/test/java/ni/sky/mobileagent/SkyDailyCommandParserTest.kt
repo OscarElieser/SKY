@@ -97,6 +97,10 @@ class SkyDailyCommandParserTest {
             as SkyDailyCommandParser.Command.Share
         assertEquals("whatsapp", shared.app)
         assertEquals("Buenos días", shared.value)
+        val other = SkyDailyCommandParser.parse("SKY comparte en Instagram: ¡Hola comunidad!")
+            as SkyDailyCommandParser.Command.Share
+        assertEquals("instagram", other.app)
+        assertEquals("¡Hola comunidad!", other.value)
         assertNull(SkyDailyCommandParser.parse("Respondé todos mis mensajes automáticamente"))
     }
 }
