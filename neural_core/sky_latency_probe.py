@@ -85,6 +85,27 @@ def prueba_asistente(modelo: str, pregunta: str = PREGUNTA) -> dict:
     from . import sky_unified_agents
     from . import sky_cerebro
     tiempos: dict[str, float] = {}
+    medidas: dict[str, object] = {}
+    ollama_info: dict[str, object] = {}
+    original_llamar = sky_cerebro._llamar
+    original_eventos = sky_cerebro._eventos
+
+    def medir_llamada(msgs: list[dict], stream: bool):
+        # Solo longitudes y contadores, nunca el contenido de los mensajes.
+        medidas["system_chars"] = sum(
+            len(str(m.get("content") or "")) for m in msgs if m.get("role") == "system"
+        )
+        medidas["history_turns"] = max(0, len(msgs) - 2)
+        return original_llamar(msgs, stream)
+
+    def medir_eventos(texto, historial, modo, info):
+        try:
+            yield from original_eventos(texto, historial, modo, info)
+        finally:
+            for k in ("prompt_tokens", "generated_tokens", "load_s", "prompt_s",
+                      "generation_s"):
+                if isinstance(info.get(k), (int, float)):
+                    ollama_info[k] = info[k]
 
     def envolver(objeto, nombre: str, etiqueta: str, pila: ExitStack) -> None:
         original = getattr(objeto, nombre)
@@ -106,6 +127,8 @@ def prueba_asistente(modelo: str, pregunta: str = PREGUNTA) -> dict:
         envolver(asistente, "reglas", "reglas_s", pila)
         envolver(sky_unified_agents, "maybe_answer", "agentes_s", pila)
         envolver(sky_cerebro, "decidir", "cerebro_s", pila)
+        pila.enter_context(patch.object(sky_cerebro, "_llamar", medir_llamada))
+        pila.enter_context(patch.object(sky_cerebro, "_eventos", medir_eventos))
         comienzo = time.perf_counter()
         resultado = asistente.atender(pregunta, proveedor="auto", modo="chat")
         total = round(time.perf_counter() - comienzo, 3)
@@ -115,6 +138,8 @@ def prueba_asistente(modelo: str, pregunta: str = PREGUNTA) -> dict:
         "tipo": str(resultado.get("tipo") or "desconocido"),
         "texto": bool(str(resultado.get("mensaje") or "").strip()),
         "etapas": tiempos,
+        "ollama": ollama_info,
+        "prompt": medidas,
     }
 
 
@@ -167,6 +192,8 @@ def main(argv: list[str] | None = None) -> int:
                 print("Proveedor / tipo:", completo["proveedor"], "/", completo["tipo"])
                 print("Respuesta presente:", completo["texto"])
                 print("Tiempos de etapas (s):", completo["etapas"])
+                print("Metricas Ollama en SKY:", completo["ollama"])
+                print("Tamano seguro del contexto:", completo["prompt"])
                 if completo["tipo"] != "respuesta" or completo["proveedor"] != "ollama" or not completo["texto"]:
                     pendientes += 1
         except Exception as exc:
