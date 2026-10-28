@@ -184,6 +184,10 @@ class SkyEyeVoicePanel(
         message.text = label
     }
 
+    fun express(message: String) {
+        eye.reactTo(message)
+    }
+
     fun isVoiceEnabled(): Boolean = readAloud.isChecked
     fun isSpeechEngineReady(): Boolean = speechReady
 
