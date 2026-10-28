@@ -18,7 +18,8 @@ class SkyAndroidActions(
     private val prefs: SharedPreferences,
     private val allowed: SharedPreferences,
     private val feedback: (String) -> Unit,
-    private val onAccessibilityHelp: () -> Unit
+    private val onAccessibilityHelp: () -> Unit,
+    private val installedApps: SkyInstalledApps
 ) {
     private val apps = linkedMapOf(
         "youtube" to Pair("YouTube", "com.google.android.youtube"),
@@ -31,7 +32,8 @@ class SkyAndroidActions(
         when (action) {
             is SkyDailyCommandParser.Command.Alarm -> alarm(action)
             is SkyDailyCommandParser.Command.Timer -> timer(action.seconds)
-            is SkyDailyCommandParser.Command.OpenApp -> openApp(action.app)
+            is SkyDailyCommandParser.Command.OpenApp -> installedApps.requestLaunch(action.app)
+            SkyDailyCommandParser.Command.ShowApps -> installedApps.showCatalog()
             is SkyDailyCommandParser.Command.Note -> saveNote(action.value)
             is SkyDailyCommandParser.Command.WebSearch -> webSearch(action.query)
             is SkyDailyCommandParser.Command.Share -> share(action.app, action.value)
@@ -74,26 +76,6 @@ class SkyAndroidActions(
                 launch(intent, "Solicité al Reloj el temporizador. Revisá su estado en Android.")
             }
             .setNegativeButton("Cancelar", null)
-            .show()
-    }
-
-    private fun openApp(id: String) {
-        val details = apps[id] ?: return feedback("Esta aplicación no está permitida.")
-        if (!allowed.getBoolean(id, false)) {
-            feedback("Autorizá " + details.first + " desde Ajustes para abrirla.")
-            return
-        }
-        AlertDialog.Builder(host)
-            .setTitle("SKY · Abrir " + details.first)
-            .setMessage("¿Querés abrir " + details.first + " en este teléfono?")
-            .setPositiveButton("Abrir") { _, _ ->
-                val intent = host.packageManager.getLaunchIntentForPackage(details.second)
-                if (intent == null) {
-                    feedback(details.first + " no está instalada o no se puede abrir.")
-                } else launch(intent,
-                    "Android recibió la solicitud de apertura de " + details.first + ".")
-            }
-            .setNegativeButton("Cancelar") { _, _ -> feedback("Apertura cancelada.") }
             .show()
     }
 
