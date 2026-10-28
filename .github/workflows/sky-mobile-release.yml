@@ -74,7 +74,7 @@ jobs:
           "$build_tools/apksigner" verify --print-certs SKY-IA-Android-standard-release.apk |
             grep -F 'Signer #1 certificate SHA-256 digest:' > signer-fingerprint.txt
           test -s signer-fingerprint.txt
-          "$build_tools/aapt" dump badging "$apk" | sed -n "s/^package:.*versionName='\\([^']*\\)'.*/\\1/p" > version.txt
+          "$build_tools/aapt" dump badging "SKY-IA-Android-standard-release.apk" | sed -n "s/^package:.*versionName='\\([^']*\\)'.*/\\1/p" > version.txt
           test -s version.txt
       - name: Attach signed release candidate for device tests (not Play certified)
         uses: actions/upload-artifact@v4
