@@ -62,9 +62,11 @@ class SkyEyeVoicePanel(
     var onSpeechStarted: (() -> Unit)? = null
     var onSpeechFinished: (() -> Unit)? = null
     private var handsFreeOn = false
+    private var handsFreeAsleep = true
 
     fun setHandsFreeActive(enabled: Boolean) {
         handsFreeOn = enabled
+        handsFreeAsleep = true
         if (enabled) {
             setConversationMode(false)
             if (listening) {
@@ -78,6 +80,8 @@ class SkyEyeVoicePanel(
     }
 
     fun showHandsFreeState(label: String) {
+        handsFreeAsleep = label.contains("durmi", ignoreCase = true) ||
+            label.contains("duerme", ignoreCase = true)
         setMode(EyeMode.IDLE, label)
     }
 
@@ -255,14 +259,17 @@ class SkyEyeVoicePanel(
     private fun dp(value: Int) = (value * resources.displayMetrics.density + 0.5f).toInt()
 
     private fun setMode(mode: EyeMode, label: String) {
-        eye.mode = mode.name
+        eye.mode = if (mode == EyeMode.IDLE && handsFreeOn && handsFreeAsleep)
+            "SLEEPING" else mode.name
         message.text = label
         onVisualStatusChanged?.invoke(when (mode) {
             EyeMode.LISTENING -> "● TE ESTOY ESCUCHANDO"
             EyeMode.THINKING -> "✦ UN MOMENTO, ESTOY PENSANDO"
             EyeMode.SPEAKING -> "♫ SKY ESTÁ HABLANDO"
             EyeMode.ERROR -> "REVISÁ EL AVISO DE SKY"
-            EyeMode.IDLE -> if (handsFreeOn) "SKY DURMIENDO · DECÍ SKY" else "SKY LISTA · TOCÁ PARA HABLAR"
+            EyeMode.IDLE -> if (handsFreeOn) {
+                if (handsFreeAsleep) "SKY DURMIENDO · DECÍ SKY" else "SKY ESTÁ ESCUCHÁNDOTE"
+            } else "SKY LISTA · TOCÁ PARA HABLAR"
         })
     }
 

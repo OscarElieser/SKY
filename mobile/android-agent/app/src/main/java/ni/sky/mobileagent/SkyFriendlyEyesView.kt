@@ -174,6 +174,7 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         val pulse = ((sin(t * 2.2) + 1.0) / 2.0).toFloat()
         val speaking = mode == "SPEAKING"
         val mood = when (mode) {
+            "SLEEPING" -> Emotion.SLEEPY
             "LISTENING", "THINKING" -> Emotion.CURIOUS
             "ERROR" -> Emotion.CURIOUS
             else -> if (now < emotionUntil) emotion else
