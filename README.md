@@ -17,28 +17,22 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 ---
 
 
-## 📱 SKY Android — Aura Premium 0.7.1 (independiente de Windows)
+## 📱 SKY Android — Ojos & Voz 0.8.0
 
-**Versión móvil publicada:** `0.7.1` · **Estado:** beta personal, compilación Android y firma verificadas en GitHub Actions; las funciones de voz, visualización y acciones locales deben probarse en el teléfono real.
+**SKY Android es independiente de Windows.** La beta móvil utiliza Gemini por internet para conversar y herramientas locales autorizadas para acciones reales del teléfono. Windows es opcional y este cambio no modifica sus módulos.
 
-**[⬇ Descargar SKY Android 0.7.1 (APK firmada)](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.7.1/SKY-IA-Android-v0.7.1-firmada.apk)** · [Página de la versión](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.7.1) · [Notas e instalación Android](mobile/android-agent/README.md) · [Guía de APK y verificación](mobile/android-agent/apk/README.md)
+[**⬇ Descargar SKY Android 0.8.0 (APK firmada)**](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.0/SKY-IA-Android-v0.8.0-firmada.apk) · [Release oficial](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.0) · [README móvil](mobile/android-agent/README.md) · [Instalación y verificación](mobile/android-agent/apk/README.md)
 
-La app Android vive en [`mobile/android-agent/`](mobile/android-agent/), tiene su propio código Kotlin y **funciona sin SKY Windows, sin Tailscale y sin emparejamiento** para la conversación mediante Gemini. Windows se mantiene como conexión **opcional** y no se inicia, modifica ni configura al utilizar el modo móvil independiente.
+### Diseño y funciones móviles
 
-### Experiencia móvil integrada
+- **Ojos & Boca:** sin máscara, sin silueta de cabeza, sin nariz ni mejillas. Dos ojos ovalados y boca animada sobre un fondo premium nocturno; expresiones y gestos mientras SKY escucha, piensa y habla.
+- **Voz interactiva:** reconocimiento de voz y síntesis TTS desde Android, con selección de voz española disponible. Conversación fluida optativa en primer plano, con límites y permisos de micrófono.
+- **Acciones locales:** reconocimiento de órdenes para abrir apps, notas, alarmas, temporizadores y búsqueda. Los permisos y confirmaciones dependen de cada aplicación.
+- **WhatsApp supervisado:** una orden como «SKY, abrí WhatsApp y mandá un mensaje a Ana: hola» abre una vista previa y, tras autorización, prepara el texto en WhatsApp. El usuario **elige el destinatario y pulsa Enviar**; SKY no lee conversaciones ni confirma envíos que no ha verificado.
+- **Chat Gemini independiente:** clave de pruebas introducida solo desde el teléfono, guardada cifrada con Android Keystore. Para distribución pública se requiere un backend seguro con autenticación y límites de cuota.
+- **APK firmada:** GitHub Actions ejecuta pruebas, verifica firma y manifiesto y publica versiones beta en Releases; la prueba en hardware real sigue siendo necesaria.
 
-- **SKY Aura Premium:** rostro vertical animado, ojos expresivos, gestos táctiles, brillo suave y estados visuales de escuchar, pensar, hablar y error.
-- **Conversación natural por turnos:** dictado del reconocimiento de voz de Android y respuestas reproducidas por TextToSpeech; se prefiere una voz española instalada de mejor calidad cuando existe. No equivale a voz neuronal propia.
-- **Rostro a la vista:** una conversación iniciada por voz no abre automáticamente el panel de texto; el historial escrito permanece disponible al solicitarlo.
-- **Modo fluido opcional:** hasta ocho turnos consecutivos en **primer plano**, con micrófono autorizado y parada manual. No constituye escucha continua oculta ni control en segundo plano.
-- **Acciones locales supervisadas:** abrir apps compatibles, notas, alarmas, temporizadores, modo acompañante, chistes y otras órdenes implementadas según permisos reales. No concede control universal de cualquier aplicación.
-- **IA por internet sin PC:** configuración de una clave personal de Gemini desde Ajustes para beta privada; SKY valida su acceso y la almacena cifrada con Android Keystore. No insertar ni enviar claves en GitHub, capturas, incidencias o chats.
-
-**Instalación:** abrir el enlace de la APK en Chrome desde Android, descargarla de GitHub Releases e instalarla encima de la anterior **solo si conserva el mismo certificado de firma**; no desinstalar sin respaldar los datos. Si Google Play Protect muestra una alerta de riesgo, **no forzar la instalación** y documentar el aviso. La beta no está certificada por Google Play.
-
-**Privacidad:** aunque Android Keystore cifra la clave en reposo, una clave API dentro de un cliente móvil no ofrece seguridad suficiente para una distribución pública. Antes del lanzamiento general será necesario un backend autenticado, control de cuota y medidas contra abuso. La app necesita internet para responder con Gemini; las acciones puramente locales pueden funcionar sin él.
-
-**Publicación y pruebas:** [SKY Android Signed Release Candidate](.github/workflows/sky-mobile-release.yml) compila, verifica firma/manifest, genera SHA-256 y publica las versiones aprobadas en [GitHub Releases](https://github.com/OscarElieser/SKY/releases). El workflow [SKY Mobile Android Agent](.github/workflows/sky-mobile-agent.yml) mantiene pruebas de desarrollo. Las APK no se almacenan como binarios en el árbol de código.
+**Seguridad:** esta versión no instala control universal de aplicaciones ni envía mensajes de forma silenciosa. Si Play Protect muestra un bloqueo, no forzar la instalación. La APK nueva debe instalarse sobre la anterior con la misma firma para conservar los datos.
 
 ---
 
