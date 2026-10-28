@@ -328,6 +328,23 @@ class MainActivity : Activity() {
                     home.addExchange(message, answer, reply.optString("proveedor", "desconocido"))
                     voicePanel.speakReply(answer)
                 }
+            } catch (error: Exception) {
+                if (error.message?.contains("HTTP 401") == true ||
+                    error.message?.contains("HTTP 403") == true) {
+                    // El token de chat independiente vence o puede revocarse.
+                    // No borrar el emparejamiento del teléfono ni la API del dueño.
+                    tokens.clearChat()
+                    runOnUiThread {
+                        refreshConnection()
+                        home.showMessage("La sesión de chat venció. Renovala desde Ajustes.")
+                        voicePanel.showError("La conversación necesita nueva autorización.")
+                    }
+                } else {
+                    runOnUiThread {
+                        home.showMessage("No fue posible consultar SKY. Verificá el servidor.")
+                        voicePanel.showError("Revisá tu conexión y volvé a intentar.")
+                    }
+                }
             } finally {
                 chatPending = false
             }
