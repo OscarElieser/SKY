@@ -7,22 +7,26 @@ on:
       - feature/sky-ai-auction-20261028
     paths:
       - 'neural_core/sky_ai_auction.py'
+      - 'neural_core/sky_ai_diagnostics.py'
       - 'neural_core/sky_cerebro.py'
       - 'neural_core/providers.py'
       - 'neural_core/assistant.py'
       - 'neural_core/sky_asistente_personal.py'
       - 'neural_core/sky_metricas.py'
       - 'tests/test_sky_ai_auction.py'
+      - 'tests/test_sky_ai_diagnostics.py'
       - '.github/workflows/sky-ai-auction.yml'
   pull_request:
     paths:
       - 'neural_core/sky_ai_auction.py'
+      - 'neural_core/sky_ai_diagnostics.py'
       - 'neural_core/sky_cerebro.py'
       - 'neural_core/providers.py'
       - 'neural_core/assistant.py'
       - 'neural_core/sky_asistente_personal.py'
       - 'neural_core/sky_metricas.py'
       - 'tests/test_sky_ai_auction.py'
+      - 'tests/test_sky_ai_diagnostics.py'
       - '.github/workflows/sky-ai-auction.yml'
 
 jobs:
@@ -35,6 +39,8 @@ jobs:
           python-version: '3.11'
       - name: Compile affected files
         run: |
-          python -m py_compile neural_core/sky_ai_auction.py neural_core/sky_cerebro.py neural_core/providers.py neural_core/assistant.py neural_core/sky_asistente_personal.py neural_core/sky_metricas.py tests/test_sky_ai_auction.py
+          python -m py_compile neural_core/sky_ai_auction.py neural_core/sky_ai_diagnostics.py neural_core/sky_cerebro.py neural_core/providers.py neural_core/assistant.py neural_core/sky_asistente_personal.py neural_core/sky_metricas.py tests/test_sky_ai_auction.py
       - name: Run auction unit tests
-        run: python -m unittest discover -s tests -p 'test_sky_ai_auction.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_sky_ai_auction.py' -v
+          python -m unittest discover -s tests -p 'test_sky_ai_diagnostics.py' -v
