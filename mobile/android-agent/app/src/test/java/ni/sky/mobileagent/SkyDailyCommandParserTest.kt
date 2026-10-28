@@ -48,6 +48,13 @@ class SkyDailyCommandParserTest {
         assertTrue(app is SkyDailyCommandParser.Command.Unsupported)
     }
 
+    @Test fun explicitlyRequestedBrowserSearch() {
+        val search = SkyDailyCommandParser.parse("SKY busca en internet inteligencia artificial")
+            as SkyDailyCommandParser.Command.WebSearch
+        assertEquals("inteligencia artificial", search.query)
+        assertNull(SkyDailyCommandParser.parse("Investiga esta situación educativa"))
+    }
+
     @Test fun privateNotesAndReadBack() {
         val note = SkyDailyCommandParser.parse("SKY anota comprar leche y pan") as SkyDailyCommandParser.Command.Note
         assertEquals("comprar leche y pan", note.value)
