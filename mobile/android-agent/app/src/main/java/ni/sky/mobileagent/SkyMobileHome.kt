@@ -207,7 +207,7 @@ class SkyMobileHome(
         panel.addView(header)
         panel.addView(panelSubtitle)
         val scroll = ScrollView(host).apply {
-            fillViewport = true
+            isFillViewport = true
             isVerticalScrollBarEnabled = false
             addView(chatOutput)
         }
