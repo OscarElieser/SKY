@@ -22,7 +22,11 @@ import java.util.concurrent.Executors
  * cuando está visible y requiere permisos por app y confirmación por comando.
  */
 class MainActivity : Activity() {
+    // La red de chat nunca debe esperar detrás de los sondeos del agente ni
+    // de operaciones creativas largas. Cada canal conserva su orden interno.
     private val executor = Executors.newSingleThreadExecutor()
+    private val chatExecutor = Executors.newSingleThreadExecutor()
+    private val pollingExecutor = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var tokens: PrivateTokenStore
     private lateinit var serverInput: EditText
@@ -889,6 +893,8 @@ class MainActivity : Activity() {
         if (::voicePanel.isInitialized) voicePanel.close()
         if (::companionController.isInitialized) companionController.close()
         executor.shutdown()
+        chatExecutor.shutdown()
+        pollingExecutor.shutdown()
         super.onDestroy()
     }
 
@@ -1031,7 +1037,8 @@ class MainActivity : Activity() {
         privateConsent.isChecked = false
         chatPending = true
         voicePanel.showThinking()
-        execute {
+        chatExecutor.execute {
+            val started = android.os.SystemClock.elapsedRealtime()
             try {
                 val history = JSONArray()
                 val begin = maxOf(0, chatHistory.length() - 8)
@@ -1066,7 +1073,10 @@ class MainActivity : Activity() {
                     chatInput.setText("")
                     val keepFace = voiceReplyOnFace
                     voiceReplyOnFace = false
-                    home.addExchange(message, answer, provider, revealPanel = !keepFace)
+                    val elapsedMs = android.os.SystemClock.elapsedRealtime() - started
+                    home.addExchange(message, answer,
+                        provider + " · " + (elapsedMs / 1000.0).toString().take(5) + " s",
+                        revealPanel = !keepFace)
                     voicePanel.speakReply(answer)
                 }
             } catch (error: Exception) {
@@ -1104,7 +1114,7 @@ class MainActivity : Activity() {
         val token = tokens.token()
         if (id.isEmpty() || token.isEmpty() || pendingCommand != null || polling) return
         polling = true
-        execute {
+        pollingExecutor.execute {
             try {
                 val response = SkyNetwork.request(tokens.server(),
                     "/api/sky/mobile-agent/devices/" + id + "/next", "GET", token)
