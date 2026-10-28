@@ -1,10 +1,68 @@
-# SKY Android — Núcleo móvil + Estudio Creativo 0.8.3
+# SKY Android — Núcleo móvil, redes y control de música 0.8.4
 
 **Beta Android independiente de Windows.** Diseño con **solo ojos y boca animados**, sin máscara ni rostro. Órdenes del teléfono por texto y voz, supervisadas por el usuario.
 
-**Código en `main`: 0.8.2 · APK 0.8.2 pendiente de validación CI.**
+**Código en `main`: 0.8.4 (versionCode 17).** La APK se distribuye solo cuando aparece firmada en GitHub Releases. No desinstalés la versión anterior sin respaldo.
 
-[**Ver las versiones APK efectivamente publicadas**](https://github.com/OscarElieser/SKY/releases) · [Última APK confirmada, 0.8.0](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.0) · [Guía de instalación y seguridad](apk/README.md)
+[**Ver las versiones APK efectivamente publicadas**](https://github.com/OscarElieser/SKY/releases) · [Versiones Android publicadas](https://github.com/OscarElieser/SKY/releases) · [Guía de instalación y seguridad](apk/README.md)
+
+## SKY Android 0.8.4 — música a tu voz y activación segura
+
+**Novedades del código (aún necesitan validación en el Samsung):**
+
+- Reconoce órdenes directas **sin repetir «SKY»** mientras está escuchando:
+  `siguiente`, `atrás`, `repite`, `subí el volumen`,
+  `bajá el volumen`, `pará`, `reanudar` y `cambiá de música`.
+- Desde **Ajustes → CONTROL MUSICAL · SIGUIENTE / ATRÁS / VOLUMEN**
+  también se pueden probar los controles táctiles sin micrófono.
+- Usa `AudioManager.dispatchMediaKeyEvent` para solicitar a la sesión
+  multimedia activa pasar de pista, retroceder, pausar y reanudar.
+  El ajuste de volumen modifica **STREAM_MUSIC** y confirma el nivel
+  cuando Android permite cambiarlo. Spotify/YouTube Music/YouTube
+  determinan si atienden los comandos; SKY no debe declarar éxito
+  musical sin comprobarlo.
+- **Repetir:** la primera implementación envía «anterior», que en
+  algunos reproductores reinicia el tema actual y en otros cambia al
+  anterior. **No activa todavía el bucle de repetición**. La integración
+  posterior con un reproductor autorizado o servicio de sesión
+  permitirá un control más preciso.
+- Voz para **«activá el teléfono»** o «desbloqueá el teléfono»
+  disponible **solo si SKY ya está abierta y escuchando**. Solicita
+  al sistema mostrar el desbloqueo. Si Samsung exige PIN o biometría,
+  el usuario debe autenticarse. Nunca desactiva el bloqueo.
+- **No hay escucha permanente con la pantalla apagada:** requiere
+  un servicio específico con notificación, permiso de micrófono,
+  controles de batería y validación según la versión de Android.
+  Esta versión no lo declara ni finge funcionar en segundo plano.
+
+### Vincular tus redes sociales
+
+Podés compartir los **@usuarios o enlaces públicos** de TikTok,
+Instagram, Facebook, YouTube, X, Threads y otras cuentas para preparar
+las integraciones. **No compartas contraseñas, códigos 2FA, cookies,
+tokens, archivos de sesión ni claves API.** Solo el identificador público
+no otorga permiso de lectura o publicación. Las conexiones privadas
+requieren un flujo de autorización OAuth de cada plataforma, sus
+permisos aprobados y revocación.
+
+Esta beta ofrece Studio Creativo, importación voluntaria de métricas,
+preparación de contenidos y compartir videos; **no está conectada
+automáticamente a las estadísticas privadas ni publica en secreto**.
+
+### Prueba cuando la APK esté firmada
+
+1. Abrí una canción en Spotify o YouTube Music y dejá SKY visible.
+2. Habilitá el micrófono y tocá **HABLAR**. Decí «siguiente», «atrás»,
+   «subí el volumen» y «pará». Observá **si el reproductor realmente
+   obedece**, no solo si SKY muestra un mensaje.
+3. En Ajustes, probá los controles táctiles para aislar problemas del
+   reconocimiento de voz.
+4. Con la app visible, probá «activá el teléfono» si se muestra el
+   bloqueo: Samsung debe pedir PIN/huella si corresponde.
+5. **No esperés que SKY escuche mientras la pantalla esté apagada
+   en esta versión**; esa capacidad sigue en desarrollo.
+
+---
 
 ## Historial de diseño y comandos 0.8.1 (referencia)
 
