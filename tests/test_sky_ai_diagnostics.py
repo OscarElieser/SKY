@@ -23,6 +23,16 @@ class TestSkyAiDiagnostics(unittest.TestCase):
         self.assertNotIn('SKY_SECRET_NEVER_SHOW', value)
         self.assertNotIn('Private message', value)
 
+    def test_openai_429_billing_code_is_different_from_rate(self):
+        err = urllib.error.HTTPError(
+            'https://test.invalid/secret=NEVER_SHOW', 429, 'private', {},
+            io.BytesIO(b'{"error":{"code":"credit_balance_exhausted",'
+                       b'"message":"NEVER_SHOW private details"}}'))
+        value = sky_ai_diagnostics.error_seguro('openai', err)
+        self.assertIn('credit_balance_exhausted', value)
+        self.assertIn('saldo agotado', value)
+        self.assertNotIn('NEVER_SHOW', value)
+
     def test_http_404_model_and_nonjson_body(self):
         err = urllib.error.HTTPError(
             'https://host.test/key=SECRET', 404, 'bad', {},
