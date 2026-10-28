@@ -2,6 +2,7 @@
 from urllib import request, error
 import json
 from datetime import date
+import os
 from neural_core.storage import buscar_documentos, memorias
 from neural_core.providers import reply, choose_provider
 from neural_core.sky_evolution import feedback_reciente
@@ -170,5 +171,7 @@ Metadatos de fuentes externas traídos bajo petición (podrían estar incompleto
         if m.get('role') in ('user','assistant'):
             mensajes.append({'role':m['role'],'content':str(m.get('content',''))[:4000]})
     mensajes.append({'role':'user','content':pregunta})
+    if proveedor in ('auto', 'sky') and os.getenv('SKY_CEREBRO', 'auto').strip().lower() == 'subasta':
+        return reply(mensajes, 'subasta'), evidencias
     elegido, predeterminado = choose_provider(proveedor, area)
     return reply(mensajes, elegido, modelo or predeterminado), evidencias
