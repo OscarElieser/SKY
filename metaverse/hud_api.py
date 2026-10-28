@@ -24,9 +24,20 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from .api import require_key
+from fastapi.security import APIKeyHeader
 from neural_core import dispositivos
 from neural_core.sky_asistente_personal import token_agente_local, url_agente_local
+
+def require_key(request: Request, token: str | None = Depends(
+        APIKeyHeader(name='X-SKY-KEY', auto_error=False))):
+    """Misma autorización del propietario y MFA, importada al atender el pedido.
+
+    hud_api puede cargarse directamente para diagnósticos, sin importar api.py
+    antes de que el propio router haya terminado de inicializarse.
+    """
+    from .api import require_key as autorizar, require_owner_key_only
+    return autorizar(request, owner_key=require_owner_key_only(token))
+
 
 router = APIRouter(prefix='/api/hud', dependencies=[Depends(require_key)])
 VERSION_SKY = '12.5.0'
