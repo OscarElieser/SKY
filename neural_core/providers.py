@@ -127,6 +127,36 @@ def _openai_sdk(key, base_url=None):
     return OpenAI(**kw)
 
 def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_tokens: int=2500):
+    if provider in ('subasta', 'auction') or (
+        provider in ('auto', 'sky') and os.getenv('SKY_CEREBRO', 'auto').strip().lower() == 'subasta'
+    ):
+        from .sky_ai_auction import ofertas, max_intentos
+        import time
+        texto = next((str(m.get('content') or '') for m in reversed(mensajes)
+                      if m.get('role') == 'user'), '')
+        candidatos = ofertas(texto)[:max_intentos()]
+        if not candidatos:
+            raise ProviderError('No hay proveedores autorizados disponibles para la subasta.')
+        for candidato in candidatos:
+            nombre = candidato['proveedor']
+            inicio = time.perf_counter()
+            ok = False
+            try:
+                respuesta = reply(mensajes, nombre, max_output_tokens=max_output_tokens)
+                ok = True
+                return respuesta
+            except ProviderError:
+                pass
+            finally:
+                try:
+                    from .sky_metricas import registrar
+                    cfg = PROVIDERS[nombre]
+                    nombre_modelo = f"{nombre}:{os.getenv(cfg.model_env, cfg.model_default)}"
+                    registrar('modelo', nombre_modelo, ok, (time.perf_counter() - inicio) * 1000,
+                              origen='texto')
+                except Exception:
+                    pass
+        raise ProviderError('Las API autorizadas fallaron. Revisá conexión, cuotas y modelos.')
     if provider=='auto': provider,chosen=choose_provider('auto')
     else: provider,chosen=choose_provider(provider)
     model=(model or chosen).strip()
