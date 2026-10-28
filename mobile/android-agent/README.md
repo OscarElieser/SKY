@@ -118,3 +118,22 @@ chat sigue sujeto a autorización independiente y los permisos existentes.
 La APK de CI requiere aún pruebas físicas de micrófono, audio, idioma,
 tiempos de respuesta y ciclo de vida. No se garantiza una experiencia Alexa
 completa con este primer incremento.
+
+## SKY expresiva: dos ojitos amigables
+
+La interfaz del chat de voz usa SkyFriendlyEyesView.kt, con dos ojos grandes
+y redondeados, cejas, sonrisa, mejillas de colores pastel y animaciones
+dibujadas directamente en Android. No utiliza ojos realistas ni estética
+de terror.
+
+- Parpadeo periódico, mirada móvil y movimientos suaves.
+- Escucha: pupilas atentas; procesamiento: mirada curiosa y burbujas;
+  habla: sonrisa animada y destellos; error: duda suave, sin agresividad.
+- Al tocar los ojos rota por alegría, curiosidad, sorpresa, cariño,
+  sueño y calma; las expresiones regresan al modo normal automáticamente.
+- Los saludos, agradecimientos y frases afectuosas activan gestos amables.
+- La respuesta hablada utiliza el TTS de Android, si está habilitado.
+
+La animación no requiere micrófono ni conexión; la conversación sigue
+dependiendo del reconocimiento, la autorización del chat y la API SKY.
+Esta versión no agrega escucha permanente ni permisos invasivos.
