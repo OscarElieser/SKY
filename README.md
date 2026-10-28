@@ -17,7 +17,7 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 ---
 
 
-## 📱 SKY Android — núcleo móvil autónomo (0.8.5)
+## 📱 SKY Android — núcleo móvil autónomo (0.8.6)
 
 **SKY Android funciona de forma independiente de SKY Windows** para
 conversaciones por Gemini y acciones locales autorizadas. El desarrollo
@@ -26,6 +26,27 @@ Android no modifica los servicios del PC.
 [**Ver APK realmente publicadas en GitHub Releases**](https://github.com/OscarElieser/SKY/releases) ·
 [Guía móvil](mobile/android-agent/README.md) ·
 [Instalación y verificación](mobile/android-agent/apk/README.md)
+
+### Nuevo en 0.8.6 — preparación de Instagram API con Creador
+
+- **Instagram personal no admite acceso API profesional.** Desde
+  Instagram se puede cambiar a **Creador**, conservando publicaciones
+  y seguidores, pero pasando a un perfil público.
+- SKY Android muestra una guía paso a paso para convertir la cuenta,
+  registrar localmente que el usuario hizo el cambio y revisar los
+  requisitos de **Instagram API with Instagram Login** de Meta.
+- La confirmación de Creador dentro de SKY **no significa conectado**.
+  Todavía faltan una app Meta configurada, permisos OAuth y un backend
+  HTTPS seguro sin claves privadas dentro del APK.
+- Permisos previstos: `instagram_business_basic`,
+  `instagram_business_manage_insights` y
+  `instagram_business_content_publish`, solicitados por finalidad
+  cuando estén disponibles y aprobados.
+- No se requiere una Página de Facebook para la ruta
+  **Instagram Login**; SKY Windows permanece sin cambios.
+
+[Guía de Instagram y autorización oficial](mobile/android-agent/INSTAGRAM_OAUTH_SETUP.md).
+La APK debe verificarse en CI y publicarse en Releases antes de instalar.
 
 ### Nuevo en 0.8.5 — perfiles sociales identificados localmente
 
