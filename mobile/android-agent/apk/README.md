@@ -1,9 +1,26 @@
-# SKY Android 0.8.5 — guía de instalación y perfiles sociales
+# SKY Android 0.8.6 — guía para Instagram Creador y acceso Meta
 
 **Estado:** código `0.8.5` en GitHub `main`. Descargar la APK
 únicamente desde [Releases](https://github.com/OscarElieser/SKY/releases)
 una vez aprobada la compilación y firma; hasta entonces conservá la
 versión instalada y no desinstalés sin respaldo.
+
+## Preparación Instagram 0.8.6
+
+Esta versión incorpora **Ajustes → MIS REDES → Instagram →
+Preparar acceso oficial**. Solo ofrece guía y registro del tipo de
+cuenta indicado por el usuario. Meta aún no ha autorizado a SKY;
+**no consulta métricas privadas ni publica directamente**.
+
+La cuenta personal debe cambiarse a **Creador** en Instagram.
+Para OAuth real se necesita una app Meta, un backend HTTPS que
+guarde el secreto y permisos oficiales aprobados. Consultá
+[la guía detallada](../INSTAGRAM_OAUTH_SETUP.md).
+
+**APK:** instalar 0.8.6 solo si la compilación firmada aparece en
+[GitHub Releases](https://github.com/OscarElieser/SKY/releases)
+con el archivo `SKY-IA-Android-v0.8.6-firmada.apk` y su SHA-256.
+No desinstalar versiones anteriores sin respaldo de datos.
 
 ## Importar los perfiles públicos proporcionados por el usuario
 
