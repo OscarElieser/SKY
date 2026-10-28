@@ -17,16 +17,44 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 ---
 
 
-## 📱 SKY Android — núcleo móvil autónomo (0.8.3)
+## 📱 SKY Android — núcleo móvil autónomo (0.8.4)
 
 **SKY Android funciona de forma independiente de SKY Windows** para
 conversaciones por Gemini y acciones locales autorizadas. El desarrollo
 Android no modifica los servicios del PC.
 
-[**SKY Android 0.8.2 — Releases**](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.3) ·
-[Descarga directa de APK firmada (solo tras aprobar CI)](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.3/SKY-IA-Android-v0.8.3-firmada.apk) ·
+[**Ver APK realmente publicadas en GitHub Releases**](https://github.com/OscarElieser/SKY/releases) ·
 [Guía móvil](mobile/android-agent/README.md) ·
 [Instalación y verificación](mobile/android-agent/apk/README.md)
+
+### Nuevo en 0.8.4 — órdenes musicales sin repetir SKY
+
+- **Control multimedia Android:** `siguiente`, `atrás`,
+  `cambia de música`, `repite`, `subí el volumen`,
+  `bajá el volumen`, `pará` y `reanudar`, mediante el
+  reproductor activo y ajustes de audio del teléfono.
+- **Acción verificable, no promesa:** para siguiente/anterior/pausa
+  se envían pulsaciones multimedia estándar; la app reproductora
+  determina si se cumplen. «Repite» intenta volver al inicio enviando
+  anterior, que puede cambiar la pista. No existe aún bucle completo.
+  El volumen informa si Android modificó el nivel.
+- **Pantalla de bloqueo:** la voz «activá el teléfono» solicita
+  el desbloqueo **solo mientras SKY está visible y escuchando**.
+  Android exige PIN o biometría cuando corresponde. No se evade
+  el bloqueo ni se mantiene el micrófono escuchando con pantalla
+  apagada en esta versión.
+- **Pruebas y control:** panel de órdenes multimedia en Ajustes
+  para validar la acción sin voz; tests unitarios del intérprete
+  de comandos. Requiere pruebas en el Samsung real.
+- **Redes sociales:** compartir identificadores públicos ayuda a
+  preparar conectores, pero no equivale a acceso a estadísticas o
+  publicación. Para ello se necesitan autorizaciones OAuth y
+  permisos de las plataformas; jamás almacenar contraseñas en GitHub.
+
+**Código Android `0.8.4`, versionCode `17`** en `main`.
+Comprobar la compilación y firma antes de instalar desde
+[Releases](https://github.com/OscarElieser/SKY/releases).
+El PC y el proyecto SKY Windows permanecen intactos.
 
 ### Nuevo en 0.8.3 — creador y analista local de redes
 
