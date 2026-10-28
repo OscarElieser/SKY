@@ -57,10 +57,10 @@ class TestSkyLatencyProbe(unittest.TestCase):
             "prompt_eval_duration": 800000000,
             "eval_duration": 2000000000,
         }
-        contenido = ("\\n".join(json.dumps(x) for x in (linea1, linea2)) + "\\n").encode("utf-8")
+        contenido = ("\n".join(json.dumps(x) for x in (linea1, linea2)) + "\n").encode("utf-8")
         info = {"tokens": None}
         with patch.object(sky_cerebro, "_mensajes",
-                          return_value=[{"role": "user", "content": "Pregunta publica"}]), \\
+                          return_value=[{"role": "user", "content": "Pregunta publica"} ]), \
              patch.object(sky_cerebro, "_llamar", return_value=io.BytesIO(contenido)):
             eventos = list(sky_cerebro._eventos("Pregunta publica", [], "chat", info))
         self.assertEqual(eventos, [("delta", "Managua."), ("fin", "Managua.")])
