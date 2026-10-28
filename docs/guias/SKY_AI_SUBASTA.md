@@ -84,3 +84,36 @@ modelo. No publicar las claves, los tokens ni el archivo `.env`.
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -p test_sky_ai_auction.py -v
 ```
+
+
+## Diagnostico de API (sin mostrar claves)
+
+Una puntuación alta en la subasta **no confirma** que una API funcione.
+Si la subasta devuelve error, revisar el código seguro de cada proveedor:
+
+```powershell
+# Sin consumir cuotas: modelos configurados, nunca muestra claves.
+.\.venv\Scripts\python.exe -m neural_core.sky_ai_diagnostics
+
+# Prueba REAL, facturable, con una pregunta pública mínima por proveedor.
+.\.venv\Scripts\python.exe -m neural_core.sky_ai_diagnostics --live --providers gemini openai
+
+# Opcionalmente, comprobar los otros cuatro motores con claves.
+.\.venv\Scripts\python.exe -m neural_core.sky_ai_diagnostics --live --providers anthropic groq deepseek mistral
+```
+
+Los mensajes muestran **HTTP 401** (autenticación), **403** (permiso),
+**404** (modelo/ruta), **429** (cuota/rate limit), **400/422**
+(formato y parámetros) o **error de red**. Los códigos públicos del
+proveedor pueden acompañar al número HTTP; no se imprime el mensaje
+bruto de la API, claves, URLs, conversaciones ni respuestas.
+
+La prueba usa únicamente el texto `Di solamente la palabra OK.`
+sin memoria personal y sin ejecutar herramientas. Cada prueba puede
+consumir cuota, aunque la respuesta no sea válida. No pegar el contenido
+de `.env` ni la clave completa en una conversación.
+
+El enrutador muestra ahora los errores seguros de **cada intento**, en
+vez del mensaje genérico que ocultaba si el problema era Gemini, OpenAI
+o ambos. En caso de error, `ultimo_proveedor()` indica el último
+proveedor **intentado**, no uno que respondiera correctamente.
