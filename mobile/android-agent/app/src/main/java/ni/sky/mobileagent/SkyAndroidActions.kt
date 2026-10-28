@@ -119,7 +119,11 @@ class SkyAndroidActions(
     }
 
     private fun share(id: String, text: String) {
-        val details = apps[id] ?: return feedback("Aplicación no permitida.")
+        val details = apps[id]
+        if (details == null) {
+            installedApps.requestShare(id, text)
+            return
+        }
         if (!allowed.getBoolean(id, false)) {
             feedback("Autorizá " + details.first + " desde Ajustes antes de compartir.")
             return
