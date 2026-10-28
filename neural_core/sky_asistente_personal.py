@@ -533,7 +533,7 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
     if contribucion is not None:
         return contribucion
     try:
-        if usar_cerebro(proveedor, texto):
+        if usar_cerebro(proveedor):
             from . import sky_cerebro
             d = sky_cerebro.decidir(texto, turnos, modo)
             if d['tipo'] == 'herramienta':
