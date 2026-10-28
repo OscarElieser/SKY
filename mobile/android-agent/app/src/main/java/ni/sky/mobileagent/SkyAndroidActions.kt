@@ -29,6 +29,7 @@ class SkyAndroidActions(
     fun run(action: SkyDailyCommandParser.Command) {
         when (action) {
             is SkyDailyCommandParser.Command.Alarm -> alarm(action)
+            is SkyDailyCommandParser.Command.Timer -> timer(action.seconds)
             is SkyDailyCommandParser.Command.OpenApp -> openApp(action.app)
             is SkyDailyCommandParser.Command.Note -> saveNote(action.value)
             is SkyDailyCommandParser.Command.Share -> share(action.app, action.value)
@@ -54,6 +55,23 @@ class SkyAndroidActions(
                     "Envié al Reloj la solicitud para las " + hh + ". Verificá que quede configurada.")
             }
             .setNegativeButton("Cancelar") { _, _ -> feedback("No se creó ninguna alarma.") }
+            .show()
+    }
+
+    private fun timer(seconds: Int) {
+        AlertDialog.Builder(host)
+            .setTitle("SKY · Temporizador")
+            .setMessage("Solicitar al Reloj un temporizador de " + seconds +
+                " segundos. Verificá que el Reloj lo inicie.")
+            .setPositiveButton("Iniciar") { _, _ ->
+                val intent = Intent(AlarmClock.ACTION_SET_TIMER).apply {
+                    putExtra(AlarmClock.EXTRA_LENGTH, seconds)
+                    putExtra(AlarmClock.EXTRA_MESSAGE, "Temporizador SKY")
+                    putExtra(AlarmClock.EXTRA_SKIP_UI, false)
+                }
+                launch(intent, "Solicité al Reloj el temporizador. Revisá su estado en Android.")
+            }
+            .setNegativeButton("Cancelar", null)
             .show()
     }
 
