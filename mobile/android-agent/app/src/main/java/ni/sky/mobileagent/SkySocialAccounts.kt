@@ -82,7 +82,7 @@ class SkySocialAccounts(
         val choices = arrayOf("Abrir perfil público", "Crear contenido para esta red",
             "Editar identificador", "Quitar de SKY") +
             if (profile.platform == "Instagram")
-                arrayOf("Preparar acceso oficial de Instagram") else emptyArray()
+                arrayOf("Preparar acceso oficial de Instagram") else emptyArray<String>()
         AlertDialog.Builder(host)
             .setTitle(profile.platform + " · " + label)
             .setMessage("Perfil identificado localmente. Sin acceso a estadísticas, " +
