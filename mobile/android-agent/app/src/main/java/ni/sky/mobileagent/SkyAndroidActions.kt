@@ -128,7 +128,7 @@ class SkyAndroidActions(
             feedback("Autorizá " + details.first + " desde Ajustes antes de compartir.")
             return
         }
-        AlertDialog.Builder(host)
+        val shareDialog = AlertDialog.Builder(host)
             .setTitle("SKY · Preparar en " + details.first)
             .setMessage("SKY compartirá el texto con esta aplicación. " +
                 "No enviará mensajes por su cuenta.\n\n" + text.take(250))
@@ -141,7 +141,8 @@ class SkyAndroidActions(
                 launch(intent, "Texto compartido con " + details.first +
                     ". Revisá y confirmá el envío allí.")
             }
-            .setNeutralButton("Escribir en campo") { _, _ ->
+        if (BuildConfig.ENABLE_TEXT_ASSIST) {
+            shareDialog.setNeutralButton("Escribir en campo") { _, _ ->
                 if (!SkyTextAssistService.enabled() ||
                     !host.getSharedPreferences("sky_assistive_text",
                         android.content.Context.MODE_PRIVATE)
@@ -158,8 +159,8 @@ class SkyAndroidActions(
                     } else feedback("Escritura asistida no disponible. Revisá sus permisos.")
                 }
             }
-            .setNegativeButton("Cancelar", null)
-            .show()
+        }
+        shareDialog.setNegativeButton("Cancelar", null).show()
     }
 
     private fun launch(intent: Intent, message: String) {
