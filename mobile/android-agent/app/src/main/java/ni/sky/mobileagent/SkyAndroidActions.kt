@@ -33,6 +33,7 @@ class SkyAndroidActions(
             is SkyDailyCommandParser.Command.Timer -> timer(action.seconds)
             is SkyDailyCommandParser.Command.OpenApp -> openApp(action.app)
             is SkyDailyCommandParser.Command.Note -> saveNote(action.value)
+            is SkyDailyCommandParser.Command.WebSearch -> webSearch(action.query)
             is SkyDailyCommandParser.Command.Share -> share(action.app, action.value)
             SkyDailyCommandParser.Command.ShowNotes -> showNotes()
             is SkyDailyCommandParser.Command.Unsupported -> feedback(action.reason)
@@ -94,6 +95,13 @@ class SkyAndroidActions(
             }
             .setNegativeButton("Cancelar") { _, _ -> feedback("Apertura cancelada.") }
             .show()
+    }
+
+    private fun webSearch(query: String) {
+        val uri = android.net.Uri.parse("https://www.google.com/search?q=" +
+            android.net.Uri.encode(query))
+        val intent = Intent(Intent.ACTION_VIEW, uri)
+        launch(intent, "Abrí en el navegador una búsqueda de: " + query.take(90))
     }
 
     private fun saveNote(value: String) {
