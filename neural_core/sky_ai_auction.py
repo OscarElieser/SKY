@@ -182,6 +182,26 @@ def ofertas(texto: str, modo: str = "chat") -> list[dict]:
                                            if x["proveedor"] in CLOUD else len(CLOUD)))
 
 
+def candidatos_con_respaldo(texto: str, modo: str = "chat") -> list[dict]:
+    """Máximo N ofertas iniciales, más rescate Ollama sin gasto de API.
+
+    El respaldo local no cuenta contra el presupuesto de llamadas cloud.
+    Nunca añade una segunda ejecución local ni ignora SKY_LOCAL_ONLY.
+    Puede deshabilitarse explícitamente con SKY_AUCTION_LOCAL_FALLBACK=0.
+    """
+    propuestas = ofertas(texto, modo)
+    candidatos = propuestas[:max_intentos()]
+    activo = os.getenv("SKY_AUCTION_LOCAL_FALLBACK", "1").strip().lower()
+    if activo in ("0", "false", "no", "off"):
+        return candidatos
+    if any(p["proveedor"] == "ollama" for p in candidatos):
+        return candidatos
+    local = next((p for p in propuestas if p["proveedor"] == "ollama"), None)
+    if local:
+        candidatos.append(local)
+    return candidatos
+
+
 def seleccionar(texto: str, modo: str = "chat") -> str | None:
     ofertas_disponibles = ofertas(texto, modo)
     return ofertas_disponibles[0]["proveedor"] if ofertas_disponibles else None
