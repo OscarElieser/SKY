@@ -75,3 +75,56 @@ esté desconectado.
 **Actualizaciones:** los APK debug de distintas máquinas de GitHub Actions
 pueden tener firmas incompatibles. Conservá el código de vinculación y una
 vía para recuperar el acceso antes de desinstalar una versión ya configurada.
+
+## APK de lanzamiento con firma estable y evaluación de Play Protect
+
+No desactivar Play Protect ni forzar una instalación que fue bloqueada.
+El bloqueo debe diagnosticarse con su texto exacto; la firma estable no
+garantiza por sí sola que una APK vaya a ser aprobada.
+
+El workflow manual **SKY Android Signed Release Candidate** genera
+`SKY-IA-Android-standard-release.apk`, su SHA-256 y la huella pública
+del certificado, sin incluir el servicio opcional de Accesibilidad. La
+firma utiliza una clave privada que solo conoce el propietario. Una
+compilación exitosa no equivale a aprobación de Google Play.
+
+1. En Windows, fuera del repositorio de SKY, crear una clave persistente
+   con JDK 17+ (las contraseñas se solicitan durante la ejecución):
+
+   ```powershell
+   keytool -genkeypair -v -keystore "$HOME\sky-android-release.p12" -storetype PKCS12 -alias sky-mobile -keyalg RSA -keysize 3072 -validity 3650 -dname "CN=SKY Mobile, O=SKY"
+   ```
+
+2. Guardar respaldo privado cifrado de ese archivo, alias y contraseñas.
+   En GitHub, entrar a **Settings > Secrets and variables > Actions** y
+   crear cuatro secretos del repositorio:
+
+   | Secreto | Contenido |
+   |---|---|
+   | `SKY_ANDROID_RELEASE_KEYSTORE_B64` | Base64 de los bytes del archivo .p12 |
+   | `SKY_ANDROID_RELEASE_STORE_PASSWORD` | Contraseña del almacén |
+   | `SKY_ANDROID_RELEASE_KEY_ALIAS` | `sky-mobile`, o el alias elegido |
+   | `SKY_ANDROID_RELEASE_KEY_PASSWORD` | Contraseña de la clave (PKCS12 normalmente usa la del almacén) |
+
+   Para codificar el archivo con PowerShell:
+
+   ```powershell
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\sky-android-release.p12"))
+   ```
+
+   **Nunca subir ni compartir ese Base64, contraseñas o archivo privado**
+   como código, issue, captura ni mensaje.
+
+3. Abrir GitHub > Actions > **SKY Android Signed Release Candidate** >
+   **Run workflow** sobre `main`. Si los secretos están ausentes, el
+   proceso falla sin generar APK.
+4. Si todas las pruebas aprueban, descargar el artefacto
+   `sky-mobile-standard-signed-release` y verificar la suma SHA-256.
+   Validar en un celular real el comportamiento y cualquier advertencia
+   de Play Protect antes de distribuir la app.
+
+La firma del APK release es distinta de la firma debug. Android no
+permite actualizar in situ cuando cambian los certificados. Preparar
+copia de notas y revinculación antes de considerar desinstalar una
+versión configurada. La prueba CI con certificado desechable jamás se
+distribuye; sirve exclusivamente para comprobar el proceso de firma.

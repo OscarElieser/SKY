@@ -80,6 +80,24 @@ jobs:
             exit 1
           fi
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+      - name: Verify release signing with a disposable CI key (never distributed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_key="$RUNNER_TEMP/sky-ci-throwaway.p12"
+          keytool -genkeypair -noprompt -keystore "$temp_key" -storetype PKCS12 \
+            -alias sky-ci -keyalg RSA -keysize 3072 -validity 1 \
+            -dname "CN=SKY Android CI, OU=Tests, O=SKY" \
+            -storepass ci-only-pass123 -keypass ci-only-pass123
+          export SKY_ANDROID_RELEASE_KEYSTORE="$temp_key"
+          export SKY_ANDROID_RELEASE_STORE_PASSWORD="ci-only-pass123"
+          export SKY_ANDROID_RELEASE_KEY_ALIAS="sky-ci"
+          export SKY_ANDROID_RELEASE_KEY_PASSWORD="ci-only-pass123"
+          export SKY_ANDROID_REQUIRE_SIGNED_RELEASE="true"
+          gradle -p mobile/android-agent :app:assembleStandardRelease --no-daemon
+          signed_apk="mobile/android-agent/app/build/outputs/apk/standard/release/app-standard-release.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$signed_apk"
+          rm -f "$temp_key"
       - name: Stage SKY Android APK in its isolated folder
         shell: bash
         run: |

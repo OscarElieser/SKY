@@ -37,3 +37,8 @@ mobile/**/build/
 # Node dependencies and binary installers
 node_modules/
 *.exe
+
+# Android release signing keys must never be committed
+*.jks
+*.keystore
+*.p12
