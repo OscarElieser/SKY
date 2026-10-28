@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Separate experimental build only. Requires a deliberate user opt-in.
+             Do not distribute as the standard SKY Android APK. -->
+        <service android:name=".SkyTextAssistService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"
+            android:label="SKY · Escritura asistida">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice"
+                android:resource="@xml/sky_text_assist_config" />
+        </service>
+    </application>
+</manifest>
