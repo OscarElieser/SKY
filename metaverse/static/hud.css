@@ -357,3 +357,16 @@ body.sky-cinematic{background:
   background:#06384b;border:1px solid #2183a0;border-radius:5px;
   color:#ecfbff;font-size:12px;letter-spacing:0;text-decoration:none;
 }
+
+/* YouTube necesita superficie mínima de video: no usar la miniventana 360x245.
+   Solo se amplía el reproductor; chat, herramientas y otras ventanas siguen igual.
+   La proporción recomendada por YouTube es 480x270 como mínimo práctico. */
+.sky-cinematic .win[data-id="player"].mini{
+  width:min(540px, calc(100vw - 32px))!important;
+  height:min(365px, calc(100vh - 88px))!important;
+  min-width: min(480px, calc(100vw - 32px));
+  min-height: min(320px, calc(100vh - 88px));
+}
+.sky-cinematic .win[data-id="player"].mini iframe{
+  min-height: min(270px, calc(100vh - 142px));
+}
