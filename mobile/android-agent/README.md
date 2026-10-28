@@ -1,4 +1,27 @@
 # SKY IA Android 0.6 — modo independiente (prueba personal)
+## SKY Android 0.7.0 · Aura Premium (solo teléfono)
+
+- Rostro de SKY rediseñado en Canvas vectorial vertical 360×590:
+  ocupa casi toda la altura útil, con fondo aurora, facciones grandes,
+  iris expresivos, animaciones de parpadeo, rubor, boca al hablar,
+  luces según el estado de voz y gestos táctiles amistosos.
+- Se conserva el personaje dibujado (no hay imagen estática ni carcasa
+  robótica) y se respetan las capacidades de Android sin tocar Windows.
+- Cabecera compacta, estado visible de escuchar/pensar/hablar y
+  controles de chat, voz y detener con estilo premium.
+- La respuesta a comandos hablados no abre automáticamente el chat
+  encima del rostro. Por texto sí se mantiene el historial completo.
+- Ajustes: **Conversación fluida** voluntaria, primer plano, hasta
+  8 turnos consecutivos. Después se pausa. Se detiene al salir de la
+  aplicación o al presionar Detener. Sin micrófono encubierto.
+- Se compensa la barra de navegación real con WindowInsets en Android
+  15/16 para que los botones inferiores no queden tapados.
+- La voz utiliza los motores SpeechRecognizer/TextToSpeech disponibles
+  en el teléfono y Gemini si está activado. No es una voz neuronal
+  personalizada ni una escucha permanente en segundo plano.
+- Se conservan acciones locales, permisos, perfil personal,
+  firmas de APK y el backend opcional sin cambiar SKY Windows.
+
 ## SKY Android 0.6.3 — aceptar claves de autorización de Google
 
 Google AI Studio emite **auth keys**, no solo claves antiguas con el

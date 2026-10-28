@@ -40,6 +40,7 @@ class MainActivity : Activity() {
     private lateinit var privateConsent: CheckBox
     private val chatHistory = JSONArray()
     @Volatile private var chatPending = false
+    @Volatile private var voiceReplyOnFace = false
     @Volatile private var pendingCommand: String? = null
     @Volatile private var polling = false
     private var visible = false
@@ -78,12 +79,17 @@ class MainActivity : Activity() {
             android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        window.navigationBarColor = android.graphics.Color.rgb(7, 11, 32)
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            window.isNavigationBarContrastEnforced = false
+        }
         tokens = PrivateTokenStore(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
             if (!processLocalPanelCommand(transcript, spoken = true) &&
                 !processCompanionCommand(transcript) &&
                 !processDailyCommand(transcript)) {
-                home.openChat()
+                // Keep the animated face visible during spoken conversation.
+                voiceReplyOnFace = true
                 chatInput.setText(transcript)
                 if (!tokens.cloudEnabled() && tokens.chatToken().isEmpty()) {
                     voicePanel.showError("Activá el chat seguro en Ajustes.")
@@ -130,6 +136,14 @@ class MainActivity : Activity() {
             voicePanel.speakReply(message)
         }
         setContentView(home.root)
+        home.root.setOnApplyWindowInsetsListener { _, insets ->
+            val bottom = if (android.os.Build.VERSION.SDK_INT >= 30) {
+                insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+            } else @Suppress("DEPRECATION") insets.systemWindowInsetBottom
+            home.applyNavigationInset(bottom)
+            insets
+        }
+        home.root.requestApplyInsets()
         refreshConnection()
         if (tokens.token().isEmpty() && !tokens.cloudEnabled()) {
             home.root.post { if (!isFinishing) showSettings() }
@@ -191,7 +205,9 @@ class MainActivity : Activity() {
             "Escritura asistida conectada: " +
                 if (SkyTextAssistService.enabled()) "Sí" else "No",
             "Vinculación SKY Core: " + if (tokens.token().isNotEmpty()) "Configurada" else "Pendiente",
-            "Chat: " + if (tokens.chatToken().isNotEmpty()) "Token almacenado" else "Sin autorizar"
+            "Chat: " + if (tokens.cloudEnabled()) "Gemini Android activo" else
+                if (tokens.chatToken().isNotEmpty()) "Token almacenado" else "Sin autorizar",
+            "Conversación fluida: " + if (voicePanel.isConversationModeEnabled()) "Activada" else "Desactivada"
         ).joinToString("\n")
         AlertDialog.Builder(this)
             .setTitle("SKY · Autodiagnóstico Android")
@@ -455,6 +471,16 @@ class MainActivity : Activity() {
             })
         }
         content.addView(CheckBox(this).apply {
+            text = "Conversación fluida (solo con SKY abierta · máximo 8 turnos)"
+            isChecked = voicePanel.isConversationModeEnabled()
+            setOnCheckedChangeListener { _, enabled ->
+                voicePanel.setConversationMode(enabled)
+                home.showMessage(if (enabled)
+                    "Conversación fluida activada. Tocá HABLAR para comenzar."
+                    else "Conversación fluida desactivada.")
+            }
+        })
+        content.addView(CheckBox(this).apply {
             text = "SKY responde con voz"
             isChecked = voicePanel.isVoiceEnabled()
             setOnCheckedChangeListener { _, enabled ->
@@ -475,6 +501,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         visible = true
+        if (::voicePanel.isInitialized) voicePanel.onEnterForeground()
         companionController.onResume()
         handler.post(pollLoop)
     }
@@ -660,7 +687,9 @@ class MainActivity : Activity() {
                 while (chatHistory.length() > 8) chatHistory.remove(0)
                 runOnUiThread {
                     chatInput.setText("")
-                    home.addExchange(message, answer, provider)
+                    val keepFace = voiceReplyOnFace
+                    voiceReplyOnFace = false
+                    home.addExchange(message, answer, provider, revealPanel = !keepFace)
                     voicePanel.speakReply(answer)
                 }
             } catch (error: Exception) {
@@ -686,6 +715,7 @@ class MainActivity : Activity() {
                     }
                 }
             } finally {
+                voiceReplyOnFace = false
                 chatPending = false
             }
         }

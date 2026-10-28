@@ -47,6 +47,18 @@ class SkyEyeVoicePanel(
     private var speechEngine: TextToSpeech? = null
     private var speechReady = false
     private var listening = false
+    /** Explicitly enabled, foreground-only voice turn taking. */
+    private var fluidConversation = false
+    private var foreground = false
+    private var continuousTurns = 0
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val resumeListening = Runnable {
+        if (foreground && fluidConversation && !listening && continuousTurns < 8) {
+            continuousTurns++
+            listenAutomatic()
+        }
+    }
+    var onVisualStatusChanged: ((String) -> Unit)? = null
 
     init {
         orientation = VERTICAL
@@ -120,7 +132,16 @@ class SkyEyeVoicePanel(
                 host.runOnUiThread { setMode(EyeMode.SPEAKING, "SKY está hablando…") }
             }
             override fun onDone(utteranceId: String) {
-                host.runOnUiThread { setMode(EyeMode.IDLE, "SKY lista para escucharte.") }
+                host.runOnUiThread {
+                    setMode(EyeMode.IDLE, "SKY lista para escucharte.")
+                    if (fluidConversation && foreground && continuousTurns < 8) {
+                        handler.removeCallbacks(resumeListening)
+                        handler.postDelayed(resumeListening, 650L)
+                    } else if (fluidConversation && continuousTurns >= 8) {
+                        setConversationMode(false)
+                        setMode(EyeMode.IDLE, "Conversación pausada · tocá HABLAR.")
+                    }
+                }
             }
             override fun onError(utteranceId: String) {
                 host.runOnUiThread { setMode(EyeMode.ERROR, "No fue posible reproducir la voz.") }
@@ -182,6 +203,30 @@ class SkyEyeVoicePanel(
     private fun setMode(mode: EyeMode, label: String) {
         eye.mode = mode.name
         message.text = label
+        onVisualStatusChanged?.invoke(when (mode) {
+            EyeMode.LISTENING -> "● TE ESTOY ESCUCHANDO"
+            EyeMode.THINKING -> "✦ UN MOMENTO, ESTOY PENSANDO"
+            EyeMode.SPEAKING -> "♫ SKY ESTÁ HABLANDO"
+            EyeMode.ERROR -> "REVISÁ EL AVISO DE SKY"
+            EyeMode.IDLE -> "SKY ESTÁ AQUÍ · TOCÁ PARA HABLAR"
+        })
+    }
+
+    fun isConversationModeEnabled() = fluidConversation
+
+    /** User opt-in only; never records in the background. */
+    fun setConversationMode(enabled: Boolean) {
+        fluidConversation = enabled
+        continuousTurns = 0
+        handler.removeCallbacks(resumeListening)
+    }
+
+    fun onEnterForeground() {
+        foreground = true
+    }
+
+    private fun listenAutomatic() {
+        if (foreground && fluidConversation) listen(auto = true)
     }
 
     fun express(message: String) {
@@ -226,7 +271,9 @@ class SkyEyeVoicePanel(
         }
     }
 
-    fun listen() {
+    fun listen(auto: Boolean = false) {
+        handler.removeCallbacks(resumeListening)
+        if (!auto) continuousTurns = 0
         if (host.checkSelfPermission(Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED) {
             host.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MICROPHONE_REQUEST)
@@ -264,6 +311,7 @@ class SkyEyeVoicePanel(
                     setMode(EyeMode.THINKING, "Interpretando lo que dijiste…")
                 }
                 override fun onError(error: Int) {
+                    handler.removeCallbacks(resumeListening)
                     listening = false
                     setMode(EyeMode.ERROR, "No pude escucharte bien. Tocá Hablar para intentar otra vez.")
                 }
@@ -306,6 +354,7 @@ class SkyEyeVoicePanel(
     }
 
     fun stop() {
+        setConversationMode(false)
         listening = false
         recognizer?.cancel()
         speechEngine?.stop()
@@ -313,6 +362,9 @@ class SkyEyeVoicePanel(
     }
 
     fun onPausePanel() {
+        foreground = false
+        setConversationMode(false)
+        handler.removeCallbacks(resumeListening)
         if (listening) {
             listening = false
             recognizer?.cancel()
@@ -321,6 +373,7 @@ class SkyEyeVoicePanel(
     }
 
     fun close() {
+        handler.removeCallbacks(resumeListening)
         recognizer?.destroy()
         recognizer = null
         speechEngine?.stop()

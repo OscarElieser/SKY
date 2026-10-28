@@ -34,7 +34,13 @@ class SkyMobileHome(
     private val white = Color.WHITE
     private val soft = Color.rgb(202, 208, 233)
     private val cyan = Color.rgb(132, 215, 245)
-    private val violet = Color.rgb(117, 95, 229)
+    private val violet = Color.rgb(125, 98, 245)
+    private lateinit var mainSurface: LinearLayout
+    private val faceCaption = text("SKY ESTÁ AQUÍ · TOCÁ PARA HABLAR", 12f, Color.rgb(207, 200, 252)).apply {
+        gravity = Gravity.CENTER
+        letterSpacing = 0.07f
+        contentDescription = "Estado actual de SKY"
+    }
     private val history = ArrayList<String>()
     private var activeModule = ""
     private var expandedHistory = false
@@ -118,7 +124,10 @@ class SkyMobileHome(
     }
     private val panel = LinearLayout(host).apply {
         orientation = LinearLayout.VERTICAL
-        background = bg(Color.rgb(28, 30, 74), 28)
+        background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.rgb(35, 30, 87), Color.rgb(15, 20, 59))).apply {
+            cornerRadius = dp(28).toFloat()
+        }
         setPadding(dp(17), dp(12), dp(17), dp(16))
         isClickable = true
         elevation = dp(12).toFloat()
@@ -139,53 +148,69 @@ class SkyMobileHome(
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.rgb(10, 16, 42), Color.rgb(26, 29, 75),
-                    Color.rgb(19, 37, 77))
+                intArrayOf(Color.rgb(7, 11, 32), Color.rgb(21, 18, 61),
+                    Color.rgb(13, 31, 67))
             )
-            setPadding(dp(18), dp(12), dp(18), dp(14))
+            setPadding(dp(12), dp(10), dp(12), dp(18))
         }
+        mainSurface = main
         root.addView(main, FrameLayout.LayoutParams(-1, -1))
+        voicePanel.onVisualStatusChanged = { label -> faceCaption.text = label }
         val header = LinearLayout(host).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        header.addView(text("SKY", 24f, white).apply {
+        val brand = LinearLayout(host).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        brand.addView(text("SKY", 27f, white).apply {
             typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
-            letterSpacing = 0.06f
-        }, LinearLayout.LayoutParams(0, dp(48), 1f))
-        header.addView(connected, LinearLayout.LayoutParams(dp(24), dp(48)))
-        header.addView(pill("⚙", Color.rgb(52, 55, 107), onSettings).apply {
-            contentDescription = "Abrir ajustes y vinculación de SKY"
-            textSize = 23f
-        }, LinearLayout.LayoutParams(dp(48), dp(44)))
+            letterSpacing = 0.075f
+        })
+        brand.addView(text("INTELIGENCIA PERSONAL", 9.5f, Color.rgb(175, 171, 220)).apply {
+            letterSpacing = 0.12f
+        })
+        header.addView(brand, LinearLayout.LayoutParams(0, dp(58), 1f))
+        header.addView(connected, LinearLayout.LayoutParams(dp(25), dp(54)))
+        header.addView(pill("⚙", Color.rgb(55, 48, 115), onSettings).apply {
+            contentDescription = "Abrir ajustes y permisos de SKY Android"
+            textSize = 22f
+        }, LinearLayout.LayoutParams(dp(49), dp(48)))
         main.addView(header)
 
         // El personaje ocupa la pantalla. No se muestran explicaciones largas,
         // botones técnicos, tarjetas ni módulos hasta una orden expresa.
         voicePanel.setMinimalFace()
         main.addView(voicePanel, LinearLayout.LayoutParams(-1, 0, 1f))
-        main.addView(text("SKY", 14f, soft).apply {
-            gravity = Gravity.CENTER
-            letterSpacing = 0.2f
-        }, LinearLayout.LayoutParams(-1, dp(30)))
+        main.addView(faceCaption, LinearLayout.LayoutParams(-1, dp(36)))
 
         val actions = LinearLayout(host).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        actions.addView(pill("⌨", Color.rgb(58, 62, 119)) { openChat() }.apply {
+        actions.addView(pill("⌨", Color.rgb(42, 43, 95)) { openChat() }.apply {
             textSize = 23f
-            contentDescription = "Abrir panel de conversación"
-        }, LinearLayout.LayoutParams(dp(60), dp(56)).apply { rightMargin = dp(14) })
-        actions.addView(pill("🎙  Hablar", violet) { voicePanel.listen() }.apply {
-            contentDescription = "Hablar con SKY por voz"
+            contentDescription = "Abrir conversación por texto"
+        }, LinearLayout.LayoutParams(dp(56), dp(56)).apply { rightMargin = dp(9) })
+        actions.addView(pill("🎙  HABLAR", violet) { voicePanel.listen() }.apply {
+            textSize = 16f
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            contentDescription = "Activar micrófono para hablar con SKY"
         }, LinearLayout.LayoutParams(0, dp(56), 1f))
-        actions.addView(pill("■", Color.rgb(58, 62, 119)) { voicePanel.stop() }.apply {
-            textSize = 20f
-            contentDescription = "Detener voz de SKY"
-        }, LinearLayout.LayoutParams(dp(60), dp(56)).apply { leftMargin = dp(14) })
+        actions.addView(pill("■", Color.rgb(42, 43, 95)) { voicePanel.stop() }.apply {
+            textSize = 18f
+            contentDescription = "Detener la escucha y la voz"
+        }, LinearLayout.LayoutParams(dp(56), dp(56)).apply { leftMargin = dp(9) })
         main.addView(actions)
         buildPanel()
+    }
+
+    /** Avoid Android 15/16 three-button navigation overlap without hiding system controls. */
+    fun applyNavigationInset(bottomPx: Int) {
+        if (!::mainSurface.isInitialized) return
+        mainSurface.setPadding(dp(12), dp(10), dp(12),
+            maxOf(dp(18), bottomPx + dp(9)))
     }
 
     private fun buildPanel() {
@@ -300,11 +325,11 @@ class SkyMobileHome(
         }
     }
 
-    fun addExchange(question: String, answer: String, engine: String) {
+    fun addExchange(question: String, answer: String, engine: String, revealPanel: Boolean = true) {
         history.add("Vos: " + question.take(350) + "\n\nSKY: " + answer.take(2500))
         if (history.size > 20) history.removeAt(0)
         val entries = if (expandedHistory) history.takeLast(8) else history.takeLast(3)
         chatOutput.text = entries.joinToString("\n\n────────────\n\n")
-        if (!isPanelOpen()) openChat()
+        if (revealPanel && !isPanelOpen()) openChat()
     }
 }
