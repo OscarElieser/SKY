@@ -219,6 +219,58 @@ async function webhook(req: Request) {
   // Verified delivery only. No logging personal message bodies, no automated replies.
   return json({ received: true });
 }
+
+/** Temporary pairing via owner-authorized CLI; mobile receives only revocable credential. */
+const pairCode = () => Array.from(crypto.getRandomValues(new Uint8Array(9)), x => x.toString(16).padStart(2,"0")).join("");
+async function pairCreate() {
+  const code = pairCode();
+  await database("sky_instagram_pairing_codes","POST","",{
+    code_hash: await digest(code),
+    expires_at: new Date(Date.now()+10*60*1000).toISOString()
+  },"return=minimal");
+  return json({pairing_code:code,expires_in_seconds:600});
+}
+async function pairClaim(req: Request) {
+  const data = await req.json() as Json;
+  const code = typeof data.code === "string" ? data.code.trim() : "";
+  if(!/^[0-9a-f]{18}$/.test(code))return json({error:"invalid_code"},400);
+  const q = new URLSearchParams({code_hash:"eq."+await digest(code),
+    claimed_at:"is.null",expires_at:"gt."+new Date().toISOString()});
+  const rows = await database("sky_instagram_pairing_codes","PATCH","?"+q.toString(),
+    {claimed_at:new Date().toISOString()},"return=representation");
+  if(!Array.isArray(rows)||rows.length!==1)return json({error:"invalid_or_expired_code"},403);
+  const raw = b64(crypto.getRandomValues(new Uint8Array(32)))
+    .replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/g,"");
+  await database("sky_instagram_mobile_devices","POST","",{
+    token_hash:await digest(raw),device_label:"SKY Android",
+    expires_at:new Date(Date.now()+30*24*60*60*1000).toISOString()
+  },"return=minimal");
+  return json({device_token:raw,expires_in_seconds:2592000});
+}
+async function mobileAuthorized(req:Request):Promise<boolean> {
+  const h=req.headers.get("authorization")||"";
+  if(!h.startsWith("Bearer "))return false;
+  const token=h.slice(7);
+  if(!/^[A-Za-z0-9_-]{43}$/.test(token))return false;
+  const f=new URLSearchParams({token_hash:"eq."+await digest(token),
+    revoked_at:"is.null",expires_at:"gt."+new Date().toISOString()});
+  const records=await database("sky_instagram_mobile_devices","GET","?"+f.toString()+"&select=token_hash");
+  return Array.isArray(records)&&records.length===1;
+}
+async function mobileStatus() {
+  const record=await database("sky_instagram_connections","GET",
+    "?id=eq.owner&select=verified_at,token_expires_at,scopes");
+  const found=Array.isArray(record)&&record.length?record[0]:null;
+  return json({authorized:!!found,profile_verified:false,connection:found});
+}
+async function mobileRevoke(req:Request) {
+  const token=(req.headers.get("authorization")||"").slice(7);
+  const query=new URLSearchParams({token_hash:"eq."+await digest(token)});
+  await database("sky_instagram_mobile_devices","PATCH","?"+query.toString(),
+    {revoked_at:new Date().toISOString()},"return=minimal");
+  return json({disconnected:true});
+}
+
 Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
@@ -228,8 +280,18 @@ Deno.serve(async (req: Request) => {
     }
     if (path === "callback" && req.method === "GET") return await oauthCallback(req);
     if (path === "webhook") return await webhook(req);
+    if (path === "pair-claim" && req.method === "POST") return await pairClaim(req);
+    if (path === "mobile-status" && req.method === "GET") {
+      if (!(await mobileAuthorized(req)))return json({error:"unauthorized"},401);
+      return await mobileStatus();
+    }
+    if (path === "mobile-disconnect" && req.method === "POST") {
+      if (!(await mobileAuthorized(req)))return json({error:"unauthorized"},401);
+      return await mobileRevoke(req);
+    }
     // All owner actions require a strong secret, including the start request.
     if (!(await owner(req))) return json({ error: "unauthorized" }, 401);
+    if (path === "pair-create" && req.method === "POST") return await pairCreate();
     if (path === "start" && req.method === "POST") return await start();
     if (path === "status" && req.method === "GET") return await status();
     if (path === "disconnect" && req.method === "POST") return await disconnect();
