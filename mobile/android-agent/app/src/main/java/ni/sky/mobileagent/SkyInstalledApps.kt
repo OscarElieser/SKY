@@ -22,6 +22,10 @@ class SkyInstalledApps(
     private val activity: Activity,
     private val say: (String) -> Unit
 ) {
+    private val trusted = activity.getSharedPreferences(
+        "sky_trusted_launcher_apps", android.content.Context.MODE_PRIVATE
+    )
+
     data class Launchable(
         val name: String,
         val packageName: String,
@@ -56,7 +60,11 @@ class SkyInstalledApps(
         when (available.size) {
             0 -> say("No encontré «" + query.take(65) +
                 "» entre las aplicaciones visibles. Podés revisar el catálogo en Ajustes.")
-            1 -> confirm(available.first())
+            1 -> {
+                val app = available.first()
+                if (trusted.getBoolean(app.packageName, false)) launchDirect(app)
+                else confirm(app)
+            }
             else -> {
                 AlertDialog.Builder(activity)
                     .setTitle("SKY · ¿Cuál aplicación?")
@@ -148,7 +156,8 @@ class SkyInstalledApps(
             }.take(100)
             for (app in results) {
                 val row = TextView(activity).apply {
-                    text = app.name
+                    text = (if (trusted.getBoolean(app.packageName, false)) "★ " else "") +
+                        app.name
                     textSize = 16f
                     setTextColor(Color.rgb(40, 45, 90))
                     setPadding(20, 18, 20, 18)
@@ -172,31 +181,46 @@ class SkyInstalledApps(
     }
 
     private fun confirm(app: Launchable) {
+        val isTrusted = trusted.getBoolean(app.packageName, false)
         AlertDialog.Builder(activity)
             .setTitle("SKY · " + app.name)
-            .setMessage("¿Abrir esta aplicación en tu teléfono?\n\n" +
-                "SKY no recibe acceso al contenido ni a sus cuentas por abrirla.")
-            .setPositiveButton("Abrir") { _, _ ->
-                try {
-                    // Volver a consultar antes de ejecutar: puede desinstalarse.
-                    val current = discover().firstOrNull {
-                        it.packageName == app.packageName && it.className == app.className
-                    }
-                    if (current == null) {
-                        say("La aplicación ya no aparece instalada o visible.")
-                    } else {
-                        val launchIntent = Intent(Intent.ACTION_MAIN)
-                            .addCategory(Intent.CATEGORY_LAUNCHER)
-                            .setComponent(ComponentName(current.packageName, current.className))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        activity.startActivity(launchIntent)
-                        say("Envié a Android la solicitud para abrir " + current.name + ".")
-                    }
-                } catch (_: Exception) {
-                    say("Android no permitió abrir " + app.name + ".")
+            .setMessage("¿Abrir esta aplicación?\n\n" +
+                "Podés confiar en ella para que SKY la abra directamente " +
+                "cuando VOS lo ordenés por voz o chat. " +
+                "Confiar no autoriza leer contenido, escribir ni publicar.")
+            .setPositiveButton("Abrir esta vez") { _, _ -> launchDirect(app) }
+            .setNeutralButton(if (isTrusted) "Quitar confianza" else "Confiar y abrir") { _, _ ->
+                if (isTrusted) {
+                    trusted.edit().remove(app.packageName).apply()
+                    say("SKY pedirá confirmación nuevamente para " + app.name + ".")
+                } else {
+                    trusted.edit().putBoolean(app.packageName, true).apply()
+                    launchDirect(app)
                 }
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    private fun launchDirect(app: Launchable) {
+        try {
+            // Revalidación necesaria: el catálogo es dinámico.
+            val current = discover().firstOrNull {
+                it.packageName == app.packageName && it.className == app.className
+            }
+            if (current == null) {
+                trusted.edit().remove(app.packageName).apply()
+                say("Esta aplicación ya no aparece instalada o visible.")
+                return
+            }
+            val launchIntent = Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_LAUNCHER)
+                .setComponent(ComponentName(current.packageName, current.className))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(launchIntent)
+            say("Android recibió la orden para abrir " + current.name + ".")
+        } catch (_: Exception) {
+            say("Android no permitió abrir " + app.name + ".")
+        }
     }
 }
