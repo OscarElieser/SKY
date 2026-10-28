@@ -11,9 +11,9 @@
         <package android:name="com.google.android.gm" />
     </queries>
     <application android:allowBackup="false" android:usesCleartextTraffic="false"
-        android:label="SKY Mobile Agent"
+        android:label="SKY IA"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
