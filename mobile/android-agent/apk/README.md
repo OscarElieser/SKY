@@ -1,4 +1,39 @@
-# SKY IA — APK Android (distribución separada)
+# SKY Android — descargar, verificar e instalar la APK 0.7.1
+
+**Última beta personal publicada:** SKY Aura Premium **0.7.1**. El código de Android vive en [`mobile/android-agent/`](../); **no modifica SKY Windows**.
+
+[**⬇ Descarga directa firmada (.apk)**](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.7.1/SKY-IA-Android-v0.7.1-firmada.apk) · [Página de la Release](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.7.1) · [Instrucciones del teléfono](../README.md)
+
+**Datos verificados en GitHub (Release 0.7.1):**
+- Archivo: `SKY-IA-Android-v0.7.1-firmada.apk`
+- Tamaño: 706405 bytes · Android `versionCode=12` · variante `standard`.
+- SHA-256: `73ab848a8f5c74367d78199b86bc1e765c338f7fe951d237b07853fb363c28cf`
+- [Archivo SHA-256 publicado](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.7.1/SKY-IA-Android-v0.7.1-firmada.apk.sha256)
+- La firma y el manifiesto de la variante estándar se verifican antes de publicar. **Esto no implica certificación de Google Play ni pruebas completas en un dispositivo real.**
+
+## Instalación desde Samsung Android
+
+1. Abrí la **página de Releases** en Chrome, desplegá **Assets** y elegí `SKY-IA-Android-v0.7.1-firmada.apk`. No hace falta extraer ZIP ni descargar artefactos de GitHub Actions.
+2. Abrí el APK desde **Mis archivos → Descargas**. Si ya tenés SKY firmada con la misma clave, instalá encima sin desinstalar.
+3. Si Android indica `App not installed`, puede haber incompatibilidad de firma. **No desinstalés ni borres datos** sin respaldo. Revisá versión, origen y huella del certificado.
+4. Si Google Play Protect bloquea o advierte sobre un riesgo, **no lo desactives ni forces la instalación**. Guardá el mensaje exacto para revisar la seguridad y el canal de distribución.
+5. Abrí SKY → Ajustes; el modo de Gemini funciona por internet independientemente de Windows. La clave se introduce **solo en el teléfono** y no debe enviarse por chats o GitHub.
+
+## Cómo se publica cada APK
+
+- [Workflow firmado](../../../.github/workflows/sky-mobile-release.yml): `SKY Android Signed Release Candidate`, activado al cambiar `mobile/android-agent/**` en `main` o manualmente.
+- Ejecuta tests, compila `standardRelease`, comprueba paquete, firma, ausencia del servicio de accesibilidad y genera SHA-256/huella de certificado.
+- Publica `sky-mobile-standard-signed-release` en Actions y, tras las comprobaciones, crea una **prerelease** con APK directa y archivo SHA-256 en [GitHub Releases](https://github.com/OscarElieser/SKY/releases).
+- La clave privada de firma vive en **GitHub Actions Secrets**; no se versiona. No reutilizar una versión para publicar otra compilación distinta: aumentar `versionName`/`versionCode`.
+- Los artefactos `debug` son para desarrollo y pueden tener firmas diferentes: **no deben instalarse encima de una APK release existente**.
+- La variante `standard` no incluye servicio de Accesibilidad; las capacidades asistidas más amplias requieren revisión de permisos y una distribución separada.
+
+---
+
+## Documentación histórica de compilaciones anteriores
+
+Las secciones siguientes se conservan como referencia del proceso inicial.
+**Para descargar o actualizar hoy, usá la guía 0.7.1 anterior.**
 
 Esta carpeta pertenece **únicamente a la aplicación nativa Android** de SKY.
 No contiene el ejecutable de Windows, ni el núcleo Python, ni las credenciales

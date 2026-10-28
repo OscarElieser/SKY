@@ -17,23 +17,30 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 ---
 
 
-## 📱 SKY Android — APK separada, núcleo compartido
+## 📱 SKY Android — Aura Premium 0.7.1 (independiente de Windows)
 
-El código del celular se mantiene independiente en
-[mobile/android-agent/](mobile/android-agent/), y la carpeta exclusiva para
-distribuir las APK es [mobile/android-agent/apk/](mobile/android-agent/apk/).
-El workflow [SKY Mobile Android Agent](.github/workflows/sky-mobile-agent.yml)
-compila la APK desde `main`, calcula un SHA-256 y publica ambos como
-**artefactos de GitHub Actions**; no agrega binarios debug al código fuente.
+**Versión móvil publicada:** `0.7.1` · **Estado:** beta personal, compilación Android y firma verificadas en GitHub Actions; las funciones de voz, visualización y acciones locales deben probarse en el teléfono real.
 
-Windows y Android **comparten SKY Core y la API propia**, pero conservan
-permisos e interfaces específicos. El teléfono necesita emparejamiento
-HTTPS privado y autorización de chat; no ejecuta automáticamente todas
-las capacidades locales de Windows.
+**[⬇ Descargar SKY Android 0.7.1 (APK firmada)](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.7.1/SKY-IA-Android-v0.7.1-firmada.apk)** · [Página de la versión](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.7.1) · [Notas e instalación Android](mobile/android-agent/README.md) · [Guía de APK y verificación](mobile/android-agent/apk/README.md)
 
-[Arquitectura Windows + Android](docs/SKY_PC_ANDROID_ARQUITECTURA.md) ·
-[Instrucciones de APK y actualización](mobile/android-agent/apk/README.md) ·
-[Compilaciones Android](https://github.com/OscarElieser/SKY/actions/workflows/sky-mobile-agent.yml)
+La app Android vive en [`mobile/android-agent/`](mobile/android-agent/), tiene su propio código Kotlin y **funciona sin SKY Windows, sin Tailscale y sin emparejamiento** para la conversación mediante Gemini. Windows se mantiene como conexión **opcional** y no se inicia, modifica ni configura al utilizar el modo móvil independiente.
+
+### Experiencia móvil integrada
+
+- **SKY Aura Premium:** rostro vertical animado, ojos expresivos, gestos táctiles, brillo suave y estados visuales de escuchar, pensar, hablar y error.
+- **Conversación natural por turnos:** dictado del reconocimiento de voz de Android y respuestas reproducidas por TextToSpeech; se prefiere una voz española instalada de mejor calidad cuando existe. No equivale a voz neuronal propia.
+- **Rostro a la vista:** una conversación iniciada por voz no abre automáticamente el panel de texto; el historial escrito permanece disponible al solicitarlo.
+- **Modo fluido opcional:** hasta ocho turnos consecutivos en **primer plano**, con micrófono autorizado y parada manual. No constituye escucha continua oculta ni control en segundo plano.
+- **Acciones locales supervisadas:** abrir apps compatibles, notas, alarmas, temporizadores, modo acompañante, chistes y otras órdenes implementadas según permisos reales. No concede control universal de cualquier aplicación.
+- **IA por internet sin PC:** configuración de una clave personal de Gemini desde Ajustes para beta privada; SKY valida su acceso y la almacena cifrada con Android Keystore. No insertar ni enviar claves en GitHub, capturas, incidencias o chats.
+
+**Instalación:** abrir el enlace de la APK en Chrome desde Android, descargarla de GitHub Releases e instalarla encima de la anterior **solo si conserva el mismo certificado de firma**; no desinstalar sin respaldar los datos. Si Google Play Protect muestra una alerta de riesgo, **no forzar la instalación** y documentar el aviso. La beta no está certificada por Google Play.
+
+**Privacidad:** aunque Android Keystore cifra la clave en reposo, una clave API dentro de un cliente móvil no ofrece seguridad suficiente para una distribución pública. Antes del lanzamiento general será necesario un backend autenticado, control de cuota y medidas contra abuso. La app necesita internet para responder con Gemini; las acciones puramente locales pueden funcionar sin él.
+
+**Publicación y pruebas:** [SKY Android Signed Release Candidate](.github/workflows/sky-mobile-release.yml) compila, verifica firma/manifest, genera SHA-256 y publica las versiones aprobadas en [GitHub Releases](https://github.com/OscarElieser/SKY/releases). El workflow [SKY Mobile Android Agent](.github/workflows/sky-mobile-agent.yml) mantiene pruebas de desarrollo. Las APK no se almacenan como binarios en el árbol de código.
+
+---
 
 ## ✨ Capacidades del ecosistema
 
