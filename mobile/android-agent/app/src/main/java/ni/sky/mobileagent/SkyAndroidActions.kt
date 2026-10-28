@@ -33,6 +33,7 @@ class SkyAndroidActions(
             is SkyDailyCommandParser.Command.Note -> saveNote(action.value)
             is SkyDailyCommandParser.Command.Share -> share(action.app, action.value)
             SkyDailyCommandParser.Command.ShowNotes -> showNotes()
+            is SkyDailyCommandParser.Command.Unsupported -> feedback(action.reason)
         }
     }
 
