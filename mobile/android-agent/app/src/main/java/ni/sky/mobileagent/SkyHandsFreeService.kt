@@ -343,9 +343,8 @@ class SkyHandsFreeService : Service() {
                         suspendForSpeech()
                         callback.invoke(decision.command)
                     } else {
-                        awake = false
-                        handler.removeCallbacks(fallAsleep)
-                        notifyState("Orden pendiente: abrí SKY para continuar", decision.command)
+                        // Seguir aceptando órdenes hasta que termine la ventana
+                        // de 45 segundos; no exigir "SKY" después de cada turno.
                         handleWithoutVisibleUi(decision.command)
                     }
                 }
