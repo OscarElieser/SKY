@@ -124,5 +124,64 @@ class TestSkyAuction(unittest.TestCase):
             self.assertEqual(sky_ai_auction.en_espera(), {})
 
 
+    def test_local_rescue_added_after_two_cloud_attempts(self):
+        with patch.dict(os.environ, {"SKY_LOCAL_ONLY": "0", "SKY_AUCTION_MAX_ATTEMPTS": "2",
+                                     "SKY_AUCTION_LOCAL_FALLBACK": "1"}, clear=False), \
+             patch("neural_core.providers.provider_ready",
+                   side_effect=lambda p: p in ("openai", "gemini", "anthropic")), \
+             patch("neural_core.sky_ai_auction._ollama_disponible", return_value=True), \
+             patch("neural_core.sky_ai_auction._telemetria", return_value={}):
+            nombres = [x["proveedor"] for x in sky_ai_auction.candidatos_con_respaldo(
+                "investiga energia solar")]
+            self.assertEqual(nombres, ["gemini", "openai", "ollama"])
+
+    def test_local_rescue_opt_out_and_unavailable(self):
+        with patch.dict(os.environ, {"SKY_LOCAL_ONLY": "0", "SKY_AUCTION_MAX_ATTEMPTS": "1",
+                                     "SKY_AUCTION_LOCAL_FALLBACK": "0"}, clear=False), \
+             patch("neural_core.providers.provider_ready",
+                   side_effect=lambda p: p in ("gemini",)), \
+             patch("neural_core.sky_ai_auction._ollama_disponible", return_value=True), \
+             patch("neural_core.sky_ai_auction._telemetria", return_value={}):
+            self.assertEqual([x["proveedor"] for x in
+                              sky_ai_auction.candidatos_con_respaldo("investiga")],
+                             ["gemini"])
+        with patch.dict(os.environ, {"SKY_LOCAL_ONLY": "0", "SKY_AUCTION_MAX_ATTEMPTS": "1",
+                                     "SKY_AUCTION_LOCAL_FALLBACK": "1"}, clear=False), \
+             patch("neural_core.providers.provider_ready", side_effect=lambda p: p == "gemini"), \
+             patch("neural_core.sky_ai_auction._ollama_disponible", return_value=False), \
+             patch("neural_core.sky_ai_auction._telemetria", return_value={}):
+            self.assertEqual([x["proveedor"] for x in
+                              sky_ai_auction.candidatos_con_respaldo("investiga")],
+                             ["gemini"])
+
+    def test_cloud_failure_then_local_response_without_duplicate_action(self):
+        with patch.dict(os.environ, {"SKY_LOCAL_ONLY": "0", "SKY_CEREBRO": "subasta",
+                                     "SKY_AUCTION_MAX_ATTEMPTS": "1",
+                                     "SKY_AUCTION_LOCAL_FALLBACK": "1"}, clear=False), \
+             patch("neural_core.providers.provider_ready",
+                   side_effect=lambda p: p == "gemini"), \
+             patch("neural_core.sky_ai_auction._ollama_disponible", return_value=True), \
+             patch("neural_core.sky_ai_auction._telemetria", return_value={}), \
+             patch("neural_core.sky_cerebro._eventos_nube",
+                   return_value=iter([("error", "GEMINI HTTP 503")])) as nube, \
+             patch("neural_core.sky_cerebro._eventos",
+                   return_value=iter([("delta", "Respuesta local"), ("fin", "Respuesta local")])) as local, \
+             patch("neural_core.sky_metricas.registrar"):
+            sky_cerebro.preferir(None)
+            resultado = sky_cerebro.decidir("explica fotosintesis", modo="chat")
+            self.assertEqual(resultado, {"tipo": "texto", "mensaje": "Respuesta local"})
+            self.assertEqual(sky_cerebro.ultimo_proveedor(), "ollama")
+            self.assertEqual(nube.call_count, 1)
+            self.assertEqual(local.call_count, 1)
+
+    def test_private_request_uses_only_ollama(self):
+        with patch.dict(os.environ, {"SKY_LOCAL_ONLY": "0", "SKY_AUCTION_LOCAL_FALLBACK": "1"}, clear=False), \
+             patch("neural_core.sky_ai_auction._ollama_disponible", return_value=True), \
+             patch("neural_core.sky_ai_auction._telemetria", return_value={}):
+            nombres = [x["proveedor"] for x in
+                       sky_ai_auction.candidatos_con_respaldo("Mi PIN es 1234")]
+            self.assertEqual(nombres, ["ollama"])
+
+
 if __name__ == "__main__":
     unittest.main()

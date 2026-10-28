@@ -119,6 +119,33 @@ o ambos. En caso de error, `ultimo_proveedor()` indica el último
 proveedor **intentado**, no uno que respondiera correctamente.
 
 
+## Rescate gratuito en Ollama al agotar las API
+
+La subasta tiene una ruta local de respaldo **habilitada por defecto**:
+`SKY_AUCTION_LOCAL_FALLBACK=1`. Cuando fallan los proveedores externos
+dentro del límite de intentos, SKY consulta Ollama **una única vez**
+si está funcionando y tiene un modelo instalado. El rescate local no
+incrementa el consumo de API y no requiere subir
+`SKY_AUCTION_MAX_ATTEMPTS` a 7.
+
+Ejemplo: `SKY_AUCTION_MAX_ATTEMPTS=2` significa como máximo **dos**
+solicitudes a proveedores de pago, seguidas de **un** intento local
+si las dos fallan. Si la primera IA responde, no se consulta Ollama.
+Si Ollama está apagado o sin modelo, SKY informa el error real; no
+finge haber completado la tarea. Se mantiene la política de
+confirmación de acciones, y jamás se reenvían acciones ejecutadas.
+
+Para comprobarlo en Windows:
+
+```powershell
+ollama list
+& .\.venv\Scripts\python.exe -m unittest discover -s tests -p test_sky_ai_auction.py -v
+```
+
+El respaldo se puede desactivar con `SKY_AUCTION_LOCAL_FALLBACK=0`.
+Los errores externos siguen mostrando su código seguro sin incluir
+claves API ni conversaciones.
+
 ## Continuidad del servicio al fallar una API
 
 Con `SKY_AUCTION_MAX_ATTEMPTS=2` SKY intenta como máximo dos motores

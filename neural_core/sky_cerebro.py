@@ -439,8 +439,8 @@ def _decidir_subasta(texto: str, historial: list[dict] | None, modo: str) -> Ite
     No mezcla respuestas parciales de proveedores ni reenvía una orden a
     múltiples agentes. El permiso de cada acción sigue en la capa de dispositivo.
     """
-    from .sky_ai_auction import ofertas, max_intentos
-    propuestas = ofertas(texto, modo)[:max_intentos()]
+    from .sky_ai_auction import candidatos_con_respaldo
+    propuestas = candidatos_con_respaldo(texto, modo)
     if not propuestas:
         yield 'error', 'No hay un proveedor autorizado disponible para esta solicitud.'
         return
