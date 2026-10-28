@@ -17,22 +17,48 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 ---
 
 
-## 📱 SKY Android — Ojos & Voz 0.8.0
+## 📱 SKY Android — Ojos, Voz y Estudio Creativo (0.8.1)
 
-**SKY Android es independiente de Windows.** La beta móvil utiliza Gemini por internet para conversar y herramientas locales autorizadas para acciones reales del teléfono. Windows es opcional y este cambio no modifica sus módulos.
+**SKY Android funciona de forma independiente de SKY Windows** para
+conversaciones por Gemini y acciones locales autorizadas. El desarrollo
+Android no modifica los servicios del PC.
 
-[**⬇ Descargar SKY Android 0.8.0 (APK firmada)**](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.0/SKY-IA-Android-v0.8.0-firmada.apk) · [Release oficial](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.0) · [README móvil](mobile/android-agent/README.md) · [Instalación y verificación](mobile/android-agent/apk/README.md)
+[**SKY Android 0.8.1 — Releases**](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.1) ·
+[Descarga directa de APK firmada (solo tras aprobar CI)](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.1/SKY-IA-Android-v0.8.1-firmada.apk) ·
+[Guía móvil](mobile/android-agent/README.md) ·
+[Instalación y verificación](mobile/android-agent/apk/README.md)
 
-### Diseño y funciones móviles
+### Experiencia y herramientas Android
 
-- **Ojos & Boca:** sin máscara, sin silueta de cabeza, sin nariz ni mejillas. Dos ojos ovalados y boca animada sobre un fondo premium nocturno; expresiones y gestos mientras SKY escucha, piensa y habla.
-- **Voz interactiva:** reconocimiento de voz y síntesis TTS desde Android, con selección de voz española disponible. Conversación fluida optativa en primer plano, con límites y permisos de micrófono.
-- **Acciones locales:** reconocimiento de órdenes para abrir apps, notas, alarmas, temporizadores y búsqueda. Los permisos y confirmaciones dependen de cada aplicación.
-- **WhatsApp supervisado:** una orden como «SKY, abrí WhatsApp y mandá un mensaje a Ana: hola» abre una vista previa y, tras autorización, prepara el texto en WhatsApp. El usuario **elige el destinatario y pulsa Enviar**; SKY no lee conversaciones ni confirma envíos que no ha verificado.
-- **Chat Gemini independiente:** clave de pruebas introducida solo desde el teléfono, guardada cifrada con Android Keystore. Para distribución pública se requiere un backend seguro con autenticación y límites de cuota.
-- **APK firmada:** GitHub Actions ejecuta pruebas, verifica firma y manifiesto y publica versiones beta en Releases; la prueba en hardware real sigue siendo necesaria.
+- **Interfaz viva:** únicamente ojos y boca animados, sin máscara ni rostro;
+  estados visuales mientras SKY escucha, piensa y habla.
+- **Conversación:** voz mediante SpeechRecognizer/TextToSpeech, charla con
+  Gemini desde internet, escucha fluida opcional únicamente en primer plano.
+- **Acciones supervisadas:** abrir aplicaciones instaladas, alarmas, notas,
+  temporizadores, búsquedas y borradores de WhatsApp con confirmación
+  del propietario. SKY no envía mensajes a escondidas.
+- **SKY Estudio Creativo:** ideas, guiones, ganchos, subtítulos, descripciones,
+  cinco hashtags y planes de siete días para **TikTok, Instagram, Facebook,
+  YouTube, X, Threads, Snapchat, Pinterest y LinkedIn**.
+- **Creación sin cámara:** guiones con tomas propias, pantalla, subtítulos
+  y narración opcional; no requiere mostrar el rostro ni hablar ante cámara.
+- **Publicación supervisada:** borrador editable y menú de compartir oficial de
+  Android. Las aplicaciones receptoras deciden qué formatos aceptan; SKY
+  no afirma haber publicado. No usa bots, seguidores o likes falsos.
+- **Crecimiento real:** recomendaciones basadas en la información aportada
+  por el usuario. SKY todavía no tiene acceso automático a estadísticas,
+  cuentas sociales, tendencias actuales ni permisos OAuth de publicación.
 
-**Seguridad:** esta versión no instala control universal de aplicaciones ni envía mensajes de forma silenciosa. Si Play Protect muestra un bloqueo, no forzar la instalación. La APK nueva debe instalarse sobre la anterior con la misma firma para conservar los datos.
+**Estado:** versión 0.8.1 de código Android en `main`. La APK debe
+superar compilación, tests y firma antes de descargarse desde GitHub Releases,
+y se validará posteriormente en el Samsung. Conservá la instalación anterior
+hasta confirmar el nuevo paquete. Si Play Protect bloquea la instalación,
+no fuerces el proceso.
+
+**Seguridad:** la clave Gemini se configura y cifra en el teléfono para
+beta privada. La distribución pública exige migrar a un backend autenticado
+con cuotas y prevención de abuso; SKY no solicita contraseñas de redes
+sociales ni automatiza acciones sociales sin aprobación.
 
 ---
 
