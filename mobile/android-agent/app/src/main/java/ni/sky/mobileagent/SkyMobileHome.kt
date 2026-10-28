@@ -217,6 +217,9 @@ class SkyMobileHome(
         if (!::mainSurface.isInitialized) return
         mainSurface.setPadding(dp(12), dp(10), dp(12),
             maxOf(dp(18), bottomPx + dp(9)))
+        // Keep the chat composer and footer above Android's navigation bar.
+        panel.setPadding(dp(17), dp(12), dp(17),
+            maxOf(dp(18), bottomPx + dp(12)))
     }
 
     private fun buildPanel() {
