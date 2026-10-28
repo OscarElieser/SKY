@@ -300,6 +300,7 @@ class MainActivity : Activity() {
     }
 
     /** Camera is never running without the user opening Android's camera app. */
+    @Suppress("DEPRECATION")
     private fun startCameraReflection() {
         if (!tokens.cloudEnabled()) {
             home.showMessage("Activá Gemini en Ajustes para comentar una foto voluntaria.")
@@ -312,7 +313,6 @@ class MainActivity : Activity() {
                 "SKY no puede saber cómo te sentís por tu rostro: te preguntará.")
             .setPositiveButton("Abrir cámara") { _, _ ->
                 try {
-                    @Suppress("DEPRECATION")
                     startActivityForResult(android.content.Intent(
                         android.provider.MediaStore.ACTION_IMAGE_CAPTURE), photoRequest)
                 } catch (_: Exception) {
@@ -413,8 +413,16 @@ class MainActivity : Activity() {
         return true
     }
 
-    private fun processCompanionCommand(message: String): Boolean =
-        companionController.handle(message)
+    private fun processCompanionCommand(message: String): Boolean {
+        val normalized = message.trim().lowercase(java.util.Locale.ROOT)
+            .replace(Regex("""^sky[ ,.:!]*"""), "")
+        if (normalized in setOf("mirame", "mírame", "quiero que me veas",
+                "como me veo", "cómo me veo", "abrí la cámara", "abre la cámara")) {
+            startCameraReflection()
+            return true
+        }
+        return companionController.handle(message)
+    }
 
     /** Acción autorizada del teléfono, incluso si SKY Core está desconectado. */
     private fun processDailyCommand(message: String): Boolean {
@@ -695,9 +703,12 @@ class MainActivity : Activity() {
             })
         }
         content.addView(CheckBox(this).apply {
-            text = "Conversación fluida (solo con SKY abierta · máximo 8 turnos)"
-            isChecked = voicePanel.isConversationModeEnabled()
+            text = "Conversar sin decir SKY (solo con la app abierta · 8 turnos)"
+            isChecked = getSharedPreferences("sky_voice_settings", MODE_PRIVATE)
+                .getBoolean("fluid_opt_in", false)
             setOnCheckedChangeListener { _, enabled ->
+                getSharedPreferences("sky_voice_settings", MODE_PRIVATE)
+                    .edit().putBoolean("fluid_opt_in", enabled).apply()
                 voicePanel.setConversationMode(enabled)
                 home.showMessage(if (enabled)
                     "Conversación fluida activada. Tocá HABLAR para comenzar."
@@ -725,7 +736,11 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         visible = true
-        if (::voicePanel.isInitialized) voicePanel.onEnterForeground()
+        if (::voicePanel.isInitialized) {
+            voicePanel.onEnterForeground()
+            voicePanel.setConversationMode(getSharedPreferences(
+                "sky_voice_settings", MODE_PRIVATE).getBoolean("fluid_opt_in", false))
+        }
         companionController.onResume()
         handler.post(pollLoop)
     }
