@@ -12,16 +12,22 @@ PREGUNTA = "Explica en dos oraciones que es la fotosintesis."
 class TestVozProgresivaLocal(unittest.TestCase):
     def test_opt_in_y_privacidad(self):
         with patch.dict(os.environ, {"SKY_LOCAL_FAST_CONTEXT": "1",
-                                     "SKY_VOICE_STREAM_LOCAL": "0"}, clear=False):
+                                     "SKY_VOICE_STREAM_LOCAL": "0", "SKY_VOICE_PROVIDER": "auto"}, clear=False):
             self.assertFalse(voz.eligible(PREGUNTA))
         with patch.dict(os.environ, {"SKY_LOCAL_FAST_CONTEXT": "1",
-                                     "SKY_VOICE_STREAM_LOCAL": "1"}, clear=False):
+                                     "SKY_VOICE_STREAM_LOCAL": "1", "SKY_VOICE_PROVIDER": "auto"}, clear=False):
             self.assertTrue(voz.eligible(PREGUNTA))
             self.assertFalse(voz.eligible("Explica mi proyecto de SKY"))
             self.assertFalse(voz.eligible("Abre Word y crea un documento"))
             self.assertFalse(voz.eligible(PREGUNTA, [
                 {"role": "user", "content": "Contexto anterior"}
             ]))
+
+    def test_proveedor_cloud_explicito_no_se_sustituye_por_ollama(self):
+        with patch.dict(os.environ, {"SKY_LOCAL_FAST_CONTEXT": "1",
+                                     "SKY_VOICE_STREAM_LOCAL": "1",
+                                     "SKY_VOICE_PROVIDER": "anthropic"}, clear=False):
+            self.assertFalse(voz.eligible(PREGUNTA))
 
     def test_emite_primera_frase_antes_de_fin(self):
         secuencia = []
