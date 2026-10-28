@@ -12,6 +12,22 @@ android {
         versionCode = 5
         versionName = "0.5.0"
     }
+    // El paquete distribuible no declara servicios de accesibilidad.
+    // La variante assistive queda separada para revisión y pruebas explícitas.
+    flavorDimensions += "capabilities"
+    productFlavors {
+        create("standard") {
+            dimension = "capabilities"
+            buildConfigField("boolean", "ENABLE_TEXT_ASSIST", "false")
+        }
+        create("assistive") {
+            dimension = "capabilities"
+            buildConfigField("boolean", "ENABLE_TEXT_ASSIST", "true")
+        }
+    }
+    buildFeatures {
+        buildConfig = true
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
