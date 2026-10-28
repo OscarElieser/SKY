@@ -42,8 +42,24 @@ class SkyDailyCommandParserTest {
     @Test fun openKnownAppsExplicitly() {
         val app = SkyDailyCommandParser.parse("SKY abre WhatsApp en mi teléfono")
         assertEquals("whatsapp", (app as SkyDailyCommandParser.Command.OpenApp).app)
-        assertNull(SkyDailyCommandParser.parse("SKY abre mi banco"))
+        // Una app arbitraria se resuelve contra las apps realmente instaladas;
+        // no implica que SKY tenga acceso a datos bancarios.
+        assertTrue(SkyDailyCommandParser.parse("SKY abre mi banco")
+            is SkyDailyCommandParser.Command.OpenApp)
         assertNull(SkyDailyCommandParser.parse("Explícame qué es WhatsApp"))
+    }
+
+    @Test fun openFutureSocialAiOfficeAndGames() {
+        for (app in listOf("Spotify", "TikTok", "Instagram", "Facebook", "X",
+                "Threads", "Snapchat", "Word", "Excel", "PowerPoint",
+                "ChatGPT", "Claude", "Gemini", "Copilot", "Minecraft")) {
+            val command = SkyDailyCommandParser.parse("SKY abre " + app)
+                as SkyDailyCommandParser.Command.OpenApp
+            assertEquals(SkyDailyCommandParser.canonical(app), command.app)
+        }
+        assertEquals(SkyDailyCommandParser.Command.ShowApps,
+            SkyDailyCommandParser.parse("SKY mostrame mis aplicaciones"))
+        assertNull(SkyDailyCommandParser.parse("¿Qué opinás de Spotify?"))
     }
 
     @Test fun keepWindowsCommandsOutsideAndroid() {
