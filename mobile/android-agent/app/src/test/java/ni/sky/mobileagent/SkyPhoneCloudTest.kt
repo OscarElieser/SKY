@@ -7,6 +7,21 @@ import org.junit.Test
 
 /** Pruebas sin credenciales, ni red, ni dependencia de Windows. */
 class SkyPhoneCloudTest {
+    @Test fun shortPublicQuestionLimitsOnlyOutputTokens() {
+        assertEquals(300, SkyPhoneCloud.responseTokenLimit(
+            "SKY, explícame en dos oraciones qué es la fotosíntesis"))
+        assertEquals(400, SkyPhoneCloud.responseTokenLimit(
+            "¿Qué es la fotosíntesis?"))
+        assertEquals(1000, SkyPhoneCloud.responseTokenLimit(
+            "Redacta un documento con mi proyecto y sus objetivos"))
+        assertEquals(1000, SkyPhoneCloud.responseTokenLimit(
+            "Explica paso a paso cómo implementar un modelo de lenguaje"))
+        assertEquals(1000, SkyPhoneCloud.responseTokenLimit(
+            "Abrí WhatsApp y escribe un mensaje"))
+        assertEquals(1000, SkyPhoneCloud.responseTokenLimit(
+            "Investiga estas cuatro fuentes científicas y prepara una bibliografía"))
+    }
+
     @Test fun modelIsPinnedToKnownStableGemini() {
         assertEquals("gemini-3.5-flash-lite", SkyPhoneCloud.MODEL)
     }
