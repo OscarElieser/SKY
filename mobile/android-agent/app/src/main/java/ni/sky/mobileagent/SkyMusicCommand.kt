@@ -32,16 +32,16 @@ object SkyMusicCommand {
         }
         // Una sola orden compuesta: "Abre YouTube y reproduce la canción X".
         val launchAndPlay = Regex(
-            """^(?:abre|abri|abrime|abreme|abrir|inicia|iniciar)\\s+""" +
-            """(?:(?:la|el)\\s+)?(?:(?:app|aplicacion)\\s+)?""" +
-            """(youtube music|youtube musica|yt music|spotify|youtube)\\s+""" +
-            """(?:(?:y|para)\\s+)?""" +
-            """(?:pon(?:me)?|pone(?:me)?|reproduce|reproducime|reproduci|reproducir|busca|buscame|coloca)\\s+""" +
-            """(?:(?:la|una)\\s+)?(?:(?:cancion|musica|tema|video)\\s+)?(.+)$"""
+            """^(?:abre|abri|abrime|abreme|abrir|inicia|iniciar)\s+""" +
+            """(?:(?:la|el)\s+)?(?:(?:app|aplicacion)\s+)?""" +
+            """(youtube music|youtube musica|yt music|spotify|youtube)\s+""" +
+            """(?:(?:y|para)\s+)?""" +
+            """(?:pon(?:me)?|pone(?:me)?|reproduce|reproducime|reproduci|reproducir|busca|buscame|coloca)\s+""" +
+            """(?:(?:la|una)\s+)?(?:(?:cancion|musica|tema|video)\s+)?(.+)$"""
         ).matchEntire(clean)
         if (launchAndPlay != null) {
             val song = launchAndPlay.groupValues[2]
-                .replace(Regex("""^(?:de|del)\\s+"""), "")
+                .replace(Regex("""^(?:de|del)\s+"""), "")
                 .trim(' ', '.', '?', '¿', '!', '"')
             if (song.length !in 2..180 || song in setOf("musica", "cancion", "algo")) return null
             return Request(song, choose(launchAndPlay.groupValues[1]))
