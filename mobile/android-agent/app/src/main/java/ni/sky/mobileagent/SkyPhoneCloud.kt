@@ -73,6 +73,7 @@ object SkyPhoneCloud {
     fun responseTokenLimit(message: String): Int {
         val text = message.trim().lowercase(java.util.Locale.ROOT)
             .replace(Regex("""^sky[ ,.:!¿?]*"""), "")
+            .trimStart('¿', '¡', ' ')
         if (text.length > 200 || text.isBlank()) return 1000
         if (Regex("""\b(?:mi|mis|nuestro|archivo|documento|investiga|busca|redacta|escribe|programa|código|codigo|crea|genera|analiza|resume|lista|plan|proyecto|pasos|explica paso a paso)\b""")
                 .containsMatchIn(text)) return 1000
