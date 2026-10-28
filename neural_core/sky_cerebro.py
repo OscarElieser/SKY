@@ -38,11 +38,17 @@ COMPATIBLES_OPENAI = {'openai': 'https://api.openai.com/v1/chat/completions',
                       'mistral': 'https://api.mistral.ai/v1/chat/completions'}
 import contextvars
 _PREFERIDO: contextvars.ContextVar[str] = contextvars.ContextVar('sky_cerebro_preferido', default='')
+_ULTIMO: contextvars.ContextVar[str] = contextvars.ContextVar('sky_cerebro_ultimo', default='')
 
 
 def preferir(proveedor: str | None) -> None:
     """El proveedor que el dueño eligió para este mensaje (en el HUD). 'auto' = lo que diga SKY_CEREBRO."""
-    _PREFERIDO.set(proveedor if proveedor in NUBE else '')
+    _PREFERIDO.set(proveedor if proveedor in NUBE or proveedor == 'ollama' else '')
+
+
+def ultimo_proveedor() -> str:
+    """Motor realmente consultado en este turno (no el ganador supuesto)."""
+    return _ULTIMO.get()
 
 
 def _clave(proveedor: str) -> str:
@@ -57,15 +63,21 @@ def _modelo_nube(proveedor: str) -> str:
     return os.getenv(cfg.model_env, cfg.model_default).strip() or cfg.model_default
 
 
-def motor() -> str:
-    """'ollama' o el proveedor de la nube que decide las herramientas."""
+def motor(texto: str = '', modo: str = 'chat') -> str:
+    """Resuelve un proveedor explícito o la subasta consentida por el dueño."""
     from .providers import local_only
     if local_only():
         return 'ollama'
     cfg = os.getenv('SKY_CEREBRO', 'auto').strip().lower()
-    elegido = _PREFERIDO.get() or (cfg if cfg in NUBE else '')
+    preferido = _PREFERIDO.get()
+    if preferido == 'ollama':
+        return 'ollama'
+    elegido = preferido or (cfg if cfg in NUBE else '')
     if elegido:
         return elegido if _clave(elegido) else 'ollama'
+    if cfg == 'subasta':
+        from .sky_ai_auction import seleccionar
+        return seleccionar(texto, modo) or 'ollama'
     if cfg == 'nube':
         return next((p for p in NUBE if _clave(p)), 'ollama')
     return 'ollama'
@@ -136,10 +148,14 @@ def herramientas() -> list[dict]:
     return t
 
 
-def disponible() -> bool:
-    if os.getenv('SKY_CEREBRO', 'auto').strip().lower() == 'reglas':
+def disponible(texto: str = '', modo: str = 'chat') -> bool:
+    cfg = os.getenv('SKY_CEREBRO', 'auto').strip().lower()
+    if cfg == 'reglas':
         return False
-    if motor() != 'ollama':
+    if cfg == 'subasta' and not _PREFERIDO.get():
+        from .sky_ai_auction import ofertas
+        return bool(ofertas(texto, modo))
+    if motor(texto, modo) != 'ollama':
         return True
     return _ollama_ok()
 
@@ -393,7 +409,11 @@ def decidir_eventos(texto: str, historial: list[dict] | None = None, modo: str =
     Cada llamada queda medida en los KPIs (milisegundos y tokens que informa Ollama)."""
     import time as _time
     inicio, info, ok, via = _time.perf_counter(), {'tokens': None}, True, 'texto'
-    quien = motor()
+    if os.getenv('SKY_CEREBRO', 'auto').strip().lower() == 'subasta' and not _PREFERIDO.get():
+        yield from _decidir_subasta(texto, historial, modo)
+        return
+    quien = motor(texto, modo)
+    _ULTIMO.set(quien)
     nombre_modelo = ('ollama:' + modelo()) if quien == 'ollama' else f'{quien}:{_modelo_nube(quien)}'
     try:
         fuente = _eventos(texto, historial, modo, info) if quien == 'ollama' else _eventos_nube(quien, texto, historial, modo, info)
@@ -410,6 +430,61 @@ def decidir_eventos(texto: str, historial: list[dict] | None = None, modo: str =
                       tokens=info['tokens'])
         except Exception:
             pass
+
+
+
+def _decidir_subasta(texto: str, historial: list[dict] | None, modo: str) -> Iterator[tuple[str, object]]:
+    """Prueba ofertas de modo secuencial y acotado; nunca ejecuta herramientas aquí.
+
+    No mezcla respuestas parciales de proveedores ni reenvía una orden a
+    múltiples agentes. El permiso de cada acción sigue en la capa de dispositivo.
+    """
+    from .sky_ai_auction import ofertas, max_intentos
+    propuestas = ofertas(texto, modo)[:max_intentos()]
+    if not propuestas:
+        yield 'error', 'No hay un proveedor autorizado disponible para esta solicitud.'
+        return
+
+    for propuesta in propuestas:
+        quien = propuesta['proveedor']
+        _ULTIMO.set(quien)
+        nombre_modelo = ('ollama:' + modelo()) if quien == 'ollama' else f'{quien}:{_modelo_nube(quien)}'
+        inicio = time.perf_counter()
+        info = {'tokens': None}
+        ok, emitido, via = False, False, 'texto'
+        try:
+            fuente = _eventos(texto, historial, modo, info) if quien == 'ollama' else _eventos_nube(quien, texto, historial, modo, info)
+            for evento, valor in fuente:
+                if evento == 'error':
+                    break
+                if evento == 'delta' and valor:
+                    emitido = True
+                    yield evento, valor
+                elif evento == 'herramienta':
+                    via, ok = 'herramienta', True
+                    yield evento, valor
+                    return
+                elif evento == 'fin':
+                    if str(valor or '').strip() or emitido:
+                        ok = True
+                        yield evento, valor
+                        return
+                    break
+        except Exception:
+            # Nunca mostrar mensajes de SDK que puedan contener URL o credenciales.
+            pass
+        finally:
+            try:
+                from .sky_metricas import registrar
+                registrar('modelo', nombre_modelo, ok,
+                          (time.perf_counter() - inicio) * 1000, origen=via, tokens=info['tokens'])
+            except Exception:
+                pass
+        if emitido:
+            # Una respuesta parcial no se concatena con otra de un proveedor distinto.
+            yield 'error', 'El proveedor interrumpió una respuesta parcial. Volvé a intentarlo.'
+            return
+    yield 'error', 'Las API autorizadas no pudieron completar esta solicitud. Revisá conexión, cuotas y modelos.'
 
 
 def _eventos(texto: str, historial: list[dict] | None, modo: str, info: dict) -> Iterator[tuple[str, object]]:
