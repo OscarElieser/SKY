@@ -87,7 +87,8 @@ class SkyInstalledApps(
         holder.addView(search)
         val list = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         val scroll = ScrollView(activity).apply { addView(list) }
-        holder.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        holder.addView(scroll, LinearLayout.LayoutParams(-1,
+            (activity.resources.displayMetrics.heightPixels * 0.52f).toInt()))
         val dialog = AlertDialog.Builder(activity)
             .setTitle("SKY · Aplicaciones (" + all.size + ")")
             .setView(holder)
