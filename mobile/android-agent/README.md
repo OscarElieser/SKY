@@ -13,6 +13,7 @@ confirmaciones; ninguna respuesta generada por IA ejecuta acciones solas.
 | «SKY abre WhatsApp» | Solicita confirmación y abre la aplicación permitida | Android aceptó la apertura, no verifica que haya cargado |
 | «SKY pon una alarma a las 5:30» | Abre el Reloj mediante `AlarmClock.ACTION_SET_ALARM` con hora y etiqueta | Debe verificarse la alarma en Reloj; no declarar creada antes |
 | «SKY pon un temporizador de 10 minutos» | Abre temporizador nativo con duración | Revisar que Reloj lo inició |
+| «SKY busca en internet recetas saludables» | Abre la búsqueda real en el navegador del teléfono | Android aceptó la apertura de la búsqueda |
 | «SKY anota comprar leche» | Guarda una nota privada en SharedPreferences local | Se confirma el guardado con `commit()` |
 | «SKY mostrame mis notas» | Muestra las últimas notas privadas del teléfono | Lee almacenamiento local |
 | «SKY escribe en WhatsApp: hola» | Ofrece Compartir o Escritura asistida, tras confirmación | Nunca envía mensajes automáticamente |
