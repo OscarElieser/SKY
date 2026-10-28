@@ -1,0 +1,27 @@
+name: SKY Local Latency Probe
+
+on:
+  pull_request:
+    paths:
+      - 'neural_core/sky_latency_probe.py'
+      - 'tests/test_sky_latency_probe.py'
+      - '.github/workflows/sky-local-latency-probe.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'neural_core/sky_latency_probe.py'
+      - 'tests/test_sky_latency_probe.py'
+      - '.github/workflows/sky-local-latency-probe.yml'
+
+jobs:
+  offline-probe-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile latency probe and tests
+        run: python -m py_compile neural_core/sky_latency_probe.py tests/test_sky_latency_probe.py
+      - name: Test latency probe without network or API credentials
+        run: python -m unittest discover -s tests -p 'test_sky_latency_probe.py' -v
