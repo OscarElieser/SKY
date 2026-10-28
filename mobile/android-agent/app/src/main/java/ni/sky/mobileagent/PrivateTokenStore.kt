@@ -69,5 +69,38 @@ class PrivateTokenStore(context: Context) {
     fun clearChat() {
         prefs.edit().remove("chat_iv").remove("chat_token").apply()
     }
-    fun clear() { prefs.edit().clear().apply() }
+    /** Clave opcional solo para PRUEBAS PERSONALES: nunca en BuildConfig/Git. */
+    fun savePersonalCloudKey(value: String) {
+        require(SkyPhoneCloud.validPersonalKey(value))
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key())
+        prefs.edit()
+            .putString("cloud_iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            .putString("cloud_key", Base64.encodeToString(
+                cipher.doFinal(value.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP))
+            .putBoolean("cloud_enabled", true)
+            .apply()
+    }
+    fun cloudEnabled(): Boolean =
+        prefs.getBoolean("cloud_enabled", false) &&
+        !prefs.getString("cloud_key", "").isNullOrBlank()
+
+    fun personalCloudKey(): String {
+        if (!cloudEnabled()) return ""
+        return try {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, key(),
+                GCMParameterSpec(128, Base64.decode(prefs.getString("cloud_iv", ""), Base64.NO_WRAP)))
+            String(cipher.doFinal(Base64.decode(
+                prefs.getString("cloud_key", ""), Base64.NO_WRAP)), Charsets.UTF_8)
+        } catch (_: Exception) { "" }
+    }
+    fun clearPersonalCloudKey() {
+        prefs.edit().remove("cloud_iv").remove("cloud_key").remove("cloud_enabled").apply()
+    }
+    /** Revocar Windows jamás debe borrar la clave independiente del teléfono. */
+    fun clear() {
+        prefs.edit().remove("server").remove("id").remove("iv").remove("token")
+            .remove("chat_iv").remove("chat_token").apply()
+    }
 }

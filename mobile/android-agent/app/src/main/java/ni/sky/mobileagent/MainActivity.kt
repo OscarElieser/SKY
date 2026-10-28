@@ -43,6 +43,7 @@ class MainActivity : Activity() {
     @Volatile private var pendingCommand: String? = null
     @Volatile private var polling = false
     private var visible = false
+    private var showOptionalWindowsLink = false
     private val apps = linkedMapOf(
         "youtube" to Pair("YouTube", "com.google.android.youtube"),
         "chrome" to Pair("Chrome", "com.android.chrome"),
@@ -84,7 +85,7 @@ class MainActivity : Activity() {
                 !processDailyCommand(transcript)) {
                 home.openChat()
                 chatInput.setText(transcript)
-                if (tokens.chatToken().isEmpty()) {
+                if (!tokens.cloudEnabled() && tokens.chatToken().isEmpty()) {
                     voicePanel.showError("Activá el chat seguro en Ajustes.")
                     home.showMessage("Activá el chat desde Ajustes para conversar.")
                 } else {
@@ -130,7 +131,7 @@ class MainActivity : Activity() {
         }
         setContentView(home.root)
         refreshConnection()
-        if (tokens.token().isEmpty()) {
+        if (tokens.token().isEmpty() && !tokens.cloudEnabled()) {
             home.root.post { if (!isFinishing) showSettings() }
         }
     }
@@ -242,7 +243,7 @@ class MainActivity : Activity() {
     }
 
     private fun refreshConnection() {
-        home.setConnection(tokens.token().isNotEmpty(), tokens.chatToken().isNotEmpty())
+        home.setConnection(tokens.token().isNotEmpty(), tokens.chatToken().isNotEmpty(), tokens.cloudEnabled())
     }
 
     /** La vinculación solo se muestra si aún no existe un token válido. */
@@ -254,9 +255,55 @@ class MainActivity : Activity() {
             setPadding(30, 18, 30, 18)
         }
         val linked = tokens.token().isNotEmpty() && tokens.deviceId().isNotEmpty()
-        content.addView(description(if (linked) "SKY · Ajustes y permisos"
-            else "Bienvenido a SKY · Primera configuración"))
-        if (!linked) {
+        content.addView(description("SKY Android · Ajustes y permisos"))
+        content.addView(description("MODO INDEPENDIENTE · No necesitás Windows, Tailscale ni código de vinculación."))
+        if (tokens.cloudEnabled()) {
+            content.addView(description("SKY móvil está activada. Conversa con Gemini por internet. " +
+                "La voz, los ojos y las acciones locales funcionan independientemente del PC."))
+            content.addView(actionButton("Desactivar nube y borrar mi clave") {
+                tokens.clearPersonalCloudKey()
+                refreshConnection()
+                settingsDialog?.dismiss()
+                showSettings()
+            })
+        } else {
+            content.addView(description("Prueba personal: necesitás tu propia clave Gemini API. " +
+                "La clave queda cifrada con Android Keystore, pero las claves utilizadas desde " +
+                "un cliente móvil pueden extraerse en un teléfono comprometido. " +
+                "No utilizar esta modalidad en una APK distribuida al público. " +
+                "Tu uso puede consumir cuota o generar costos en Google."))
+            val personalKey = input("Clave personal de Gemini API", true)
+            val permission = CheckBox(this).apply {
+                text = "Autorizo enviar mis mensajes y el contexto reciente a Google Gemini. " +
+                    "Entiendo que puedo desactivar SKY Cloud y borrar la clave."
+            }
+            content.addView(personalKey)
+            content.addView(permission)
+            content.addView(actionButton("Abrir Google AI Studio para obtener clave") {
+                startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse("https://aistudio.google.com/apikey")))
+            })
+            content.addView(actionButton("ACTIVAR SKY ANDROID INDEPENDIENTE") {
+                val value = personalKey.text.toString().trim()
+                if (!permission.isChecked) {
+                    setStatus("Primero autorizá el envío de mensajes a Gemini.")
+                } else if (!SkyPhoneCloud.validPersonalKey(value)) {
+                    setStatus("Ingresá una clave personal válida de Gemini API.")
+                } else {
+                    tokens.savePersonalCloudKey(value)
+                    personalKey.setText("")
+                    refreshConnection()
+                    settingsDialog?.dismiss()
+                    showSettings()
+                }
+            })
+        }
+        content.addView(actionButton(if (showOptionalWindowsLink || linked)
+            "Ocultar conexión Windows (opcional)" else "Conexión Windows (opcional)") {
+            showOptionalWindowsLink = !showOptionalWindowsLink
+            showSettings()
+        })
+        if (!linked && showOptionalWindowsLink) {
             content.addView(description("Conectá el celular con tu SKY Core mediante HTTPS privado."))
             serverInput = input("URL HTTPS privada de SKY")
             serverInput.setText(tokens.server())
@@ -267,7 +314,7 @@ class MainActivity : Activity() {
             content.addView(deviceInput)
             content.addView(codeInput)
             content.addView(actionButton("Vincular teléfono") { pair() })
-        } else {
+        } else if (showOptionalWindowsLink && linked) {
             content.addView(description("Dispositivo vinculado. Las claves permanecen protegidas."))
             if (tokens.chatToken().isEmpty()) {
                 content.addView(description("Chat: necesita autorización independiente del propietario."))
@@ -445,8 +492,12 @@ class MainActivity : Activity() {
     private fun checkHomeStatus() {
         val id = tokens.deviceId()
         val token = tokens.token()
+        if (tokens.cloudEnabled()) {
+            setStatus("SKY Android independiente · Gemini configurado. Windows no es necesario.")
+            return
+        }
         if (id.isEmpty() || token.isEmpty()) {
-            setStatus("Vinculá este teléfono antes de consultar el servidor SKY.")
+            setStatus("Configurá SKY móvil desde Ajustes o vinculá Windows opcionalmente.")
             return
         }
         execute {
@@ -489,8 +540,6 @@ class MainActivity : Activity() {
     }
 
     private fun sendChat() {
-        val id = tokens.deviceId()
-        val token = tokens.chatToken()
         val message = chatInput.text.toString().trim()
         if (message.isEmpty()) return
         if (processLocalPanelCommand(message, spoken = false) ||
@@ -498,13 +547,15 @@ class MainActivity : Activity() {
             chatInput.setText("")
             return
         }
-        if (id.isEmpty() || token.isEmpty()) {
-            setStatus("Activá el chat seguro desde Ajustes para conversar.")
+        if (chatPending) return
+        val mobileCloud = tokens.cloudEnabled()
+        val id = tokens.deviceId()
+        val token = tokens.chatToken()
+        if (!mobileCloud && (id.isEmpty() || token.isEmpty())) {
+            setStatus("Configurá SKY móvil independiente desde Ajustes.")
             showSettings()
             return
         }
-        if (message.isEmpty() || chatPending) return
-        // Each request requires fresh opt-in; checkboxes are reset immediately.
         val cloud = cloudConsent.isChecked
         val privateData = privateConsent.isChecked
         cloudConsent.isChecked = false
@@ -518,30 +569,38 @@ class MainActivity : Activity() {
                 for (i in begin until chatHistory.length()) {
                     history.put(chatHistory.getJSONObject(i))
                 }
-                val payload = JSONObject()
-                    .put("device_id", id)
-                    .put("texto", message)
-                    .put("historial", history)
-                    .put("proveedor", "auto")
-                    .put("datos", "privados")
-                    .put("autorizar_nube", cloud)
-                    .put("autorizar_datos_privados", privateData)
-                val reply = SkyNetwork.requestChat(tokens.server(), "/api/sky/mobile-chat/chat",
-                    token, payload)
-                val answer = reply.optString("respuesta", "SKY no devolvió texto.")
+                val answer: String
+                val provider: String
+                if (mobileCloud) {
+                    // Requiere consentimiento explícito al activar modo móvil en Ajustes.
+                    // No requiere ni solicita llaves ni módulos de Windows.
+                    answer = SkyPhoneCloud.reply(tokens.personalCloudKey(), message, history)
+                    provider = "Gemini · SKY Android"
+                } else {
+                    val payload = JSONObject()
+                        .put("device_id", id)
+                        .put("texto", message)
+                        .put("historial", history)
+                        .put("proveedor", "auto")
+                        .put("datos", "privados")
+                        .put("autorizar_nube", cloud)
+                        .put("autorizar_datos_privados", privateData)
+                    val reply = SkyNetwork.requestChat(tokens.server(), "/api/sky/mobile-chat/chat",
+                        token, payload)
+                    answer = reply.optString("respuesta", "SKY no devolvió texto.")
+                    provider = reply.optString("proveedor", "SKY Core")
+                }
                 chatHistory.put(JSONObject().put("role", "user").put("content", message))
                 chatHistory.put(JSONObject().put("role", "assistant").put("content", answer.take(2000)))
                 while (chatHistory.length() > 8) chatHistory.remove(0)
                 runOnUiThread {
                     chatInput.setText("")
-                    home.addExchange(message, answer, reply.optString("proveedor", "desconocido"))
+                    home.addExchange(message, answer, provider)
                     voicePanel.speakReply(answer)
                 }
             } catch (error: Exception) {
-                if (error.message?.contains("HTTP 401") == true ||
-                    error.message?.contains("HTTP 403") == true) {
-                    // El token de chat independiente vence o puede revocarse.
-                    // No borrar el emparejamiento del teléfono ni la API del dueño.
+                if (!mobileCloud && (error.message?.contains("HTTP 401") == true ||
+                    error.message?.contains("HTTP 403") == true)) {
                     tokens.clearChat()
                     runOnUiThread {
                         refreshConnection()
@@ -549,9 +608,16 @@ class MainActivity : Activity() {
                         voicePanel.showError("La conversación necesita nueva autorización.")
                     }
                 } else {
+                    val reason = if (mobileCloud) when (error) {
+                        is java.net.UnknownHostException -> "No hay acceso a internet."
+                        is java.net.SocketTimeoutException -> "Gemini tardó demasiado en responder."
+                        is IllegalStateException -> error.message ?: "Gemini no respondió."
+                        is IllegalArgumentException -> error.message ?: "Revisá la configuración."
+                        else -> "No se pudo conectar con Gemini. Revisá tu internet y tu clave."
+                    } else "No fue posible consultar SKY Core. Revisá tu conexión."
                     runOnUiThread {
-                        home.showMessage("No fue posible consultar SKY. Verificá el servidor.")
-                        voicePanel.showError("Revisá tu conexión y volvé a intentar.")
+                        home.showMessage(reason)
+                        voicePanel.showError("No pude responder. Revisá el estado y volvé a intentar.")
                     }
                 }
             } finally {

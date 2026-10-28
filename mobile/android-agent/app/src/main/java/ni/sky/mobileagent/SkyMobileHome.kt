@@ -257,7 +257,7 @@ class SkyMobileHome(
     fun openModule(id: String) {
         activeModule = id
         panelTitle.text = moduleTitle(id)
-        panelSubtitle.text = "Panel solicitado · consultas con SKY Core"
+        panelSubtitle.text = "Consultas con SKY Android · Internet opcional"
         panelSubtitle.visibility = View.VISIBLE
         chatOutput.text = "¿Qué necesitas hacer en " + moduleTitle(id) + "?\n\n" +
             "SKY puede conversar sobre esta tarea. La ejecución de herramientas " +
@@ -281,12 +281,13 @@ class SkyMobileHome(
                 .joinToString("\n\n────────────\n\n")
     }
 
-    fun setConnection(linked: Boolean, chatReady: Boolean) {
-        connected.text = if (chatReady) "●" else if (linked) "◉" else "○"
+    fun setConnection(linked: Boolean, chatReady: Boolean, mobileCloud: Boolean = false) {
+        connected.text = if (mobileCloud || chatReady) "●" else if (linked) "◉" else "○"
         connected.setTextColor(
-            if (chatReady) Color.rgb(139, 234, 191) else cyan
+            if (mobileCloud || chatReady) Color.rgb(139, 234, 191) else cyan
         )
-        status.text = if (linked) "SKY vinculada" else "SKY sin vincular"
+        status.text = if (mobileCloud) "SKY Android lista"
+            else if (linked) "SKY vinculada" else "SKY sin configurar"
         connected.contentDescription = status.text
     }
 

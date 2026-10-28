@@ -1,3 +1,67 @@
+# SKY IA Android 0.6 — modo independiente (prueba personal)
+
+SKY Android funciona sin que SKY Windows esté encendida. Esta actualización
+**solo modifica el subproyecto Android**: no altera módulos, puertos,
+archivos de configuración ni API de SKY Windows.
+
+## Cómo activar la conversación sin Windows
+
+1. Actualizar la APK **release** firmada con el MISMO certificado privado que
+   usaste antes (versión Android 0.6.0, code 7). No instalar la APK debug sobre
+   una release; Android no permite actualización entre firmantes distintos.
+2. Abrir SKY Android > Ajustes. Se muestra primero el **modo independiente**.
+   Ya no es obligatorio introducir HTTPS de Tailscale o un código temporal.
+3. Para la versión de **pruebas personales**, obtener una clave de Gemini API
+   propia en https://aistudio.google.com/apikey .
+4. Introducirla solamente en Ajustes de tu teléfono, leer y marcar la
+   autorización de envío de mensajes a Google y seleccionar
+   **ACTIVAR SKY ANDROID INDEPENDIENTE**. SKY cifra la clave con Android
+   Keystore y no la registra en GitHub, logs ni archivos de código.
+5. Abrir Conversación, escribir una pregunta o tocar Hablar con SKY. La
+   respuesta de Gemini se presenta y, si el motor TTS está habilitado, se
+   escucha. Esta ruta funciona con Wi-Fi o datos móviles y SIN SKY Windows.
+6. El botón **Desactivar nube y borrar mi clave** revoca el uso local de la
+   clave y elimina su cifrado del teléfono. Revocar la clave en AI Studio
+   también cuando deje de usarse.
+
+La integración de pruebas utiliza el endpoint HTTPS oficial Gemini
+`models/gemini-3.5-flash-lite:generateContent` y el encabezado
+`x-goog-api-key`. Se limita el historial a los últimos cuatro turnos
+y se conserva sólo en memoria durante la sesión. La app no envía archivos,
+contactos ni herramientas del teléfono a Gemini. Comandos locales,
+apertura de apps autorizadas, notas, alarmas, ojos y chistes permanecen
+locales como antes.
+
+**Advertencia crítica:** Google recomienda NO utilizar claves API
+directamente desde aplicaciones cliente de producción, aunque se almacenen
+con Android Keystore, ya que un atacante con control del dispositivo o del
+tráfico de su aplicación puede extraerlas. Este modo es únicamente una
+**beta privada con una clave propia**; no distribuir públicamente esa APK
+como producto de uso general. Para publicar SKY, sustituir el transporte por
+un servicio de backend móvil con autenticación, límites y App Check, o
+Firebase AI Logic. El usuario es responsable de cuotas y posibles cargos.
+
+Si Gemini rechaza la clave, comprobar las restricciones, el modelo y las
+cuotas en AI Studio. Se usa el modelo estable `gemini-3.5-flash-lite`;
+la disponibilidad depende de la cuenta y la región.
+
+## SKY Windows sigue opcional
+
+El botón **Conexión Windows (opcional)** mantiene el emparejamiento
+anterior sin modificar su implementación ni su servidor. El modo
+independiente tiene prioridad cuando está activado. Esta versión NO
+introduce escucha en segundo plano, control indiscriminado de apps,
+envío de mensajes, ni IA totalmente offline: requiere internet para
+conversaciones Gemini. Las funciones Android locales siguen disponibles
+sin internet.
+
+Documentación oficial:
+- https://ai.google.dev/gemini-api/docs/api-key
+- https://ai.google.dev/api/generate-content
+- https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite
+
+---
+
 # SKY IA Android 0.5 — aplicaciones dinámicas y compañía divertida
 
 SKY mantiene el diseño de **ojitos expresivos flotantes**, interfaz minimalista
