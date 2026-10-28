@@ -370,3 +370,7 @@ body.sky-cinematic{background:
 .sky-cinematic .win[data-id="player"].mini iframe{
   min-height: min(270px, calc(100vh - 142px));
 }
+
+/* Identidad visual SKY IA · logotipo oficial · 2026-10-28 */
+.brand .sky-official-mark {display:block;width:39px;height:39px;object-fit:contain;flex:none;filter:drop-shadow(0 0 6px rgba(0,229,255,.25))}
+.brand .word {letter-spacing:.13em;white-space:nowrap}

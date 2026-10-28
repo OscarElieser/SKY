@@ -710,3 +710,9 @@ textarea{
 .pref-hint{color:#94a3b8;font-size:13px;}
 .pref-active{color:#10b981;font-size:13px;}
 
+
+/* Marca oficial SKY IA en la barra lateral, cabecera y bienvenida. */
+.sidebar-brand .sky-official-mark{width:35px;height:35px;object-fit:contain;flex:none}
+.top-title{display:inline-flex;align-items:center;gap:8px}
+.top-title .sky-official-mark{width:32px;height:32px;object-fit:contain;flex:none}
+.welcome .sky-official-lockup{display:block;width:min(224px,65vw);height:auto;max-height:128px;object-fit:contain;margin:0 auto 4px}

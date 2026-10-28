@@ -11,6 +11,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -164,13 +165,18 @@ class SkyMobileHome(
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        brand.addView(text("SKY", 27f, white).apply {
+        brand.addView(text("SKY IA", 25f, white).apply {
             typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
             letterSpacing = 0.075f
         })
         brand.addView(text("INTELIGENCIA PERSONAL", 9.5f, Color.rgb(175, 171, 220)).apply {
             letterSpacing = 0.12f
         })
+        header.addView(ImageView(host).apply {
+            setImageResource(R.drawable.sky_brand_emblem)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "Emblema oficial SKY IA"
+        }, LinearLayout.LayoutParams(dp(52), dp(52)).apply { rightMargin = dp(8) })
         header.addView(brand, LinearLayout.LayoutParams(0, dp(58), 1f))
         header.addView(connected, LinearLayout.LayoutParams(dp(25), dp(54)))
         header.addView(pill("⚙", Color.rgb(55, 48, 115), onSettings).apply {
