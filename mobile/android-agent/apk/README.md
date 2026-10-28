@@ -1,12 +1,29 @@
-# SKY Android 0.8.1 — APK beta firmada
+# SKY Android 0.8.2 — APK beta firmada
 
-**[Descargar APK de SKY Android 0.8.1 tras publicación de la Release](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.1/SKY-IA-Android-v0.8.1-firmada.apk)** · [Página oficial de la Release](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.1) · [README Android](../README.md)
+**[Descargar APK de SKY Android 0.8.2 tras publicación de la Release](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.2/SKY-IA-Android-v0.8.2-firmada.apk)** · [Página oficial de la Release](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.2) · [README Android](../README.md)
 
-La versión **0.8.1** conserva los ojos y boca animados, los comandos supervisados de WhatsApp y añade **SKY Estudio Creativo**, con guiones y planes para redes sociales desde el teléfono. Los borradores se comparten mediante el selector oficial de Android; publicar y elegir la cuenta son decisiones del usuario. SKY Windows permanece intacto.
+La versión **0.8.2** conserva los ojos y boca animados, los comandos supervisados de WhatsApp y añade **SKY Estudio Creativo**, con guiones y planes para redes sociales desde el teléfono. Los borradores se comparten mediante el selector oficial de Android; publicar y elegir la cuenta son decisiones del usuario. SKY Windows permanece intacto.
+
+## Novedades de SKY Android 0.8.2
+
+Esta entrega agrega órdenes musicales sin repetir «SKY», preferencia de
+Spotify/YouTube Music/YouTube, borradores de respuestas naturales solo para
+contactos autorizados y una cámara puntual con confirmación antes de enviar
+una miniatura a Gemini. Las canciones pueden requerir un toque en la app
+receptora; los mensajes y publicaciones deben aprobarse y enviarse allí.
+No hay lectura automática de chats, vigilancia de cámara o acceso irrestricto
+al celular. SKY Windows no cambia.
+
+**Publicación:** el enlace de APK 0.8.2 únicamente está disponible cuando
+[Releases](https://github.com/OscarElieser/SKY/releases) muestra el tag
+`sky-android-v0.8.2` con el archivo
+`SKY-IA-Android-v0.8.2-firmada.apk` y su archivo `.sha256`. No se debe
+usar una APK de Actions sin revisar firma y versión, ni desinstalar la
+versión anterior sin respaldo.
 
 ## Instalación en Samsung
 
-1. Entrá a GitHub Releases desde Chrome en el Samsung y descargá el archivo `SKY-IA-Android-v0.8.1-firmada.apk` dentro de **Assets**. No hace falta descomprimir ZIP.
+1. Entrá a GitHub Releases desde Chrome en el Samsung y descargá el archivo `SKY-IA-Android-v0.8.2-firmada.apk` dentro de **Assets**. No hace falta descomprimir ZIP.
 2. Instalá sobre la APK release anterior, si utiliza el mismo certificado; **no desinstalés** sin respaldo de claves/notas.
 3. Si Google Play Protect detecta un riesgo, no desactives la protección ni forces la instalación. Revisá el mensaje exacto.
 4. Comprobá ojos y boca, voz, apertura de aplicaciones y WhatsApp. Desde Ajustes, abrí **ESTUDIO CREATIVO · MIS REDES SOCIALES**, generá un borrador y revisá el menú para copiar/compartir. Ninguna publicación se envía automáticamente.
