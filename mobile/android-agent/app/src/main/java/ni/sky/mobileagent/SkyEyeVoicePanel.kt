@@ -59,6 +59,33 @@ class SkyEyeVoicePanel(
         }
     }
     var onVisualStatusChanged: ((String) -> Unit)? = null
+    var onSpeechStarted: (() -> Unit)? = null
+    var onSpeechFinished: (() -> Unit)? = null
+    private var handsFreeOn = false
+
+    fun setHandsFreeActive(enabled: Boolean) {
+        handsFreeOn = enabled
+        if (enabled) {
+            setConversationMode(false)
+            if (listening) {
+                listening = false
+                recognizer?.cancel()
+                recognizer?.destroy()
+                recognizer = null
+            }
+            setMode(EyeMode.IDLE, "SKY durmiendo · decí SKY")
+        }
+    }
+
+    fun showHandsFreeState(label: String) {
+        setMode(EyeMode.IDLE, label)
+    }
+
+    fun acceptHandsFreeTranscript(transcript: String) {
+        eye.reactTo(transcript)
+        showThinking()
+        onTranscript(transcript)
+    }
 
     init {
         orientation = VERTICAL
@@ -149,10 +176,14 @@ class SkyEyeVoicePanel(
         }
         speechEngine?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String) {
-                host.runOnUiThread { setMode(EyeMode.SPEAKING, "SKY está hablando…") }
+                host.runOnUiThread {
+                    onSpeechStarted?.invoke()
+                    setMode(EyeMode.SPEAKING, "SKY está hablando…")
+                }
             }
             override fun onDone(utteranceId: String) {
                 host.runOnUiThread {
+                    onSpeechFinished?.invoke()
                     setMode(EyeMode.IDLE, "SKY lista para escucharte.")
                     if (fluidConversation && foreground && continuousTurns < 8) {
                         handler.removeCallbacks(resumeListening)
@@ -164,7 +195,10 @@ class SkyEyeVoicePanel(
                 }
             }
             override fun onError(utteranceId: String) {
-                host.runOnUiThread { setMode(EyeMode.ERROR, "No fue posible reproducir la voz.") }
+                host.runOnUiThread {
+                    onSpeechFinished?.invoke()
+                    setMode(EyeMode.ERROR, "No fue posible reproducir la voz.")
+                }
             }
         })
     }
@@ -228,7 +262,7 @@ class SkyEyeVoicePanel(
             EyeMode.THINKING -> "✦ UN MOMENTO, ESTOY PENSANDO"
             EyeMode.SPEAKING -> "♫ SKY ESTÁ HABLANDO"
             EyeMode.ERROR -> "REVISÁ EL AVISO DE SKY"
-            EyeMode.IDLE -> "SKY ESTÁ AQUÍ · TOCÁ PARA HABLAR"
+            EyeMode.IDLE -> if (handsFreeOn) "SKY DURMIENDO · DECÍ SKY" else "SKY LISTA · TOCÁ PARA HABLAR"
         })
     }
 
@@ -281,6 +315,7 @@ class SkyEyeVoicePanel(
             setMode(EyeMode.IDLE, "Respuesta vacía.")
             return
         }
+        onSpeechStarted?.invoke()
         val result = speechEngine?.speak(
             clean,
             TextToSpeech.QUEUE_FLUSH,
@@ -288,11 +323,16 @@ class SkyEyeVoicePanel(
             "sky-eye-" + SystemClock.uptimeMillis()
         )
         if (result != TextToSpeech.SUCCESS) {
+            onSpeechFinished?.invoke()
             setMode(EyeMode.ERROR, "Android no pudo iniciar la voz.")
         }
     }
 
     fun listen(auto: Boolean = false) {
+        if (handsFreeOn) {
+            showHandsFreeState("Manos libres activa · decí SKY")
+            return
+        }
         handler.removeCallbacks(resumeListening)
         if (!auto) continuousTurns = 0
         if (host.checkSelfPermission(Manifest.permission.RECORD_AUDIO) !=

@@ -59,6 +59,7 @@ class MainActivity : Activity() {
     @Volatile private var polling = false
     private var visible = false
     private var showOptionalWindowsLink = false
+    private val handsFreePrefs by lazy { getSharedPreferences("sky_voice_settings", MODE_PRIVATE) }
     private val apps = linkedMapOf(
         "youtube" to Pair("YouTube", "com.google.android.youtube"),
         "chrome" to Pair("Chrome", "com.android.chrome"),
@@ -123,12 +124,15 @@ class MainActivity : Activity() {
             getSharedPreferences("sky_voice_settings", MODE_PRIVATE)
                 .getBoolean("read_aloud", true)
         )
+        voicePanel.onSpeechStarted = { SkyHandsFreeService.pauseForReply() }
+        voicePanel.onSpeechFinished = { SkyHandsFreeService.resumeAfterReply() }
         home = SkyMobileHome(
             this, voicePanel,
             onSend = { voiceReplyOnFace = false; sendChat() },
             onSettings = { showSettings() },
             onChatAccess = { showSettings() },
-            onDiagnostics = { checkHomeStatus() }
+            onDiagnostics = { checkHomeStatus() },
+            onStopHandsFree = { setHandsFreeEnabled(false) }
         )
         status = home.status
         chatInput = home.chatInput
@@ -840,7 +844,12 @@ class MainActivity : Activity() {
             })
         }
         content.addView(CheckBox(this).apply {
-            text = "Conversar sin decir SKY (solo con la app abierta · 8 turnos)"
+            text = "Manos libres: decir SKY para despertar (micrófono local y notificación permanente)"
+            isChecked = handsFreePrefs.getBoolean("hands_free_opt_in", false)
+            setOnCheckedChangeListener { _, enabled -> setHandsFreeEnabled(enabled) }
+        })
+        content.addView(CheckBox(this).apply {
+            text = "Conversación fluida antigua (solo con la app abierta)"
             isChecked = getSharedPreferences("sky_voice_settings", MODE_PRIVATE)
                 .getBoolean("fluid_opt_in", false)
             setOnCheckedChangeListener { _, enabled ->
@@ -861,13 +870,61 @@ class MainActivity : Activity() {
                     .edit().putBoolean("read_aloud", enabled).apply()
             }
         })
-        content.addView(description("SKY solicita el micrófono solo al hablar y requiere confirmación para abrir otras aplicaciones."))
+        content.addView(description("Manos libres requiere Android 12 o posterior y reconocimiento de voz instalado en el dispositivo. Mientras está activa se muestra una notificación para apagarla. Puede consumir batería; si Android cierra el servicio, abrí SKY para reactivarlo. Fuera de la aplicación, una orden queda pendiente hasta que abras SKY. Las acciones sensibles siguen exigiendo aprobación."))
         val scroll = ScrollView(this).apply { addView(content) }
         settingsDialog = AlertDialog.Builder(this)
             .setView(scroll)
             .setNegativeButton("Cerrar", null)
             .create()
         settingsDialog?.show()
+    }
+
+    private fun setHandsFreeEnabled(enabled: Boolean) {
+        handsFreePrefs.edit().putBoolean("hands_free_opt_in", enabled).apply()
+        if (!enabled) {
+            stopService(android.content.Intent(this, SkyHandsFreeService::class.java)
+                .setAction(SkyHandsFreeService.ACTION_STOP))
+            SkyHandsFreeService.stop(this)
+            home.setHandsFreeActive(false)
+            voicePanel.showHandsFreeState("Manos libres apagadas.")
+            return
+        }
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 1615)
+            return
+        }
+        startHandsFree()
+    }
+
+    private fun startHandsFree() {
+        if (android.os.Build.VERSION.SDK_INT < 31 ||
+            !android.speech.SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
+            handsFreePrefs.edit().putBoolean("hands_free_opt_in", false).apply()
+            home.setHandsFreeActive(false)
+            voicePanel.showError("Este teléfono no tiene reconocimiento local compatible. Seguís pudiendo usar HABLAR.")
+            return
+        }
+        try {
+            startForegroundService(android.content.Intent(this, SkyHandsFreeService::class.java)
+                .setAction(SkyHandsFreeService.ACTION_START))
+            voicePanel.setConversationMode(false)
+            home.setHandsFreeActive(true)
+            voicePanel.showHandsFreeState("SKY duerme hasta que digás su nombre.")
+        } catch (_: Exception) {
+            handsFreePrefs.edit().putBoolean("hands_free_opt_in", false).apply()
+            home.setHandsFreeActive(false)
+            voicePanel.showError("Android bloqueó el inicio del micrófono permanente.")
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        val pending = intent?.getStringExtra(SkyHandsFreeService.EXTRA_COMMAND)
+        if (!pending.isNullOrBlank() && ::voicePanel.isInitialized) {
+            intent.removeExtra(SkyHandsFreeService.EXTRA_COMMAND)
+            voicePanel.acceptHandsFreeTranscript(pending)
+        }
     }
 
     override fun onResume() {
@@ -878,10 +935,29 @@ class MainActivity : Activity() {
             voicePanel.setConversationMode(getSharedPreferences(
                 "sky_voice_settings", MODE_PRIVATE).getBoolean("fluid_opt_in", false))
         }
+        SkyHandsFreeService.onPhrase = { phrase ->
+            if (visible && ::voicePanel.isInitialized) voicePanel.acceptHandsFreeTranscript(phrase)
+        }
+        SkyHandsFreeService.onWake = {
+            if (visible && ::voicePanel.isInitialized) voicePanel.speakReply("¡Aquí estoy! Decime.")
+        }
+        SkyHandsFreeService.onStatus = { asleep ->
+            if (visible && ::voicePanel.isInitialized) {
+                voicePanel.showHandsFreeState(if (asleep) "SKY durmiendo · decí SKY" else "SKY escuchándote")
+            }
+        }
+        if (handsFreePrefs.getBoolean("hands_free_opt_in", false) &&
+            checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED) startHandsFree()
+        if (::home.isInitialized) home.setHandsFreeActive(
+            handsFreePrefs.getBoolean("hands_free_opt_in", false))
         companionController.onResume()
         handler.post(pollLoop)
     }
     override fun onPause() {
+        SkyHandsFreeService.onPhrase = null
+        SkyHandsFreeService.onWake = null
+        SkyHandsFreeService.onStatus = null
         visible = false
         if (::companionController.isInitialized) companionController.onPause()
         if (::voicePanel.isInitialized) voicePanel.onPausePanel()
@@ -904,6 +980,17 @@ class MainActivity : Activity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 1615) {
+            val granted = grantResults.isNotEmpty() &&
+                grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (granted) startHandsFree()
+            else {
+                handsFreePrefs.edit().putBoolean("hands_free_opt_in", false).apply()
+                home.setHandsFreeActive(false)
+                voicePanel.showError("Sin permiso de micrófono; manos libres desactivadas.")
+            }
+            return
+        }
         if (requestCode == SkyEyeVoicePanel.MICROPHONE_REQUEST &&
             ::voicePanel.isInitialized) {
             voicePanel.onMicrophonePermissionResult(

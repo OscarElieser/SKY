@@ -30,14 +30,17 @@ class SkyMobileHome(
     private val onSend: () -> Unit,
     private val onSettings: () -> Unit,
     private val onChatAccess: () -> Unit,
-    private val onDiagnostics: () -> Unit
+    private val onDiagnostics: () -> Unit,
+    private val onStopHandsFree: () -> Unit
 ) {
     private val white = Color.WHITE
     private val soft = Color.rgb(202, 208, 233)
     private val cyan = Color.rgb(132, 215, 245)
     private val violet = Color.rgb(125, 98, 245)
     private lateinit var mainSurface: LinearLayout
-    private val faceCaption = text("SKY ESTÁ AQUÍ · TOCÁ PARA HABLAR", 12f, Color.rgb(207, 200, 252)).apply {
+    private lateinit var manualTalkButton: View
+    private var handsFreeActive = false
+    private val faceCaption = text("SKY LISTA · TOCÁ PARA HABLAR", 12f, Color.rgb(207, 200, 252)).apply {
         gravity = Gravity.CENTER
         letterSpacing = 0.07f
         contentDescription = "Estado actual de SKY"
@@ -199,17 +202,28 @@ class SkyMobileHome(
             textSize = 23f
             contentDescription = "Abrir conversación por texto"
         }, LinearLayout.LayoutParams(dp(56), dp(56)).apply { rightMargin = dp(9) })
-        actions.addView(pill("🎙  HABLAR", violet) { voicePanel.listen() }.apply {
+        manualTalkButton = pill("🎙  HABLAR", violet) { voicePanel.listen() }.apply {
             textSize = 16f
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             contentDescription = "Activar micrófono para hablar con SKY"
-        }, LinearLayout.LayoutParams(0, dp(56), 1f))
-        actions.addView(pill("■", Color.rgb(42, 43, 95)) { voicePanel.stop() }.apply {
+        }
+        actions.addView(manualTalkButton, LinearLayout.LayoutParams(0, dp(56), 1f))
+        actions.addView(pill("■", Color.rgb(42, 43, 95)) {
+            if (handsFreeActive) onStopHandsFree() else voicePanel.stop()
+        }.apply {
             textSize = 18f
             contentDescription = "Detener la escucha y la voz"
         }, LinearLayout.LayoutParams(dp(56), dp(56)).apply { leftMargin = dp(9) })
         main.addView(actions)
         buildPanel()
+    }
+
+    fun setHandsFreeActive(enabled: Boolean) {
+        handsFreeActive = enabled
+        voicePanel.setHandsFreeActive(enabled)
+        if (::manualTalkButton.isInitialized) manualTalkButton.visibility =
+            if (enabled) View.GONE else View.VISIBLE
+        faceCaption.text = if (enabled) "SKY DURMIENDO · DECÍ SKY" else "SKY LISTA · TOCÁ PARA HABLAR"
     }
 
     /** Avoid Android 15/16 three-button navigation overlap without hiding system controls. */

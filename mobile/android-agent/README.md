@@ -895,3 +895,29 @@ de terror.
 La animación no requiere micrófono ni conexión; la conversación sigue
 dependiendo del reconocimiento, la autorización del chat y la API SKY.
 Esta versión no agrega escucha permanente ni permisos invasivos.
+
+
+## Manos libres Android (0.8.9)
+
+Desde **Ajustes**, habilitá **Manos libres: decir SKY para despertar**. Se solicita
+RECORD_AUDIO; un servicio visible de tipo microphone mantiene el reconocimiento
+*en el dispositivo* y una notificación permite **Apagar micrófono**. Con la app
+abierta, SKY acepta «SKY, abrí YouTube» y preguntas siguientes sin tocar el botón.
+«SKY, despertá» inicia conversación; tras 45 segundos sin órdenes, vuelve al
+reposo de voz; «SKY, dormí» la deja en reposo, pero **no** apaga el micrófono.
+Para apagar el micrófono, usá el botón de detener o la notificación.
+
+Cuando SKY pasa a segundo plano, el servicio escucha la activación y puede
+recibir instrucciones, pero **no ejecuta las acciones de Activity en segundo plano**:
+muestra una notificación para que el dueño abra la app y continúe la orden.
+Se preservan todas las confirmaciones de acciones sensibles.
+
+**Compatibilidad:** requiere Android 12+ (API 31) y un servicio de reconocimiento
+de voz local instalado. Si no hay un modelo local compatible, la app conserva
+el modo HABLAR manual y no transfiere la activación a un servidor remoto.
+El reconocimiento de Android no es un detector DSP de palabra clave de bajo
+consumo, por lo que puede gastar batería y ser limitado o detenido por el
+fabricante o el sistema; no se promete funcionamiento tras forzar la detención,
+reiniciar el equipo ni en todos los dispositivos. En Android 14+, el servicio de
+micrófono solo puede arrancar mientras la app está visible. No se permite activar
+el micrófono sin consentimiento ni reiniciarlo silenciosamente tras el arranque.
