@@ -17,16 +17,44 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 ---
 
 
-## 📱 SKY Android — asistente cotidiana (0.8.2)
+## 📱 SKY Android — núcleo móvil autónomo (0.8.3)
 
 **SKY Android funciona de forma independiente de SKY Windows** para
 conversaciones por Gemini y acciones locales autorizadas. El desarrollo
 Android no modifica los servicios del PC.
 
-[**SKY Android 0.8.2 — Releases**](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.2) ·
-[Descarga directa de APK firmada (solo tras aprobar CI)](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.2/SKY-IA-Android-v0.8.2-firmada.apk) ·
+[**SKY Android 0.8.2 — Releases**](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.3) ·
+[Descarga directa de APK firmada (solo tras aprobar CI)](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.3/SKY-IA-Android-v0.8.3-firmada.apk) ·
 [Guía móvil](mobile/android-agent/README.md) ·
 [Instalación y verificación](mobile/android-agent/apk/README.md)
+
+### Nuevo en 0.8.3 — creador y analista local de redes
+
+- **Análisis de métricas reales importadas:** panel en Android que acepta
+  CSV del usuario con plataforma, publicación, vistas, likes, comentarios,
+  compartidos, seguidores y fecha. Calcula interacción y destaca contenido;
+  **no sincroniza todavía con redes por OAuth** ni inventa métricas.
+- **Video MP4 generado en el teléfono:** 10 segundos verticales H.264
+  (720×1280, 15 fps), fondos y textos originales animados desde un
+  guion editable. Exportación local usando MediaCodec/OpenGL ES.
+  **Sin audio ni fotografías** en esta primera etapa; se completa en
+  el editor de la red. Requiere pruebas reales de GPU/codificador.
+- **Publicación asistida:** compartir guiones y MP4 vía el selector
+  oficial Android. La aplicación receptora y el usuario controlan
+  destinatario, privacidad y publicación. La publicación directa
+  automática requiere API, consentimiento y permisos de plataforma.
+- **Arquitectura móvil:** Android gestiona interfaces, herramientas,
+  archivos, métricas y permisos; Gemini ayuda en generación de texto
+  cuando el usuario habilita conexión. No se modifican módulos Windows.
+- **Sin accesos ocultos:** no hay lectura de chats, uso clandestino
+  de cámara/micrófono, tokens de redes extraídos ni automatización de
+  seguidores/likes. Toda función comunica si la acción fue iniciada,
+  completada o requiere confirmación.
+
+**Estado:** código `0.8.3` en `main`; la APK no debe presentarse
+como disponible hasta aprobar pruebas y firma en GitHub Actions y
+publicarse en [Releases](https://github.com/OscarElieser/SKY/releases).
+[Documentación Android y formatos CSV](mobile/android-agent/README.md).
 
 ### Evolución 0.8.2: hablá con SKY como con una compañera
 
@@ -47,7 +75,7 @@ Android no modifica los servicios del PC.
 - **Seguridad:** no solicitar control irrestricto, contactos ni permisos de
   mensajería en segundo plano; no exponer claves ni materiales privados.
 
-**Estado de entrega:** código 0.8.2 en `main`; la descarga de APK
+**Estado de la etapa anterior:** código 0.8.2 integrado en `main`; la descarga de APK
 solo se recomienda cuando la compilación, firma y SHA-256 aparezcan
 en [GitHub Releases](https://github.com/OscarElieser/SKY/releases).
 La app instalada se conserva hasta completar pruebas en Android.
