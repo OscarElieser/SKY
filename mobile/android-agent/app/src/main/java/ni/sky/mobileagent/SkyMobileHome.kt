@@ -203,7 +203,7 @@ class SkyMobileHome(
 
     fun showMessage(s: String) {
         status.text = s
-        if (history.isEmpty()) chatOutput.text = s
+        chatOutput.text = s // Los errores y avisos deben verse incluso después de conversar
     }
 
     fun addExchange(question: String, answer: String, engine: String) {
