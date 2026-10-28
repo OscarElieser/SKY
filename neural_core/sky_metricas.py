@@ -284,9 +284,11 @@ def detectar(ahora: datetime | None = None, filas: list | None = None, base: lis
                     f'Llevás USD {costo:.2f} este mes de un presupuesto de USD {float(presupuesto):.2f}.',
                     'Usá Ollama local (SKY_CEREBRO=auto) o subí el presupuesto en .env.')
 
-    # 5) Cerebro lento o fallando
+    # 5) Lentitud local sólo cuando hay mediciones REALES de Ollama.
+    # Un turno con origen='cerebro' también puede haber usado la nube.
     turnos = [f for f in recientes if f['tipo'] == 'turno']
-    cerebro = [f['ms'] for f in turnos if f['origen'] == 'cerebro' and f['ms'] is not None]
+    cerebro = [f['ms'] for f in recientes if f['tipo'] == 'modelo'
+               and str(f['nombre']).startswith('ollama:') and f['ms'] is not None]
     if len(cerebro) >= 3 and percentil(cerebro, 50) > 6000:
         agregar('cerebro_lento', 'media', 'El cerebro local tarda en decidir',
                 f'Mediana de {percentil(cerebro, 50) / 1000:.1f} s en {len(cerebro)} órdenes.',
@@ -473,7 +475,7 @@ def _seg(ms) -> str:
     return f'{ms} ms' if ms < 1000 else f'{ms / 1000:.1f} s'.replace('.', ',')
 
 
-ORIGENES = {'reglas': 'con reglas al instante', 'aprendido': 'con atajos aprendidos', 'cerebro': 'con el cerebro local',
+ORIGENES = {'reglas': 'con reglas al instante', 'aprendido': 'con atajos aprendidos', 'cerebro': 'con el cerebro de SKY',
             'ia': 'con la IA conversacional'}
 
 
@@ -496,7 +498,7 @@ def diagnosticar(r: dict) -> str:
         partes.append(f"El disco está casi lleno ({sis['disco_usado_pct']:.0f} %).")
     cer = (r['asistente']['por_origen'].get('cerebro') or {})
     if cer.get('n') and not any('cerebro' in p['id'] for p in r['problemas']):
-        partes.append(f"Referencia: el cerebro local tardó una mediana de {_seg(cer['p50_ms'])} en {cer['n']} órdenes.")
+        partes.append(f"Referencia: el cerebro de SKY tardó una mediana de {_seg(cer['p50_ms'])} en {cer['n']} órdenes.")
     if not partes:
         return ('Revisé mis indicadores reales y no encuentro fallas: ' + describir(r))
     return 'Esto es lo que encontré en mis mediciones. ' + ' '.join(partes)
