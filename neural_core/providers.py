@@ -130,7 +130,7 @@ def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_
     if provider in ('subasta', 'auction') or (
         provider in ('auto', 'sky') and os.getenv('SKY_CEREBRO', 'auto').strip().lower() == 'subasta'
     ):
-        from .sky_ai_auction import ofertas, max_intentos
+        from .sky_ai_auction import ofertas, max_intentos, registrar_fallo, registrar_exito
         import time
         texto = next((str(m.get('content') or '') for m in reversed(mensajes)
                       if m.get('role') == 'user'), '')
@@ -144,9 +144,12 @@ def reply(mensajes: list[dict], provider: str, model: str|None=None, max_output_
             try:
                 respuesta = reply(mensajes, nombre, max_output_tokens=max_output_tokens)
                 ok = True
+                registrar_exito(nombre)
                 return respuesta
             except ProviderError:
-                pass
+                # El SDK no siempre ofrece un código HTTP confiable aquí.
+                # Suspensión breve en memoria; no registrar errores crudos con claves.
+                registrar_fallo(nombre, 'fallo de texto')
             finally:
                 try:
                     from .sky_metricas import registrar
