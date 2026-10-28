@@ -1,4 +1,20 @@
 # SKY IA Android 0.6 — modo independiente (prueba personal)
+## Versión 0.6.1 — diagnóstico y verificación de claves de Gemini
+
+En la primera configuración, tocá **Copiar clave** en Google AI Studio.
+**NO copies** el nombre/número del proyecto (por ejemplo `projects/...`).
+SKY ahora explica si el formato pegado es incorrecto sin mostrar la clave
+y comprueba la conexión real con Gemini antes de activar el chat.
+La contraseña se guarda cifrada únicamente tras una respuesta válida;
+no se almacena en GitHub ni en SKY Windows.
+
+En cada modificación de `mobile/android-agent/**` sobre `main`, el flujo
+`SKY Android Signed Release Candidate` compila automáticamente una APK
+firmada con el certificado de distribución previamente configurado.
+El ZIP privado del artefacto de GitHub Actions requiere iniciar sesión;
+la APK se encuentra dentro del ZIP. No distribuir la beta de clave personal
+a otros usuarios sin reemplazar la integración por un backend autenticado.
+
 
 SKY Android funciona sin que SKY Windows esté encendida. Esta actualización
 **solo modifica el subproyecto Android**: no altera módulos, puertos,

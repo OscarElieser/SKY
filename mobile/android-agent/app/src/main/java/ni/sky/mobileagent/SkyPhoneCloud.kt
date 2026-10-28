@@ -18,8 +18,36 @@ object SkyPhoneCloud {
     const val MODEL = "gemini-3.5-flash-lite"
     private const val API = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
 
-    fun validPersonalKey(value: String): Boolean =
-        value.length in 20..200 && value.all { it.isLetterOrDigit() || it == '_' || it == '-' }
+    /** Only trim clipboard padding, never alter characters inside an API key. */
+    fun normalizePersonalKey(raw: String): String =
+        raw.trim { it.isWhitespace() || it == '\u200B' || it == '\uFEFF' || it == '\u00A0' }
+
+    /** User-facing validation without revealing any part of the credential. */
+    fun personalKeyProblem(raw: String): String? {
+        val value = normalizePersonalKey(raw)
+        if (value.isBlank()) {
+            return "No se pegó ninguna clave. En Google AI Studio tocá «Copiar clave»."
+        }
+        if (value.startsWith("projects/", ignoreCase = true) ||
+            value.startsWith("project/", ignoreCase = true) ||
+            value.all { it in '0'..'9' }) {
+            return "Pegaste el identificador del proyecto, no la API key. Tocá «Copiar clave»."
+        }
+        if (value.contains("Bearer ", ignoreCase = true) || value.startsWith("{") ||
+            value.startsWith("[") || value.contains("GEMINI_API_KEY=")) {
+            return "Pegá únicamente la clave que entrega «Copiar clave», sin prefijos ni configuración."
+        }
+        if (value.length !in 20..200) {
+            return "La longitud no corresponde a una clave Gemini. Usá «Copiar clave»; no copies el ID del proyecto."
+        }
+        if (value.any { !(it in 'A'..'Z' || it in 'a'..'z' ||
+                    it in '0'..'9' || it == '_' || it == '-') }) {
+            return "La clave tiene espacios o caracteres no permitidos. Copiala de nuevo desde «Copiar clave»."
+        }
+        return null
+    }
+
+    fun validPersonalKey(value: String): Boolean = personalKeyProblem(value) == null
 
     fun makePayload(message: String, history: JSONArray): JSONObject {
         require(message.isNotBlank() && message.length <= 4000) { "Escribí una consulta de hasta 4000 caracteres." }

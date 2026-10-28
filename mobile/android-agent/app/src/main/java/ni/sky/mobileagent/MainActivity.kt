@@ -277,26 +277,74 @@ class MainActivity : Activity() {
                 text = "Autorizo enviar mis mensajes y el contexto reciente a Google Gemini. " +
                     "Entiendo que puedo desactivar SKY Cloud y borrar la clave."
             }
+            content.addView(description("En AI Studio elegí «Copiar clave». " +
+                "No copies el nombre ni el número del proyecto. Nunca compartás tu clave."))
             content.addView(personalKey)
             content.addView(permission)
             content.addView(actionButton("Abrir Google AI Studio para obtener clave") {
                 startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
                     android.net.Uri.parse("https://aistudio.google.com/apikey")))
             })
-            content.addView(actionButton("ACTIVAR SKY ANDROID INDEPENDIENTE") {
-                val value = personalKey.text.toString().trim()
+            lateinit var activationButton: Button
+            activationButton = actionButton("VERIFICAR CLAVE Y ACTIVAR SKY") {
+                val value = SkyPhoneCloud.normalizePersonalKey(personalKey.text.toString())
+                val problem = SkyPhoneCloud.personalKeyProblem(value)
                 if (!permission.isChecked) {
-                    setStatus("Primero autorizá el envío de mensajes a Gemini.")
-                } else if (!SkyPhoneCloud.validPersonalKey(value)) {
-                    setStatus("Ingresá una clave personal válida de Gemini API.")
+                    AlertDialog.Builder(this)
+                        .setTitle("Consentimiento necesario")
+                        .setMessage("Primero autorizá el envío de mensajes y contexto a Gemini.")
+                        .setPositiveButton("Entendido", null).show()
+                } else if (problem != null) {
+                    AlertDialog.Builder(this)
+                        .setTitle("La clave no tiene el formato esperado")
+                        .setMessage(problem)
+                        .setPositiveButton("Entendido", null).show()
                 } else {
-                    tokens.savePersonalCloudKey(value)
-                    personalKey.setText("")
-                    refreshConnection()
-                    settingsDialog?.dismiss()
-                    showSettings()
+                    activationButton.isEnabled = false
+                    activationButton.text = "Comprobando conexión con Gemini…"
+                    execute {
+                        // Only Google verifies the key; no key is logged or sent to SKY Windows.
+                        try {
+                            SkyPhoneCloud.reply(value, "Respondé solamente: lista.", JSONArray())
+                            runOnUiThread {
+                                if (isFinishing) return@runOnUiThread
+                                tokens.savePersonalCloudKey(value)
+                                personalKey.setText("")
+                                refreshConnection()
+                                settingsDialog?.dismiss()
+                                AlertDialog.Builder(this)
+                                    .setTitle("SKY Android activada")
+                                    .setMessage("Conexión con Gemini verificada. Ya podés conversar " +
+                                        "por texto o voz sin SKY Windows.")
+                                    .setPositiveButton("Comenzar") { _, _ -> home.openChat() }
+                                    .show()
+                            }
+                        } catch (error: Exception) {
+                            val message = when (error) {
+                                is IllegalStateException -> error.message
+                                    ?: "Gemini no aceptó la solicitud."
+                                is java.net.UnknownHostException ->
+                                    "No se pudo encontrar Google. Revisá tu conexión a internet."
+                                is java.net.SocketTimeoutException ->
+                                    "La conexión tardó demasiado. Intentá de nuevo."
+                                is javax.net.ssl.SSLException ->
+                                    "Falló la conexión HTTPS. Revisá fecha, red y certificados de Android."
+                                else -> "No fue posible verificar Gemini. Revisá la conexión e intentá de nuevo."
+                            }
+                            runOnUiThread {
+                                if (isFinishing) return@runOnUiThread
+                                activationButton.isEnabled = true
+                                activationButton.text = "VERIFICAR CLAVE Y ACTIVAR SKY"
+                                AlertDialog.Builder(this)
+                                    .setTitle("SKY aún no está activada")
+                                    .setMessage(message)
+                                    .setPositiveButton("Entendido", null).show()
+                            }
+                        }
+                    }
                 }
-            })
+            }
+            content.addView(activationButton)
         }
         content.addView(actionButton(if (showOptionalWindowsLink || linked)
             "Ocultar conexión Windows (opcional)" else "Conexión Windows (opcional)") {
