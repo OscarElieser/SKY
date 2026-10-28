@@ -1,6 +1,9 @@
 name: SKY Android Signed Release Candidate
 permissions:
   contents: read
+concurrency:
+  group: sky-android-signed-${{ github.ref }}
+  cancel-in-progress: true
 on:
   workflow_dispatch:
   push:
