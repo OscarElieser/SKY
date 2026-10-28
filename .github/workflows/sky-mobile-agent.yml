@@ -1,4 +1,9 @@
 name: SKY Mobile Android Agent
+permissions:
+  contents: read
+concurrency:
+  group: sky-mobile-agent-${{ github.ref }}
+  cancel-in-progress: true
 on:
   push:
     paths:
