@@ -11,6 +11,9 @@ from neural_core import sky_ai_diagnostics, sky_cerebro
 class TestSkyAiDiagnostics(unittest.TestCase):
     def tearDown(self):
         sky_cerebro.preferir(None)
+        from neural_core import sky_ai_auction
+        with sky_ai_auction._FALLOS_LOCK:
+            sky_ai_auction._FALLOS.clear()
 
     def test_http_429_quota_without_leaking_provider_message_or_url(self):
         err = urllib.error.HTTPError(
