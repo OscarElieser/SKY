@@ -326,10 +326,13 @@ class MainActivity : Activity() {
         content.addView(actionButton("Autodiagnóstico Android") {
             showDeviceDiagnostics()
         })
-        content.addView(actionButton("Escritura asistida en WhatsApp/Gmail") {
-            showTextAssistDisclosure()
-        })
-        if (getSharedPreferences("sky_assistive_text", MODE_PRIVATE)
+        if (BuildConfig.ENABLE_TEXT_ASSIST) {
+            content.addView(actionButton("Escritura asistida en WhatsApp/Gmail") {
+                showTextAssistDisclosure()
+            })
+        }
+        if (BuildConfig.ENABLE_TEXT_ASSIST &&
+            getSharedPreferences("sky_assistive_text", MODE_PRIVATE)
                 .getBoolean("consent", false)) {
             content.addView(actionButton("Desactivar escritura asistida") {
                 getSharedPreferences("sky_assistive_text", MODE_PRIVATE)
