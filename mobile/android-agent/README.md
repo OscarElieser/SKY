@@ -1,10 +1,46 @@
-# SKY Android — Núcleo móvil y perfiles sociales 0.8.5
+# SKY Android — Redes y autorización oficial Instagram 0.8.6
 
 **Beta Android independiente de Windows.** Diseño con **solo ojos y boca animados**, sin máscara ni rostro. Órdenes del teléfono por texto y voz, supervisadas por el usuario.
 
-**Código en `main`: 0.8.5 (versionCode 18).** La APK se distribuye solo cuando aparece firmada en GitHub Releases. No desinstalés la versión anterior sin respaldo.
+**Código en `main`: 0.8.6 (versionCode 19).** La APK se distribuye solo cuando aparece firmada en GitHub Releases. No desinstalés la versión anterior sin respaldo.
 
 [**Ver las versiones APK efectivamente publicadas**](https://github.com/OscarElieser/SKY/releases) · [Versiones Android publicadas](https://github.com/OscarElieser/SKY/releases) · [Guía de instalación y seguridad](apk/README.md)
+
+## Instagram @usuario — preparación real de autorización (0.8.6)
+
+La API profesional de Meta **no autoriza cuentas personales**. Para
+usar estadísticas y publicación directa en tu propia cuenta,
+desde Instagram cambiá a **Creador** (gratis; conserva seguidores
+y publicaciones, pero implica que el perfil sea público):
+
+1. Instagram → Perfil → ☰ → **Tipo de cuenta y herramientas** →
+   **Cambiar a cuenta profesional** → **Creador**.
+2. Verificá el **Panel para profesionales** en Instagram.
+3. En SKY → Ajustes → **MIS REDES · PERFIL Y ENLACES PÚBLICOS** →
+   seleccioná Instagram → **Preparar acceso oficial de Instagram**.
+4. Elegí **Ya cambié a Creador** solamente cuando lo hayas completado.
+   SKY guarda el dato local como **declaración**, jamás como conexión
+   verificable por API.
+5. Para la autorización posterior, registrar una app en
+   [Meta for Developers](https://developers.facebook.com/apps/) y
+   configurar **Instagram API with Instagram Login**, un callback
+   HTTPS y un backend seguro para conservar el secreto de Meta.
+   Esta ruta no exige una Página de Facebook.
+6. Permisos oficiales necesarios, separables por función:
+   `instagram_business_basic` para el perfil,
+   `instagram_business_manage_insights` para estadísticas,
+   `instagram_business_content_publish` para publicaciones.
+
+**Estado real:** todavía no hay aplicación Meta registrada y configurada
+para SKY ni un backend OAuth activo; por tanto, no existe botón de
+inicio de sesión funcional ni acceso autorizado a estadísticas.
+El paso de Creador no concede automáticamente permisos a SKY.
+
+[Leé la guía técnica completa y sus requisitos de seguridad](INSTAGRAM_OAUTH_SETUP.md).
+No ingresés ni compartás contraseñas, tokens, códigos 2FA o secretos
+de Meta. No se cambia ninguna configuración en SKY Windows.
+
+---
 
 ## SKY Android 0.8.5 — mis cuentas y perfiles sociales
 
