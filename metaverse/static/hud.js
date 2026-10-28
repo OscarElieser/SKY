@@ -2821,7 +2821,7 @@
   /* ------------------------------------------------------------------ reproductor */
   const YT = 'https://www.youtube.com';
   let lista = [], indice = 0, ytVerificado = false, ytApiPlayerPromise = null, ytIntentos = new Set(), ytModoActual = 'normal';
-  let ytSesion = 0, ytVigilanciaTimer = null, ytReproduccionConfirmada = false;
+  let ytSesion = 0, ytVigilanciaTimer = null, ytReproduccionConfirmada = false, ytAvisosChat = new Set();
   function cancelarVigilanciaYT() {
     if (ytVigilanciaTimer !== null) clearTimeout(ytVigilanciaTimer);
     ytVigilanciaTimer = null;
@@ -2857,6 +2857,34 @@
     acciones.appendChild(cerrarAviso);
     aviso.appendChild(acciones);
     actual.el.appendChild(aviso);
+    // El usuario puede tener la ventana del reproductor bloqueada detrás del chat.
+    // Presentar la salida oficial también en la conversación, con acciones reales.
+    if (!ytAvisosChat.has(videoId)) {
+      ytAvisosChat.add(videoId);
+      const tarjeta = addCard('YouTube no confirmó la reproducción', mensaje);
+      const opciones = el('div', 'btns');
+      const ver = el('a', 'btn', 'Abrir video original');
+      ver.href = 'https://www.youtube.com/watch?v=' + encodeURIComponent(videoId);
+      ver.target = '_blank'; ver.rel = 'noopener noreferrer';
+      opciones.appendChild(ver);
+      if (lista.length > 1) {
+        const otroChat = el('button', 'btn', 'Probar otra versión');
+        otroChat.type = 'button';
+        otroChat.addEventListener('click', () => {
+          const siguiente = lista.findIndex((v, pos) =>
+            pos !== indice && v && !ytIntentos.has(v.id));
+          if (siguiente < 0) {
+            otroChat.disabled = true;
+            otroChat.textContent = 'No quedan más videos';
+            return;
+          }
+          indice = siguiente; mostrarVideo(); aplicarModoVentana('player', ytModoActual);
+        });
+        opciones.appendChild(otroChat);
+      }
+      tarjeta.appendChild(opciones);
+      scroll();
+    }
   }
   // Carga bajo demanda la API oficial: permite observar errores reales del iframe.
   function cargarIframePlayerApi() {
@@ -2936,7 +2964,7 @@
   }
   async function reproductor(consulta, mode = 'normal') {
     setState('thinking', 'Buscando “' + consulta + '”');
-    ytModoActual = mode; ytIntentos = new Set();
+    ytModoActual = mode; ytIntentos = new Set(); ytAvisosChat = new Set();
     let r;
     try { r = await api('/api/hud/youtube?q=' + encodeURIComponent(consulta)); } catch (e) { r = { embebible: false, motivo: e.message }; }
     if (!r.embebible) {
