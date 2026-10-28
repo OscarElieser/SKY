@@ -275,7 +275,8 @@ class SkyEyeVoicePanel(
             return
         }
         // El motor TTS de Android acepta una cantidad limitada de caracteres por turno.
-        val clean = text.trim().take(min(3500, TextToSpeech.getMaxSpeechInputLength() - 1))
+        val clean = SkySpokenText.prepare(text)
+            .take(min(3500, TextToSpeech.getMaxSpeechInputLength() - 1))
         if (clean.isBlank()) {
             setMode(EyeMode.IDLE, "Respuesta vacía.")
             return
