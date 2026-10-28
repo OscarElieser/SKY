@@ -93,3 +93,28 @@ de APK, reconexión, incidencias por suspensión del sistema, experiencia
 holográfica Flutter y notificaciones para órdenes pendientes cuando la app
 no está abierta. Android limita lanzamientos de apps y servicios en segundo
 plano: no se debe prometer control continuo incondicional.
+
+## Ojo animado y conversación hablada (en desarrollo, rama main)
+
+La interfaz nativa incluye un ojo que cambia de estado (en espera, escucha,
+procesamiento, respuesta y error), un botón **Hablar con SKY**, un botón
+**Detener** y la opción **SKY responde con voz**. El reconocimiento usa
+`SpeechRecognizer` y la lectura de respuestas usa el motor Android
+`TextToSpeech` disponible en el teléfono. Se conecta al mismo endpoint de
+chat `/api/sky/mobile-chat/chat`: no reemplaza la autenticación ni la
+memoria existente del servidor.
+
+Para probar: vincular primero el agente con HTTPS privado; activar el chat
+autorizado por el propietario con su código temporal; tocar **Hablar con SKY**,
+autorizar el micrófono y dictar una pregunta. El texto reconocido pasa al
+chat y, cuando llega una respuesta, SKY la lee en voz alta si la casilla está
+activada. El usuario puede detener la salida de voz.
+
+**Límites**: no hay palabra de activación permanente, ni escucha cuando
+la app no está visible, ni voz neuronal propia. El reconocimiento y la calidad
+de las voces dependen del servicio configurado en Android y pueden requerir
+internet; la aplicación no controla cómo procesa audio ese proveedor. El
+chat sigue sujeto a autorización independiente y los permisos existentes.
+La APK de CI requiere aún pruebas físicas de micrófono, audio, idioma,
+tiempos de respuesta y ciclo de vida. No se garantiza una experiencia Alexa
+completa con este primer incremento.
