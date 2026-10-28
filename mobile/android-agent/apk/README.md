@@ -1,15 +1,15 @@
-# SKY Android 0.8.0 — APK beta firmada
+# SKY Android 0.8.1 — APK beta firmada
 
-**[Descargar APK de SKY Android 0.8.0](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.0/SKY-IA-Android-v0.8.0-firmada.apk)** · [Página oficial de la Release](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.0) · [README Android](../README.md)
+**[Descargar APK de SKY Android 0.8.1 tras publicación de la Release](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.1/SKY-IA-Android-v0.8.1-firmada.apk)** · [Página oficial de la Release](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.1) · [README Android](../README.md)
 
-La versión **0.8.0** presenta únicamente ojos y boca animados e incorpora órdenes de WhatsApp que abren el compositor con **confirmación del usuario**, sin enviar de forma silenciosa. SKY Windows permanece intacto.
+La versión **0.8.1** conserva los ojos y boca animados, los comandos supervisados de WhatsApp y añade **SKY Estudio Creativo**, con guiones y planes para redes sociales desde el teléfono. Los borradores se comparten mediante el selector oficial de Android; publicar y elegir la cuenta son decisiones del usuario. SKY Windows permanece intacto.
 
 ## Instalación en Samsung
 
-1. Entrá a GitHub Releases desde Chrome en el Samsung y descargá el archivo `SKY-IA-Android-v0.8.0-firmada.apk` dentro de **Assets**. No hace falta descomprimir ZIP.
+1. Entrá a GitHub Releases desde Chrome en el Samsung y descargá el archivo `SKY-IA-Android-v0.8.1-firmada.apk` dentro de **Assets**. No hace falta descomprimir ZIP.
 2. Instalá sobre la APK release anterior, si utiliza el mismo certificado; **no desinstalés** sin respaldo de claves/notas.
 3. Si Google Play Protect detecta un riesgo, no desactives la protección ni forces la instalación. Revisá el mensaje exacto.
-4. Comprobá visualmente ojos y boca; probá voz, abrir apps y el borrador de WhatsApp sin enviarlo hasta que decidas.
+4. Comprobá ojos y boca, voz, apertura de aplicaciones y WhatsApp. Desde Ajustes, abrí **ESTUDIO CREATIVO · MIS REDES SOCIALES**, generá un borrador y revisá el menú para copiar/compartir. Ninguna publicación se envía automáticamente.
 5. Si Android rechaza la actualización, compará firma y versión antes de borrar datos.
 
 ## Integridad y publicación
