@@ -516,6 +516,12 @@ def main():
                     'wordless_active': False, 'coordinator_state': VoiceState.ESPERANDO_ACTIVACION.value})
 
 def _start_single_instance() -> None:
+    # --list-input-devices consulta metadatos de PortAudio; NO abre un
+    # stream de captura. No debe bloquearse por la escucha ya activa.
+    # Cualquier modo que abra el micrófono conserva el mutex original.
+    if '--list-input-devices' in sys.argv[1:]:
+        main()
+        return
     # Prevenir dos capturas Vosk del mismo micrófono antes de cargar el modelo.
     from neural_core.sky_voice_single_instance import single_voice_instance
     with single_voice_instance() as acquired:
