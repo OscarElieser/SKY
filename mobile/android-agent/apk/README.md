@@ -1,10 +1,36 @@
-# SKY Android 0.8.3 — APK beta pendiente de firma
+# SKY Android 0.8.5 — guía de instalación y perfiles sociales
+
+**Estado:** código `0.8.5` en GitHub `main`. Descargar la APK
+únicamente desde [Releases](https://github.com/OscarElieser/SKY/releases)
+una vez aprobada la compilación y firma; hasta entonces conservá la
+versión instalada y no desinstalés sin respaldo.
+
+## Importar los perfiles públicos proporcionados por el usuario
+
+1. Descargá en tu Samsung el **archivo JSON de perfiles** que preparaste
+   para SKY Android; el repositorio público **no contiene perfiles
+   personales ni teléfonos/correos**.
+2. Una vez instalada la versión 0.8.5 firmada, abrí
+   **Ajustes → MIS REDES · PERFIL Y ENLACES PÚBLICOS**.
+3. Elegí **Importar perfiles JSON** y seleccioná el archivo desde
+   **Mis archivos → Descargas**. SKY guarda solo nombres de usuario
+   públicos y, si falta el enlace de Facebook, deja el nombre visible
+   sin inventar una URL.
+4. Tocá una cuenta para abrir su perfil, usar Estudio Creativo,
+   editar o quitar su identificador.
+5. El estado correcto es **«Identificada, sin autorización OAuth»**.
+   No significa que SKY pueda consultar métricas privadas, acceder
+   a conversaciones ni publicar automáticamente.
+
+La importación no requiere contraseña, código de verificación, número
+de WhatsApp ni clave de Google. Para conexiones reales se necesitarán
+autorizaciones OAuth oficiales y permisos aprobados por plataforma.
 
 **SKY 0.8.3 es código integrado en main; no confundás ese estado
 con una APK publicada.** Verificá [GitHub Releases](https://github.com/OscarElieser/SKY/releases)
-antes de instalar. Cuando aparezca la etiqueta `sky-android-v0.8.3`, la
+antes de instalar. Cuando aparezca la etiqueta `sky-android-v0.8.5`, la
 APK firmada se llamará
-`SKY-IA-Android-v0.8.3-firmada.apk` y habrá un archivo `.sha256`.
+`SKY-IA-Android-v0.8.5-firmada.apk` y habrá un archivo `.sha256`.
 La firma debe coincidir con la versión anterior para actualizar sin
 borrar datos.
 
@@ -19,7 +45,7 @@ MediaCodec/OpenGL ES se debe comprobar en el Samsung real. La
 sincronización automática de estadísticas y publicación directa
 no están activadas: requieren OAuth e integración oficial.
 
-**[Descargar APK de SKY Android 0.8.3 tras publicación de la Release](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.3/SKY-IA-Android-v0.8.3-firmada.apk)** · [Página oficial de la Release](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.3) · [README Android](../README.md)
+**[Descargar APK de SKY Android 0.8.3 tras publicación de la Release](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.5/SKY-IA-Android-v0.8.5-firmada.apk)** · [Página oficial de la Release](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.5) · [README Android](../README.md)
 
 La versión **0.8.3** conserva los ojos y boca animados, los comandos supervisados de WhatsApp y añade **SKY Estudio Creativo**, con guiones y planes para redes sociales desde el teléfono. Los borradores se comparten mediante el selector oficial de Android; publicar y elegir la cuenta son decisiones del usuario. SKY Windows permanece intacto.
 
@@ -35,14 +61,14 @@ al celular. SKY Windows no cambia.
 
 **Publicación:** el enlace de APK 0.8.3 únicamente está disponible cuando
 [Releases](https://github.com/OscarElieser/SKY/releases) muestra el tag
-`sky-android-v0.8.3` con el archivo
-`SKY-IA-Android-v0.8.3-firmada.apk` y su archivo `.sha256`. No se debe
+`sky-android-v0.8.5` con el archivo
+`SKY-IA-Android-v0.8.5-firmada.apk` y su archivo `.sha256`. No se debe
 usar una APK de Actions sin revisar firma y versión, ni desinstalar la
 versión anterior sin respaldo.
 
 ## Instalación en Samsung
 
-1. Entrá a GitHub Releases desde Chrome en el Samsung y descargá el archivo `SKY-IA-Android-v0.8.3-firmada.apk` dentro de **Assets**. No hace falta descomprimir ZIP.
+1. Entrá a GitHub Releases desde Chrome en el Samsung y descargá el archivo `SKY-IA-Android-v0.8.5-firmada.apk` dentro de **Assets**. No hace falta descomprimir ZIP.
 2. Instalá sobre la APK release anterior, si utiliza el mismo certificado; **no desinstalés** sin respaldo de claves/notas.
 3. Si Google Play Protect detecta un riesgo, no desactives la protección ni forces la instalación. Revisá el mensaje exacto.
 4. Comprobá ojos y boca, voz, apertura de aplicaciones y WhatsApp. Desde Ajustes, abrí **ESTUDIO CREATIVO · MIS REDES SOCIALES**, generá un borrador y revisá el menú para copiar/compartir. Ninguna publicación se envía automáticamente.
