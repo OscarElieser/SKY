@@ -1,4 +1,4 @@
-# SKY Android — Asistente personal 0.8.2
+# SKY Android — Núcleo móvil + Estudio Creativo 0.8.3
 
 **Beta Android independiente de Windows.** Diseño con **solo ojos y boca animados**, sin máscara ni rostro. Órdenes del teléfono por texto y voz, supervisadas por el usuario.
 
@@ -26,6 +26,88 @@
 6. Preguntale algo a Gemini y comprobá la voz natural. **Conversación fluida** es opcional y solo funciona en primer plano, con límite de turnos.
 
 **Seguridad:** las claves Gemini no se publican en GitHub; se guardan cifradas en Android Keystore para esta beta personal. Para distribución pública es necesario un backend autenticado. No compartir credenciales en capturas ni mensajes.
+
+---
+
+## SKY Android 0.8.3 — datos reales, MP4 y publicación supervisada
+
+### 1. Consultar y analizar métricas reales en el propio teléfono
+
+En **Ajustes → MÉTRICAS REALES · IMPORTAR ESTADÍSTICAS** ahora podés
+importar registros de estadísticas de tus perfiles, **sin enviar las cifras
+a Gemini ni a terceros**. El archivo CSV debe incluir como mínimo las
+columnas `Plataforma,Publicacion,Vistas` y puede incluir
+`Likes,Comentarios,Compartidos,Seguidores,Fecha`. También reconoce
+varios encabezados equivalentes en inglés.
+
+Ejemplo **ficticio de formato**, NO estadísticas reales:
+```csv
+Plataforma,Publicacion,Vistas,Likes,Comentarios,Compartidos,Seguidores,Fecha
+TikTok,Mi primer video,120,10,2,1,0,2026-10-28
+Instagram,Mi segundo video,240,25,3,4,2,2026-10-28
+```
+
+Usá números que **vos hayas obtenido realmente** de TikTok Studio,
+Instagram Insights, YouTube Studio u otras fuentes oficiales. Algunos
+exportes vienen con columnas o formatos distintos: adaptalos antes de
+importar. SKY calcula vistas, interacción por vista y publicaciones
+destacadas. El análisis es local y se puede borrar en Ajustes.
+
+**Estado:** importación CSV voluntaria e interpretación local.
+**No hay sincronización automática OAuth**: requiere autorización de
+cada perfil, registro de la app y permisos aprobados por la red.
+No afirma que sean métricas consultadas directamente de las APIs.
+
+### 2. Crear un video MP4 sin salir de SKY
+
+En **Ajustes → ESTUDIO CREATIVO · MIS REDES SOCIALES**, elegí una red,
+escribí el tema y elegí **Crear publicación**. Después de revisar el
+guion generado, tocá **Crear video MP4**. SKY construye en el propio
+teléfono un video **vertical H.264 de 720×1280, 10 segundos, 15 fps**
+con cinco escenas de **texto animado** y fondos de colores. No emplea
+imagen generativa remota ni requiere salir ante cámara.
+
+**Límite actual:** MP4 sin sonido, sin videos de stock, sin voz en off
+ni fotos; completá la edición con música propia o licenciada y material
+original dentro del editor de Instagram/TikTok/YouTube. La generación
+usa el codificador de hardware **MediaCodec/OpenGL ES** disponible en
+Android. Puede fallar si el dispositivo no lo admite o no tiene espacio.
+**Se necesita una prueba real en el Samsung**: superar CI no garantiza
+que el codificador concreto funcione en todos los dispositivos.
+
+SKY ofrece **Compartir video** mediante una URI temporal de solo
+lectura, sin publicar por sí misma. La app que elijas y el propietario
+confirman dónde y cuándo se publica.
+
+### 3. Publicación automatizada y cuentas conectadas
+
+La app ya permite compartir texto y video desde Android para completar
+la publicación en la red elegida. **No está conectada por OAuth
+a tus perfiles y no puede publicar silenciosamente.** Publicación
+directa con programación, estadísticas remotas y confirmación de
+publicación requieren:
+- TikTok: app registrada y permisos `video.publish`, autorización del
+  creador y auditoría para publicaciones públicas.
+- Instagram/Facebook: integración Meta y acceso autorizado a las
+  cuentas compatibles (Instagram profesional para la API relevante).
+- YouTube: OAuth para Analytics y permisos de subida para publicar;
+  la clave API de Gemini **no sustituye** el acceso de YouTube.
+
+### 4. Teléfono como núcleo independiente
+
+El reconocimiento de órdenes, gestión de permisos, interfaz, notas,
+estadísticas importadas, generación del MP4 y reproducción local se
+ejecutan **en Android**. Gemini sigue siendo opcionalmente el motor
+remoto de lenguaje para tareas inteligentes; el teléfono orquesta
+las herramientas y protege los datos que el usuario no autorizó
+compartir. Android no ofrece acceso irrestricto a credenciales,
+datos de todas las apps, cámara, micrófono ni permisos de publicación;
+la autonomía se construye con permisos verificables y límites por tarea.
+
+**Versión de código:** `0.8.3`, `versionCode=16`.
+**Distribución:** solo instalar después de que la compilación, pruebas,
+firma y Release sean aprobadas en GitHub. Los APK anteriores permanecen
+como respaldo. SKY Windows no fue modificado.
 
 ---
 
