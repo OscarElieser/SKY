@@ -2,9 +2,11 @@
 
 **Beta Android independiente de Windows.** Diseño con **solo ojos y boca animados**, sin máscara ni rostro. Órdenes del teléfono por texto y voz, supervisadas por el usuario.
 
-[**Descargar APK firmada 0.8.1**](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.1/SKY-IA-Android-v0.8.1-firmada.apk) · [GitHub Releases](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.1) · [Guía de instalación](apk/README.md)
+**Código en `main`: 0.8.2 · APK 0.8.2 pendiente de validación CI.**
 
-## Novedades 0.8.1
+[**Ver las versiones APK efectivamente publicadas**](https://github.com/OscarElieser/SKY/releases) · [Última APK confirmada, 0.8.0](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.0) · [Guía de instalación y seguridad](apk/README.md)
+
+## Historial de diseño y comandos 0.8.1 (referencia)
 
 - SKY ya no dibuja un rostro gigante. Los **dos ojos ovalados** flotan, parpadean y se mueven; **la boca** sonríe y se anima al hablar. Conserva estados escuchar, pensar, hablar y error.
 - El fondo mantiene una iluminación violeta/turquesa discreta. Los controles de voz, chat y detener permanecen accesibles y se ajusta el panel a la barra de navegación Android.
@@ -16,7 +18,7 @@
 
 ## Prueba en el Samsung
 
-1. Instalá la APK 0.8.1 **encima** de 0.7.1; no desinstalés ni borres la clave local. Si Play Protect muestra un riesgo, no fuerces la instalación.
+1. Descargá una APK **solo cuando figure publicada y firmada** en GitHub Releases. Instalá encima de la anterior sin desinstalar ni borrar la clave local. Si Play Protect muestra un riesgo, no fuerces la instalación.
 2. Comprobá que solo se vean dos ojos y la boca. Tocá los ojos y observá sus gestos.
 3. Presioná **HABLAR** y decí «SKY, abrí YouTube»; confirmá el permiso cuando Android lo solicite.
 4. Decí «SKY, mandá un mensaje a Ana: hola, ¿cómo estás?». Verificá la vista previa. Pulsá **ABRIR WHATSAPP**, elegí la conversación y decidí si lo enviás.
