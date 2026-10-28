@@ -26,6 +26,10 @@ def eligible(text: str, history: list[dict] | None = None) -> bool:
     """Opt-in deliberado. La función requiere además el modo local breve."""
     if os.getenv("SKY_VOICE_STREAM_LOCAL", "0").lower() not in ("1", "true", "yes", "si"):
         return False
+    # Una elección explícita de API cloud para voz tiene prioridad sobre
+    # el nuevo modo local; jamás sustituirla silenciosamente.
+    if os.getenv("SKY_VOICE_PROVIDER", "auto").strip().lower() not in ("auto", "sky", "ollama"):
+        return False
     from .sky_cerebro import contexto_local_breve
     return contexto_local_breve(text, history)
 
