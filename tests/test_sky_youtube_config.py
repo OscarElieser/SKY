@@ -2,11 +2,30 @@
 from __future__ import annotations
 
 from unittest.mock import patch
+import subprocess
+import sys
+from pathlib import Path
 
 # La API registra el router HUD. Importarla primero evita el ciclo
 # hud_api -> api -> hud_api durante la colección aislada de pytest.
 from metaverse import api as _sky_api  # noqa: F401
 from metaverse import hud_api
+
+
+def test_hud_api_can_be_imported_first_without_circular_import():
+    """Reproduce el fallo real del diagnóstico original, en intérprete nuevo."""
+    root = Path(__file__).resolve().parents[1]
+    code = (
+        "from metaverse.hud_api import _youtube_clave, router; "
+        "from metaverse.api import app; "
+        "assert callable(_youtube_clave); "
+        "assert router is not None; assert app is not None"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], cwd=root, capture_output=True,
+        text=True, timeout=35,
+    )
+    assert result.returncode == 0, (result.stderr or result.stdout)[-1600:]
 
 
 def test_api_reads_local_dotenv_even_if_process_started_before_key(monkeypatch, tmp_path):
