@@ -27,7 +27,8 @@ class SkySocialStudio(
     private fun dp(value: Int) =
         (value * host.resources.displayMetrics.density + 0.5f).toInt()
 
-    fun showCreatorMenu(onGenerate: (SkySocialCommand.Request) -> Unit) {
+    fun showCreatorMenu(initialPlatform: String? = null,
+                        onGenerate: (SkySocialCommand.Request) -> Unit) {
         val content = LinearLayout(host).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(21), dp(12), dp(21), dp(12))
@@ -47,6 +48,8 @@ class SkySocialStudio(
         val platform = Spinner(host)
         platform.adapter = ArrayAdapter(host,
             android.R.layout.simple_spinner_dropdown_item, SkySocialCommand.platforms)
+        val selected = SkySocialCommand.platforms.indexOf(initialPlatform)
+        if (selected >= 0) platform.setSelection(selected)
         content.addView(platform)
         val topic = EditText(host).apply {
             hint = "¿Sobre qué querés publicar? Ej.: rincones de Nicaragua"
