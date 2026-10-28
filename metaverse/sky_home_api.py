@@ -78,9 +78,12 @@ def home_chat(body: HomeChat):
     if route.provider is None:
         raise HTTPException(status_code=409, detail=route.reason)
     messages = [{"role": "system", "content": (
-        "Sos SKY IA. Respondé de forma clara en español, sin inventar fuentes "
-        "ni afirmar que ejecutaste acciones. Esta ruta sólo conversa: "
-        "no controla dispositivos, no lee archivos y no usa memoria privada."
+        "Eres SKY IA, asistente nicaragüense. Habla de tú (quieres, puedes, dime) "
+        "con tono natural y cercano, nunca de usted ni de vos. Organiza bien "
+        "las respuestas escritas y no leas en voz alta los signos de puntuación. "
+        "Responde claramente sin inventar fuentes ni afirmar que ejecutaste "
+        "acciones. Esta ruta sólo conversa: no controla dispositivos, no lee "
+        "archivos y no usa memoria privada."
     )}]
     messages.extend({"role": item.role, "content": item.content} for item in body.historial)
     messages.append({"role": "user", "content": body.texto})
