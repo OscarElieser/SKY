@@ -1,0 +1,82 @@
+"""La subasta explica fallos sin exponer credenciales ni respuestas privadas."""
+import io
+import os
+import unittest
+import urllib.error
+from unittest.mock import patch
+
+from neural_core import sky_ai_diagnostics, sky_cerebro
+
+
+class TestSkyAiDiagnostics(unittest.TestCase):
+    def tearDown(self):
+        sky_cerebro.preferir(None)
+
+    def test_http_429_quota_without_leaking_provider_message_or_url(self):
+        err = urllib.error.HTTPError(
+            'https://example.com?key=SKY_SECRET_NEVER_SHOW', 429, 'Private message', {},
+            io.BytesIO(b'{"error":{"status":"RESOURCE_EXHAUSTED",'
+                       b'"message":"My private API key is SKY_SECRET_NEVER_SHOW"}}'))
+        value = sky_ai_diagnostics.error_seguro('gemini', err)
+        self.assertIn('GEMINI HTTP 429', value)
+        self.assertIn('RESOURCE_EXHAUSTED', value)
+        self.assertNotIn('SKY_SECRET_NEVER_SHOW', value)
+        self.assertNotIn('Private message', value)
+
+    def test_http_404_model_and_nonjson_body(self):
+        err = urllib.error.HTTPError(
+            'https://host.test/key=SECRET', 404, 'bad', {},
+            io.BytesIO(b'the key SECRET is invalid'))
+        value = sky_ai_diagnostics.error_seguro('openai', err)
+        self.assertIn('OPENAI HTTP 404', value)
+        self.assertIn('modelo', value)
+        self.assertNotIn('SECRET', value)
+
+    def test_redact_urlerror(self):
+        err = urllib.error.URLError('SKY_SECRET_NEVER_SHOW')
+        self.assertNotIn('SKY_SECRET_NEVER_SHOW',
+                         sky_ai_diagnostics.error_seguro('gemini', err))
+
+    def test_auction_reports_each_provider_failure(self):
+        def fake_events(provider, texto, history, modo, info):
+            if provider == 'gemini':
+                yield 'error', 'GEMINI HTTP 429: cuota agotada'
+            else:
+                yield 'error', 'OPENAI HTTP 401: autenticacion rechazada'
+
+        with patch.dict(os.environ, {'SKY_CEREBRO':'subasta','SKY_LOCAL_ONLY':'0'}, clear=False), \
+             patch('neural_core.sky_ai_auction.ofertas',
+                   return_value=[{'proveedor':'gemini'}, {'proveedor':'openai'}]), \
+             patch('neural_core.sky_cerebro._eventos_nube', side_effect=fake_events), \
+             patch('neural_core.sky_metricas.registrar'):
+            sky_cerebro.preferir(None)
+            result = sky_cerebro.decidir('Explica la fotosintesis', modo='chat')
+        self.assertEqual(result['tipo'], 'error')
+        self.assertIn('gemini', result['mensaje'])
+        self.assertIn('openai', result['mensaje'])
+        self.assertIn('429', result['mensaje'])
+        self.assertIn('401', result['mensaje'])
+
+    def test_partial_response_never_retries_cloud(self):
+        def fake_events(provider, texto, history, modo, info):
+            yield 'delta', 'respuesta parcial'
+            yield 'error', 'GEMINI HTTP 503: servicio indisponible'
+
+        with patch.dict(os.environ, {'SKY_CEREBRO':'subasta','SKY_LOCAL_ONLY':'0'}, clear=False), \
+             patch('neural_core.sky_ai_auction.ofertas',
+                   return_value=[{'proveedor':'gemini'}, {'proveedor':'openai'}]), \
+             patch('neural_core.sky_cerebro._eventos_nube', side_effect=fake_events) as requests, \
+             patch('neural_core.sky_metricas.registrar'):
+            sky_cerebro.preferir(None)
+            answer = sky_cerebro.decidir('Explica', modo='chat')
+            self.assertEqual(answer['tipo'], 'error')
+            self.assertEqual(requests.call_count, 1)
+
+    def test_invalid_api_response_never_discloses_internal_exception_text(self):
+        exc = RuntimeError('SKY_SECRET_NEVER_SHOW')
+        self.assertNotIn('SKY_SECRET_NEVER_SHOW',
+                         sky_ai_diagnostics.error_seguro('openai', exc))
+
+
+if __name__ == '__main__':
+    unittest.main()
