@@ -1,3 +1,45 @@
+# SKY IA Android 0.2 — interfaz principal inmersiva
+
+**Interfaz actual:** abre a pantalla completa, con SKY y sus ojos animados como
+protagonistas, controles de voz, conversación, accesos rápidos para redactar
+instrucciones de investigación/documentos/código y un acceso a Ajustes.
+
+### Configuración inicial y sesiones
+- El enlace con el SKY Core por HTTPS privado se solicita únicamente cuando
+  el teléfono no tiene un token válido almacenado en Android Keystore.
+- Una vez vinculado, las entradas de URL, nombre y código **no aparecen en el
+  inicio**. La pantalla principal se abre directamente con SKY.
+- El propietario puede consultar permisos, estado y revocación desde Ajustes.
+- El chat tiene un permiso separado y temporal de 24 horas. Al caducar,
+  se solicita **renovarlo**, sin repetir la vinculación del teléfono.
+- Cada petición en la nube o que contenga datos privados requiere autorización
+  nueva mediante el panel Privacidad; ninguna casilla queda marcada después
+  de enviar una consulta.
+- Los accesos de investigación, documentos y código **preparan solicitudes
+  para el chat de SKY Core**; no convierten por sí solos al Android en
+  controlador general de estas tareas ni habilitan ejecución arbitraria.
+- El reconocimiento de voz sigue requiriendo un toque. No se incorpora
+  escucha en segundo plano o con pantalla bloqueada.
+
+### Actualización e instalación
+GitHub Actions genera un APK de depuración en el artefacto
+`sky-mobile-agent-debug` del workflow **SKY Mobile Android Agent**.
+Es una compilación técnica; aún requiere pruebas físicas en Samsung/Android.
+
+**Firma de desarrollo:** los APK debug compilados en distintas ejecuciones
+de GitHub Actions pueden tener certificados diferentes. Si Android rechaza
+una actualización por firma, no es un fallo de los ojos; no desinstalés
+sin asegurar antes una vía de revinculación, porque al desinstalar se
+perderán los tokens locales. Para actualizaciones que conserven datos se
+necesita una misma clave de firma protegida en CI.
+
+El chat depende de conectividad con el SKY Core o un backend remoto
+configurado. Que la computadora esté apagada no garantiza conversación
+activa con la arquitectura actual. El estado "vinculada" indica tokens
+almacenados y no sustituye una comprobación de conexión real.
+
+---
+
 # SKY Mobile Agent (Android) — primer hito operativo
 
 Módulo nativo Kotlin dentro del proyecto SKY existente. Reutiliza la API FastAPI y
