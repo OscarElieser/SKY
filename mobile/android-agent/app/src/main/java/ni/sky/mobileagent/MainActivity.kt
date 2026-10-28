@@ -92,6 +92,7 @@ class MainActivity : Activity() {
                 voiceReplyOnFace = true
                 chatInput.setText(transcript)
                 if (!tokens.cloudEnabled() && tokens.chatToken().isEmpty()) {
+                    voiceReplyOnFace = false
                     voicePanel.showError("Activá el chat seguro en Ajustes.")
                     home.showMessage("Activá el chat desde Ajustes para conversar.")
                 } else {
@@ -105,7 +106,7 @@ class MainActivity : Activity() {
         )
         home = SkyMobileHome(
             this, voicePanel,
-            onSend = { sendChat() },
+            onSend = { voiceReplyOnFace = false; sendChat() },
             onSettings = { showSettings() },
             onChatAccess = { showSettings() },
             onDiagnostics = { checkHomeStatus() }
@@ -696,12 +697,14 @@ class MainActivity : Activity() {
                 if (!mobileCloud && (error.message?.contains("HTTP 401") == true ||
                     error.message?.contains("HTTP 403") == true)) {
                     tokens.clearChat()
+                    voiceReplyOnFace = false
                     runOnUiThread {
                         refreshConnection()
                         home.showMessage("La sesión de chat venció. Renovala desde Ajustes.")
                         voicePanel.showError("La conversación necesita nueva autorización.")
                     }
                 } else {
+                    voiceReplyOnFace = false
                     val reason = if (mobileCloud) when (error) {
                         is java.net.UnknownHostException -> "No hay acceso a internet."
                         is java.net.SocketTimeoutException -> "Gemini tardó demasiado en responder."
@@ -715,7 +718,6 @@ class MainActivity : Activity() {
                     }
                 }
             } finally {
-                voiceReplyOnFace = false
                 chatPending = false
             }
         }
