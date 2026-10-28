@@ -76,11 +76,16 @@ class MainActivity : Activity() {
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         tokens = PrivateTokenStore(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
-            chatInput.setText(transcript)
-            if (tokens.chatToken().isEmpty()) {
-                voicePanel.showError("Para conversar, activá el chat seguro en Ajustes.")
-                home.showMessage("Activá el chat desde Ajustes.")
-            } else sendChat()
+            if (!processLocalPanelCommand(transcript, spoken = true)) {
+                home.openChat()
+                chatInput.setText(transcript)
+                if (tokens.chatToken().isEmpty()) {
+                    voicePanel.showError("Activá el chat seguro en Ajustes.")
+                    home.showMessage("Activá el chat desde Ajustes para conversar.")
+                } else {
+                    sendChat()
+                }
+            }
         }
         home = SkyMobileHome(
             this, voicePanel,
@@ -98,6 +103,36 @@ class MainActivity : Activity() {
         refreshConnection()
         if (tokens.token().isEmpty()) {
             home.root.post { if (!isFinishing) showSettings() }
+        }
+    }
+
+    /** Las órdenes de interfaz se ejecutan localmente, incluso sin SKY Core. */
+    private fun processLocalPanelCommand(message: String, spoken: Boolean): Boolean {
+        val route = SkyMobileIntentRouter.route(message) ?: return false
+        val feedback = when (route.kind) {
+            SkyMobileIntentRouter.Action.Kind.OPEN_CHAT -> {
+                home.openChat()
+                "Abrí el panel de conversación."
+            }
+            SkyMobileIntentRouter.Action.Kind.OPEN_MODULE -> {
+                home.openModule(route.module)
+                "Abrí el panel solicitado. Decime qué querés hacer."
+            }
+            SkyMobileIntentRouter.Action.Kind.CLOSE_PANEL -> {
+                home.closePanel()
+                "Listo. Volvimos a la pantalla de SKY."
+            }
+        }
+        if (spoken) voicePanel.speakReply(feedback)
+        return true
+    }
+
+    @Deprecated("Usamos la navegación local de los paneles de SKY")
+    override fun onBackPressed() {
+        if (::home.isInitialized && home.isPanelOpen()) {
+            home.closePanel()
+        } else {
+            super.onBackPressed()
         }
     }
 
@@ -289,6 +324,11 @@ class MainActivity : Activity() {
         val id = tokens.deviceId()
         val token = tokens.chatToken()
         val message = chatInput.text.toString().trim()
+        if (message.isEmpty()) return
+        if (processLocalPanelCommand(message, spoken = false)) {
+            chatInput.setText("")
+            return
+        }
         if (id.isEmpty() || token.isEmpty()) {
             setStatus("Activá el chat seguro desde Ajustes para conversar.")
             showSettings()
