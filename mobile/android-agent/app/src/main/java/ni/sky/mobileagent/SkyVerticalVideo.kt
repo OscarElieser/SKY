@@ -172,11 +172,14 @@ object SkyVerticalVideo {
                 setInteger(MediaFormat.KEY_FRAME_RATE, FPS)
                 setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
             }
-            codec = MediaCodec.createEncoderByType(MIME)
-            codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-            input = codec.createInputSurface()
-            codec.start()
-            muxer = MediaMuxer(temp.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            val encoder = MediaCodec.createEncoderByType(MIME)
+            codec = encoder
+            encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            input = encoder.createInputSurface()
+            encoder.start()
+            val writer = MediaMuxer(temp.absolutePath,
+                MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            muxer = writer
 
             display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
             require(display != EGL14.EGL_NO_DISPLAY) { "No hay EGL en el teléfono." }
@@ -244,24 +247,24 @@ object SkyVerticalVideo {
 
             fun drain(eos: Boolean) {
                 while (true) {
-                    val out = codec.dequeueOutputBuffer(bufferInfo, if (eos) 10000 else 0)
+                    val out = encoder.dequeueOutputBuffer(bufferInfo, if (eos) 10000 else 0)
                     if (out == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                         require(!muxStarted) { "El encoder cambió formato dos veces." }
-                        track = muxer.addTrack(codec.outputFormat)
-                        muxer.start()
+                        track = writer.addTrack(encoder.outputFormat)
+                        writer.start()
                         muxStarted = true
                     } else if (out >= 0) {
                         if (bufferInfo.size > 0 &&
                             bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
                             require(muxStarted) { "El video todavía no tiene pista." }
-                            val bytes = codec.getOutputBuffer(out) ?: error("Buffer vacío.")
+                            val bytes = encoder.getOutputBuffer(out) ?: error("Buffer vacío.")
                             bytes.position(bufferInfo.offset)
                             bytes.limit(bufferInfo.offset + bufferInfo.size)
-                            muxer.writeSampleData(track, bytes, bufferInfo)
+                            writer.writeSampleData(track, bytes, bufferInfo)
                         }
                         val complete = bufferInfo.flags and
                             MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
-                        codec.releaseOutputBuffer(out, false)
+                        encoder.releaseOutputBuffer(out, false)
                         if (complete) return
                     } else if (out == MediaCodec.INFO_TRY_AGAIN_LATER) {
                         if (!eos) return
@@ -285,13 +288,13 @@ object SkyVerticalVideo {
                 }
                 drain(false)
             }
-            codec.signalEndOfInputStream()
+            encoder.signalEndOfInputStream()
             drain(true)
             require(temp.length() > 10_000L) { "La salida MP4 está incompleta." }
             // Replace only after a complete MP4 has been muxed.
-            muxer.stop()
+            writer.stop()
             muxStarted = false
-            muxer.release()
+            writer.release()
             muxer = null
             file.delete()
             check(temp.renameTo(file)) { "No se pudo guardar el video final." }
