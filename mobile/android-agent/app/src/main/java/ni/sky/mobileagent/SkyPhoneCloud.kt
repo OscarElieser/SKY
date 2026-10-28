@@ -102,7 +102,38 @@ object SkyPhoneCloud {
     fun reply(personalKey: String, message: String, history: JSONArray): String {
         require(validPersonalKey(personalKey)) { "Configurá una clave de Gemini para probar con Google." }
         val payload = makePayload(message, history).toString()
-        require(payload.toByteArray(Charsets.UTF_8).size < 36000) {
+        return send(personalKey, payload)
+    }
+
+    /**
+     * A ONE-TIME photo chosen by the user. No ongoing camera access,
+     * no biometric identification and no emotional/medical diagnosis.
+     */
+    fun reflectOnPhoto(personalKey: String, jpeg: ByteArray): String {
+        require(jpeg.isNotEmpty() && jpeg.size <= 360_000) {
+            "La fotografía es demasiado grande. Tomá otra foto."
+        }
+        val instruction = "Sos SKY, una amiga virtual cercana de Nicaragua. " +
+            "Describí con mucho cuidado uno o dos detalles VISIBLES de la expresión " +
+            "de la persona, sin identificarla. NO deduzcas su emoción real, " +
+            "su salud mental, personalidad ni enfermedades a partir de la cara. " +
+            "Preguntale directamente cómo se siente y ofrecé escucharla, " +
+            "con tono cálido y natural. Máximo tres frases."
+        val parts = JSONArray()
+            .put(JSONObject().put("text", instruction))
+            .put(JSONObject().put("inlineData", JSONObject()
+                .put("mimeType", "image/jpeg")
+                .put("data", android.util.Base64.encodeToString(jpeg, android.util.Base64.NO_WRAP))))
+        val payload = JSONObject()
+            .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", parts)))
+            .put("generationConfig", JSONObject().put("maxOutputTokens", 350))
+            .toString()
+        return send(personalKey, payload)
+    }
+
+    private fun send(personalKey: String, payload: String): String {
+        require(validPersonalKey(personalKey)) { "Revisá la clave Gemini en Ajustes." }
+        require(payload.toByteArray(Charsets.UTF_8).size < 600_000) {
             "La conversación es demasiado larga; iniciá una sesión nueva."
         }
         val connection = URL(API).openConnection() as HttpURLConnection
