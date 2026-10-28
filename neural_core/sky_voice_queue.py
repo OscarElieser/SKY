@@ -223,6 +223,12 @@ class VoiceWorkQueue:
         print("SKY-IA:", message if _interactivo() else f"(respuesta de {len(message)} caracteres)")
         if self._engine is None:
             return
+        # Solo se limpia la copia pronunciada. La respuesta visual, historial y
+        # todas las herramientas permanecen intactas.
+        from .sky_spoken_text import preparar_voz
+        spoken = preparar_voz(message)
+        if not spoken:
+            return
         self._cancel_speech.clear()
         self._transition_speech(True)
         try:
@@ -232,7 +238,7 @@ class VoiceWorkQueue:
                 pass
             # Frases breves permiten interrupción aun si un backend no entrega
             # eventos por palabra. La voz nunca se ejecuta en el hilo de Vosk.
-            words = message[:1000].split()
+            words = spoken[:1000].split()
             chunk = []
             for word in words:
                 if self._cancel_speech.is_set() or self._stop.is_set():
