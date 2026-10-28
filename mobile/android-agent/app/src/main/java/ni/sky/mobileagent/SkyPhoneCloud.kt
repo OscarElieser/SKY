@@ -53,7 +53,7 @@ object SkyPhoneCloud {
         }
         // New Google AI Studio auth keys may use different formats from old AIza keys.
         // Only enforce safe HTTP header encoding; Google alone checks validity.
-        if (value.length !in 8..2048) {
+        if (value.length !in 16..2048) {
             return "El texto copiado está vacío, incompleto o es demasiado largo. Copiá solamente la clave."
         }
         if (value.any { it.code !in 33..126 }) {
