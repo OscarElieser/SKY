@@ -1,0 +1,8 @@
+# Los APK de desarrollo son resultados de compilación, no código fuente.
+*.apk
+*.aab
+*.apks
+*.apk.sha256
+*.zip
+# Conservar las instrucciones de distribución en main.
+!README.md
