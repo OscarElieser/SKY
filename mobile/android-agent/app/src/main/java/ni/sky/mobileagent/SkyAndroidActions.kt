@@ -28,6 +28,34 @@ class SkyAndroidActions(
         "gmail" to Pair("Gmail", "com.google.android.gm")
     )
 
+    /**
+     * Prepare a real WhatsApp composer. SKY never presses Send or reads chats.
+     * The user chooses the recipient and confirms the message in WhatsApp.
+     */
+    fun prepareWhatsApp(draft: SkyMessagingIntent.Draft) {
+        if (!allowed.getBoolean("whatsapp", false)) {
+            feedback("Activá «Permitir WhatsApp» en Ajustes de SKY para continuar.")
+            return
+        }
+        val text = SkyMessagingIntent.preparedText(draft)
+        AlertDialog.Builder(host)
+            .setTitle("SKY · Mensaje para " + draft.recipient)
+            .setMessage("Voy a preparar este texto en WhatsApp:\n\n" + text +
+                "\n\nEn WhatsApp seleccioná el chat de «" + draft.recipient +
+                "» y confirmá el envío. SKY no lo enviará automáticamente.")
+            .setPositiveButton("ABRIR WHATSAPP") { _, _ ->
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    setPackage("com.whatsapp")
+                    putExtra(Intent.EXTRA_TEXT, text)
+                }
+                launch(intent, "Abrí WhatsApp con tu mensaje preparado. " +
+                    "Elegí el destinatario y pulsá Enviar si estás de acuerdo.")
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     fun run(action: SkyDailyCommandParser.Command) {
         when (action) {
             is SkyDailyCommandParser.Command.Alarm -> alarm(action)
