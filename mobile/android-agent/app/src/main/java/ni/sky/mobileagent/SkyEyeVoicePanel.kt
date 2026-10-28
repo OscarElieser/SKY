@@ -59,7 +59,13 @@ class SkyEyeVoicePanel(
             gravity = android.view.Gravity.CENTER
         })
         addView(eye, LayoutParams(LayoutParams.MATCH_PARENT, dp(220)))
-        eye.setOnClickListener { message.text = eye.nextEmotion() }
+        eye.setOnClickListener {
+            val reaction = eye.nextEmotion()
+            message.text = reaction
+            if (readAloud.isChecked && !listening && !chatPending) {
+                speakReply(reaction)
+            }
+        }
         addView(TextView(host).apply {
             text = "Tocá los ojitos de SKY para descubrir sus gestos ✨"
             textSize = 12f
