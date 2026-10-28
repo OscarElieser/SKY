@@ -1,3 +1,69 @@
+# SKY IA Android 0.4 — acciones locales y asistente animada
+
+La aplicación Android mantiene **ojos expresivos, voz, paneles bajo demanda,
+chat y configuración segura**. Esta versión añade un ejecutor REAL pero
+limitado de acciones locales, independiente de que el SKY Core en Windows
+esté conectado. Su seguridad se basa en comandos expresos, permisos y
+confirmaciones; ninguna respuesta generada por IA ejecuta acciones solas.
+
+## Comandos disponibles ahora
+
+| Orden hablada o escrita | Ejecución | Evidencia honesta |
+| --- | --- | --- |
+| «SKY abre WhatsApp» | Solicita confirmación y abre la aplicación permitida | Android aceptó la apertura, no verifica que haya cargado |
+| «SKY pon una alarma a las 5:30» | Abre el Reloj mediante `AlarmClock.ACTION_SET_ALARM` con hora y etiqueta | Debe verificarse la alarma en Reloj; no declarar creada antes |
+| «SKY pon un temporizador de 10 minutos» | Abre temporizador nativo con duración | Revisar que Reloj lo inició |
+| «SKY anota comprar leche» | Guarda una nota privada en SharedPreferences local | Se confirma el guardado con `commit()` |
+| «SKY mostrame mis notas» | Muestra las últimas notas privadas del teléfono | Lee almacenamiento local |
+| «SKY escribe en WhatsApp: hola» | Ofrece Compartir o Escritura asistida, tras confirmación | Nunca envía mensajes automáticamente |
+| «SKY abre panel de conversación» | Abre el panel nativo solicitado | Ejecución local inmediata |
+
+Las aplicaciones soportadas por apertura directa son YouTube, Chrome,
+WhatsApp y Gmail; se habilitan individualmente en Ajustes.
+La alarma usa el **Reloj del teléfono**. La API de Android no ofrece
+confirmación universal de que el Reloj guardó una alarma, por lo que SKY
+no informa falsamente `VERIFIED`. La creación de alarmas para fechas
+concretas (por ejemplo, «mañana a las 5») requiere una interfaz de fecha
+que el intent estándar no proporciona: SKY no finge garantizar esa fecha.
+
+## Escritura asistida opcional (alcance restringido)
+
+Es una función **manual y optativa** para WhatsApp y Gmail, no un agente
+autónomo que navega por todas las aplicaciones. Antes de habilitar el
+servicio de Accesibilidad, SKY presenta una divulgación de permisos y
+requiere una aceptación explícita; el usuario debe activarlo además desde
+Ajustes Android. Después, para **una solicitud aprobada**, SKY abre la
+app correspondiente, y el usuario toca **un campo de texto vacío**. El
+servicio puede poner ahí el texto solicitado dentro de 45 segundos.
+
+- No lee historiales ni contactos; no accede a contraseñas.
+- No envía mensajes, no presiona el botón Enviar y no opera por órdenes
+  ocultas de modelos de IA.
+- El permiso para cada aplicación sigue siendo necesario.
+- El usuario puede retirar su consentimiento desde Ajustes de SKY y
+  desactivar el servicio desde Ajustes Android > Accesibilidad.
+- Google Play impone reglas de divulgación y limita la autonomía con
+  AccessibilityService; la APK de desarrollo no equivale a una
+  publicación aprobada en Play Store.
+
+## Límites que todavía requieren desarrollo y pruebas
+
+- No hay palabra clave escuchando las 24 horas con la pantalla bloqueada;
+  la voz comienza al pulsar Hablar.
+- No hay replicación completa de herramientas Windows en Android. El
+  motor de chat móvil actual no recibe privilegios de ejecución remota.
+- No hay sincronización permanente completa del historial ni de las
+  notas del teléfono con Windows.
+- La compilación de CI valida código y pruebas automatizadas, no sustituye
+  pruebas físicas con Samsung, Clock, Gmail, WhatsApp, micrófono, batería,
+  reinicio, accesibilidad o firma estable de APK.
+
+Los APK siguen aislados en
+[carpeta APK](apk/) y se generan mediante
+[GitHub Actions](../../.github/workflows/sky-mobile-agent.yml).
+
+---
+
 # SKY IA Android 0.3 — ojos protagonistas y paneles bajo demanda
 
 La pantalla inicial ya no muestra la conversación, tarjetas, accesos rápidos
