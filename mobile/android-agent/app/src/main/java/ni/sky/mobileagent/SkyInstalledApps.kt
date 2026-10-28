@@ -69,6 +69,52 @@ class SkyInstalledApps(
         }
     }
 
+    /**
+     * Enviar texto al menú de preparación de una app compatible. El usuario
+     * decide posteriormente si publicarlo o enviarlo; SKY nunca pulsa Enviar.
+     */
+    fun requestShare(query: String, text: String) {
+        val available = discover()
+        val matched = SkyAppNameMatcher.matches(query, available.map { it.asEntry() })
+            .mapNotNull { entry ->
+                available.firstOrNull { it.packageName == entry.packageName && it.name == entry.label }
+            }
+        if (matched.isEmpty()) {
+            say("No encontré esa aplicación instalada para compartir texto.")
+            return
+        }
+        fun prepare(app: Launchable) {
+            AlertDialog.Builder(activity)
+                .setTitle("SKY · Compartir con " + app.name)
+                .setMessage("¿Preparar este texto en " + app.name + "?\n\n" +
+                    text.take(220) + "\n\nConfirmar la publicación es decisión tuya.")
+                .setPositiveButton("Preparar") { _, _ ->
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        setPackage(app.packageName)
+                        putExtra(Intent.EXTRA_TEXT, text.take(1000))
+                    }
+                    try {
+                        activity.startActivity(shareIntent)
+                        say("Preparé el texto para " + app.name +
+                            ". Revisá el resultado antes de publicarlo.")
+                    } catch (_: Exception) {
+                        say(app.name + " no admite este modo de compartir texto.")
+                    }
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        }
+        if (matched.size == 1) prepare(matched.first())
+        else AlertDialog.Builder(activity)
+            .setTitle("SKY · Elegí la aplicación")
+            .setItems(matched.map { it.name }.toTypedArray()) { _, which ->
+                prepare(matched[which])
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     fun showCatalog() {
         val all = discover()
         if (all.isEmpty()) {
