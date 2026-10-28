@@ -8,6 +8,7 @@ on:
   push:
     paths:
       - 'neural_core/sky_mobile_agent.py'
+      - 'metaverse/sentinel.py'
       - 'metaverse/mobile_agent_api.py'
       - 'metaverse/mobile_chat_api.py'
       - 'metaverse/static/hud.js'
@@ -22,6 +23,7 @@ on:
   pull_request:
     paths:
       - 'neural_core/sky_mobile_agent.py'
+      - 'metaverse/sentinel.py'
       - 'metaverse/mobile_agent_api.py'
       - 'metaverse/mobile_chat_api.py'
       - 'metaverse/static/hud.js'
@@ -43,7 +45,7 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install 'pytest>=8,<10' 'fastapi>=0.115,<1'
       - name: Python syntax
-        run: python -m py_compile neural_core/sky_mobile_agent.py neural_core/sky_mobile_chat.py metaverse/mobile_agent_api.py metaverse/mobile_chat_api.py metaverse/sky_home_api.py metaverse/asistente_api.py metaverse/api.py
+        run: python -m py_compile metaverse/sentinel.py neural_core/sky_mobile_agent.py neural_core/sky_mobile_chat.py metaverse/mobile_agent_api.py metaverse/mobile_chat_api.py metaverse/sky_home_api.py metaverse/asistente_api.py metaverse/api.py
       - name: Consent and queue tests
         run: python -m pytest -q tests/test_sky_mobile_agent.py tests/test_sky_mobile_chat.py
   android:

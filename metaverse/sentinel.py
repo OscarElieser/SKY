@@ -23,6 +23,7 @@ Este control no depende del modelo de IA: es código que corre antes de cualquie
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import time
 from collections import defaultdict, deque
@@ -42,6 +43,34 @@ CON_SESION_BLOQUEADA = frozenset({
     ('GET', '/api/asistente/emergencia'), ('POST', '/api/asistente/emergencia'),
 })
 LOCALES = frozenset({'127.0.0.1', '::1', 'localhost', 'testclient'})
+
+# Rutas Android SIN llave del propietario, pero NO sin autenticar.
+# La ruta /pair/complete verifica el código aleatorio efímero de un solo uso.
+# Las demás validan el token restringido del dispositivo o chat en su endpoint.
+# No incluir rutas administrativas (/pair/start, /devices, /invite, /commands).
+MOBILE_SCOPED_EXACT = frozenset({
+    ('POST', '/api/sky/mobile-agent/pair/complete'),
+    ('POST', '/api/sky/mobile-chat/pair'),
+    ('POST', '/api/sky/mobile-chat/chat'),
+})
+_MOBILE_ID = r'[0-9a-f]{32}'
+_MOBILE_SCOPED_PATTERNS = (
+    ('GET', re.compile(rf'/api/sky/mobile-agent/devices/{_MOBILE_ID}/(?:next|home-status)')),
+    ('POST', re.compile(rf'/api/sky/mobile-agent/devices/{_MOBILE_ID}/revoke-self')),
+    ('POST', re.compile(rf'/api/sky/mobile-agent/devices/{_MOBILE_ID}/commands/{_MOBILE_ID}/complete')),
+)
+
+
+def es_movil_con_token(metodo: str, ruta: str) -> bool:
+    """Solo delega a endpoints que verifican código efímero/token móvil.
+
+    La excepción NO otorga autenticación: si faltan credenciales válidas,
+    el endpoint responde 401. Nunca permite rutas del propietario.
+    """
+    return ((metodo, ruta) in MOBILE_SCOPED_EXACT or
+            any(metodo == verb and patron.fullmatch(ruta)
+                for verb, patron in _MOBILE_SCOPED_PATTERNS))
+
 # Rutas que piden sólo la llave (son las que crean la sesión de 2FA).
 SOLO_LLAVE = frozenset({('POST', '/api/security/owner-mfa/session')})
 VENTANA = 300
@@ -91,6 +120,8 @@ def verificar(request: Request) -> tuple[bool, int, str]:
     except Exception:
         return False, 503, 'verificación de seguridad no disponible'
     if es_publica(metodo, ruta):
+        return True, 200, ''
+    if es_movil_con_token(metodo, ruta):
         return True, 200, ''
     if ruta == '/api/telemetria/push' and _sensor_ok(request):
         return True, 200, ''

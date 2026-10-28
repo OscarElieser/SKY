@@ -90,3 +90,53 @@ def test_expired_pair_and_commands(isolated_db, monkeypatch):
     with patch.object(m.time, "time", return_value=1700.0):
         assert m.poll(pair["device_id"], pair["token"])["command"] is None
         assert m.command_status(pair["device_id"], cmd["command_id"])["state"] == "EXPIRED"
+
+
+def test_sentinel_mobile_scopes_are_exact_and_keep_owner_paths_private(monkeypatch):
+    """SENTINEL must not demand the Windows owner key for limited mobile tokens.
+
+    This tests routing only; the mobile endpoint independently validates its
+    one-use code or device/chat token before allowing any operation.
+    """
+    from types import SimpleNamespace
+    from metaverse import sentinel
+    from neural_core import sentinel_identidad as ident
+
+    monkeypatch.setattr(ident, "solo_local", lambda: False)
+    device_id = "a" * 32
+    command_id = "b" * 32
+    allowed = [
+        ("POST", "/api/sky/mobile-agent/pair/complete"),
+        ("GET", f"/api/sky/mobile-agent/devices/{device_id}/home-status"),
+        ("GET", f"/api/sky/mobile-agent/devices/{device_id}/next"),
+        ("POST", f"/api/sky/mobile-agent/devices/{device_id}/revoke-self"),
+        ("POST", f"/api/sky/mobile-agent/devices/{device_id}/commands/{command_id}/complete"),
+        ("POST", "/api/sky/mobile-chat/pair"),
+        ("POST", "/api/sky/mobile-chat/chat"),
+    ]
+    for method, path in allowed:
+        request = SimpleNamespace(
+            method=method,
+            url=SimpleNamespace(path=path),
+            client=SimpleNamespace(host="100.115.243.4"),
+            headers={},
+        )
+        assert sentinel.es_movil_con_token(method, path)
+        assert sentinel.verificar(request) == (True, 200, "")
+
+    forbidden = [
+        ("POST", "/api/sky/mobile-agent/pair/start"),
+        ("GET", "/api/sky/mobile-agent/devices"),
+        ("POST", f"/api/sky/mobile-agent/devices/{device_id}/commands"),
+        ("POST", "/api/sky/mobile-chat/invite"),
+        ("POST", "/api/sky/mobile-chat/revoke"),
+        ("GET", "/api/sky/mobile-agent/pair/complete"),
+        ("DELETE", f"/api/sky/mobile-agent/devices/{device_id}/revoke-self"),
+        ("GET", f"/api/sky/mobile-agent/devices/{device_id}/next/admin"),
+        ("GET", "/api/sky/mobile-agent/devices/invalid/home-status"),
+        ("POST", f"/api/sky/mobile-agent/devices/{device_id}/commands/invalid/complete"),
+        ("POST", "/api/developer/repl"),
+        ("POST", "/api/sky/mobile-agent/pair/complete/anything"),
+    ]
+    for method, path in forbidden:
+        assert not sentinel.es_movil_con_token(method, path), (method, path)
