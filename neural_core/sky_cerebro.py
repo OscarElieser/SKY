@@ -24,6 +24,7 @@ import json
 import os
 import re
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 from typing import Iterator
@@ -91,6 +92,51 @@ No inventes resultados: las herramientas sólo proponen y SKY confirma después.
 {estilo}"""
 ESTILO_VOZ = 'Estás hablando en voz alta: respuestas de 1 a 3 oraciones, naturales, sin listas, emojis ni markdown.'
 ESTILO_CHAT = 'Respondé con claridad; usá listas sólo si ayudan.'
+
+# Instrucción mínima para explicaciones públicas aisladas. No elimina ni
+# sobrescribe el sistema habitual, la memoria, las habilidades o permisos.
+SISTEMA_LOCAL_BREVE = (
+    'Sos SKY, un asistente personal. Respondé en español de forma precisa, '
+    'clara y concisa. No inventes fuentes ni afirmes que realizaste acciones '
+    'en el equipo. Si no sabés algo, decilo. {estilo}'
+)
+
+
+def contexto_local_breve(texto: str, historial: list[dict] | None = None) -> bool:
+    """Opt-in solo para una pregunta pública, autónoma y sin referencias privadas.
+
+    Nunca se aplica a cloud ni a órdenes, solicitudes ambiguas, consultas
+    personales, historial o tareas de investigación. Si hay duda, prompt completo.
+    """
+    if os.getenv('SKY_LOCAL_FAST_CONTEXT', '0').strip().lower() not in ('1', 'true', 'si', 'sí', 'yes'):
+        return False
+    if historial or not isinstance(texto, str) or not 12 <= len(texto.strip()) <= 160:
+        return False
+    t = ''.join(c for c in unicodedata.normalize('NFD', texto.lower())
+                if unicodedata.category(c) != 'Mn')
+    t = re.sub(r'\s+', ' ', t).strip().lstrip('¿?¡! ')
+    if not re.match(
+        r'^(?:que es |define |cual es la capital de |'
+        r'explica(?:me)?(?: en (?:una|dos|tres|[1-3]) oraciones?)? '
+        r'(?:que es |como funciona |por que ))', t
+    ):
+        return False
+    # El contexto habitual es obligatorio si la frase pudiera referirse al
+    # dueño, recuerdos, mensajes previos, tareas u operaciones del dispositivo.
+    if re.search(
+        r'\b(?:mi|mis|mio|mia|mios|mias|tu|tus|tuyo|tuya|'
+        r'nuestro|nuestra|nosotros|sky|antes|anterior|eso|esto|'
+        r'dijiste|recuerdas|recuerda|recorda|conversacion|chat|'
+        r'perfil|pin|clave|contrasena|password|token|api|'
+        r'cuenta|correo|agenda|documento|archivo|carpeta|'
+        r'trabajo|proyecto|empresa|alumno|estudiante|'
+        r'investiga|busca|navega|abre|abrir|ejecuta|instala|'
+        r'escribe|guarda|modifica|borra|elimina|envia|'
+        r'crea|genera|reproduce|apaga|enciende)\b|'
+        r'https?://|www\.|[/\\]|[;&]', t
+    ):
+        return False
+    return True
 
 
 def _f(nombre: str, desc: str, props: dict, req: list[str] | None = None) -> dict:
@@ -367,8 +413,15 @@ def contexto_aprendido(texto: str) -> str:
     return '\n\n'.join(partes)[:5500]
 
 
-def _mensajes(texto: str, historial: list[dict], modo: str) -> list[dict]:
+def _mensajes(texto: str, historial: list[dict], modo: str, *, local: bool = False) -> list[dict]:
     estilo = ESTILO_VOZ if modo == 'voz' else ESTILO_CHAT
+    # Fast path solo para Ollama, sin historial ni referencias del usuario.
+    # Toda otra consulta conserva memoria, aprendizaje, habilidades y seguridad.
+    if local and contexto_local_breve(texto, historial):
+        return [
+            {'role': 'system', 'content': SISTEMA_LOCAL_BREVE.format(estilo=estilo)},
+            {'role': 'user', 'content': texto[:4000]},
+        ]
     sistema = SISTEMA.format(estilo=estilo)
     extra = contexto_aprendido(texto)
     if extra:
@@ -499,7 +552,7 @@ def _decidir_subasta(texto: str, historial: list[dict] | None, modo: str) -> Ite
 def _eventos(texto: str, historial: list[dict] | None, modo: str, info: dict) -> Iterator[tuple[str, object]]:
     completo = ''
     try:
-        with _llamar(_mensajes(texto, historial or [], modo), stream=True) as resp:
+        with _llamar(_mensajes(texto, historial or [], modo, local=True), stream=True) as resp:
             for linea in resp:
                 if not linea.strip():
                     continue

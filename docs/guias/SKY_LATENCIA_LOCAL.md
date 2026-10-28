@@ -67,3 +67,42 @@ modelo lento al generar de un prompt demasiado extenso.
 Si la respuesta se corta antes de la trama final de Ollama, los contadores
 pueden aparecer vacíos; no deben inventarse valores ni atribuirse a la nube.
 El diagnóstico no modifica reglas ni límites de respuesta del asistente.
+
+
+## Contexto ligero opcional para preguntas generales
+
+El diagnóstico de Windows del 28/10/2026 mostró que SKY con `llama3.2`
+consumió **28,266 s en evaluar 1337 tokens del prompt**, frente a
+11,182 s generando 114 tokens. La mayor oportunidad de mejora es reducir
+el contexto enviado a Ollama **solo cuando no sea necesario**.
+
+La optimización `SKY_LOCAL_FAST_CONTEXT=1` es optativa y está desactivada
+por defecto. Para peticiones autónomas como «Explica en dos oraciones
+que es la fotosintesis» usa instrucciones cortas, sin incorporar datos
+personales ni reglas de habilidades que no son relevantes. Conserva el
+sistema habitual cuando se usan conversaciones previas, se mencionan
+proyectos, archivos, cuentas o información del usuario, o se solicita
+realizar acciones. Las API de nube siguen usando siempre el contexto
+completo. No altera ninguna memoria ni elimina funciones.
+
+**Prueba A/B sin guardar cambios en .env ni gastar cuotas cloud:**
+
+```powershell
+Set-Location "C:\Users\PC 1\Documents\Desktop\SKY"
+git pull --ff-only origin main
+
+& .\.venv\Scripts\python.exe -m neural_core.sky_latency_probe --models llama3.2 --skip-direct --full-context
+& .\.venv\Scripts\python.exe -m neural_core.sky_latency_probe --models llama3.2 --skip-direct --fast-context
+```
+
+Comparar `SKY completo (s)`, `prompt_tokens`, `prompt_s`,
+`generation_s`, `system_chars` y que la respuesta siga siendo correcta.
+Como el hardware y la memoria varían, repetir en orden inverso si los
+resultados parecen inconsistentes.
+
+Solo si compruebas una mejora útil en la PC, activar de forma persistente
+`SKY_LOCAL_FAST_CONTEXT=1` dentro del `.env` local. Para revertir,
+ajustar a `0` y reiniciar SKY. Las pruebas del repositorio comprueban
+que los prompts completos siguen disponibles para memoria, historial,
+órdenes y nube. Ninguna optimización de esta ruta elude las autorizaciones
+del agente de dispositivo.
