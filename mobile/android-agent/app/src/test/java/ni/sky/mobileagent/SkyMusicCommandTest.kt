@@ -6,12 +6,12 @@ import org.junit.Test
 class SkyMusicCommandTest {
     @Test fun naturalCommandsNeedNoWakeWord() {
         val one = SkyMusicCommand.parse("Reproduce la canción Eres tú en Spotify")
-        assertEquals("Eres tu", one?.query)
+        assertEquals("eres tu", one?.query)
         assertEquals(SkyMusicCommand.Service.SPOTIFY, one?.service)
         val two = SkyMusicCommand.parse("Ponme la canción Bonita de Morat en YouTube Music")
-        assertEquals("Bonita de Morat", two?.query)
+        assertEquals("bonita de morat", two?.query)
         assertEquals(SkyMusicCommand.Service.YOUTUBE_MUSIC, two?.service)
-        assertEquals("Mi canción", SkyMusicCommand.parse("SKY, pon Mi canción")?.query)
+        assertEquals("mi cancion", SkyMusicCommand.parse("SKY, pon Mi canción")?.query)
     }
     @Test fun noAccidentalActivation() {
         assertNull(SkyMusicCommand.parse("Quiero crecer en YouTube"))
@@ -21,7 +21,7 @@ class SkyMusicCommandTest {
     }
     @Test fun youtubeSearchAndDefaultChoice() {
         val result = SkyMusicCommand.parse("Buscá música de Carlos Vives en YouTube")
-        assertEquals("de Carlos Vives", result?.query)
+        assertEquals("carlos vives", result?.query)
         assertEquals(SkyMusicCommand.Service.YOUTUBE, result?.service)
         assertNull(SkyMusicCommand.parse("Escuchame, ¿cómo estás?"))
     }
