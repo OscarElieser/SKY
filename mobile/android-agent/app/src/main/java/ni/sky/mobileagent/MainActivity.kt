@@ -132,10 +132,10 @@ class MainActivity : Activity() {
             .setMessage(
                 "Si aceptás, Android permitirá a SKY detectar cuándo enfocás " +
                 "un campo de texto en WhatsApp o Gmail para escribir SOLO el " +
-                "texto que vos solicitaste y aprobaste.\\n\\n" +
+                "texto que vos solicitaste y aprobaste.\n\n" +
                 "SKY no lee conversaciones completas, no registra textos " +
                 "de otras apps, no escribe contraseñas y NUNCA toca Enviar. " +
-                "La solicitud vence en 45 segundos y requiere un campo vacío.\\n\\n" +
+                "La solicitud vence en 45 segundos y requiere un campo vacío.\n\n" +
                 "Podés desactivar este permiso cuando quieras en " +
                 "Ajustes de Android > Accesibilidad."
             )
@@ -256,6 +256,16 @@ class MainActivity : Activity() {
         content.addView(actionButton("Escritura asistida en WhatsApp/Gmail") {
             showTextAssistDisclosure()
         })
+        if (getSharedPreferences("sky_assistive_text", MODE_PRIVATE)
+                .getBoolean("consent", false)) {
+            content.addView(actionButton("Desactivar escritura asistida") {
+                getSharedPreferences("sky_assistive_text", MODE_PRIVATE)
+                    .edit().putBoolean("consent", false).apply()
+                SkyTextAssistService.cancelPending()
+                home.showMessage("Escritura asistida desactivada en SKY. " +
+                    "También podés apagar el servicio desde Ajustes de Android.")
+            })
+        }
         content.addView(CheckBox(this).apply {
             text = "SKY responde con voz"
             isChecked = voicePanel.isVoiceEnabled()
