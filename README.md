@@ -17,7 +17,7 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 ---
 
 
-## 📱 SKY Android — núcleo móvil autónomo (0.8.4)
+## 📱 SKY Android — núcleo móvil autónomo (0.8.5)
 
 **SKY Android funciona de forma independiente de SKY Windows** para
 conversaciones por Gemini y acciones locales autorizadas. El desarrollo
@@ -26,6 +26,26 @@ Android no modifica los servicios del PC.
 [**Ver APK realmente publicadas en GitHub Releases**](https://github.com/OscarElieser/SKY/releases) ·
 [Guía móvil](mobile/android-agent/README.md) ·
 [Instalación y verificación](mobile/android-agent/apk/README.md)
+
+### Nuevo en 0.8.5 — perfiles sociales identificados localmente
+
+- **Catálogo de redes en Android:** perfiles públicos de Instagram,
+  Threads, TikTok, Facebook, YouTube, X y otras redes, identificados
+  mediante JSON descargado por el usuario o añadidos manualmente.
+- **Sin divulgar datos:** el repositorio no incluye los perfiles
+  personales, teléfonos ni correos del propietario; Android almacena
+  los identificadores importados solo en preferencias privadas locales.
+- **Enlaces públicos y Estudio Creativo:** abrir el perfil registrado,
+  editarlo, retirarlo o crear contenido para esa plataforma.
+- **Sin confundir identificación con conexión OAuth:** un usuario
+  público no permite a SKY consultar métricas privadas, publicar
+  automáticamente ni enviar mensajes. Esas capacidades requieren
+  consentimiento, autorización y permisos oficiales por plataforma.
+- **Android independiente:** no se cambia SKY Windows, no se introduce
+  clave privada ni se activa un servicio que lea todas las cuentas.
+
+**Versión de código:** `0.8.5` (`versionCode 18`), a comprobar con
+compilación firmada y prueba de importación JSON en el Samsung.
 
 ### Nuevo en 0.8.4 — órdenes musicales sin repetir SKY
 
