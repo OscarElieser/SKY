@@ -188,6 +188,19 @@ def test_hud_yt_blocked_iframe_shows_official_fallback_without_fake_success():
     assert "youtube.com/watch?v=" in script
 
 
+def test_youtube_blocked_player_offers_clickable_links_in_chat_too():
+    """La ventana del chat puede estar al frente aunque el iframe quede bloqueado."""
+    from pathlib import Path
+    script = (Path(__file__).resolve().parents[1] / "metaverse/static/hud.js").read_text(encoding="utf-8")
+    assert "ytAvisosChat = new Set()" in script
+    assert "const tarjeta = addCard('YouTube no confirmó la reproducción', mensaje);" in script
+    assert "const ver = el('a', 'btn', 'Abrir video original');" in script
+    assert "ver.target = '_blank'; ver.rel = 'noopener noreferrer';" in script
+    assert "otroChat.addEventListener('click', () => {" in script
+    assert "ytIntentos.has(v.id)" in script
+    assert "reproduccion_confirmada" not in script  # La API de búsqueda no confirma reproducción.
+
+
 def test_player_automatic_fallback_has_no_bypass():
     from pathlib import Path
     script = (Path(__file__).resolve().parents[1] / "metaverse" / "static" / "hud.js").read_text(encoding="utf-8")
