@@ -120,6 +120,25 @@ class SkyEyeVoicePanel(
                     result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     speechEngine?.language = Locale("es", "ES")
                 }
+                // Prefer a high-quality installed Spanish voice where Android
+                // provides one, without requiring any additional paid service.
+                val voices = speechEngine?.voices.orEmpty()
+                    .filter { candidate ->
+                        candidate.locale.language == "es" &&
+                        android.speech.tts.TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED
+                            !in candidate.features.orEmpty()
+                    }
+                val preferred = voices.maxByOrNull { candidate ->
+                    val region = when (candidate.locale.country.uppercase(Locale.ROOT)) {
+                        "NI" -> 32
+                        "MX" -> 27
+                        "ES" -> 24
+                        else -> 8
+                    }
+                    candidate.quality * 10 + region -
+                        if (candidate.isNetworkConnectionRequired) 15 else 0
+                }
+                if (preferred != null) runCatching { speechEngine?.voice = preferred }
                 speechEngine?.setSpeechRate(0.97f)
                 speechEngine?.setPitch(1.0f)
                 speechReady = true

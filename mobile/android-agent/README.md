@@ -1,4 +1,13 @@
 # SKY IA Android 0.6 — modo independiente (prueba personal)
+## SKY Android 0.7.1 — versión premium corregida
+
+La versión 0.7.1 sustituye la beta inicial 0.7.0. Corrige la prioridad
+del rostro durante conversaciones por voz (el chat no oculta SKY),
+y selecciona preferentemente una voz española de alta calidad si
+Android la tiene instalada. Si no hay voces mejores, conserva el motor
+TTS estándar. El usuario controla el micrófono y el modo fluido;
+el modo fluido nunca permanece activo en segundo plano.
+
 ## SKY Android 0.7.0 · Aura Premium (solo teléfono)
 
 - Rostro de SKY rediseñado en Canvas vectorial vertical 360×590:
