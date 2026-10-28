@@ -138,3 +138,15 @@ def test_cancelacion_durante_tts_por_callback_en_mismo_hilo():
     assert engine.stopped
     assert not worker.speaking
     worker.stop()
+
+
+def test_interrupcion_tts_persiste_entre_frases_progresivas():
+    executor = VoiceWorkQueue(lambda _cmd: None, tts_factory=lambda: None)
+    inicio = executor.speech_interrupt_epoch
+    assert not executor.interrupt_speech()
+    assert executor.speech_interrupt_epoch == inicio
+    executor._transition_speech(True)
+    assert executor.interrupt_speech()
+    assert executor.speech_interrupt_epoch == inicio + 1
+    executor._transition_speech(False)
+    assert executor.speech_interrupt_epoch == inicio + 1

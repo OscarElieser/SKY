@@ -83,6 +83,7 @@ class VoiceWorkQueue:
         self._thread: threading.Thread | None = None
         self._engine = None
         self._speech_epoch = 0
+        self._speech_interrupt_epoch = 0
         self._epoch_lock = threading.Lock()
         # v12.6: Vosk a veces entrega dos veces la misma frase (o el dueño la repite al no oír respuesta):
         # una orden idéntica dentro de esta ventana no se vuelve a ejecutar.
@@ -102,6 +103,12 @@ class VoiceWorkQueue:
     def speech_epoch(self) -> int:
         with self._epoch_lock:
             return self._speech_epoch
+
+    @property
+    def speech_interrupt_epoch(self) -> int:
+        """Marcador monotónico de interrupciones explícitas del TTS."""
+        with self._epoch_lock:
+            return self._speech_interrupt_epoch
 
     @property
     def current_turn_cancelled(self) -> bool:
@@ -178,6 +185,8 @@ class VoiceWorkQueue:
         """Solicita detener TTS. Nunca intenta llamar COM/pyttsx3 desde el hilo del micrófono."""
         if not self.speaking:
             return False
+        with self._epoch_lock:
+            self._speech_interrupt_epoch += 1
         self._cancel_speech.set()
         return True
 

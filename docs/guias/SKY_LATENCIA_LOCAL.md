@@ -106,3 +106,45 @@ ajustar a `0` y reiniciar SKY. Las pruebas del repositorio comprueban
 que los prompts completos siguen disponibles para memoria, historial,
 órdenes y nube. Ninguna optimización de esta ruta elude las autorizaciones
 del agente de dispositivo.
+
+## Voz progresiva local (ruta manos libres Vosk)
+
+El ejecutable `sky_manos_libres.py` conserva sus reglas, PIN, micrófono
+único y cola serial de TTS. Por defecto la conversación continua por su
+ruta anterior `assistant.responder`. El respaldo de voz progresiva **no**
+afecta Android ni el micrófono del HUD.
+
+Para habilitar la respuesta por frases al hablar, solo para preguntas
+públicas autónomas que no dependen del historial:
+
+```dotenv
+SKY_LOCAL_FAST_CONTEXT=1
+SKY_VOICE_STREAM_LOCAL=1
+```
+
+Tras reiniciar SKY, el reconocimiento Vosk detectará la frase. Si cumple
+el filtro conservador `contexto_local_breve`, el worker solicita
+`sky_cerebro.decidir_eventos(..., modo="voz")` con preferencia temporal
+a **Ollama local**, y pronuncia una frase completa mientras llega el
+resto. No ejecuta ninguna herramienta ni reintenta automáticamente la
+respuesta si el flujo se interrumpe. Si el usuario pide silencio durante
+una frase, se cancela el resto de la respuesta progresiva. La parada de
+emergencia, bloqueo por PIN y confirmaciones del dispositivo permanecen
+intactos. Las consultas personales, investigaciones, tareas y diálogos
+con historial siguen por la ruta habitual.
+
+La métrica `ml_primer_tts` mide el tiempo hasta la **primera entrega de
+texto al motor TTS**, no el primer sonido audible del altavoz. La métrica
+`ml_voz_progresiva` incluye tiempo del modelo más la reproducción de
+las frases. No se registran claves, transcripciones ni respuestas en
+estas métricas.
+
+Antes de activar en el equipo, validar:
+
+```powershell
+& .\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_sky_voice_stream_local.py" -v
+& .\.venv\Scripts\python.exe -m pytest -q tests/test_sky_voice_queue.py
+```
+
+Para desactivar, establecer `SKY_VOICE_STREAM_LOCAL=0` y reiniciar SKY.
+Ninguna optimización de voz altera la política de permisos del agente.
