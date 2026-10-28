@@ -32,6 +32,7 @@ class MainActivity : Activity() {
     private lateinit var chatCodeInput: EditText
     private lateinit var chatInput: EditText
     private lateinit var chatOutput: TextView
+    private lateinit var voicePanel: SkyEyeVoicePanel
     private lateinit var cloudConsent: CheckBox
     private lateinit var privateConsent: CheckBox
     private val chatHistory = JSONArray()
@@ -73,6 +74,15 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this)
         scroll.addView(content)
         setContentView(scroll)
+        voicePanel = SkyEyeVoicePanel(this) { transcript ->
+            chatInput.setText(transcript)
+            if (tokens.chatToken().isEmpty()) {
+                voicePanel.showError("Para hablar con SKY primero activá el chat autorizado.")
+            } else {
+                sendChat()
+            }
+        }
+        content.addView(voicePanel)
         content.addView(description("SKY MOBILE AGENT — control bajo tu autorización"))
         content.addView(description("Permisos por aplicación. Cada orden requiere un toque de confirmación."))
         serverInput = input("Servidor HTTPS privado de SKY")
@@ -134,13 +144,30 @@ class MainActivity : Activity() {
     }
     override fun onPause() {
         visible = false
+        if (::voicePanel.isInitialized) voicePanel.onPausePanel()
         handler.removeCallbacks(pollLoop)
         super.onPause()
     }
     override fun onDestroy() {
         handler.removeCallbacks(pollLoop)
+        if (::voicePanel.isInitialized) voicePanel.close()
         executor.shutdown()
         super.onDestroy()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == SkyEyeVoicePanel.MICROPHONE_REQUEST &&
+            ::voicePanel.isInitialized) {
+            voicePanel.onMicrophonePermissionResult(
+                grantResults.isNotEmpty() &&
+                    grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED
+            )
+        }
     }
 
     private val pollLoop = object : Runnable {
@@ -153,7 +180,12 @@ class MainActivity : Activity() {
     private fun execute(background: () -> Unit) {
         executor.execute {
             try { background() }
-            catch (exc: Exception) { setStatus("Error de SKY: " + (exc.message ?: "Conexión fallida")) }
+            catch (exc: Exception) {
+                setStatus("Error de SKY: " + (exc.message ?: "Conexión fallida"))
+                runOnUiThread {
+                    if (::voicePanel.isInitialized) voicePanel.showError("Falló la conexión con SKY.")
+                }
+            }
         }
     }
     private fun setStatus(value: String) = runOnUiThread { status.text = value }
@@ -233,6 +265,7 @@ class MainActivity : Activity() {
         cloudConsent.isChecked = false
         privateConsent.isChecked = false
         chatPending = true
+        voicePanel.showThinking()
         execute {
             try {
                 val history = JSONArray()
@@ -258,6 +291,7 @@ class MainActivity : Activity() {
                     chatInput.setText("")
                     chatOutput.text = "SKY: " + answer + "\nMotor: " +
                         reply.optString("proveedor", "desconocido")
+                    voicePanel.speakReply(answer)
                 }
             } finally {
                 chatPending = false
