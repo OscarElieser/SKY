@@ -63,26 +63,39 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Compile Android debug APK
-        run: gradle -p mobile/android-agent :app:assembleDebug --no-daemon
-      - name: Validate spoken and typed panel routing
-        run: gradle -p mobile/android-agent :app:testDebugUnitTest --no-daemon
+      - name: Compile standard Android debug APK without accessibility service
+        run: gradle -p mobile/android-agent :app:assembleStandardDebug --no-daemon
+      - name: Validate voice, application routing, and device commands
+        run: gradle -p mobile/android-agent :app:testStandardDebugUnitTest --no-daemon
+      - name: Verify standard APK manifest does not declare AccessibilityService
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="mobile/android-agent/app/build/outputs/apk/standard/debug/app-standard-debug.apk"
+          test -s "$apk"
+          manifests=$(find mobile/android-agent/app/build/intermediates -type f -name AndroidManifest.xml -path '*standardDebug*')
+          test -n "$manifests"
+          if echo "$manifests" | xargs grep -l 'SkyTextAssistService'; then
+            echo "ERROR: standard APK contains the optional accessibility service"
+            exit 1
+          fi
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
       - name: Stage SKY Android APK in its isolated folder
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p mobile/android-agent/apk
-          cp mobile/android-agent/app/build/outputs/apk/debug/app-debug.apk \
-            mobile/android-agent/apk/SKY-IA-Android-debug.apk
+          cp mobile/android-agent/app/build/outputs/apk/standard/debug/app-standard-debug.apk \
+            mobile/android-agent/apk/SKY-IA-Android-standard-debug.apk
           cd mobile/android-agent/apk
-          sha256sum SKY-IA-Android-debug.apk > SKY-IA-Android-debug.apk.sha256
-          test -s SKY-IA-Android-debug.apk
+          sha256sum SKY-IA-Android-standard-debug.apk > SKY-IA-Android-standard-debug.apk.sha256
+          test -s SKY-IA-Android-standard-debug.apk
       - name: Attach development APK (not device-validated)
         uses: actions/upload-artifact@v4
         with:
-          name: sky-mobile-agent-debug
+          name: sky-mobile-standard-debug
           path: |
-            mobile/android-agent/apk/SKY-IA-Android-debug.apk
-            mobile/android-agent/apk/SKY-IA-Android-debug.apk.sha256
+            mobile/android-agent/apk/SKY-IA-Android-standard-debug.apk
+            mobile/android-agent/apk/SKY-IA-Android-standard-debug.apk.sha256
           if-no-files-found: error
           retention-days: 30
