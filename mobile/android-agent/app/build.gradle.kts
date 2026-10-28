@@ -11,7 +11,7 @@ val skyHasReleaseSigning = listOf(
     skyKeyStorePath, skyStorePassword, skyKeyAlias, skyKeyPassword
 ).all { !it.isNullOrBlank() }
 if (providers.environmentVariable("SKY_ANDROID_REQUIRE_SIGNED_RELEASE").orNull == "true") {
-    check(skyHasReleaseSigning && java.io.File(skyKeyStorePath!!).isFile) {
+    check(skyHasReleaseSigning && file(skyKeyStorePath!!).isFile) {
         "No hay configuracion completa de firma release SKY. Se prohibe distribuir sin firma."
     }
 }
