@@ -35,6 +35,7 @@ class MainActivity : Activity() {
     private lateinit var voicePanel: SkyEyeVoicePanel
     private lateinit var dailyActions: SkyAndroidActions
     private lateinit var installedApps: SkyInstalledApps
+    private lateinit var companionController: SkyCompanionController
     private lateinit var cloudConsent: CheckBox
     private lateinit var privateConsent: CheckBox
     private val chatHistory = JSONArray()
@@ -79,6 +80,7 @@ class MainActivity : Activity() {
         tokens = PrivateTokenStore(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
             if (!processLocalPanelCommand(transcript, spoken = true) &&
+                !processCompanionCommand(transcript) &&
                 !processDailyCommand(transcript)) {
                 home.openChat()
                 chatInput.setText(transcript)
@@ -121,6 +123,11 @@ class MainActivity : Activity() {
             onAccessibilityHelp = { showTextAssistDisclosure() },
             installedApps = installedApps
         )
+        companionController = SkyCompanionController { message ->
+            voicePanel.express(message)
+            home.showMessage(message)
+            voicePanel.speakReply(message)
+        }
         setContentView(home.root)
         refreshConnection()
         if (tokens.token().isEmpty()) {
@@ -193,6 +200,9 @@ class MainActivity : Activity() {
             .setPositiveButton("Cerrar", null)
             .show()
     }
+
+    private fun processCompanionCommand(message: String): Boolean =
+        companionController.handle(message)
 
     /** Acción autorizada del teléfono, incluso si SKY Core está desconectado. */
     private fun processDailyCommand(message: String): Boolean {
@@ -293,6 +303,22 @@ class MainActivity : Activity() {
                 })
             }
         }
+        content.addView(actionButton("Modo acompañante y diversión") {
+            val labels = arrayOf(
+                "Acompañame", "Voy caminando", "Voy en bus",
+                "Contame un chiste", "Silba", "Detener modo acompañante"
+            )
+            val commands = arrayOf(
+                "SKY acompañame", "SKY voy caminando", "SKY voy en bus",
+                "SKY contame un chiste", "SKY silba",
+                "SKY desactiva modo acompañante"
+            )
+            AlertDialog.Builder(this).setTitle("SKY · Tu compañera")
+                .setItems(labels) { _, index ->
+                    companionController.handle(commands[index])
+                }
+                .setNegativeButton("Cerrar", null).show()
+        })
         content.addView(actionButton("Mis aplicaciones instaladas") {
             settingsDialog?.dismiss()
             installedApps.showCatalog()
@@ -334,10 +360,12 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         visible = true
+        companionController.onResume()
         handler.post(pollLoop)
     }
     override fun onPause() {
         visible = false
+        if (::companionController.isInitialized) companionController.onPause()
         if (::voicePanel.isInitialized) voicePanel.onPausePanel()
         handler.removeCallbacks(pollLoop)
         super.onPause()
@@ -345,6 +373,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         handler.removeCallbacks(pollLoop)
         if (::voicePanel.isInitialized) voicePanel.close()
+        if (::companionController.isInitialized) companionController.close()
         executor.shutdown()
         super.onDestroy()
     }
@@ -462,7 +491,7 @@ class MainActivity : Activity() {
         val message = chatInput.text.toString().trim()
         if (message.isEmpty()) return
         if (processLocalPanelCommand(message, spoken = false) ||
-            processDailyCommand(message)) {
+            processCompanionCommand(message) || processDailyCommand(message)) {
             chatInput.setText("")
             return
         }
