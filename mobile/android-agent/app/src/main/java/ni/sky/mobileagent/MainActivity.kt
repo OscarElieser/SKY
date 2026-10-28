@@ -177,10 +177,10 @@ class MainActivity : Activity() {
                 if (SkyTextAssistService.enabled()) "Sí" else "No",
             "Vinculación SKY Core: " + if (tokens.token().isNotEmpty()) "Configurada" else "Pendiente",
             "Chat: " + if (tokens.chatToken().isNotEmpty()) "Token almacenado" else "Sin autorizar"
-        ).joinToString("\\n")
+        ).joinToString("\n")
         AlertDialog.Builder(this)
             .setTitle("SKY · Autodiagnóstico Android")
-            .setMessage(lines + "\\n\\n" +
+            .setMessage(lines + "\n\n" +
                 "Este chequeo verifica capacidades locales, no prueba conexiones remotas " +
                 "ni garantiza que una alarma haya sonado o un mensaje se haya enviado.")
             .setPositiveButton("Cerrar", null)
