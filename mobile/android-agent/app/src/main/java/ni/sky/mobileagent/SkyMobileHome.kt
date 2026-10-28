@@ -1,6 +1,9 @@
 package ni.sky.mobileagent
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -8,13 +11,18 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.text.Editable
+import android.text.TextWatcher
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import android.text.InputFilter
 import android.text.InputType
 import android.text.TextUtils
@@ -45,9 +53,24 @@ class SkyMobileHome(
         letterSpacing = 0.07f
         contentDescription = "Estado actual de SKY"
     }
-    private val history = ArrayList<String>()
+    private data class Exchange(val question: String, val answer: String, val engine: String)
+    private val history = ArrayList<Exchange>()
     private var activeModule = ""
     private var expandedHistory = false
+    private var keyboardVisible = false
+    private var pendingQuestion: String? = null
+    private var pendingInfo: String? = null
+    private lateinit var conversationScroll: ScrollView
+    private lateinit var conversationRows: LinearLayout
+    private lateinit var footerBar: LinearLayout
+    private lateinit var suggestionBar: HorizontalScrollView
+    private lateinit var sendButton: TextView
+    private lateinit var panelLayout: FrameLayout.LayoutParams
+    private val progressLabel = text("SKY lista para conversar", 11f, soft).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(6), dp(4), dp(6), dp(7))
+        contentDescription = "Estado de conversación"
+    }
 
     private fun dp(v: Int) = (v * host.resources.displayMetrics.density + 0.5f).toInt()
     private fun bg(color: Int, radius: Int) = GradientDrawable().apply {
@@ -85,16 +108,26 @@ class SkyMobileHome(
     }
     private val connected = text("○", 13f, cyan)
     val chatInput = EditText(host).apply {
-        hint = "Escribí o pedí un panel a SKY"
+        hint = "Escribile a SKY..."
         setHintTextColor(Color.rgb(175, 180, 211))
         setTextColor(white)
         textSize = 15f
         background = null
-        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+            InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        imeOptions = EditorInfo.IME_ACTION_SEND
         maxLines = 4
         minLines = 1
         filters = arrayOf(InputFilter.LengthFilter(4000))
-        setPadding(dp(14), dp(8), dp(4), dp(8))
+        setPadding(dp(15), dp(10), dp(7), dp(10))
+        addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (::sendButton.isInitialized) updateSendButton()
+                if (::suggestionBar.isInitialized) updateSuggestions()
+            }
+            override fun afterTextChanged(s: Editable?) = Unit
+        })
         setOnEditorActionListener { _, id, _ ->
             if (id == EditorInfo.IME_ACTION_SEND) {
                 onSend()
@@ -102,8 +135,9 @@ class SkyMobileHome(
             } else false
         }
     }
-    val chatOutput = text("Conversación con SKY", 14f, white).apply {
-        setPadding(dp(9), dp(8), dp(9), dp(8))
+    val chatOutput = text("¿En qué te ayudo hoy?\n\nEscribí tu mensaje o hablame con naturalidad.", 15f, soft).apply {
+        gravity = Gravity.CENTER
+        setPadding(dp(15), dp(24), dp(15), dp(24))
     }
     val cloudConsent = CheckBox(host).apply {
         text = "Nube autorizada para ESTE mensaje e historial"
@@ -226,23 +260,122 @@ class SkyMobileHome(
         faceCaption.text = if (enabled) "SKY DURMIENDO · DECÍ SKY" else "SKY LISTA · TOCÁ PARA HABLAR"
     }
 
-    /** Avoid Android 15/16 three-button navigation overlap without hiding system controls. */
-    fun applyNavigationInset(bottomPx: Int) {
-        if (!::mainSurface.isInitialized) return
-        mainSurface.setPadding(dp(12), dp(10), dp(12),
-            maxOf(dp(18), bottomPx + dp(9)))
-        // Keep the chat composer and footer above Android's navigation bar.
-        panel.setPadding(dp(17), dp(12), dp(17),
-            maxOf(dp(18), bottomPx + dp(12)))
+    /**
+     * Insets are handled by the root, not by stacking a navigation inset below
+     * the IME. On Android 15/16 the composer must move with the software keyboard.
+     */
+    fun applyWindowInsets(topPx: Int, bottomPx: Int, imeVisible: Boolean) {
+        root.setPadding(0, topPx, 0, bottomPx)
+        keyboardVisible = imeVisible
+        if (::panelLayout.isInitialized) {
+            val margin = dp(if (imeVisible) 4 else 104)
+            if (panelLayout.topMargin != margin) {
+                panelLayout.topMargin = margin
+                panel.layoutParams = panelLayout
+            }
+        }
+        if (::footerBar.isInitialized) footerBar.visibility =
+            if (imeVisible) View.GONE else View.VISIBLE
+        panel.setPadding(dp(17), dp(if (imeVisible) 8 else 12),
+            dp(17), dp(if (imeVisible) 8 else 16))
+        updateSuggestions()
+    }
+
+    private fun updateSuggestions() {
+        if (!::suggestionBar.isInitialized) return
+        suggestionBar.visibility = if (keyboardVisible || history.isNotEmpty() ||
+            pendingQuestion != null || chatInput.text.isNotBlank()) View.GONE else View.VISIBLE
+    }
+
+    private fun updateSendButton() {
+        if (!::sendButton.isInitialized) return
+        val canSend = chatInput.text.isNotBlank() && pendingQuestion == null
+        sendButton.alpha = if (canSend) 1f else 0.46f
+        sendButton.contentDescription = if (pendingQuestion != null)
+            "SKY está procesando un mensaje" else "Enviar mensaje escrito a SKY"
+    }
+
+    private fun makeBubble(value: String, mine: Boolean): LinearLayout {
+        val item = LinearLayout(host).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = if (mine) Gravity.END else Gravity.START
+            setPadding(dp(4), dp(5), dp(4), dp(5))
+        }
+        val speaker = text(if (mine) "VOS" else "SKY IA", 10f,
+            if (mine) Color.rgb(185, 169, 255) else cyan).apply {
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            letterSpacing = 0.12f
+            setPadding(dp(9), dp(2), dp(9), dp(5))
+        }
+        item.addView(speaker)
+        val bubble = text(value, 15f, white).apply {
+            gravity = Gravity.START
+            setLineSpacing(dp(3).toFloat(), 1f)
+            setTextIsSelectable(true)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                if (mine) intArrayOf(Color.rgb(97, 72, 205), Color.rgb(62, 62, 150))
+                else intArrayOf(Color.rgb(36, 52, 92), Color.rgb(32, 42, 76))).apply {
+                cornerRadius = dp(20).toFloat()
+            }
+            setPadding(dp(15), dp(12), dp(15), dp(12))
+            setOnLongClickListener {
+                val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("SKY IA", value))
+                Toast.makeText(host, "Mensaje copiado", Toast.LENGTH_SHORT).show()
+                true
+            }
+        }
+        item.addView(bubble, LinearLayout.LayoutParams(-2, -2).apply {
+            width = LinearLayout.LayoutParams.WRAP_CONTENT
+        })
+        return item
+    }
+
+    private fun renderConversation() {
+        if (!::conversationRows.isInitialized) return
+        conversationRows.removeAllViews()
+        chatOutput.visibility = if (history.isEmpty() && pendingQuestion == null &&
+            pendingInfo == null) View.VISIBLE else View.GONE
+        val entries = if (expandedHistory) history.toList() else history.takeLast(6)
+        entries.forEach { exchange ->
+            conversationRows.addView(makeBubble(exchange.question, true))
+            conversationRows.addView(makeBubble(exchange.answer, false))
+        }
+        pendingQuestion?.let { question ->
+            conversationRows.addView(makeBubble(question, true))
+            conversationRows.addView(makeBubble("Un momento, estoy preparando tu respuesta…", false))
+        }
+        pendingInfo?.let { info -> conversationRows.addView(makeBubble(info, false)) }
+        progressLabel.text = when {
+            pendingQuestion != null -> "● SKY está pensando…"
+            history.isEmpty() -> "● SKY lista para conversar"
+            else -> "● Conversación activa · mantené presionado para copiar"
+        }
+        updateSendButton()
+        updateSuggestions()
+        conversationScroll.post { conversationScroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    fun beginSending(message: String) {
+        pendingQuestion = message
+        pendingInfo = null
+        chatInput.setText("")
+        renderConversation()
+    }
+
+    fun failSending(reason: String, original: String) {
+        pendingQuestion = null
+        pendingInfo = "No pude enviar el mensaje. $reason"
+        if (chatInput.text.isBlank()) chatInput.setText(original)
+        renderConversation()
     }
 
     private fun buildPanel() {
-        val layout = FrameLayout.LayoutParams(-1, -1)
-        root.addView(dialogBackdrop, layout)
-        val panelLp = FrameLayout.LayoutParams(-1, -1, Gravity.BOTTOM).apply {
+        root.addView(dialogBackdrop, FrameLayout.LayoutParams(-1, -1))
+        panelLayout = FrameLayout.LayoutParams(-1, -1, Gravity.BOTTOM).apply {
             topMargin = dp(104)
         }
-        dialogBackdrop.addView(panel, panelLp)
+        dialogBackdrop.addView(panel, panelLayout)
         val header = LinearLayout(host).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -251,46 +384,89 @@ class SkyMobileHome(
         header.addView(pill("Historial", Color.rgb(53, 56, 107)) { toggleHistory() }.apply {
             textSize = 12f
             contentDescription = "Mostrar o reducir historial de conversación"
-        }, LinearLayout.LayoutParams(dp(86), dp(40)).apply { rightMargin = dp(7) })
+        }, LinearLayout.LayoutParams(dp(90), dp(40)).apply { rightMargin = dp(8) })
         header.addView(pill("×", Color.rgb(60, 62, 119)) { closePanel() }.apply {
             textSize = 28f
             contentDescription = "Cerrar panel y volver a SKY"
         }, LinearLayout.LayoutParams(dp(47), dp(45)))
         panel.addView(header)
         panel.addView(panelSubtitle)
-        val scroll = ScrollView(host).apply {
-            isFillViewport = true
-            isVerticalScrollBarEnabled = false
+
+        conversationRows = LinearLayout(host).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(1), dp(6), dp(1), dp(8))
             addView(chatOutput)
         }
-        panel.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        conversationScroll = ScrollView(host).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = false
+            clipToPadding = false
+            addView(conversationRows)
+        }
+        panel.addView(conversationScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        panel.addView(progressLabel, LinearLayout.LayoutParams(-1, -2))
+
+        val suggestions = LinearLayout(host).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        listOf("¿Qué podés hacer?", "Ayudame a investigar", "Abrí YouTube").forEach { sample ->
+            suggestions.addView(pill(sample, Color.rgb(40, 49, 100)) {
+                chatInput.setText(sample)
+                chatInput.setSelection(chatInput.text.length)
+                chatInput.requestFocus()
+                (host.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .showSoftInput(chatInput, InputMethodManager.SHOW_IMPLICIT)
+            }.apply {
+                textSize = 12f
+                setTextColor(Color.rgb(223, 227, 252))
+            }, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(8) })
+        }
+        suggestionBar = HorizontalScrollView(host).apply {
+            isHorizontalScrollBarEnabled = false
+            setPadding(0, dp(4), 0, dp(9))
+            addView(suggestions)
+        }
+        panel.addView(suggestionBar, LinearLayout.LayoutParams(-1, -2))
+
         val composer = LinearLayout(host).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = bg(Color.rgb(52, 56, 109), 23)
+            gravity = Gravity.BOTTOM
+            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.rgb(44, 52, 100), Color.rgb(59, 56, 116))).apply {
+                cornerRadius = dp(23).toFloat()
+                setStroke(dp(1), Color.rgb(96, 102, 161))
+            }
+            setPadding(dp(2), dp(3), dp(4), dp(3))
         }
         composer.addView(chatInput, LinearLayout.LayoutParams(0, -2, 1f))
-        composer.addView(pill("➤", violet, onSend).apply {
+        sendButton = pill("➤", violet) {
+            if (chatInput.text.isNotBlank() && pendingQuestion == null) onSend()
+        }.apply {
+            textSize = 23f
             contentDescription = "Enviar mensaje escrito a SKY"
-            textSize = 24f
-        }, LinearLayout.LayoutParams(dp(53), dp(50)))
+            elevation = dp(3).toFloat()
+        }
+        composer.addView(sendButton, LinearLayout.LayoutParams(dp(52), dp(50)))
         panel.addView(composer, LinearLayout.LayoutParams(-1, -2))
-        val footer = LinearLayout(host).apply {
+        footerBar = LinearLayout(host).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        footer.addView(pill("🎙", Color.TRANSPARENT) { voicePanel.listen() }.apply {
+        footerBar.addView(pill("🎙", Color.TRANSPARENT) { voicePanel.listen() }.apply {
             contentDescription = "Dictar mensaje a SKY"
         }, LinearLayout.LayoutParams(0, dp(44), 1f))
-        footer.addView(pill("Privacidad", Color.TRANSPARENT) {
+        footerBar.addView(pill("Privacidad", Color.TRANSPARENT) {
             privacy.visibility = if (privacy.visibility == View.GONE) View.VISIBLE else View.GONE
         }, LinearLayout.LayoutParams(0, dp(44), 1f))
-        footer.addView(pill("Motor", Color.TRANSPARENT, onDiagnostics),
+        footerBar.addView(pill("Motor", Color.TRANSPARENT, onDiagnostics),
             LinearLayout.LayoutParams(0, dp(44), 1f))
-        footer.addView(pill("Acceso", Color.TRANSPARENT, onChatAccess),
+        footerBar.addView(pill("Acceso", Color.TRANSPARENT, onChatAccess),
             LinearLayout.LayoutParams(0, dp(44), 1f))
-        panel.addView(footer)
+        panel.addView(footerBar)
         panel.addView(privacy)
+        updateSendButton()
+        updateSuggestions()
     }
 
     fun isPanelOpen() = dialogBackdrop.visibility == View.VISIBLE
@@ -307,9 +483,9 @@ class SkyMobileHome(
         panelTitle.text = moduleTitle(id)
         panelSubtitle.text = "Consultas con SKY Android · Internet opcional"
         panelSubtitle.visibility = View.VISIBLE
-        chatOutput.text = "¿Qué necesitas hacer en " + moduleTitle(id) + "?\n\n" +
-            "SKY puede conversar sobre esta tarea. La ejecución de herramientas " +
-            "requiere un servicio compatible y permisos del dispositivo."
+        pendingInfo = "¿Qué necesitás hacer en " + moduleTitle(id) + "? Puedo conversar " +
+            "sobre esta tarea; algunas acciones requieren permisos del dispositivo."
+        renderConversation()
         dialogBackdrop.visibility = View.VISIBLE
     }
 
@@ -317,16 +493,13 @@ class SkyMobileHome(
         dialogBackdrop.visibility = View.GONE
         privacy.visibility = View.GONE
         chatInput.clearFocus()
-        (host.getSystemService(Activity.INPUT_METHOD_SERVICE)
-            as? android.view.inputmethod.InputMethodManager)
+        (host.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
             ?.hideSoftInputFromWindow(chatInput.windowToken, 0)
     }
 
     private fun toggleHistory() {
         expandedHistory = !expandedHistory
-        chatOutput.text = if (history.isEmpty()) "Todavía no hay mensajes en esta sesión."
-            else history.takeLast(if (expandedHistory) 8 else 3)
-                .joinToString("\n\n────────────\n\n")
+        renderConversation()
     }
 
     fun setConnection(linked: Boolean, chatReady: Boolean, mobileCloud: Boolean = false) {
@@ -341,18 +514,20 @@ class SkyMobileHome(
 
     fun showMessage(s: String) {
         status.text = s
-        if (isPanelOpen()) chatOutput.text = s
-        else {
-            // El estado se comunica sin saturar la portada minimalista.
-            android.widget.Toast.makeText(host, s, android.widget.Toast.LENGTH_SHORT).show()
+        if (isPanelOpen()) {
+            pendingInfo = s
+            renderConversation()
+        } else {
+            Toast.makeText(host, s, Toast.LENGTH_SHORT).show()
         }
     }
 
     fun addExchange(question: String, answer: String, engine: String, revealPanel: Boolean = true) {
-        history.add("Vos: " + question.take(350) + "\n\nSKY: " + answer.take(2500))
-        if (history.size > 20) history.removeAt(0)
-        val entries = if (expandedHistory) history.takeLast(8) else history.takeLast(3)
-        chatOutput.text = entries.joinToString("\n\n────────────\n\n")
+        pendingQuestion = null
+        pendingInfo = null
+        history.add(Exchange(question.take(4000), answer.take(4000), engine))
+        if (history.size > 30) history.removeAt(0)
+        renderConversation()
         if (revealPanel && !isPanelOpen()) openChat()
     }
 }
