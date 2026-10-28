@@ -125,8 +125,9 @@ class SkyEyeVoicePanel(
                 val voices = speechEngine?.voices.orEmpty()
                     .filter { candidate ->
                         candidate.locale.language == "es" &&
-                        android.speech.tts.TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED
-                            !in candidate.features.orEmpty()
+                        !candidate.features.orEmpty().contains(
+                            android.speech.tts.TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED
+                        )
                     }
                 val preferred = voices.maxByOrNull { candidate ->
                     val region = when (candidate.locale.country.uppercase(Locale.ROOT)) {
