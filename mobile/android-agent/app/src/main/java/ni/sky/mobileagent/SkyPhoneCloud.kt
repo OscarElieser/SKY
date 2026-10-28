@@ -26,7 +26,7 @@ object SkyPhoneCloud {
      */
     fun normalizePersonalKey(raw: String): String = buildString(raw.length) {
         for (character in raw) {
-            val invisible = character.isWhitespace() || character.isSpaceChar() ||
+            val invisible = character.isWhitespace() || Character.isSpaceChar(character) ||
                 Character.getType(character) == Character.FORMAT.toInt()
             if (!invisible) append(character)
         }
