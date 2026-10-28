@@ -496,14 +496,14 @@ def _turnos(historial: list[dict] | None) -> list[dict]:
             if isinstance(h, dict) and h.get('role') in ('user', 'assistant') and h.get('content')]
 
 
-def usar_cerebro(proveedor: str) -> bool:
+def usar_cerebro(proveedor: str, texto: str = '') -> bool:
     """Cerebro con herramientas: Ollama local, o el proveedor de la nube que el dueño eligió (v12.3)."""
     from . import sky_cerebro
     proveedor = proveedor or 'auto'
     if proveedor not in ('auto', 'sky', 'ollama') + sky_cerebro.NUBE:
         return False
     sky_cerebro.preferir(proveedor)
-    return sky_cerebro.disponible()
+    return sky_cerebro.disponible(texto)
 
 
 def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'auto', modo: str = 'chat') -> dict:
@@ -533,15 +533,23 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
     if contribucion is not None:
         return contribucion
     try:
-        if usar_cerebro(proveedor):
+        if usar_cerebro(proveedor, texto):
             from . import sky_cerebro
             d = sky_cerebro.decidir(texto, turnos, modo)
             if d['tipo'] == 'herramienta':
                 return marcar_cerebro(resolver_especial(d['resultado']), original)
             if d['tipo'] == 'texto':
                 _necesidad(original)            # el cerebro no encontró herramienta: quizá falta una habilidad
-            if d['tipo'] == 'texto' and d['mensaje'] and modo == 'voz':
-                return {'tipo': 'respuesta', 'mensaje': d['mensaje'], 'proveedor': 'ollama'}
+            if d['tipo'] == 'texto' and d['mensaje'] and (
+                modo == 'voz' or (proveedor in ('auto', 'sky')
+                                  and os.getenv('SKY_CEREBRO', 'auto').strip().lower() == 'subasta')
+            ):
+                return {'tipo': 'respuesta', 'mensaje': d['mensaje'],
+                        'proveedor': sky_cerebro.ultimo_proveedor()}
+            if d['tipo'] == 'error' and proveedor in ('auto', 'sky') and (
+                os.getenv('SKY_CEREBRO', 'auto').strip().lower() == 'subasta'
+            ):
+                return {'tipo': 'error', 'mensaje': d['mensaje']}
         else:
             _necesidad(original)
     except Exception:
@@ -553,7 +561,10 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
     try:
         if modo == 'voz':
             from .providers import reply, choose_provider
-            nombre, _ = choose_provider(proveedor or 'auto')
+            if proveedor in ('auto', 'sky') and os.getenv('SKY_CEREBRO', 'auto').strip().lower() == 'subasta':
+                nombre = 'subasta'
+            else:
+                nombre, _ = choose_provider(proveedor or 'auto')
             from .sky_cerebro import contexto_aprendido
             extra = contexto_aprendido(texto)
             from .sky_impacto import impact_instructions
