@@ -39,8 +39,8 @@ object SkyMusicCommand {
         } else {
             // "Reproducí en Spotify la canción..." and "pon en YouTube Music..."
             val ahead = Regex(
-                """^(?:en|desde|por)\\s+(youtube music|youtube musica|yt music|spotify|youtube)""" +
-                """\\s+(?:(?:la|una)\\s+)?(?:(?:cancion|musica|tema|video)\\s+)?"""
+                """^(?:en|desde|por)\s+(youtube music|youtube musica|yt music|spotify|youtube)""" +
+                """\s+(?:(?:la|una)\s+)?(?:(?:cancion|musica|tema|video)\s+)?"""
             ).find(query)
             if (ahead != null) {
                 picked = choose(ahead.groupValues[1])
