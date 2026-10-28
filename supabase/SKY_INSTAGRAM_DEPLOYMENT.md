@@ -5,17 +5,17 @@
 - Proyecto indicado por el propietario: `jojzuaeqmjgnqikpnfxk`.
 - Dashboard: https://supabase.com/dashboard/project/jojzuaeqmjgnqikpnfxk
 - **No usar BAQUEANO**: la base de datos y las claves de esa aplicación quedan intactas.
-- Estado de entrega de este módulo: **código en `main`, sin confirmar despliegue**.
-- La cuenta de Instagram fue autorizada en Meta para pruebas, pero **SKY Android no está conectado aún**.
+- Estado de entrega verificado el 28/10/2026: **función `sky-instagram` activa (versión 7), URL `/health` con `ready:true`, OAuth autorizado y token cifrado almacenado**.
+- La cuenta profesional seleccionada fue autorizada en Meta y el backend verificó el token; **aún falta verificar programáticamente el perfil de Instagram y conectar SKY Android**.
 - La cuenta Meta del usuario tiene el caso de uso *Instagram API (Unified Login)*.
 
-## Direcciones planificadas (no disponibles hasta desplegar)
+## Direcciones del backend desplegado
 
 - Retorno OAuth: `https://jojzuaeqmjgnqikpnfxk.supabase.co/functions/v1/sky-instagram/callback`
 - Verificación de webhook: `https://jojzuaeqmjgnqikpnfxk.supabase.co/functions/v1/sky-instagram/webhook`
 - Salud: `https://jojzuaeqmjgnqikpnfxk.supabase.co/functions/v1/sky-instagram/health`
 
-**No registrar estas URL en Meta hasta que la función esté desplegada y se compruebe que responde.** En particular, `health` no verifica que haya OAuth funcional: `ready: false` significa que faltan credenciales y la URL de inicio de sesión oficial.
+**Comprobado el 28/10/2026:** la URL HTTPS de retorno está registrada en Meta, `/health` respondió `ready:true` y un ciclo OAuth finalizó exitosamente. La respuesta de salud por sí sola **no** acredita la identidad del perfil ni capacidades reales de Android.
 
 ## Despliegue seguro
 
@@ -47,11 +47,16 @@
 - No reusar el token de prueba compartiéndolo por chat o dentro de la APK.
 - `Instagram OAuth` no implementa autenticación de Windows y **no modifica SKY Windows**.
 
-## Evidencia pendiente para declarar completado
+## Evidencia confirmada y pendiente (28/10/2026)
 
-- Proyecto nuevo visible en el conector.
-- Tablas creadas y auditadas en ese proyecto.
-- Función desplegada y `/health` comprobada.
-- Secreto Meta y URL oficial registrados por el propietario.
-- OAuth real ejecutado, token vigente verificado y cuenta profesional identificada mediante llamada permitida a Meta.
-- Integración Android enlazada y probada en teléfono.
+- **Confirmado:** proyecto SKY-IA `jojzuaeqmjgnqikpnfxk` accesible por el conector, independiente de BAQUEANO.
+- **Confirmado:** tablas privadas creadas; ambas con RLS habilitado y sin políticas públicas.
+- **Confirmado:** función `sky-instagram` activa, `verify_jwt=false`, `/health` con `ready:true`.
+- **Confirmado:** URL de retorno registrada en Meta y secretos configurados exclusivamente en Supabase.
+- **Confirmado:** OAuth completado; registro `owner` con `verified_at=2026-10-28T22:57:02.453Z`, token cifrado y vector AES-GCM presentes; estado OAuth consumido una sola vez.
+- **Permisos de token observados:** `instagram_basic`, `instagram_manage_comments`, `instagram_content_publish`, `instagram_manage_messages`, `public_profile`.
+- **Pendiente:** identificar y validar programáticamente el perfil exacto de Instagram, verificar acceso API real, ciclo de vida y expiración/renovación del token (`token_expires_at` no informado).
+- **Pendiente:** implementar en Android autenticación de usuario/dispositivo y consulta de estado sin incrustar `SKY_INSTAGRAM_OWNER_KEY` en APK, más pruebas reales en teléfono.
+- **Seguridad a revisar:** el linter reporta `public.rls_auto_enable()` SECURITY DEFINER con permisos de ejecución públicos; evaluar revocación sin afectar el event trigger.
+
+Los tokens, claves privadas y URLs temporales con `code`/`state` no deben copiarse al repositorio ni a incidencias.
