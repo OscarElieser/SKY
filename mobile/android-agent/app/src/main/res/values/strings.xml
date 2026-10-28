@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sky_text_assist_description">SKY puede escribir un texto solicitado en un campo vacío de WhatsApp o Gmail, únicamente después de tu autorización y cuando enfoqués ese campo. No lee conversaciones, no escribe contraseñas ni envía mensajes.</string>
+</resources>
