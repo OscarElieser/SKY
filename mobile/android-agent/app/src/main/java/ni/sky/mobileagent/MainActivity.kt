@@ -108,16 +108,50 @@ class MainActivity : Activity() {
         dailyActions = SkyAndroidActions(
             this,
             getSharedPreferences("sky_private_notes", MODE_PRIVATE),
-            permissions
-        ) { feedback ->
-            home.showMessage(feedback)
-            if (!isFinishing && voicePanel.isVoiceEnabled()) voicePanel.speakReply(feedback)
-        }
+            permissions,
+            feedback = { feedback ->
+                home.showMessage(feedback)
+                if (!isFinishing && voicePanel.isVoiceEnabled()) voicePanel.speakReply(feedback)
+            },
+            onAccessibilityHelp = { showTextAssistDisclosure() }
+        )
         setContentView(home.root)
         refreshConnection()
         if (tokens.token().isEmpty()) {
             home.root.post { if (!isFinishing) showSettings() }
         }
+    }
+
+    /**
+     * Divulgación explícita de accesibilidad. No habilita permisos de forma
+     * oculta y no permite ejecución de planes autónomos del modelo.
+     */
+    private fun showTextAssistDisclosure() {
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Escritura asistida opcional")
+            .setMessage(
+                "Si aceptás, Android permitirá a SKY detectar cuándo enfocás " +
+                "un campo de texto en WhatsApp o Gmail para escribir SOLO el " +
+                "texto que vos solicitaste y aprobaste.\\n\\n" +
+                "SKY no lee conversaciones completas, no registra textos " +
+                "de otras apps, no escribe contraseñas y NUNCA toca Enviar. " +
+                "La solicitud vence en 45 segundos y requiere un campo vacío.\\n\\n" +
+                "Podés desactivar este permiso cuando quieras en " +
+                "Ajustes de Android > Accesibilidad."
+            )
+            .setPositiveButton("Acepto y abrir ajustes") { _, _ ->
+                getSharedPreferences("sky_assistive_text", MODE_PRIVATE)
+                    .edit().putBoolean("consent", true).apply()
+                try {
+                    startActivity(android.content.Intent(
+                        android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS
+                    ))
+                } catch (_: Exception) {
+                    home.showMessage("No pude abrir Ajustes de Accesibilidad.")
+                }
+            }
+            .setNegativeButton("No aceptar", null)
+            .show()
     }
 
     /** Acción autorizada del teléfono, incluso si SKY Core está desconectado. */
@@ -219,6 +253,9 @@ class MainActivity : Activity() {
                 })
             }
         }
+        content.addView(actionButton("Escritura asistida en WhatsApp/Gmail") {
+            showTextAssistDisclosure()
+        })
         content.addView(CheckBox(this).apply {
             text = "SKY responde con voz"
             isChecked = voicePanel.isVoiceEnabled()
