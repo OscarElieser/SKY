@@ -13,6 +13,14 @@ class SkyMusicCommandTest {
         assertEquals(SkyMusicCommand.Service.YOUTUBE_MUSIC, two?.service)
         assertEquals("mi cancion", SkyMusicCommand.parse("SKY, pon Mi canción")?.query)
     }
+    @Test fun providerCanComeBeforeTheSong() {
+        val a = SkyMusicCommand.parse("Reproduce en Spotify la canción mi persona favorita")
+        assertEquals(SkyMusicCommand.Service.SPOTIFY, a?.service)
+        assertEquals("mi persona favorita", a?.query)
+        val b = SkyMusicCommand.parse("pon en YouTube Music la canción la bicicleta")
+        assertEquals(SkyMusicCommand.Service.YOUTUBE_MUSIC, b?.service)
+        assertEquals("la bicicleta", b?.query)
+    }
     @Test fun noAccidentalActivation() {
         assertNull(SkyMusicCommand.parse("Quiero crecer en YouTube"))
         assertNull(SkyMusicCommand.parse("mandá un mensaje por Spotify"))
