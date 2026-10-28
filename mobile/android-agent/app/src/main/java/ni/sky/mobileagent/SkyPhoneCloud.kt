@@ -18,13 +18,31 @@ object SkyPhoneCloud {
     const val MODEL = "gemini-3.5-flash-lite"
     private const val API = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
 
-    /** Only trim clipboard padding, never alter characters inside an API key. */
-    fun normalizePersonalKey(raw: String): String =
-        raw.trim { it.isWhitespace() || it == '\u200B' || it == '\uFEFF' || it == '\u00A0' }
+    /**
+     * Google API keys never contain whitespace or invisible Unicode formatting.
+     * Samsung/Android clipboard can insert them, even inside the pasted value.
+     * Remove only whitespace/FORMAT marks; do not alter visible key characters.
+     * No key contents should be logged, displayed, or committed.
+     */
+    fun normalizePersonalKey(raw: String): String = buildString(raw.length) {
+        for (character in raw) {
+            val invisible = character.isWhitespace() || character.isSpaceChar() ||
+                Character.getType(character) == Character.FORMAT.toInt()
+            if (!invisible) append(character)
+        }
+    }
 
     /** User-facing validation without revealing any part of the credential. */
     fun personalKeyProblem(raw: String): String? {
         val value = normalizePersonalKey(raw)
+        // Check wrapper BEFORE removing whitespace; don't mistake "Bearer KEY" for a raw key.
+        if (raw.trimStart().startsWith("Bearer ", ignoreCase = true) ||
+            raw.trimStart().startsWith("Bearer\\t", ignoreCase = true) ||
+            value.startsWith("GEMINI_API_KEY=", ignoreCase = true) ||
+            value.startsWith("x-goog-api-key:", ignoreCase = true) ||
+            value.startsWith("{") || value.startsWith("[")) {
+            return "Pegá únicamente la clave que entrega «Copiar clave», sin prefijos ni configuración."
+        }
         if (value.isBlank()) {
             return "No se pegó ninguna clave. En Google AI Studio tocá «Copiar clave»."
         }
@@ -32,10 +50,6 @@ object SkyPhoneCloud {
             value.startsWith("project/", ignoreCase = true) ||
             value.all { it in '0'..'9' }) {
             return "Pegaste el identificador del proyecto, no la API key. Tocá «Copiar clave»."
-        }
-        if (value.contains("Bearer ", ignoreCase = true) || value.startsWith("{") ||
-            value.startsWith("[") || value.contains("GEMINI_API_KEY=")) {
-            return "Pegá únicamente la clave que entrega «Copiar clave», sin prefijos ni configuración."
         }
         if (value.length !in 20..200) {
             return "La longitud no corresponde a una clave Gemini. Usá «Copiar clave»; no copies el ID del proyecto."

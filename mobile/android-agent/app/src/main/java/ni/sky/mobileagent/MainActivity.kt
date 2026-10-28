@@ -267,11 +267,9 @@ class MainActivity : Activity() {
                 showSettings()
             })
         } else {
-            content.addView(description("Prueba personal: necesitás tu propia clave Gemini API. " +
-                "La clave queda cifrada con Android Keystore, pero las claves utilizadas desde " +
-                "un cliente móvil pueden extraerse en un teléfono comprometido. " +
-                "No utilizar esta modalidad en una APK distribuida al público. " +
-                "Tu uso puede consumir cuota o generar costos en Google."))
+            content.addView(description("Prueba privada de SKY Android con Gemini. " +
+                "Tu clave se cifra en el teléfono y NO se agrega a la APK. " +
+                "Puede generar consumo o costos. No distribuir públicamente este modo."))
             val personalKey = input("Clave personal de Gemini API", true)
             val permission = CheckBox(this).apply {
                 text = "Autorizo enviar mis mensajes y el contexto reciente a Google Gemini. " +
@@ -280,6 +278,25 @@ class MainActivity : Activity() {
             content.addView(description("En AI Studio elegí «Copiar clave». " +
                 "No copies el nombre ni el número del proyecto. Nunca compartás tu clave."))
             content.addView(personalKey)
+            content.addView(actionButton("PEGAR CLAVE COPIADA") {
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                val clip = clipboard?.primaryClip
+                val raw = if (clip != null && clip.itemCount > 0) {
+                    clip.getItemAt(0).coerceToText(this)?.toString().orEmpty()
+                } else ""
+                val normalized = SkyPhoneCloud.normalizePersonalKey(raw)
+                val problem = SkyPhoneCloud.personalKeyProblem(raw)
+                if (problem != null) {
+                    AlertDialog.Builder(this)
+                        .setTitle("No se detectó una clave Gemini válida")
+                        .setMessage(problem)
+                        .setPositiveButton("Entendido", null).show()
+                } else {
+                    personalKey.setText(normalized)
+                    personalKey.setSelection(normalized.length)
+                    setStatus("Clave pegada sin espacios invisibles. Ahora verificá y activá SKY.")
+                }
+            })
             content.addView(permission)
             content.addView(actionButton("Abrir Google AI Studio para obtener clave") {
                 startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,

@@ -1,4 +1,18 @@
 # SKY IA Android 0.6 — modo independiente (prueba personal)
+## SKY Android 0.6.2 — pegar claves sin espacios invisibles
+
+Esta actualización añade **PEGAR CLAVE COPIADA** en Ajustes. Lee el
+portapapeles sólo cuando el usuario toca ese botón, limpia espacios y
+caracteres Unicode invisibles que pueden introducir algunos teclados
+Android y verifica el acceso a Gemini antes de cifrar la clave en
+Android Keystore. No imprime, almacena en GitHub, ni incluye claves en
+la APK. Si el portapapeles contiene el ID de proyecto, JSON, encabezados
+Bearer o caracteres visibles no válidos, explica el problema.
+
+No compartas una clave API en chats, fotos, incidencias ni repositorios.
+La integración directa en APK sigue siendo únicamente para pruebas
+privadas; para distribución general se necesita un backend seguro.
+
 ## Versión 0.6.1 — diagnóstico y verificación de claves de Gemini
 
 En la primera configuración, tocá **Copiar clave** en Google AI Studio.

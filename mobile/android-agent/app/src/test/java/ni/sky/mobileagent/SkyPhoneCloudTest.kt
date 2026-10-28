@@ -21,7 +21,25 @@ class SkyPhoneCloudTest {
         val valid = "AIzaSyEXAMPLEonly-for-validation_12345"
         assertEquals(valid, SkyPhoneCloud.normalizePersonalKey("  " + valid + "\u200B"))
         assertTrue(SkyPhoneCloud.personalKeyProblem("  " + valid + "\u200B") == null)
-        assertTrue(SkyPhoneCloud.personalKeyProblem("AIza  EXAMPLEonly-for-validation_12345")!!.contains("caracteres"))
+        assertEquals("AIzaEXAMPLEonly-for-validation_12345",
+            SkyPhoneCloud.normalizePersonalKey("AIza  EXAMPLEonly-for-validation_12345"))
+    }
+    @Test fun clipboardInvisibleMarksAreRemovedEvenInsideKey() {
+        val key = "AIzaSyEXAMPLEonly-for-validation_12345"
+        val clipboard = " \u200B" + key.take(8) + "\u200B \u00A0\uFEFF" + key.drop(8) + "\u200E\n"
+        assertEquals(key, SkyPhoneCloud.normalizePersonalKey(clipboard))
+        assertTrue(SkyPhoneCloud.validPersonalKey(clipboard))
+    }
+    @Test fun clipboardWrapperIsNotSilentlyAccepted() {
+        val key = "AIzaSyEXAMPLEonly-for-validation_12345"
+        assertFalse(SkyPhoneCloud.validPersonalKey("Bearer " + key))
+        assertFalse(SkyPhoneCloud.validPersonalKey("GEMINI_API_KEY=" + key))
+        assertFalse(SkyPhoneCloud.validPersonalKey("x-goog-api-key: " + key))
+    }
+    @Test fun nonwhitespaceCharactersAreNeverRewritten() {
+        val key = "AIzaSyEXAMPLEonly-for-validation_12345"
+        assertFalse(SkyPhoneCloud.validPersonalKey(key + "."))
+        assertEquals(key + ".", SkyPhoneCloud.normalizePersonalKey(key + "."))
     }
     @Test fun personalKeyRejectsDangerousCharactersAndMissingValues() {
         assertFalse(SkyPhoneCloud.validPersonalKey(""))
