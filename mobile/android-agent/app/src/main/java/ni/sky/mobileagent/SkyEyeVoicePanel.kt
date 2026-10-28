@@ -185,6 +185,7 @@ class SkyEyeVoicePanel(
     }
 
     fun isVoiceEnabled(): Boolean = readAloud.isChecked
+    fun isSpeechEngineReady(): Boolean = speechReady
 
     fun setVoiceEnabled(enabled: Boolean) {
         readAloud.isChecked = enabled
