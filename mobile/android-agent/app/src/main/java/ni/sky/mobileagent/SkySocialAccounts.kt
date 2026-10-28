@@ -82,7 +82,7 @@ class SkySocialAccounts(
         val choices = arrayOf("Abrir perfil público", "Crear contenido para esta red",
             "Editar identificador", "Quitar de SKY") +
             if (profile.platform == "Instagram")
-                arrayOf("Preparar acceso oficial de Instagram") else emptyArray<String>()
+                arrayOf("Conexión segura con Instagram", "Guía de cuenta Creador") else emptyArray<String>()
         AlertDialog.Builder(host)
             .setTitle(profile.platform + " · " + label)
             .setMessage("Perfil identificado localmente. Sin acceso a estadísticas, " +
@@ -107,6 +107,8 @@ class SkySocialAccounts(
                         }
                         .setNegativeButton("Cancelar", null).show()
                     4 -> if (profile.platform == "Instagram")
+                        SkyInstagramMobileLink(host, feedback).show()
+                    5 -> if (profile.platform == "Instagram")
                         showInstagramPreparation(profile)
                 }
             }
