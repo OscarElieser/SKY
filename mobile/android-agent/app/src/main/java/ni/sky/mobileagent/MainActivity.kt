@@ -34,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var chatOutput: TextView
     private lateinit var voicePanel: SkyEyeVoicePanel
     private lateinit var dailyActions: SkyAndroidActions
+    private lateinit var installedApps: SkyInstalledApps
     private lateinit var cloudConsent: CheckBox
     private lateinit var privateConsent: CheckBox
     private val chatHistory = JSONArray()
@@ -105,6 +106,10 @@ class MainActivity : Activity() {
         chatOutput = home.chatOutput
         cloudConsent = home.cloudConsent
         privateConsent = home.privateConsent
+        installedApps = SkyInstalledApps(this) { feedback ->
+            home.showMessage(feedback)
+            if (!isFinishing && voicePanel.isVoiceEnabled()) voicePanel.speakReply(feedback)
+        }
         dailyActions = SkyAndroidActions(
             this,
             getSharedPreferences("sky_private_notes", MODE_PRIVATE),
@@ -113,7 +118,8 @@ class MainActivity : Activity() {
                 home.showMessage(feedback)
                 if (!isFinishing && voicePanel.isVoiceEnabled()) voicePanel.speakReply(feedback)
             },
-            onAccessibilityHelp = { showTextAssistDisclosure() }
+            onAccessibilityHelp = { showTextAssistDisclosure() },
+            installedApps = installedApps
         )
         setContentView(home.root)
         refreshConnection()
@@ -173,6 +179,7 @@ class MainActivity : Activity() {
             "Motor de voz listo: " + if (voicePanel.isSpeechEngineReady()) "Sí" else "No",
             "Reloj compatible con alarmas: " + if (clock) "Detectado" else "No detectado",
             "Notas guardadas: " + notes,
+            "Aplicaciones abribles visibles: " + installedApps.discover().size,
             "Escritura asistida conectada: " +
                 if (SkyTextAssistService.enabled()) "Sí" else "No",
             "Vinculación SKY Core: " + if (tokens.token().isNotEmpty()) "Configurada" else "Pendiente",
@@ -286,6 +293,10 @@ class MainActivity : Activity() {
                 })
             }
         }
+        content.addView(actionButton("Mis aplicaciones instaladas") {
+            settingsDialog?.dismiss()
+            installedApps.showCatalog()
+        })
         content.addView(actionButton("Autodiagnóstico Android") {
             showDeviceDiagnostics()
         })
