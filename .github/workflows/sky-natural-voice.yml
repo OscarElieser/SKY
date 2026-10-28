@@ -1,0 +1,51 @@
+name: SKY Natural Voice — Windows HUD Android prompts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'neural_core/sky_spoken_text.py'
+      - 'neural_core/sky_voice_queue.py'
+      - 'neural_core/sky_cerebro.py'
+      - 'neural_core/assistant.py'
+      - 'metaverse/sky_home_api.py'
+      - 'metaverse/static/sky-spoken-text.js'
+      - 'metaverse/static/hud.js'
+      - 'metaverse/static/hud.html'
+      - 'tests/test_sky_natural_voice_text.py'
+      - 'tests/test_sky_spoken_text.cjs'
+      - '.github/workflows/sky-natural-voice.yml'
+  pull_request:
+    paths:
+      - 'neural_core/sky_spoken_text.py'
+      - 'neural_core/sky_voice_queue.py'
+      - 'neural_core/sky_cerebro.py'
+      - 'neural_core/assistant.py'
+      - 'metaverse/sky_home_api.py'
+      - 'metaverse/static/sky-spoken-text.js'
+      - 'metaverse/static/hud.js'
+      - 'metaverse/static/hud.html'
+      - 'tests/test_sky_natural_voice_text.py'
+      - 'tests/test_sky_spoken_text.cjs'
+      - '.github/workflows/sky-natural-voice.yml'
+
+jobs:
+  voice-regressions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax Python and JS
+        run: |
+          python -m py_compile neural_core/sky_spoken_text.py neural_core/sky_voice_queue.py neural_core/sky_cerebro.py neural_core/assistant.py metaverse/sky_home_api.py
+          node --check metaverse/static/sky-spoken-text.js
+          node --check metaverse/static/hud.js
+      - name: Speech cleaning and tuteo tests without cloud access
+        run: |
+          python -m unittest discover -s tests -p "test_sky_natural_voice_text.py" -v
+          node --test tests/test_sky_spoken_text.cjs

@@ -201,6 +201,32 @@ class VoiceWorkQueue:
             factory = self._tts_factory
         try:
             engine = factory()
+            # Preferir una voz instalada en español, particularmente de
+            # Nicaragua. Nunca descargar una voz ni usar red sin autorización.
+            try:
+                voces = engine.getProperty('voices') or []
+                def puntaje(v):
+                    idiomas = getattr(v, 'languages', []) or []
+                    idioma = ' '.join(
+                        x.decode('utf-8', errors='ignore') if isinstance(x, bytes) else str(x)
+                        for x in idiomas
+                    )
+                    metadata = (' '.join((str(getattr(v, 'id', '')),
+                                          str(getattr(v, 'name', '')), idioma))).lower()
+                    if not any(k in metadata for k in ('spanish', 'es_', 'es-', 'es-ni',
+                                                        'es-mx', 'es-es', 'es  ')):
+                        return -1
+                    if 'es-ni' in metadata or 'es_ni' in metadata or 'nicaragua' in metadata:
+                        return 100
+                    if 'es-mx' in metadata or 'es_mx' in metadata or 'mexico' in metadata:
+                        return 75
+                    return 50
+                elegibles = [v for v in voces if puntaje(v) >= 0]
+                if elegibles:
+                    elegido = max(elegibles, key=puntaje)
+                    engine.setProperty('voice', elegido.id)
+            except (AttributeError, RuntimeError, TypeError, ValueError):
+                pass
             # pyttsx3 dispara callbacks desde su propio loop del hilo trabajador.
             # Es seguro solicitar stop() desde ese callback, nunca desde Vosk.
             def on_word(name, location, length):
@@ -223,6 +249,12 @@ class VoiceWorkQueue:
         print("SKY-IA:", message if _interactivo() else f"(respuesta de {len(message)} caracteres)")
         if self._engine is None:
             return
+        # Solo se limpia la copia pronunciada. La respuesta visual, historial y
+        # todas las herramientas permanecen intactas.
+        from .sky_spoken_text import preparar_voz
+        spoken = preparar_voz(message)
+        if not spoken:
+            return
         self._cancel_speech.clear()
         self._transition_speech(True)
         try:
@@ -232,7 +264,7 @@ class VoiceWorkQueue:
                 pass
             # Frases breves permiten interrupción aun si un backend no entrega
             # eventos por palabra. La voz nunca se ejecuta en el hilo de Vosk.
-            words = message[:1000].split()
+            words = spoken[:1000].split()
             chunk = []
             for word in words:
                 if self._cancel_speech.is_set() or self._stop.is_set():
