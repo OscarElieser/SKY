@@ -29,7 +29,12 @@ class SkyTextAssistService : AccessibilityService() {
         fun enabled(): Boolean = instance != null
 
         @Synchronized fun arm(pkg: String, text: String): Boolean {
-            if (instance == null || pkg !in ALLOWED || text.isBlank() || text.length > MAX_LENGTH) {
+            val service = instance
+            val consented = service?.getSharedPreferences(
+                "sky_assistive_text", MODE_PRIVATE
+            )?.getBoolean("consent", false) == true
+            if (!consented || service == null || pkg !in ALLOWED ||
+                text.isBlank() || text.length > MAX_LENGTH) {
                 return false
             }
             pending = Pending(pkg, text, SystemClock.elapsedRealtime() + TIMEOUT_MS)
