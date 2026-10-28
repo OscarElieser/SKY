@@ -278,7 +278,7 @@ class SkyMobileHome(
         expandedHistory = !expandedHistory
         chatOutput.text = if (history.isEmpty()) "Todavía no hay mensajes en esta sesión."
             else history.takeLast(if (expandedHistory) 8 else 3)
-                .joinToString("\\n\\n────────────\\n\\n")
+                .joinToString("\n\n────────────\n\n")
     }
 
     fun setConnection(linked: Boolean, chatReady: Boolean) {
