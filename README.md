@@ -17,16 +17,40 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 ---
 
 
-## 📱 SKY Android — Ojos, Voz y Estudio Creativo (0.8.1)
+## 📱 SKY Android — asistente cotidiana (0.8.2)
 
 **SKY Android funciona de forma independiente de SKY Windows** para
 conversaciones por Gemini y acciones locales autorizadas. El desarrollo
 Android no modifica los servicios del PC.
 
-[**SKY Android 0.8.1 — Releases**](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.1) ·
-[Descarga directa de APK firmada (solo tras aprobar CI)](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.1/SKY-IA-Android-v0.8.1-firmada.apk) ·
+[**SKY Android 0.8.2 — Releases**](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.2) ·
+[Descarga directa de APK firmada (solo tras aprobar CI)](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.2/SKY-IA-Android-v0.8.2-firmada.apk) ·
 [Guía móvil](mobile/android-agent/README.md) ·
 [Instalación y verificación](mobile/android-agent/apk/README.md)
+
+### Evolución 0.8.2: hablá con SKY como con una compañera
+
+- **Sin repetir «SKY»:** órdenes directas de música y conversación fluida
+  voluntaria, solo con la app abierta y máximo ocho turnos seguidos.
+- **Spotify, YouTube Music y YouTube:** reproducir canciones mediante el
+  intent oficial de Android, con búsqueda como respaldo. No confundir
+  solicitud a la app con reproducción confirmada.
+- **Contactos elegidos:** lista privada, fragmento recibido aportado por el
+  usuario y redacción natural con Gemini. Borradores editables para WhatsApp
+  con selección de chat y envío final por el usuario. **Sin lectura de
+  conversaciones ni autorrespuestas ocultas**.
+- **Cámara de una foto:** apertura voluntaria, confirmación antes de enviar
+  una miniatura a Gemini y comentario de lo visible sin inferir emociones
+  ni diagnosticar salud mental. No hay cámara continua.
+- **Compañera cercana:** respuestas cálidas, humor y apoyo sin saludos
+  mecánicos ni declarar acciones que no se verificaron.
+- **Seguridad:** no solicitar control irrestricto, contactos ni permisos de
+  mensajería en segundo plano; no exponer claves ni materiales privados.
+
+**Estado de entrega:** código 0.8.2 en `main`; la descarga de APK
+solo se recomienda cuando la compilación, firma y SHA-256 aparezcan
+en [GitHub Releases](https://github.com/OscarElieser/SKY/releases).
+La app instalada se conserva hasta completar pruebas en Android.
 
 ### Experiencia y herramientas Android
 
@@ -49,7 +73,7 @@ Android no modifica los servicios del PC.
   por el usuario. SKY todavía no tiene acceso automático a estadísticas,
   cuentas sociales, tendencias actuales ni permisos OAuth de publicación.
 
-**Estado:** versión 0.8.1 de código Android en `main`. La APK debe
+**Estado:** versión 0.8.2 de código Android en `main`. La APK debe
 superar compilación, tests y firma antes de descargarse desde GitHub Releases,
 y se validará posteriormente en el Samsung. Conservá la instalación anterior
 hasta confirmar el nuevo paquete. Si Play Protect bloquea la instalación,
