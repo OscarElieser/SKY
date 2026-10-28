@@ -24,9 +24,12 @@ class SkyDailyCommandParserTest {
     }
 
     @Test fun rejectInvalidTimes() {
-        assertNull(SkyDailyCommandParser.parse("pon alarma a las 26:12"))
-        assertNull(SkyDailyCommandParser.parse("pon alarma a las 12:78"))
-        assertNull(SkyDailyCommandParser.parse("pon alarma a las 13:00 pm"))
+        assertTrue(SkyDailyCommandParser.parse("pon alarma a las 26:12")
+            is SkyDailyCommandParser.Command.Unsupported)
+        assertTrue(SkyDailyCommandParser.parse("pon alarma a las 12:78")
+            is SkyDailyCommandParser.Command.Unsupported)
+        assertTrue(SkyDailyCommandParser.parse("pon alarma a las 13:00 pm")
+            is SkyDailyCommandParser.Command.Unsupported)
     }
 
     @Test fun dateSpecificAlarmNotFalselyVerified() {
