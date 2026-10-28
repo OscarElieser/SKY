@@ -47,6 +47,23 @@ def test_api_reads_local_dotenv_even_if_process_started_before_key(monkeypatch, 
     assert "clave_ficticia_para_pruebas" not in str(resultado)
 
 
+def test_diagnostic_reports_search_candidates_without_disclosing_api_key():
+    from scripts.sky_diagnostico_youtube import diagnosticar
+    with patch('metaverse.hud_api._youtube_clave', return_value='private_test_key'), \
+         patch('neural_core.sky_youtube_search.buscar_videos', return_value={
+             'origen': 'youtube_data_api', 'verificado': True,
+             'videos': [{'id':'abcdefghijk', 'title':'La canción solicitada',
+                         'channel':'Canal', 'url':'https://www.youtube.com/watch?v=abcdefghijk'}],
+         }) as buscar:
+        resultado = diagnosticar('La canción solicitada')
+    assert resultado['api_configurada'] is True
+    assert resultado['metadatos_de_incrustacion'] is True
+    assert resultado['reproduccion_confirmada'] is False
+    assert resultado['videos'][0]['id'] == 'abcdefghijk'
+    assert 'private_test_key' not in str(resultado)
+    buscar.assert_called_once_with('La canción solicitada', clave='private_test_key')
+
+
 def test_youtube_explicit_runtime_key_has_precedence(monkeypatch, tmp_path):
     archivo = tmp_path / ".env"
     archivo.write_text("YOUTUBE_API_KEY=clave_de_archivo\n", encoding="utf-8")
