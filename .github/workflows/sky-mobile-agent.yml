@@ -60,10 +60,22 @@ jobs:
           gradle-version: '8.11.1'
       - name: Compile Android debug APK
         run: gradle -p mobile/android-agent :app:assembleDebug --no-daemon
+      - name: Stage SKY Android APK in its isolated folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mobile/android-agent/apk
+          cp mobile/android-agent/app/build/outputs/apk/debug/app-debug.apk \
+            mobile/android-agent/apk/SKY-IA-Android-debug.apk
+          cd mobile/android-agent/apk
+          sha256sum SKY-IA-Android-debug.apk > SKY-IA-Android-debug.apk.sha256
+          test -s SKY-IA-Android-debug.apk
       - name: Attach development APK (not device-validated)
         uses: actions/upload-artifact@v4
         with:
           name: sky-mobile-agent-debug
-          path: mobile/android-agent/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            mobile/android-agent/apk/SKY-IA-Android-debug.apk
+            mobile/android-agent/apk/SKY-IA-Android-debug.apk.sha256
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
