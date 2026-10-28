@@ -259,6 +259,48 @@ def main():
             _medir('ml_tts', t)
             _medir('ml_turno', turno, estado != 'fallida', 'accion:' + estado)
             return
+        # Respuesta hablada PROGRESIVA opt-in para preguntas públicas aisladas:
+        # Ollama local, sin historial ni herramientas; todas las demás órdenes
+        # siguen en el flujo habitual con permisos, memoria y confirmación.
+        from neural_core.sky_voice_stream_local import eligible as voz_rapida_apta, speak_stream
+        if voz_rapida_apta(command, history):
+            t = time.perf_counter()
+            try:
+                resultado = speak_stream(
+                    command,
+                    voice_runtime.say,
+                    cancelled=lambda: voice_runtime.current_turn_cancelled,
+                )
+                if resultado.first_tts_s is not None:
+                    # Primer ENVÍO al TTS, no se presume primer sonido audible.
+                    sky_metricas.registrar(
+                        'voz', 'ml_primer_tts', True,
+                        resultado.first_tts_s * 1000,
+                        origen='manos_libres', detalle='ollama_local_progresivo',
+                    )
+                _medir('ml_voz_progresiva', t, resultado.ok, resultado.error or 'ollama')
+                if voice_runtime.current_turn_cancelled or resultado.error == 'cancelled':
+                    return
+                if resultado.ok:
+                    history.extend([
+                        {'role': 'user', 'content': command},
+                        {'role': 'assistant', 'content': resultado.text},
+                    ])
+                    history = history[-10:]
+                    coordinador_voz.record_turn(command, resultado.text)
+                    _medir('ml_turno', turno, True, 'conversacion_progresiva')
+                else:
+                    # No reintentar de forma oculta después de una respuesta
+                    # parcial: evitar duplicar voz y solicitudes cloud.
+                    voice_runtime.say('No pude completar la respuesta local.')
+                    _medir('ml_turno', turno, False, 'conversacion_progresiva')
+            except Exception as exc:
+                print('SKY: error de voz progresiva:', type(exc).__name__)
+                _medir('ml_voz_progresiva', t, False, type(exc).__name__)
+                if not voice_runtime.current_turn_cancelled:
+                    voice_runtime.say('No pude completar la consulta local.')
+            return
+
         try:
             t = time.perf_counter()
             provider, modelo = choose_provider(os.getenv('SKY_VOICE_PROVIDER', 'auto'), 'SKY voz')
