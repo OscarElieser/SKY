@@ -176,7 +176,8 @@ def test_hud_yt_blocked_iframe_shows_official_fallback_without_fake_success():
     assert "function avisoIntegracionYT(videoId, mensaje)" in script
     assert "if (sesion !== ytSesion || ytReproduccionConfirmada" in script
     assert "}, 12000);" in script
-    assert "No pude confirmar que YouTube esté reproduciendo" in script
+    assert "YouTube está preparado, pero no confirmó reproducción" in script
+    assert "El reproductor de YouTube no respondió dentro de SKY" in script
     assert "const original = el('a', 'btn', 'Ver directamente en YouTube');" in script
     assert "original.target = '_blank'; original.rel = 'noopener noreferrer';" in script
     assert "ytReproduccionConfirmada = true" in script
@@ -249,3 +250,22 @@ def test_public_scraper_compatibility_is_disabled():
     with patch.object(yt, "urlopen") as remote:
         assert yt.buscar_web_publica("una cancion") == []
         remote.assert_not_called()
+
+
+def test_youtube_miniwindow_has_official_minimum_and_user_playback():
+    """Small SKY floating players retain room for YouTube controls and manual playback."""
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    css = (root / "metaverse/static/hud.css").read_text(encoding="utf-8")
+    script = (root / "metaverse/static/hud.js").read_text(encoding="utf-8")
+    assert '.sky-cinematic .win[data-id="player"].mini{' in css
+    assert 'height:min(365px, calc(100vh - 88px))' in css
+    assert 'min-height: min(270px, calc(100vh - 142px))' in css
+    assert "const iniciar = el('button', 'sky-youtube-play', '▶ Reproducir');" in script
+    assert "iniciar.addEventListener('click', () => {" in script
+    assert "ytCmd('playVideo')" in script
+    assert "onReady: () => {" in script
+    assert "ytPlayerListo = true;" in script
+    assert "ytPlayer[func](...args)" in script
+    assert "YouTube confirmó la reproducción." in script
+    assert "ytReproduccionConfirmada = true;" in script
