@@ -35,6 +35,8 @@ class MainActivity : Activity() {
     private lateinit var voicePanel: SkyEyeVoicePanel
     private lateinit var dailyActions: SkyAndroidActions
     private lateinit var installedApps: SkyInstalledApps
+    private lateinit var socialStudio: SkySocialStudio
+    @Volatile private var socialPending = false
     private lateinit var companionController: SkyCompanionController
     private lateinit var cloudConsent: CheckBox
     private lateinit var privateConsent: CheckBox
@@ -85,7 +87,8 @@ class MainActivity : Activity() {
         }
         tokens = PrivateTokenStore(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
-            if (!processMessagingCommand(transcript) &&
+            if (!processCreatorCommand(transcript) &&
+                !processMessagingCommand(transcript) &&
                 !processLocalPanelCommand(transcript, spoken = true) &&
                 !processCompanionCommand(transcript) &&
                 !processDailyCommand(transcript)) {
@@ -132,6 +135,10 @@ class MainActivity : Activity() {
             onAccessibilityHelp = { showTextAssistDisclosure() },
             installedApps = installedApps
         )
+        socialStudio = SkySocialStudio(this) { message ->
+            home.showMessage(message)
+            if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(message)
+        }
         companionController = SkyCompanionController { message ->
             voicePanel.express(message)
             home.showMessage(message)
@@ -218,6 +225,48 @@ class MainActivity : Activity() {
                 "ni garantiza que una alarma haya sonado o un mensaje se haya enviado.")
             .setPositiveButton("Cerrar", null)
             .show()
+    }
+
+    /** Original social content, never automatic likes, followers or publishing. */
+    private fun processCreatorCommand(message: String): Boolean {
+        val request = SkySocialCommand.parse(message) ?: return false
+        createSocialContent(request)
+        return true
+    }
+
+    private fun createSocialContent(request: SkySocialCommand.Request) {
+        if (socialPending) {
+            home.showMessage("SKY ya está preparando un borrador creativo.")
+            return
+        }
+        if (!tokens.cloudEnabled()) {
+            home.showMessage("Activá Gemini en Ajustes para generar contenido original.")
+            showSettings()
+            return
+        }
+        socialPending = true
+        voicePanel.showThinking()
+        execute {
+            try {
+                val text = SkyPhoneCloud.reply(tokens.personalCloudKey(),
+                    SkySocialCommand.prompt(request), JSONArray())
+                runOnUiThread {
+                    if (!isFinishing) {
+                        voicePanel.speakReply("Tengo una propuesta para " + request.platform +
+                            ". Revisá y editá el borrador antes de compartirlo.")
+                        socialStudio.showPreview(request, text)
+                    }
+                }
+            } catch (_: Exception) {
+                runOnUiThread {
+                    home.showMessage("No pude generar el borrador. Revisá internet, Gemini " +
+                        "y volvé a intentarlo.")
+                    voicePanel.showError("No pude preparar el contenido.")
+                }
+            } finally {
+                socialPending = false
+            }
+        }
     }
 
     /** Explicit WhatsApp commands are local actions, not generic Gemini chat. */
@@ -456,6 +505,10 @@ class MainActivity : Activity() {
                 }
                 .setNegativeButton("Cerrar", null).show()
         })
+        content.addView(actionButton("ESTUDIO CREATIVO · MIS REDES SOCIALES") {
+            settingsDialog?.dismiss()
+            socialStudio.showCreatorMenu { request -> createSocialContent(request) }
+        })
         content.addView(actionButton("Mis aplicaciones instaladas") {
             settingsDialog?.dismiss()
             installedApps.showCatalog()
@@ -643,7 +696,8 @@ class MainActivity : Activity() {
     private fun sendChat() {
         val message = chatInput.text.toString().trim()
         if (message.isEmpty()) return
-        if (processMessagingCommand(message) ||
+        if (processCreatorCommand(message) ||
+            processMessagingCommand(message) ||
             processLocalPanelCommand(message, spoken = false) ||
             processCompanionCommand(message) || processDailyCommand(message)) {
             chatInput.setText("")
