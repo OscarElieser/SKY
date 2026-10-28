@@ -20,7 +20,7 @@ object SkyMobileIntentRouter {
         .trim()
 
     private val openVerbs = Regex(
-        "(^| )(abre|abrir|abreme|muestra|mostrar|muestrame|activa|activar|inicia|iniciar|entra|entrar|quiero abrir|ve a)( |$)"
+        "(^| )(abre|abrir|abreme|abri|mostrame|muestra|mostrar|muestrame|activa|activar|inicia|iniciar|entra|entrar|quiero abrir|ve a)( |$)"
     )
     private val closeVerbs = Regex("(^| )(cierra|cerrar|oculta|ocultar|esconde|salir|regresa|vuelve)( |$)")
 
@@ -34,6 +34,8 @@ object SkyMobileIntentRouter {
             return Action(Action.Kind.CLOSE_PANEL)
         }
         if (!openVerbs.containsMatchIn(command)) return null
+        // "Abre una investigación sobre X" es una tarea, no abrir un panel.
+        if (" sobre " in command && "panel" !in command && "modulo" !in command) return null
 
         if (listOf("chat", "conversacion", "platicar", "panel de conversacion")
                 .any { it in command }) {
