@@ -40,7 +40,7 @@ class SkyEyeVoicePanel(
 
     private enum class EyeMode { IDLE, LISTENING, THINKING, SPEAKING, ERROR }
 
-    private val eye = SkyEyeView(host)
+    private val eye = SkyFriendlyEyesView(host)
     private val message = TextView(host)
     private val readAloud = CheckBox(host)
     private var recognizer: SpeechRecognizer? = null
@@ -50,19 +50,26 @@ class SkyEyeVoicePanel(
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(Color.rgb(7, 16, 37))
+        setBackgroundColor(Color.rgb(247, 245, 255))
         setPadding(dp(16), dp(12), dp(16), dp(14))
         addView(TextView(host).apply {
             text = "SKY  •  ASISTENTE DE VOZ"
             textSize = 18f
-            setTextColor(Color.WHITE)
+            setTextColor(Color.rgb(51, 59, 104))
             gravity = android.view.Gravity.CENTER
         })
         addView(eye, LayoutParams(LayoutParams.MATCH_PARENT, dp(220)))
+        eye.setOnClickListener { message.text = eye.nextEmotion() }
+        addView(TextView(host).apply {
+            text = "Tocá los ojitos de SKY para descubrir sus gestos ✨"
+            textSize = 12f
+            setTextColor(Color.rgb(103, 89, 164))
+            gravity = android.view.Gravity.CENTER
+        })
         addView(message.apply {
             text = "SKY lista. Tocá «Hablar con SKY»."
             textSize = 15f
-            setTextColor(Color.rgb(180, 231, 248))
+            setTextColor(Color.rgb(74, 84, 139))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, dp(8))
         })
@@ -84,7 +91,7 @@ class SkyEyeVoicePanel(
         addView(TextView(host).apply {
             text = "El micrófono solo se activa al tocar Hablar. La voz depende del motor instalado en Android."
             textSize = 12f
-            setTextColor(Color.rgb(170, 184, 203))
+            setTextColor(Color.rgb(110, 113, 150))
         })
 
         speechEngine = TextToSpeech(host) { state ->
@@ -118,7 +125,7 @@ class SkyEyeVoicePanel(
     private fun dp(value: Int) = (value * resources.displayMetrics.density + 0.5f).toInt()
 
     private fun setMode(mode: EyeMode, label: String) {
-        eye.mode = mode
+        eye.mode = mode.name
         message.text = label
     }
 
@@ -200,6 +207,7 @@ class SkyEyeVoicePanel(
                     if (heard.isEmpty()) {
                         setMode(EyeMode.IDLE, "No detecté palabras. Intentá otra vez.")
                     } else {
+                        eye.reactTo(heard)
                         showThinking()
                         onTranscript(heard)
                     }
