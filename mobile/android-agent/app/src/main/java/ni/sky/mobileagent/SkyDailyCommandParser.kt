@@ -54,20 +54,22 @@ object SkyDailyCommandParser {
             return Command.Timer(seconds)
         }
 
+        val alarmStarts = Regex("^(?:pon|ponme|crea|crear|activa|activar|configura|configurar|programa|programar|establece|establecer) (?:una |la )?alarma\\b")
+            .containsMatchIn(action)
         val clock = Regex("^(?:pon|ponme|crea|crear|activa|activar|configura|configurar|programa|programar|establece|establecer) (?:una |la )?alarma(?: para)? (.*)$")
             .matchEntire(action)
         if (clock != null) {
             val argument = clock.groupValues[1]
             // Soporta "a las 5", "5:30 pm", "5 de la mañana", "a las 17:45".
             val time = Regex("(?:^|\\s)(?:a las? )?(\\d{1,2})(?::(\\d{2}))?\\s*(a\\.?m\\.?|p\\.?m\\.?|de la manana|de la tarde|de la noche)?(?:\\s|$)")
-                .find(argument) ?: return null
+                .find(argument) ?: return Command.Unsupported("Indicá una hora válida para la alarma, por ejemplo 05:30.")
             val h0 = time.groupValues[1].toIntOrNull() ?: return null
             val minute = time.groupValues[2].ifBlank { "0" }.toIntOrNull() ?: return null
-            if (minute !in 0..59 || h0 !in 0..23) return null
+            if (minute !in 0..59 || h0 !in 0..23) return Command.Unsupported("La hora de la alarma no es válida.")
             val period = time.groupValues[3].replace(".", "")
             val isAm = period == "am" || period == "de la manana"
             val isPm = period == "pm" || period == "de la tarde" || period == "de la noche"
-            if ((isAm || isPm) && h0 !in 1..12) return null
+            if ((isAm || isPm) && h0 !in 1..12) return Command.Unsupported("Usá 1 a 12 con AM/PM.")
             val hour = if (isAm || isPm) {
                 (h0 % 12) + if (isPm) 12 else 0
             } else h0
@@ -85,6 +87,8 @@ object SkyDailyCommandParser {
             }
             return Command.Alarm(hour, minute, label)
         }
+        if (alarmStarts) return Command.Unsupported(
+            "Decime la hora de la alarma, por ejemplo: SKY pon una alarma a las 5:30.")
         val appWords = linkedMapOf(
             "youtube" to "youtube", "chrome" to "chrome",
             "whatsapp" to "whatsapp", "gmail" to "gmail"
