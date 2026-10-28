@@ -1,3 +1,59 @@
+# SKY IA Android 0.5 — aplicaciones dinámicas y compañía divertida
+
+SKY mantiene el diseño de **ojitos expresivos flotantes**, interfaz minimalista
+y voz. Esta versión incorpora el lanzamiento supervisado de **cualquier app con
+icono de inicio visible para Android**, sin lista fija ni instalar integraciones
+de cada marca. El catálogo se consulta en el teléfono cada vez que se solicita:
+si instalás una app o un videojuego nuevo, SKY puede descubrirlo sin actualizar
+el código, siempre que Android la exponga como aplicación iniciable.
+
+## Cómo utilizarlo
+
+- «SKY, abre Spotify / TikTok / Instagram / Facebook / X / Threads /
+  Snapchat / Word / Excel / PowerPoint / ChatGPT / Claude / Gemini / Copilot».
+- «SKY, abre Minecraft» (u otro juego que esté instalado).
+- «SKY, mostrame mis aplicaciones»: abre el catálogo buscable, con acceso
+  a la apertura supervisada. También disponible desde **Ajustes**.
+- «SKY, comparte en Instagram: Texto para mi publicación»: prepara un
+  contenido mediante Android Share, solo si esa aplicación admite
+  recibir texto. **Nunca pulsa Publicar ni Enviar**.
+- «SKY, voy en bus» o «SKY, voy caminando»: inicia modo acompañante
+  contextual, con conversación y propuestas ocasionales mientras la
+  aplicación permanece visible.
+- «SKY, contame un chiste», «SKY, silba», «SKY, sorprendeme»:
+  chistes originales y un silbido corto sintetizado.
+- «SKY, desactiva modo acompañante» detiene las propuestas opcionales.
+
+## Supervisión, seguridad y límites verificables
+
+1. SKY **confirma antes de abrir** cualquier app y vuelve a verificar
+   su presencia justo antes de lanzarla. No dispone de una llave maestra
+   de aplicaciones ni de acceso automático a sus datos internos.
+2. El catálogo se construye con `ACTION_MAIN + CATEGORY_LAUNCHER` y
+   `<queries>`, sin `QUERY_ALL_PACKAGES`; se queda **en el celular**.
+   Android puede filtrar apps no visibles, sin icono o pertenecientes
+   a perfiles restringidos. No es posible garantizar que detecte todas.
+3. El uso de Share no implica soporte de escritura en todo editor ni
+   envío autónomo. La **escritura asistida** de campos vacíos mediante
+   Accesibilidad sigue limitada a WhatsApp y Gmail, voluntaria y sin
+   pulsar Enviar. Otras automatizaciones requieren APIs oficiales o
+   integraciones explícitas con cada aplicación.
+4. El modo acompañante se activa solo por una orden de voz/chat o
+   desde Ajustes; hace propuestas **solo cuando SKY está visible** y
+   limita la frecuencia y duración. No mantiene escucha continua con
+   pantalla bloqueada, ni lee ubicación, acelerómetro o conversaciones
+   externas. Al caminar, debe priorizarse la seguridad vial.
+5. Para conversaciones de IA avanzadas sigue siendo necesario que SKY
+   Core o un proveedor remoto autorizado esté disponible; los comandos
+   locales, chistes y catálogo no dependen de ese servidor.
+6. Compilación aprobada en CI no equivale a pruebas reales de APK en
+   Samsung. Comprobar TTS, micrófono, batería, instalación, app de reloj,
+   variaciones de paquetes y perfiles de usuario.
+
+Consulta [distribución Android](apk/) para la APK de GitHub Actions.
+
+---
+
 # SKY IA Android 0.4 — acciones locales y asistente animada
 
 La aplicación Android mantiene **ojos expresivos, voz, paneles bajo demanda,
