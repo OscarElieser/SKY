@@ -87,6 +87,10 @@ class MainActivity : Activity() {
                 }
             }
         }
+        voicePanel.setVoiceEnabled(
+            getSharedPreferences("sky_voice_settings", MODE_PRIVATE)
+                .getBoolean("read_aloud", true)
+        )
         home = SkyMobileHome(
             this, voicePanel,
             onSend = { sendChat() },
@@ -186,6 +190,15 @@ class MainActivity : Activity() {
             content.addView(actionButton("Estado del servidor") { checkHomeStatus() })
             content.addView(actionButton("Revocar acceso del teléfono") { revoke() })
         }
+        content.addView(CheckBox(this).apply {
+            text = "SKY responde con voz"
+            isChecked = voicePanel.isVoiceEnabled()
+            setOnCheckedChangeListener { _, enabled ->
+                voicePanel.setVoiceEnabled(enabled)
+                getSharedPreferences("sky_voice_settings", MODE_PRIVATE)
+                    .edit().putBoolean("read_aloud", enabled).apply()
+            }
+        })
         content.addView(description("SKY solicita el micrófono solo al hablar y requiere confirmación para abrir otras aplicaciones."))
         val scroll = ScrollView(this).apply { addView(content) }
         settingsDialog = AlertDialog.Builder(this)
