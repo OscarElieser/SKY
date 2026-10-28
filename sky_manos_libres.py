@@ -266,10 +266,14 @@ def main():
         if voz_rapida_apta(command, history):
             t = time.perf_counter()
             try:
+                silencio_inicial = voice_runtime.speech_interrupt_epoch
                 resultado = speak_stream(
                     command,
                     voice_runtime.say,
-                    cancelled=lambda: voice_runtime.current_turn_cancelled,
+                    cancelled=lambda: (
+                        voice_runtime.current_turn_cancelled or
+                        voice_runtime.speech_interrupt_epoch != silencio_inicial
+                    ),
                 )
                 if resultado.first_tts_s is not None:
                     # Primer ENVÍO al TTS, no se presume primer sonido audible.
