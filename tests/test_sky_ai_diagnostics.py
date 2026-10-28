@@ -11,6 +11,9 @@ from neural_core import sky_ai_diagnostics, sky_cerebro
 class TestSkyAiDiagnostics(unittest.TestCase):
     def tearDown(self):
         sky_cerebro.preferir(None)
+        from neural_core import sky_ai_auction
+        with sky_ai_auction._FALLOS_LOCK:
+            sky_ai_auction._FALLOS.clear()
 
     def test_http_429_quota_without_leaking_provider_message_or_url(self):
         err = urllib.error.HTTPError(
@@ -22,6 +25,16 @@ class TestSkyAiDiagnostics(unittest.TestCase):
         self.assertIn('RESOURCE_EXHAUSTED', value)
         self.assertNotIn('SKY_SECRET_NEVER_SHOW', value)
         self.assertNotIn('Private message', value)
+
+    def test_openai_429_billing_code_is_different_from_rate(self):
+        err = urllib.error.HTTPError(
+            'https://test.invalid/secret=NEVER_SHOW', 429, 'private', {},
+            io.BytesIO(b'{"error":{"code":"credit_balance_exhausted",'
+                       b'"message":"NEVER_SHOW private details"}}'))
+        value = sky_ai_diagnostics.error_seguro('openai', err)
+        self.assertIn('credit_balance_exhausted', value)
+        self.assertIn('saldo agotado', value)
+        self.assertNotIn('NEVER_SHOW', value)
 
     def test_http_404_model_and_nonjson_body(self):
         err = urllib.error.HTTPError(

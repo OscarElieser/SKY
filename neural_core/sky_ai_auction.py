@@ -13,10 +13,61 @@ from __future__ import annotations
 import os
 import re
 import statistics
+import threading
 import time
 import unicodedata
 
 CLOUD = ("openai", "gemini", "anthropic", "groq", "deepseek", "mistral")
+# El bloqueo temporal es por proceso. Se reinicia al reiniciar SKY.
+# No guardamos claves, preguntas ni respuestas de las IA.
+_FALLOS: dict[str, tuple[float, str]] = {}
+_FALLOS_LOCK = threading.Lock()
+
+
+def _segundos_espera(motivo: str) -> int:
+    """Penalizaciones acotadas según códigos seguros, no mensajes de SDK."""
+    numero = re.search(r'\bHTTP (\d{3})\b', str(motivo))
+    codigo = int(numero.group(1)) if numero else 0
+    if codigo in (401, 402, 403, 404):
+        return 600  # requieren revisar acceso o modelo
+    if codigo == 429:
+        if any(code in motivo for code in (
+            'credit_balance_exhausted', 'spend_limit_exceeded',
+            'usage_limit_exceeded', 'insufficient_quota',
+        )):
+            return 600  # no repetir un 429 de facturación
+        return 90
+    if codigo in (500, 502, 503, 504):
+        return 45
+    if codigo in (400, 422):
+        return 120  # petición inválida: no insistir enseguida
+    return 20
+
+
+def registrar_fallo(proveedor: str, motivo: str) -> None:
+    """Marca como indisponible una API durante un plazo corto; sólo en memoria."""
+    if proveedor not in CLOUD:
+        return
+    hasta = time.monotonic() + _segundos_espera(motivo)
+    with _FALLOS_LOCK:
+        _FALLOS[proveedor] = (hasta, str(motivo)[:120])
+
+
+def registrar_exito(proveedor: str) -> None:
+    with _FALLOS_LOCK:
+        _FALLOS.pop(proveedor, None)
+
+
+def en_espera() -> dict[str, int]:
+    """Segundos restantes de suspensión, sin datos privados."""
+    ahora = time.monotonic()
+    with _FALLOS_LOCK:
+        for nombre, (hasta, _) in list(_FALLOS.items()):
+            if hasta <= ahora:
+                del _FALLOS[nombre]
+        return {p: max(1, int(hasta - ahora + 0.999))
+                for p, (hasta, _) in _FALLOS.items()}
+
 PRIORIDAD = {
     "general": {"openai": 88, "gemini": 87, "anthropic": 85, "groq": 83, "deepseek": 81, "mistral": 80, "ollama": 72},
     "investigacion": {"gemini": 91, "openai": 89, "anthropic": 88, "deepseek": 83, "groq": 81, "mistral": 80, "ollama": 72},
@@ -80,7 +131,7 @@ def _telemetria() -> dict:
 
 def max_intentos() -> int:
     try:
-        return max(1, min(3, int(os.getenv("SKY_AUCTION_MAX_ATTEMPTS", "2"))))
+        return max(1, min(len(CLOUD) + 1, int(os.getenv("SKY_AUCTION_MAX_ATTEMPTS", "2"))))
     except (ValueError, TypeError):
         return 2
 
@@ -92,8 +143,11 @@ def ofertas(texto: str, modo: str = "chat") -> list[dict]:
     local = _solo_local(texto)
     candidatos = ["ollama"] if local else [*CLOUD, "ollama"]
     datos = _telemetria()
+    pausados = en_espera()
     resultado = []
     for nombre in candidatos:
+        if nombre in pausados:
+            continue
         if nombre == "ollama":
             if not _ollama_disponible():
                 continue

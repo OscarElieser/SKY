@@ -445,6 +445,7 @@ def _decidir_subasta(texto: str, historial: list[dict] | None, modo: str) -> Ite
         yield 'error', 'No hay un proveedor autorizado disponible para esta solicitud.'
         return
 
+    from .sky_ai_auction import registrar_fallo, registrar_exito
     errores: list[str] = []
     for propuesta in propuestas:
         quien = propuesta['proveedor']
@@ -466,11 +467,13 @@ def _decidir_subasta(texto: str, historial: list[dict] | None, modo: str) -> Ite
                     yield evento, valor
                 elif evento == 'herramienta':
                     via, ok = 'herramienta', True
+                    registrar_exito(quien)
                     yield evento, valor
                     return
                 elif evento == 'fin':
                     if str(valor or '').strip() or emitido:
                         ok = True
+                        registrar_exito(quien)
                         yield evento, valor
                         return
                     break
@@ -484,6 +487,7 @@ def _decidir_subasta(texto: str, historial: list[dict] | None, modo: str) -> Ite
                           (time.perf_counter() - inicio) * 1000, origen=via, tokens=info['tokens'])
             except Exception:
                 pass
+        registrar_fallo(quien, motivo)
         errores.append(f'{quien}: {motivo}')
         if emitido:
             # Una respuesta parcial no se concatena con otra de un proveedor distinto.
