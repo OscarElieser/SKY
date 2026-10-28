@@ -17,7 +17,8 @@ class SkyAndroidActions(
     private val host: Activity,
     private val prefs: SharedPreferences,
     private val allowed: SharedPreferences,
-    private val feedback: (String) -> Unit
+    private val feedback: (String) -> Unit,
+    private val onAccessibilityHelp: () -> Unit
 ) {
     private val apps = linkedMapOf(
         "youtube" to Pair("YouTube", "com.google.android.youtube"),
@@ -145,6 +146,23 @@ class SkyAndroidActions(
                 }
                 launch(intent, "Texto compartido con " + details.first +
                     ". Revisá y confirmá el envío allí.")
+            }
+            .setNeutralButton("Escribir en campo") { _, _ ->
+                if (!SkyTextAssistService.enabled() ||
+                    !host.getSharedPreferences("sky_assistive_text",
+                        android.content.Context.MODE_PRIVATE)
+                        .getBoolean("consent", false)) {
+                    onAccessibilityHelp()
+                } else {
+                    val app = host.packageManager.getLaunchIntentForPackage(details.second)
+                    if (app == null) {
+                        feedback("No se encontró " + details.first + " en este teléfono.")
+                    } else if (SkyTextAssistService.arm(details.second, text)) {
+                        launch(app, "Abrí " + details.first +
+                            ". Tocá un campo de texto vacío en 45 segundos. " +
+                            "SKY escribirá allí, pero no enviará el mensaje.")
+                    } else feedback("Escritura asistida no disponible. Revisá sus permisos.")
+                }
             }
             .setNegativeButton("Cancelar", null)
             .show()
