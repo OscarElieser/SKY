@@ -19,8 +19,8 @@ import kotlin.math.sin
 /**
  * SKY · Aura Face (Android).
  *
- * Rostro vectorial vertical, no robótico y sin imágenes externas.
- * Ocupa la altura útil completa y expresa estados reales del motor
+ * Dos ojos y una boca animados, sin rostro ni máscara.
+ * Ocupan la altura útil y expresan estados reales del motor
  * de voz: escucha, respuesta, pensamiento y error. No transmite audio.
  */
 class SkyFriendlyEyesView(context: Context) : View(context) {
@@ -39,7 +39,7 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
     private var touchCount = 0
 
     init {
-        contentDescription = "Rostro animado de SKY. Tocá para descubrir nuevas expresiones."
+        contentDescription = "Ojos y boca animados de SKY. Tocá para cambiar su expresión."
         isClickable = true
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
     }
@@ -122,14 +122,14 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         }
         val halfHeight = 69f * open * (1f - blink * 0.97f)
         val radius = 38f
-        fill(Color.rgb(10, 8, 44), 95)
-        canvas.drawRoundRect(x - 61f, y - halfHeight + 9f,
-            x + 61f, y + halfHeight + 13f, radius, radius, brush)
-        brush.shader = LinearGradient(x, y - 70f, x, y + 70f,
-            Color.WHITE, Color.rgb(212, 218, 249), Shader.TileMode.CLAMP)
+        // Floating, softly rounded eyes: no robotic square frames.
+        fill(Color.rgb(23, 18, 67), 105)
+        canvas.drawOval(x - 67f, y - halfHeight + 8f,
+            x + 67f, y + halfHeight + 12f, brush)
+        brush.shader = LinearGradient(x, y - 80f, x, y + 80f,
+            Color.WHITE, Color.rgb(212, 220, 251), Shader.TileMode.CLAMP)
         brush.style = Paint.Style.FILL
-        canvas.drawRoundRect(x - 60f, y - halfHeight,
-            x + 60f, y + halfHeight, radius, radius, brush)
+        canvas.drawOval(x - 65f, y - halfHeight, x + 65f, y + halfHeight, brush)
         brush.shader = null
         if (halfHeight < 17f) {
             outline(Color.rgb(157, 133, 215), 5f)
@@ -149,13 +149,7 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
             fill(Color.WHITE, 132)
             canvas.drawCircle(x + look + 18f, pupilY - 17f, 3.5f, brush)
         }
-        // Soft brows follow facial state instead of looking robotic.
-        shape.reset()
-        shape.moveTo(x - 45f, y - 109f)
-        shape.quadTo(x, y - 131f - if (mood == Emotion.SURPRISED) 10f else 0f,
-            x + 45f, y - 109f)
-        outline(Color.rgb(194, 178, 254), 7f, 225)
-        canvas.drawPath(shape, brush)
+
     }
 
     private fun heart(canvas: Canvas, x: Float, y: Float, radius: Float) {
@@ -203,27 +197,11 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         light(canvas, 180f, 287f, 224f * aura, accent, 63)
         light(canvas, 70f, 194f, 95f, Color.rgb(113, 95, 247), 35)
         light(canvas, 306f, 423f, 108f, Color.rgb(49, 217, 225), 24)
-        // Vertical avatar silhouette, soft organic face, not a robot casing.
+        // The entire screen is the stage. Only the eyes and mouth are visible;
+        // no outline, head, facial frame, nose or cheeks.
         canvas.save()
         canvas.translate(0f, (sin(t * 1.25) * 4.5).toFloat())
-        shape.reset()
-        shape.moveTo(180f, 30f)
-        shape.cubicTo(276f, 25f, 350f, 126f, 349f, 275f)
-        shape.cubicTo(349f, 453f, 291f, 553f, 180f, 566f)
-        shape.cubicTo(70f, 553f, 11f, 453f, 11f, 275f)
-        shape.cubicTo(10f, 126f, 84f, 25f, 180f, 30f)
-        shape.close()
-        fill(Color.rgb(101, 78, 209), 28)
-        brush.shader = LinearGradient(30f, 54f, 319f, 552f,
-            intArrayOf(Color.rgb(85, 70, 158),
-                Color.rgb(62, 48, 131), Color.rgb(45, 42, 106)),
-            null, Shader.TileMode.CLAMP)
-        canvas.drawPath(shape, brush)
-        brush.shader = null
-        outline(Color.rgb(167, 153, 253), 2.2f, 110)
-        canvas.drawPath(shape, brush)
-        light(canvas, 143f, 152f, 122f, Color.rgb(188, 157, 255), 40)
-        light(canvas, 240f, 465f, 145f, Color.rgb(80, 180, 231), 22)
+        light(canvas, 180f, 310f, 163f, Color.rgb(122, 92, 238), 36)
 
         // Expressive pupils track conversation state, blink naturally.
         val blinkMs = now % 4900L
@@ -239,13 +217,6 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         eyes(canvas, 112f, 290f, gaze, blink, mood, accent, speaking)
         eyes(canvas, 248f, 290f, gaze, if (mood == Emotion.LOVING) 0.3f else blink,
             mood, accent, speaking)
-
-        // Blush + subtle nose make the character warm and approachable.
-        fill(Color.rgb(255, 145, 184), 99 + (pulse * 31).toInt())
-        canvas.drawOval(23f, 381f, 91f, 414f, brush)
-        canvas.drawOval(269f, 381f, 337f, 414f, brush)
-        fill(Color.rgb(240, 201, 252), 115)
-        canvas.drawOval(170f, 407f, 190f, 421f, brush)
 
         val talkOpen = if (speaking) 12f + ((sin(t * 11.0) + 1) * 16f).toFloat() else 0f
         when {
@@ -271,13 +242,13 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
                 canvas.drawArc(138f, 441f, 222f, 503f, 8f, 168f, false, brush)
             }
             else -> {
-                outline(Color.rgb(234, 204, 255), 6.5f)
-                canvas.drawArc(152f, 450f, 208f, 499f, 20f, 140f, false, brush)
+                // Small warm smile, even at idle.
+                outline(Color.rgb(245, 204, 255), 7f)
+                shape.reset()
+                shape.moveTo(144f, 455f)
+                shape.quadTo(180f, 490f, 216f, 455f)
+                canvas.drawPath(shape, brush)
             }
-        }
-        if (mood == Emotion.LOVING) {
-            heart(canvas, 306f, 170f, 18f)
-            heart(canvas, 54f, 160f, 12f)
         }
         if (mood == Emotion.SURPRISED || speaking) {
             sparkle(canvas, 320f, 127f, 12f + pulse * 4f, Color.rgb(255, 210, 140))
