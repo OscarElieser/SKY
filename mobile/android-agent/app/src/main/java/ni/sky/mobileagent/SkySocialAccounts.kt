@@ -80,7 +80,9 @@ class SkySocialAccounts(
         val url = SkySocialProfileData.publicUrl(profile)
         val label = if (profile.handle.isNotBlank()) "@" + profile.handle else profile.displayName
         val choices = arrayOf("Abrir perfil público", "Crear contenido para esta red",
-            "Editar identificador", "Quitar de SKY")
+            "Editar identificador", "Quitar de SKY") +
+            if (profile.platform == "Instagram")
+                arrayOf("Preparar acceso oficial de Instagram") else emptyArray()
         AlertDialog.Builder(host)
             .setTitle(profile.platform + " · " + label)
             .setMessage("Perfil identificado localmente. Sin acceso a estadísticas, " +
@@ -104,9 +106,93 @@ class SkySocialAccounts(
                             feedback("Perfil retirado de SKY.")
                         }
                         .setNegativeButton("Cancelar", null).show()
+                    4 -> if (profile.platform == "Instagram")
+                        showInstagramPreparation(profile)
                 }
             }
             .setNegativeButton("Cerrar", null).show()
+    }
+
+    /**
+     * Pre-OAuth guidance. No third-party session is opened inside SKY and
+     * a Creator declaration is never represented as an API connection.
+     */
+    private fun showInstagramPreparation(profile: SkySocialProfileData.Profile) {
+        val handle = SkySocialProfileData.cleanHandle(profile.handle)
+        val preferenceKey = "instagram_creator_declared_" + handle.lowercase(java.util.Locale.ROOT)
+        val declared = prefs.getBoolean(preferenceKey, false)
+        val type = if (declared) SkyInstagramPrerequisites.Type.CREATOR
+                   else SkyInstagramPrerequisites.Type.UNKNOWN
+        val current = SkyInstagramPrerequisites.checklist(type, false, false)
+        val options = arrayOf(
+            "1 · Abrir Instagram para cambiar a Creador",
+            "2 · Ya cambié a Creador (marcar solo como declarado)",
+            "3 · Abrir Meta for Developers",
+            "4 · Consultar permisos y pasos de conexión"
+        )
+        AlertDialog.Builder(host)
+            .setTitle("SKY · Preparar Instagram")
+            .setMessage("@" + handle + "\n\n" + current +
+                "\n\nTu cuenta y tus publicaciones siguen bajo tu control. " +
+                "Una cuenta profesional normalmente será pública. " +
+                "SKY NO tiene aún permiso OAuth para métricas ni publicaciones.")
+            .setItems(options) { _, index ->
+                when (index) {
+                    0 -> {
+                        AlertDialog.Builder(host)
+                            .setTitle("Pasar a cuenta de Creador")
+                            .setMessage("En Instagram: Perfil → ☰ → Tipo de cuenta y herramientas " +
+                                "→ Cambiar a cuenta profesional → Creador. " +
+                                "Tus publicaciones y seguidores se conservan, " +
+                                "pero el perfil profesional será público. " +
+                                "Revisá la privacidad antes de confirmar.")
+                            .setPositiveButton("ABRIR INSTAGRAM") { _, _ ->
+                                try {
+                                    host.startActivity(Intent(Intent.ACTION_VIEW,
+                                        Uri.parse("https://www.instagram.com/" + handle + "/")))
+                                } catch (_: Exception) {
+                                    feedback("No pude abrir Instagram.")
+                                }
+                            }
+                            .setNegativeButton("Cancelar", null).show()
+                    }
+                    1 -> AlertDialog.Builder(host)
+                        .setTitle("Confirmá el cambio manual")
+                        .setMessage("¿Ya terminaste en Instagram el cambio a Creador " +
+                            "o Empresa? SKY guardará únicamente tu declaración. " +
+                            "NO significa que Meta haya autorizado la cuenta.")
+                        .setPositiveButton("Sí, lo cambié") { _, _ ->
+                            prefs.edit().putBoolean(preferenceKey, true).apply()
+                            feedback("Tipo profesional declarado. Falta configurar la " +
+                                "app en Meta y completar OAuth seguro.")
+                        }
+                        .setNegativeButton("Todavía no", null).show()
+                    2 -> {
+                        try {
+                            host.startActivity(Intent(Intent.ACTION_VIEW,
+                                Uri.parse(SkyInstagramPrerequisites.META_DEVELOPERS)))
+                        } catch (_: Exception) {
+                            feedback("No pude abrir Meta for Developers.")
+                        }
+                    }
+                    3 -> AlertDialog.Builder(host)
+                        .setTitle("Instagram · autorización real")
+                        .setMessage("1. Convertí tu cuenta a Creador.\n\n" +
+                            "2. Registrá una aplicación en Meta for Developers y " +
+                            "habilitá Instagram API with Instagram Login.\n\n" +
+                            "3. Para leer estadísticas necesitaremos " +
+                            "instagram_business_basic y " +
+                            "instagram_business_manage_insights. " +
+                            "Publicar requiere también instagram_business_content_publish.\n\n" +
+                            "4. Falta un backend HTTPS que guarde el secreto de Meta, " +
+                            "valide OAuth y entregue el estado a SKY. " +
+                            "No introduzcás secretos en Android ni GitHub.\n\n" +
+                            "Este botón NO solicita autorización todavía.")
+                        .setPositiveButton("Entendido", null).show()
+                }
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
     }
 
     private fun showEditor(old: SkySocialProfileData.Profile? = null) {
