@@ -85,7 +85,8 @@ class MainActivity : Activity() {
         }
         tokens = PrivateTokenStore(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
-            if (!processLocalPanelCommand(transcript, spoken = true) &&
+            if (!processMessagingCommand(transcript) &&
+                !processLocalPanelCommand(transcript, spoken = true) &&
                 !processCompanionCommand(transcript) &&
                 !processDailyCommand(transcript)) {
                 // Keep the animated face visible during spoken conversation.
@@ -217,6 +218,13 @@ class MainActivity : Activity() {
                 "ni garantiza que una alarma haya sonado o un mensaje se haya enviado.")
             .setPositiveButton("Cerrar", null)
             .show()
+    }
+
+    /** Explicit WhatsApp commands are local actions, not generic Gemini chat. */
+    private fun processMessagingCommand(message: String): Boolean {
+        val draft = SkyMessagingIntent.parse(message) ?: return false
+        dailyActions.prepareWhatsApp(draft)
+        return true
     }
 
     private fun processCompanionCommand(message: String): Boolean =
@@ -635,7 +643,8 @@ class MainActivity : Activity() {
     private fun sendChat() {
         val message = chatInput.text.toString().trim()
         if (message.isEmpty()) return
-        if (processLocalPanelCommand(message, spoken = false) ||
+        if (processMessagingCommand(message) ||
+            processLocalPanelCommand(message, spoken = false) ||
             processCompanionCommand(message) || processDailyCommand(message)) {
             chatInput.setText("")
             return
