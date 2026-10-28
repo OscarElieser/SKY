@@ -38,13 +38,15 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
         prefs.edit().putString("iv",Base64.encodeToString(c.iv,Base64.NO_WRAP))
             .putString("credential",Base64.encodeToString(c.doFinal(token.toByteArray()),Base64.NO_WRAP)).apply()
     }
-    private fun token():String=try {
+    private fun token():String {
+        return try {
         val iv=prefs.getString("iv",null)?:return ""
         val data=prefs.getString("credential",null)?:return ""
         val c=Cipher.getInstance("AES/GCM/NoPadding")
         c.init(Cipher.DECRYPT_MODE,key(),GCMParameterSpec(128,Base64.decode(iv,Base64.NO_WRAP)))
         String(c.doFinal(Base64.decode(data,Base64.NO_WRAP)),Charsets.UTF_8)
     }catch(_:Exception){""}
+    }
     private fun clear(){prefs.edit().remove("iv").remove("credential").apply()}
     private fun request(path:String,verb:String,credential:String?=null,data:JSONObject?=null):JSONObject {
         require(path in setOf("/pair-claim","/mobile-status","/mobile-disconnect"))
