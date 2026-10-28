@@ -1,10 +1,6 @@
 # SKY Android — autorización oficial de Instagram
 
-**Estado: preparación de conexión, no cuenta enlazada.** Este documento
-define la primera integración Instagram de SKY Android sin depender de SKY
-Windows. En `0.8.6` la aplicación presenta una guía para pasar de cuenta
-personal a Creador y registrar los requisitos para Meta. **Aún no ejecuta
-un flujo OAuth ni consulta métricas o publica por API.**
+**Estado verificado el 28/10/2026:** el servidor OAuth de SKY-IA en Supabase ya está desplegado, Meta autorizó el acceso y se almacenó un token cifrado tras su verificación. **SKY Android aún no incorpora ese flujo ni consulta métricas o publica por API**; el perfil exacto aún debe identificarse programáticamente. Esta integración es independiente de SKY Windows. En `0.8.6` Android conserva la guía local de preparación de cuenta profesional.
 
 ## 1. Preparación en el Samsung
 
@@ -41,7 +37,7 @@ Separar permisos por finalidad:
 Evitar solicitar permisos no utilizados. No pedir contraseñas sociales
 ni copiar cookies del navegador.
 
-## 3. Backend OAuth pendiente de implementar
+## 3. Backend OAuth desplegado; vinculación Android pendiente
 
 La arquitectura prevista es:
 
@@ -61,10 +57,7 @@ La arquitectura prevista es:
    adecuada, registro de resultados, revisión de contenido y manejo
    de errores/cuotas.
 
-**Bloqueadores reales:** no se conoce todavía el identificador de una
-aplicación Meta registrada específicamente para SKY, su URL HTTPS de
-retorno ni un backend OAuth configurado. No se pueden completar ni
-simular esos pasos desde Android hasta que existan y estén autorizados.
+**Estado de integración:** la aplicación Meta SKY-IA ya existe y el callback HTTPS en `https://jojzuaeqmjgnqikpnfxk.supabase.co/functions/v1/sky-instagram/callback` funciona. El flujo OAuth se completó mediante navegador y backend el 28/10/2026. Para SKY Android permanecen pendientes la identificación del perfil, validación de API y autenticación móvil segura que no incluya el secreto `SKY_INSTAGRAM_OWNER_KEY` en la APK. No habilitar publicación ni mensajería sin prueba y confirmación explícita del propietario.
 
 ## 4. Pruebas
 
