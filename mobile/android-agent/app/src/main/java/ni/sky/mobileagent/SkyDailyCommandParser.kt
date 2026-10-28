@@ -132,12 +132,12 @@ object SkyDailyCommandParser {
                 .trim().take(1000)
             if (value.isNotBlank()) return Command.Note(value)
         }
-        val share = Regex("^(?:comparte|compartir|prepara|preparar|escribe|escribir) (?:en |por |para )?(whatsapp|gmail)[: ,]+(.+)$")
+        val share = Regex("^(?:comparte|compartir|prepara|preparar|escribe|escribir) (?:en |por |para )?([a-z0-9][a-z0-9 ]{0,70}?): (.{1,1000})$")
             .matchEntire(action)
         if (share != null) {
-            val prefix = Regex("(?i)^(?:sky[ ,.:!]+)?(?:comparte|compartir|prepara|preparar|escribe|escribir)\\s+(?:(?:en|por|para)\\s+)?(?:whatsapp|gmail)[: ,]+")
+            val prefix = Regex("(?i)^(?:sky[ ,.:!]+)?(?:comparte|compartir|prepara|preparar|escribe|escribir)\\s+(?:(?:en|por|para)\\s+)?[a-z0-9][a-z0-9 ]{0,70}?:\\s*")
             val message = raw.trim().replace(prefix, "").trim().take(1000)
-            if (message.isNotBlank()) return Command.Share(share.groupValues[1], message)
+            if (message.isNotBlank()) return Command.Share(share.groupValues[1].trim(), message)
         }
         return null
     }
