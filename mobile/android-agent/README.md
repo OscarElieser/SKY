@@ -1,4 +1,33 @@
-# SKY Android — Aura Premium 0.7.1
+# SKY Android — Ojos & Voz 0.8.0
+
+**Beta Android independiente de Windows.** Diseño con **solo ojos y boca animados**, sin máscara ni rostro. Órdenes del teléfono por texto y voz, supervisadas por el usuario.
+
+[**Descargar APK firmada 0.8.0**](https://github.com/OscarElieser/SKY/releases/download/sky-android-v0.8.0/SKY-IA-Android-v0.8.0-firmada.apk) · [GitHub Releases](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.0) · [Guía de instalación](apk/README.md)
+
+## Novedades 0.8.0
+
+- SKY ya no dibuja un rostro gigante. Los **dos ojos ovalados** flotan, parpadean y se mueven; **la boca** sonríe y se anima al hablar. Conserva estados escuchar, pensar, hablar y error.
+- El fondo mantiene una iluminación violeta/turquesa discreta. Los controles de voz, chat y detener permanecen accesibles y se ajusta el panel a la barra de navegación Android.
+- Los comandos explícitos de WhatsApp se procesan en el teléfono ANTES de preguntar a Gemini. Ejemplo: **«SKY, abrí WhatsApp y mandá un mensaje a Ana: hola, ¿cómo estás?»**.
+- SKY prepara el texto, puede reformularlo de forma local y enseña una vista previa. **Después de confirmar, abre el compositor de WhatsApp. Vos elegís el contacto correcto y pulsás Enviar**. No envía mensajes sin tu aprobación, no lee conversaciones ni finge haber enviado algo.
+- Conserva acciones existentes: abrir aplicaciones visibles en Android, alarmas, temporizadores, notas, búsqueda web, modo acompañante y conversaciones Gemini con clave privada.
+- No activa servicios de accesibilidad ni toma control ilimitado de otras aplicaciones. Las capacidades dependen de permisos y APIs oficiales.
+- Windows no es necesario para conversar en el teléfono y **no se modifica** en este lanzamiento.
+
+## Prueba en el Samsung
+
+1. Instalá la APK 0.8.0 **encima** de 0.7.1; no desinstalés ni borres la clave local. Si Play Protect muestra un riesgo, no fuerces la instalación.
+2. Comprobá que solo se vean dos ojos y la boca. Tocá los ojos y observá sus gestos.
+3. Presioná **HABLAR** y decí «SKY, abrí YouTube»; confirmá el permiso cuando Android lo solicite.
+4. Decí «SKY, mandá un mensaje a Ana: hola, ¿cómo estás?». Verificá la vista previa. Pulsá **ABRIR WHATSAPP**, elegí la conversación y decidí si lo enviás.
+5. Si no reconoce la orden, compará el texto interpretado por el dictado con el mensaje esperado. El reconocimiento de Android puede equivocarse con nombres.
+6. Preguntale algo a Gemini y comprobá la voz natural. **Conversación fluida** es opcional y solo funciona en primer plano, con límite de turnos.
+
+**Seguridad:** las claves Gemini no se publican en GitHub; se guardan cifradas en Android Keystore para esta beta personal. Para distribución pública es necesario un backend autenticado. No compartir credenciales en capturas ni mensajes.
+
+---
+
+## Historial técnico (versiones anteriores)
 
 **Estado actual:** beta personal independiente para Android 8.0+ (API 26). Código Kotlin en `mobile/android-agent/app/`, publicado en la rama [`main`](https://github.com/OscarElieser/SKY/tree/main/mobile/android-agent). **SKY Windows permanece sin cambios y su conexión es opcional.**
 
