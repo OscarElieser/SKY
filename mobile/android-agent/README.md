@@ -1,10 +1,64 @@
-# SKY Android — Núcleo móvil, redes y control de música 0.8.4
+# SKY Android — Núcleo móvil y perfiles sociales 0.8.5
 
 **Beta Android independiente de Windows.** Diseño con **solo ojos y boca animados**, sin máscara ni rostro. Órdenes del teléfono por texto y voz, supervisadas por el usuario.
 
-**Código en `main`: 0.8.4 (versionCode 17).** La APK se distribuye solo cuando aparece firmada en GitHub Releases. No desinstalés la versión anterior sin respaldo.
+**Código en `main`: 0.8.5 (versionCode 18).** La APK se distribuye solo cuando aparece firmada en GitHub Releases. No desinstalés la versión anterior sin respaldo.
 
 [**Ver las versiones APK efectivamente publicadas**](https://github.com/OscarElieser/SKY/releases) · [Versiones Android publicadas](https://github.com/OscarElieser/SKY/releases) · [Guía de instalación y seguridad](apk/README.md)
+
+## SKY Android 0.8.5 — mis cuentas y perfiles sociales
+
+A partir de 0.8.5, SKY permite mantener en el **teléfono** un catálogo
+de perfiles públicos de Instagram, Threads, TikTok, Facebook, YouTube,
+X, Snapchat, Pinterest y LinkedIn.
+
+### Importar los perfiles desde un archivo
+
+1. En SKY, abrí **Ajustes → MIS REDES · PERFIL Y ENLACES PÚBLICOS**.
+2. Seleccioná **Importar perfiles JSON** y buscá el archivo descargado
+   en **Mis archivos / Descargas** de Android.
+3. SKY valida el formato, guarda hasta 25 perfiles en preferencias
+   privadas locales y muestra cada perfil con el estado
+   **«Identificada, sin autorización OAuth»**.
+4. Tocá un perfil para **abrir su enlace público**, **crear contenido
+   para esa red** desde Estudio Creativo, **editarlo** o **retirarlo**.
+5. Si Facebook solo tiene nombre visible, queda identificado pero SKY
+   **no inventa su dirección de perfil**: añadí el identificador exacto
+   cuando lo tengas.
+
+Ejemplo genérico, sin perfiles personales ni claves:
+
+```json
+{
+  "sky_profiles_version": 1,
+  "profiles": [
+    {"platform":"Instagram","handle":"miusuario","display_name":"Mi Instagram"},
+    {"platform":"YouTube","handle":"micanal","display_name":"Mi canal"},
+    {"platform":"Facebook","handle":"","display_name":"Mi perfil personal"}
+  ]
+}
+```
+
+**Nunca importes** teléfonos de WhatsApp, correos personales,
+contraseñas, cookies, códigos 2FA, claves privadas ni tokens OAuth.
+Los datos de identificación se guardan solo en el dispositivo
+(`sky_public_social_profiles`); no se incluyen identificadores
+personales en GitHub ni se transfieren a Gemini por este flujo.
+Desinstalar SKY o borrar sus datos puede eliminar el catálogo.
+
+### Identificar no equivale a conectar
+
+Este módulo NO inicia sesión en tus cuentas, NO consulta estadísticas
+privadas, NO programa ni publica posts y NO lee mensajes. El siguiente
+paso es integrar los flujos **OAuth oficiales**, consentimiento por
+cuenta, permisos mínimos, revocación y controles de publicación.
+Google/Gemini no puede actuar como token universal para redes sociales.
+
+**Verificación:** probar importación del JSON, acceso a enlaces
+públicos, edición, retirada y acceso al Estudio Creativo en el Samsung.
+La compilación automatizada no confirma funcionamiento en hardware.
+
+---
 
 ## SKY Android 0.8.4 — música a tu voz y activación segura
 
