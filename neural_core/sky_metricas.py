@@ -289,6 +289,12 @@ def detectar(ahora: datetime | None = None, filas: list | None = None, base: lis
     turnos = [f for f in recientes if f['tipo'] == 'turno']
     cerebro = [f['ms'] for f in recientes if f['tipo'] == 'modelo'
                and str(f['nombre']).startswith('ollama:') and f['ms'] is not None]
+    # Compatibilidad con registros antiguos sin eventos de modelo:
+    # sólo inferir motor local si la configuración también es local.
+    if not any(f['tipo'] == 'modelo' for f in recientes) and (
+        os.getenv('SKY_CEREBRO', 'auto').strip().lower() in ('auto', 'ollama')
+    ):
+        cerebro = [f['ms'] for f in turnos if f['origen'] == 'cerebro' and f['ms'] is not None]
     if len(cerebro) >= 3 and percentil(cerebro, 50) > 6000:
         agregar('cerebro_lento', 'media', 'El cerebro local tarda en decidir',
                 f'Mediana de {percentil(cerebro, 50) / 1000:.1f} s en {len(cerebro)} órdenes.',
