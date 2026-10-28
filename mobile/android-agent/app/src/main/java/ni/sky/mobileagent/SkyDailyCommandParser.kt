@@ -14,6 +14,7 @@ object SkyDailyCommandParser {
         data class Note(val value: String) : Command()
         object ShowNotes : Command()
         data class Share(val app: String, val value: String) : Command()
+        data class Unsupported(val reason: String) : Command()
     }
 
     fun canonical(raw: String) = Normalizer
@@ -29,6 +30,13 @@ object SkyDailyCommandParser {
         // Evitar tomar frases explicativas largas como órdenes autorizadas.
         val action = clean.substringBefore("\n").trim()
         if (action.length > 350) return null
+
+        val windowsTarget = Regex("\\b(?:en (?:mi |la )?(?:windows|pc|computadora|ordenador))\\b")
+            .containsMatchIn(action)
+        if (windowsTarget) {
+            return Command.Unsupported("Este comando corresponde al agente de Windows. " +
+                "La app Android aún no tiene permiso para ejecutar herramientas remotas del PC.")
+        }
 
         val clock = Regex("^(?:pon|ponme|crea|crear|activa|activar|configura|configurar|programa|programar|establece|establecer) (?:una |la )?alarma(?: para)? (.*)$")
             .matchEntire(action)
@@ -52,8 +60,13 @@ object SkyDailyCommandParser {
                 .take(70).ifBlank { "Alarma SKY" }
             // AlarmClock solo admite hora/minuto, no fecha; jamás prometer
             // que "mañana" será respetado si el usuario especifica fecha.
+            val dateWords = argument.replace("de la manana", "").trim()
             if (Regex("\\b(manana|pasado manana|lunes|martes|miercoles|jueves|viernes|sabado|domingo)\\b")
-                    .containsMatchIn(argument)) return null
+                    .containsMatchIn(dateWords)) {
+                return Command.Unsupported("El Reloj recibe hora y minutos; SKY no puede " +
+                    "garantizar una fecha específica con esta interfaz. Abrí el Reloj " +
+                    "para seleccionar el día exacto.")
+            }
             return Command.Alarm(hour, minute, label)
         }
         val appWords = linkedMapOf(
