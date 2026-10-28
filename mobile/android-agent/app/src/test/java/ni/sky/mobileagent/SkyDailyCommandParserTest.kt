@@ -55,6 +55,17 @@ class SkyDailyCommandParserTest {
             SkyDailyCommandParser.parse("SKY mostrame mis notas"))
     }
 
+    @Test fun timerDurationAndInvalidLimits() {
+        val timer = SkyDailyCommandParser.parse("SKY pon un temporizador de 10 minutos")
+            as SkyDailyCommandParser.Command.Timer
+        assertEquals(600, timer.seconds)
+        val seconds = SkyDailyCommandParser.parse("temporizador de 45 segundos")
+            as SkyDailyCommandParser.Command.Timer
+        assertEquals(45, seconds.seconds)
+        assertTrue(SkyDailyCommandParser.parse("temporizador de 26 horas")
+            is SkyDailyCommandParser.Command.Unsupported)
+    }
+
     @Test fun sharingIsExplicitAndNeverSending() {
         val shared = SkyDailyCommandParser.parse("SKY escribe en WhatsApp: Buenos días")
             as SkyDailyCommandParser.Command.Share
