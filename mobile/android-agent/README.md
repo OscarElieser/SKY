@@ -26,9 +26,12 @@ el código, siempre que Android la exponga como aplicación iniciable.
 
 ## Supervisión, seguridad y límites verificables
 
-1. SKY **confirma antes de abrir** cualquier app y vuelve a verificar
-   su presencia justo antes de lanzarla. No dispone de una llave maestra
-   de aplicaciones ni de acceso automático a sus datos internos.
+1. SKY **confirma antes de abrir** cualquier app, salvo que el propietario
+   seleccione **«Confiar y abrir»** para ese paquete. Una aplicación de
+   confianza puede abrirse inmediatamente tras una orden expresa por voz
+   o chat; desde el catálogo puede **quitarse la confianza**. SKY vuelve
+   a verificar que la app sigue instalada. Este permiso **no** concede
+   acceso automático a datos internos, mensajes, cuentas ni publicaciones.
 2. El catálogo se construye con `ACTION_MAIN + CATEGORY_LAUNCHER` y
    `<queries>`, sin `QUERY_ALL_PACKAGES`; se queda **en el celular**.
    Android puede filtrar apps no visibles, sin icono o pertenecientes
