@@ -58,8 +58,9 @@ object SkySocialCommand {
             ?.take(220)
             ?.ifBlank { null }
             ?: "marca personal, creatividad y experiencias cotidianas"
-        val faceless = !Regex("""\b(salir en cámara|mostrar mi cara|mostrarme en cámara)\b""",
+        val wantsOnCamera = Regex("""\b(quiero|voy a|prefiero)\s+(?:salir en cámara|mostrar mi cara|mostrarme en cámara)\b""",
             RegexOption.IGNORE_CASE).containsMatchIn(raw)
+        val faceless = !wantsOnCamera
         return Request(name, topic, if (weekly) Kind.WEEKLY_PLAN else Kind.POST, faceless)
     }
 
