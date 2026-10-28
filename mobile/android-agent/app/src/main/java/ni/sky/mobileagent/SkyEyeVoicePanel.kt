@@ -162,6 +162,21 @@ class SkyEyeVoicePanel(
         }
     }
 
+    /**
+     * Modo minimalista: la portada solo muestra los ojos. La escucha,
+     * síntesis y gestos siguen funcionando y los controles pasan a SkyMobileHome.
+     */
+    fun setMinimalFace() {
+        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        setPadding(0, 0, 0, 0)
+        for (i in 0 until childCount) {
+            getChildAt(i).visibility = if (getChildAt(i) === eye) View.VISIBLE else View.GONE
+        }
+        eye.layoutParams = LayoutParams(
+            LayoutParams.MATCH_PARENT, 0, 1f
+        )
+    }
+
     private fun dp(value: Int) = (value * resources.displayMetrics.density + 0.5f).toInt()
 
     private fun setMode(mode: EyeMode, label: String) {
