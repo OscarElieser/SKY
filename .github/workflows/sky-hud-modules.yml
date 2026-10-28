@@ -9,6 +9,8 @@ on:
       - 'app.py'
       - 'sky_manos_libres.py'
       - 'metaverse/static/hud.js'
+      - 'metaverse/static/sky-hud-voice-guards.js'
+      - 'tests/test_sky_hud_voice_guards.cjs'
       - 'metaverse/static/hud.html'
       - 'metaverse/static/hud.css'
       - 'tests/test_sky_module_registry.py'
@@ -22,6 +24,8 @@ on:
       - 'app.py'
       - 'sky_manos_libres.py'
       - 'metaverse/static/hud.js'
+      - 'metaverse/static/sky-hud-voice-guards.js'
+      - 'tests/test_sky_hud_voice_guards.cjs'
       - 'metaverse/static/hud.html'
       - 'metaverse/static/hud.css'
       - 'tests/test_sky_module_registry.py'
@@ -38,7 +42,10 @@ jobs:
         with:
           node-version: '22'
       - name: Syntax for HUD JS
-        run: node --check metaverse/static/hud.js
+        run: |
+          node --check metaverse/static/hud.js
+          node --check metaverse/static/sky-hud-voice-guards.js
+          node --test tests/test_sky_hud_voice_guards.cjs
       - name: Python syntax
         run: python -m py_compile neural_core/sky_module_registry.py metaverse/sky_modules_api.py metaverse/asistente_api.py metaverse/api.py app.py sky_manos_libres.py
       - name: Registry and voice activation tests

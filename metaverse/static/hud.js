@@ -8,6 +8,9 @@
     level: 0, pulse: 0, sttLocal: false, ytApi: false, analyser: null, freq: null,
     stream: null, recorder: null, recognition: null,
   };
+  // Un solo stream conversacional activo. La orden local «SKY, cállate»
+  // puede abortarlo sin pasar por la IA ni alterar otras sesiones.
+  let abortarRespuestaActual = null;
   const store = {
     get(k) { try { return sessionStorage.getItem(k) || ''; } catch { return ''; } },
     set(k, v) { try { sessionStorage.setItem(k, v); } catch { /* privado */ } },
@@ -491,8 +494,11 @@
       const wakeOrder = ordenDespertador(r.text);
       const orden = wakeOrder !== null ? wakeOrder
         : (S.conv ? String(r.text || '').trim() : null);
-      if (orden !== null) {
-        $('transcript').textContent = '“' + (r.text || '').trim() + '”';
+      const transcrito = String(r.text || '').trim();
+      const guard = window.SKYHUDVoiceGuards;
+      if (orden !== null && (wakeOrder !== null ||
+          (guard && guard.shouldAcceptContinuous(transcrito, S.conv)))) {
+        $('transcript').textContent = '“' + transcrito + '”';
         if (orden) recibir(orden, 'voz'); else { await speak('¿Sí?'); escuchar(); }
       }
     } catch { /* ruido o audio corto */ }
@@ -508,14 +514,13 @@
       // Barge-in: only explicit SKY interrupt commands can stop speech.
       // Ordinary recognition during playback is ignored to suppress self-echo.
       if (S.speaking || hablando) {
-        if (orden !== null && /^(?:para|det[eé]nte|calla|c[aá]llate|deja de hablar|silencio)\b/i.test(orden)) {
-          callar();
-          setState('listening', 'Interrumpida por indicación del usuario.');
+        if (orden !== null && window.SKYHUDVoiceGuards?.isStopSpeaking(txt)) {
+          recibir(txt, 'voz'); // silencio y cancelación del stream, sin IA.
         }
         return;
       }
       if (S.listening) return;
-      if (orden === null && !S.conv) return;
+      if (!window.SKYHUDVoiceGuards?.shouldAcceptContinuous(txt, S.conv)) return;
       const efectivo = orden !== null ? orden : txt.trim();
       if (!efectivo) return;
       $('transcript').textContent = '“' + txt.trim() + '”';
@@ -577,6 +582,21 @@
   const NO = /^(no|cancela|cancelar|dejalo|déjalo|olvidalo|olvídalo|mejor no)\b/i;
   function recibir(texto, origen) {
     S.currentOrigin = origen === 'voz' ? 'voz' : 'chat';
+    // Prioridad absoluta a silencio local: no enviarlo al LLM ni ejecutar
+    // herramientas. No confundirlo con la parada de emergencia del equipo.
+    if (window.SKYHUDVoiceGuards?.isStopSpeaking(texto)) {
+      addMsg('user', String(texto));
+      const habiaRespuesta = Boolean(abortarRespuestaActual);
+      const estabaHablando = Boolean(hablando || S.speaking);
+      if (abortarRespuestaActual) abortarRespuestaActual();
+      callar();
+      const aviso = habiaRespuesta || estabaHablando
+        ? 'Detuve la respuesta y la voz de esta ventana de SKY.'
+        : 'La voz de esta ventana ya estaba en silencio.';
+      addMsg('sky', aviso);
+      setState('idle', 'Voz detenida en esta ventana.');
+      return;
+    }
     if (S.pending && origen === 'voz') {
       const t = texto.trim().toLowerCase();
       if (SI.test(t) && S.pending.soloClic) { addMsg('user', texto); speak('Por seguridad, esto no se confirma sólo con la voz: tocá Ejecutar.'); return; }
@@ -635,6 +655,10 @@
     texto = String(texto || '').trim();
     if (!texto && adjuntosChat.length) texto = 'Analizá y resumí los archivos adjuntos.';
     if (!texto) return;
+    if (abortarRespuestaActual) {
+      addMsg('sky', 'Estoy completando otra respuesta. Podés decir «SKY, cállate» para cancelarla antes de iniciar otra.', 'err');
+      return;
+    }
     const fileContext = modo === 'chat' ? contextoDeAdjuntos() : '';
     addMsg('user', texto); $('chat-input').value = '';
     S.tEnvio = performance.now();
@@ -655,6 +679,12 @@
     const voz = modo === 'voz';
     // SKY-STREAM-TIMEOUT: informar demoras sin exponer el motor usado.
     const control = new AbortController();
+    let canceladaPorUsuario = false;
+    const cancelarEsta = () => {
+      canceladaPorUsuario = true;
+      control.abort();
+    };
+    abortarRespuestaActual = cancelarEsta;
     let finalizado = false;
     const aviso = setTimeout(() => {
       if (!finalizado && estado === 'thinking') setState('thinking', 'La respuesta está tardando más de lo normal…');
@@ -714,6 +744,7 @@
       throw new Error('La conexión terminó sin una respuesta final.');
     } catch (e) {
       if (vivo) vivo.classList.remove('live');
+      if (canceladaPorUsuario) return; // una cancelación voluntaria no es timeout.
       const mensaje = control.signal.aborted
         ? 'La respuesta tardó demasiado. Probá otra vez o abrí Diagnóstico para revisar el servicio.'
         : 'SKY no completó la respuesta: ' + e.message;
@@ -722,6 +753,7 @@
     } finally {
       clearTimeout(aviso);
       clearTimeout(limite);
+      if (abortarRespuestaActual === cancelarEsta) abortarRespuestaActual = null;
     }
   }
   async function decir(texto, extra) {
