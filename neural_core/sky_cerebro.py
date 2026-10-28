@@ -445,6 +445,7 @@ def _decidir_subasta(texto: str, historial: list[dict] | None, modo: str) -> Ite
         yield 'error', 'No hay un proveedor autorizado disponible para esta solicitud.'
         return
 
+    errores: list[str] = []
     for propuesta in propuestas:
         quien = propuesta['proveedor']
         _ULTIMO.set(quien)
@@ -452,10 +453,13 @@ def _decidir_subasta(texto: str, historial: list[dict] | None, modo: str) -> Ite
         inicio = time.perf_counter()
         info = {'tokens': None}
         ok, emitido, via = False, False, 'texto'
+        motivo = 'respuesta vacia o no interpretable'
         try:
             fuente = _eventos(texto, historial, modo, info) if quien == 'ollama' else _eventos_nube(quien, texto, historial, modo, info)
             for evento, valor in fuente:
                 if evento == 'error':
+                    # Las rutas cloud ya convierten sus errores en códigos seguros.
+                    motivo = str(valor)[:250]
                     break
                 if evento == 'delta' and valor:
                     emitido = True
@@ -470,9 +474,9 @@ def _decidir_subasta(texto: str, historial: list[dict] | None, modo: str) -> Ite
                         yield evento, valor
                         return
                     break
-        except Exception:
-            # Nunca mostrar mensajes de SDK que puedan contener URL o credenciales.
-            pass
+        except Exception as exc:
+            from .sky_ai_diagnostics import error_seguro
+            motivo = error_seguro(quien, exc)
         finally:
             try:
                 from .sky_metricas import registrar
@@ -480,11 +484,12 @@ def _decidir_subasta(texto: str, historial: list[dict] | None, modo: str) -> Ite
                           (time.perf_counter() - inicio) * 1000, origen=via, tokens=info['tokens'])
             except Exception:
                 pass
+        errores.append(f'{quien}: {motivo}')
         if emitido:
             # Una respuesta parcial no se concatena con otra de un proveedor distinto.
-            yield 'error', 'El proveedor interrumpió una respuesta parcial. Volvé a intentarlo.'
+            yield 'error', f'El proveedor interrumpió una respuesta parcial. {quien}: {motivo}.'
             return
-    yield 'error', 'Las API autorizadas no pudieron completar esta solicitud. Revisá conexión, cuotas y modelos.'
+    yield 'error', 'Subasta sin respuesta: ' + '; '.join(errores)[:650]
 
 
 def _eventos(texto: str, historial: list[dict] | None, modo: str, info: dict) -> Iterator[tuple[str, object]]:
@@ -623,11 +628,9 @@ def _llamada_nube(proveedor: str, msgs: list[dict]) -> tuple[str | None, dict, s
 def _eventos_nube(proveedor: str, texto: str, historial: list[dict] | None, modo: str, info: dict) -> Iterator[tuple[str, object]]:
     try:
         nombre, args, respuesta, tokens = _llamada_nube(proveedor, _mensajes(texto, historial or [], modo))
-    except urllib.error.HTTPError as exc:
-        yield 'error', f'{proveedor} respondió HTTP {exc.code}: revisá la clave y el modelo.'
-        return
     except Exception as exc:
-        yield 'error', f'No pude consultar {proveedor}: {str(exc)[:120]}'
+        from .sky_ai_diagnostics import error_seguro
+        yield 'error', error_seguro(proveedor, exc)
         return
     info['tokens'] = tokens
     if nombre:
