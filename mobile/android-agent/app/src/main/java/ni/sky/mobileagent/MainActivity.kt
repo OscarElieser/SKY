@@ -89,11 +89,17 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.setFlags(
-            android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
-            android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+        // FLAG_FULLSCREEN prevents adjustResize from moving the chat composer
+        // on many keyboards. Android 15/16 use explicit system/IME insets.
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        window.setSoftInputMode(
+            android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
         )
-        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            window.setDecorFitsSystemWindows(false)
+        }
+        window.statusBarColor = android.graphics.Color.rgb(7, 11, 32)
         window.navigationBarColor = android.graphics.Color.rgb(7, 11, 32)
         if (android.os.Build.VERSION.SDK_INT >= 29) {
             window.isNavigationBarContrastEnforced = false
@@ -200,10 +206,18 @@ class MainActivity : Activity() {
         setContentView(home.root)
         handler.post { acceptPendingVoiceIntent(intent) }
         home.root.setOnApplyWindowInsetsListener { _, insets ->
-            val bottom = if (android.os.Build.VERSION.SDK_INT >= 30) {
-                insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
-            } else @Suppress("DEPRECATION") insets.systemWindowInsetBottom
-            home.applyNavigationInset(bottom)
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                val top = insets.getInsets(android.view.WindowInsets.Type.statusBars()).top
+                val navigation = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+                val keyboardVisible = insets.isVisible(android.view.WindowInsets.Type.ime())
+                val keyboard = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom
+                home.applyWindowInsets(top, if (keyboardVisible) maxOf(navigation, keyboard)
+                    else navigation, keyboardVisible)
+            } else {
+                // On API 26–29 the platform handles these bars and resizes the
+                // activity itself when the keyboard is displayed.
+                home.applyWindowInsets(0, 0, false)
+            }
             insets
         }
         home.root.requestApplyInsets()
@@ -1140,6 +1154,7 @@ class MainActivity : Activity() {
         cloudConsent.isChecked = false
         privateConsent.isChecked = false
         chatPending = true
+        home.beginSending(message)
         voicePanel.showThinking()
         chatExecutor.execute {
             val started = android.os.SystemClock.elapsedRealtime()
@@ -1174,7 +1189,7 @@ class MainActivity : Activity() {
                 chatHistory.put(JSONObject().put("role", "assistant").put("content", answer.take(2000)))
                 while (chatHistory.length() > 8) chatHistory.remove(0)
                 runOnUiThread {
-                    chatInput.setText("")
+                    // Keep any newer draft typed while SKY was thinking.
                     val keepFace = voiceReplyOnFace
                     voiceReplyOnFace = false
                     val elapsedMs = android.os.SystemClock.elapsedRealtime() - started
@@ -1190,7 +1205,7 @@ class MainActivity : Activity() {
                     voiceReplyOnFace = false
                     runOnUiThread {
                         refreshConnection()
-                        home.showMessage("La sesión de chat venció. Renovala desde Ajustes.")
+                        home.failSending("La sesión venció. Renovala desde Ajustes.", message)
                         voicePanel.showError("La conversación necesita nueva autorización.")
                     }
                 } else {
@@ -1203,7 +1218,7 @@ class MainActivity : Activity() {
                         else -> "No se pudo conectar con Gemini. Revisá tu internet y tu clave."
                     } else "No fue posible consultar SKY Core. Revisá tu conexión."
                     runOnUiThread {
-                        home.showMessage(reason)
+                        home.failSending(reason, message)
                         voicePanel.showError("No pude responder. Revisá el estado y volvé a intentar.")
                     }
                 }
