@@ -184,6 +184,13 @@ class SkyEyeVoicePanel(
         message.text = label
     }
 
+    fun isVoiceEnabled(): Boolean = readAloud.isChecked
+
+    fun setVoiceEnabled(enabled: Boolean) {
+        readAloud.isChecked = enabled
+        if (!enabled) speechEngine?.stop()
+    }
+
     fun showThinking() = setMode(EyeMode.THINKING, "SKY está preparando su respuesta…")
 
     fun showError(label: String) = setMode(EyeMode.ERROR, label)
