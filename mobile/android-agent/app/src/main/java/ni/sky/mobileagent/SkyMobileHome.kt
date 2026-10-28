@@ -200,6 +200,10 @@ class SkyMobileHome(
             gravity = Gravity.CENTER_VERTICAL
         }
         header.addView(panelTitle, LinearLayout.LayoutParams(0, dp(50), 1f))
+        header.addView(pill("Historial", Color.rgb(53, 56, 107)) { toggleHistory() }.apply {
+            textSize = 12f
+            contentDescription = "Mostrar o reducir historial de conversación"
+        }, LinearLayout.LayoutParams(dp(86), dp(40)).apply { rightMargin = dp(7) })
         header.addView(pill("×", Color.rgb(60, 62, 119)) { closePanel() }.apply {
             textSize = 28f
             contentDescription = "Cerrar panel y volver a SKY"
@@ -235,7 +239,7 @@ class SkyMobileHome(
         }, LinearLayout.LayoutParams(0, dp(44), 1f))
         footer.addView(pill("Motor", Color.TRANSPARENT, onDiagnostics),
             LinearLayout.LayoutParams(0, dp(44), 1f))
-        footer.addView(pill("Chat", Color.TRANSPARENT, onChatAccess),
+        footer.addView(pill("Acceso", Color.TRANSPARENT, onChatAccess),
             LinearLayout.LayoutParams(0, dp(44), 1f))
         panel.addView(footer)
         panel.addView(privacy)
@@ -268,6 +272,13 @@ class SkyMobileHome(
         (host.getSystemService(Activity.INPUT_METHOD_SERVICE)
             as? android.view.inputmethod.InputMethodManager)
             ?.hideSoftInputFromWindow(chatInput.windowToken, 0)
+    }
+
+    private fun toggleHistory() {
+        expandedHistory = !expandedHistory
+        chatOutput.text = if (history.isEmpty()) "Todavía no hay mensajes en esta sesión."
+            else history.takeLast(if (expandedHistory) 8 else 3)
+                .joinToString("\\n\\n────────────\\n\\n")
     }
 
     fun setConnection(linked: Boolean, chatReady: Boolean) {
