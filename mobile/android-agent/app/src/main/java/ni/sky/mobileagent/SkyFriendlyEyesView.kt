@@ -118,7 +118,7 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         line.reset()
         line.moveTo(x - 24f, eyebrowY + 4f)
         line.quadTo(x, eyebrowY - 6f, x + 24f, eyebrowY + 4f)
-        stroke(Color.rgb(111, 105, 172), 4f)
+        stroke(Color.rgb(189, 178, 248), 4f)
         canvas.drawPath(line, brush)
     }
 
@@ -169,14 +169,12 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         canvas.scale(scale, scale)
         canvas.translate(0f, (sin(seconds * 1.5) * 2.4).toFloat())
 
-        fill(Color.rgb(166, 174, 217), 80)
-        canvas.drawRoundRect(26f, 14f, 334f, 215f, 64f, 64f, brush)
-        fill(Color.rgb(227, 236, 255))
-        canvas.drawRoundRect(26f, 8f, 334f, 207f, 64f, 64f, brush)
-        stroke(Color.rgb(174, 197, 250), 2.5f)
-        canvas.drawRoundRect(28f, 9f, 332f, 205f, 62f, 62f, brush)
-        fill(accent, 30 + (pulse * 16f).toInt())
-        canvas.drawCircle(180f, 109f, 99f + pulse * 4f, brush)
+        // Rostro virtual libre y flotante: sin carcasa rectangular ni
+        // efecto robótico. Una luz suave acompaña sus expresiones.
+        fill(Color.rgb(102, 76, 202), 32)
+        canvas.drawOval(39f, 23f, 321f, 203f, brush)
+        fill(accent, 22 + (pulse * 18f).toInt())
+        canvas.drawOval(57f, 34f, 303f, 194f, brush)
 
         val blinkMs = now % 5400L
         val blinking = if (blinkMs in 5080L..5310L) {
@@ -200,11 +198,11 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         when {
             mode == "ERROR" -> {
                 // Duda suave y amistosa, nunca gesto agresivo.
-                stroke(Color.rgb(120, 110, 165), 4f)
+                stroke(Color.rgb(209, 185, 239), 4f)
                 canvas.drawArc(165f, 164f, 195f, 183f, 203f, 134f, false, brush)
             }
             mood == Emotion.SLEEPY -> {
-                stroke(Color.rgb(109, 107, 166), 4f)
+                stroke(Color.rgb(206, 188, 237), 4f)
                 canvas.drawLine(170f, 171f, 190f, 171f, brush)
             }
             mood == Emotion.SURPRISED ||
@@ -216,11 +214,19 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
                 canvas.drawOval(172f, 173f, 188f, 181f, brush)
             }
             else -> {
-                stroke(Color.rgb(110, 105, 168), 5f)
+                stroke(Color.rgb(222, 198, 250), 5f)
                 canvas.drawArc(157f, 145f, 203f, 182f, 10f, 160f, false, brush)
             }
         }
         if (mood == Emotion.LOVING) {
+            // Unos lentes juguetones aparecen únicamente cuando SKY
+            // hace el gesto cariñoso; desaparecen automáticamente.
+            stroke(Color.rgb(48, 35, 90), 5.5f)
+            canvas.drawRoundRect(79f, 65f, 174f, 143f, 23f, 23f, brush)
+            canvas.drawRoundRect(186f, 65f, 281f, 143f, 23f, 23f, brush)
+            canvas.drawLine(174f, 83f, 186f, 83f, brush)
+            heart(canvas, 127f, 105f, 0.65f)
+            heart(canvas, 235f, 105f, 0.65f)
             heart(canvas, 301f, 40f, 0.65f)
             heart(canvas, 55f, 52f, 0.40f)
         }
