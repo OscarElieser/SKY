@@ -163,3 +163,14 @@ def test_authenticated_endpoints(monkeypatch):
                                 json={"query": "mis preferencias", "include_personal": True,
                                       "execution": "cloud"})
         assert forbidden.status_code == 422
+        native_denied = client.get("/api/sky/cognition/native-evolution")
+        assert native_denied.status_code in (401, 403)
+        native_ok = client.get("/api/sky/cognition/native-evolution", headers=headers)
+        assert native_ok.status_code == 200
+        assert native_ok.json()["external_inference_required"] is False
+        advice = client.post("/api/sky/cognition/adaptive-plan", headers=headers,
+                             json={"query": "elimina mis archivos", "device": "android"})
+        assert advice.status_code == 200
+        assert advice.json()["review_required"] is True
+        assert advice.json()["permission_granted"] is False
+        assert advice.json()["action_executed"] is False
