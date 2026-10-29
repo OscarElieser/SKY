@@ -104,6 +104,20 @@ class SkyAdaptiveMemory(context: Context) :
         )
         private fun containsSecret(text: String): Boolean = secret.containsMatchIn(text)
 
+        /**
+         * Orden directa por texto o voz: "SKY, corrige tu última respuesta: ..."
+         * Devuelve null si no es una orden, y "" cuando falta la corrección.
+         */
+        fun correctionFromCommand(raw: String): String? {
+            val input = raw.trim().replaceFirst(
+                Regex("""^sky\s*[,.:;!?¡¿-]*\s*""", RegexOption.IGNORE_CASE), "")
+            val match = Regex(
+                """^(?:corrige|corregi|corregí)\s+(?:(?:tu|la)\s+)?(?:[uú]ltima\s+)?respuesta\s*(?:[:：-]\s*(.*))?$""",
+                setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+            ).matchEntire(input) ?: return null
+            return match.groupValues.getOrElse(1) { "" }.trim()
+        }
+
         /** Dynamic information and commands are never replayed as "learned facts". */
         fun ineligibleReason(question: String): String? {
             if (question.trim().length !in 4..4000)
