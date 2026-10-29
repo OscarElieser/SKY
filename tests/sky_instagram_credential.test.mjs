@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { webcrypto } from "node:crypto";
 
 const source = readFileSync("supabase/functions/sky-instagram/index.ts", "utf8");
-const match = source.match(/const raw = ([\s\S]+?);\s+await database\("sky_instagram_mobile_devices"/);
+const match = source.match(/const raw = (b64\(crypto\.getRandomValues\(new Uint8Array\(32\)\)\)[\s\S]+?);\s+await database\("sky_instagram_mobile_devices"/);
 assert.ok(match, "The production token expression must remain detectable");
 
 // Exercise the expression used by the deployed Edge Function, not a copied implementation.
