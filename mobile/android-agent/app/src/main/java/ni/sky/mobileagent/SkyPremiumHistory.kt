@@ -142,7 +142,7 @@ class SkyPremiumHistory(
             setSingleLine(true)
             textSize = 14f
             imeOptions = EditorInfo.IME_ACTION_SEARCH
-            filters = arrayOf(InputFilter.LengthFilter(100))
+            this.filters = arrayOf(InputFilter.LengthFilter(100))
             setHintTextColor(ui.muted)
             setTextColor(ui.white)
             background = ui.shape(host)
