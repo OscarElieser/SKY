@@ -1,3 +1,19 @@
+## SKY Android 0.8.29 — presencia supervisada y rostro premium (beta pendiente de CI)
+
+**Alcance: exclusivamente `mobile/android-agent/`; no se modifican los servicios SKY Windows.** La numeración de código no implica que exista una APK 0.8.29 publicada ni probada físicamente.
+
+- **Sueño explícito persistente:** «SKY, duerme» establece el modo `SLEEP_LOCKED` en preferencias privadas. La captura local de la palabra de activación puede seguir autorizada mientras viva el servicio, pero las órdenes no se procesan hasta «SKY, despierta». El reinicio visual de la Activity no debe cancelar el estado.
+- **Modo atenta a orientaciones:** «SKY, estate pendiente de mis orientaciones» activa `ATTENTIVE` sin el temporizador normal de 45 segundos entre turnos. No instala un motor de hotword de bajo consumo; Android 16 puede suspender o terminar el micrófono por política o batería.
+- **Confirmación de segundo plano:** cuando SKY no tiene Activity visible, no ejecuta una orden captada sin confirmación. Repite la frase interpretada, espera «SKY confirmo» o «SKY cancela» durante un plazo de 20 segundos y después aplica los límites previos: desbloqueo para apps y acciones protegidas. No concede permisos extra ni evita PIN/biometría.
+- **Identificación del creador (pendiente):** no existe todavía un modelo validado de **verificación de hablante** ni una plantilla biométrica inscrita. `SpeechRecognizer` reconoce palabras, **no** confirma la identidad física de Oscar. La segunda confirmación verbal tampoco demuestra identidad; las acciones sensibles siguen sujetas a las verificaciones existentes de Android. No vender esta funcionalidad como reconocimiento de voz personal operativo.
+- **Animaciones premium:** «SKY baila», «SKY salta», «SKY corre» y «SKY gira» activan movimientos del rostro sin nube. `SkyFriendlyEyesView` utiliza traslación, salto, escala y `android.graphics.Camera` para perspectiva 3D de los ojos dibujados; no renderiza un personaje volumétrico 3D completo. El sueño reduce la frecuencia de redibujado para ahorrar batería.
+- **Ventanas premium:** tema nocturno nativo con azul marino, bordes violetas, texto claro y cian en diálogos, controles y permisos, sin eliminar funciones ni claves.
+- **Pruebas necesarias:** compilación y firma, pruebas unitarias de modos de voz y animación, emuladores Android 15/16, comparación de firma con la APK anterior, instalación y pruebas en Samsung SM-S711U/Android 16. Probar sueño de al menos 10 minutos, segundo plano, bloqueo de pantalla y cancelación. La pantalla apagada **no** asegura escucha continua, incluso con notificación visible.
+
+[Acciones Android en GitHub](https://github.com/OscarElieser/SKY/actions) · [APK realmente publicadas](https://github.com/OscarElieser/SKY/releases).
+
+---
+
 ## SKY Android 0.8.28 — respuestas completas, Word descargable y órdenes musicales naturales
 
 **Implementado en el código de `main`; no equivale a APK publicada ni a instalación probada.** La nueva APK debe pasar compilación firmada, pruebas Android 15/16, auditoría y distribución de GitHub Releases antes de ofrecerse como descarga. SKY Windows no se modifica.
