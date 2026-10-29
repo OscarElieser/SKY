@@ -89,3 +89,17 @@ def prepare_speech(body: VoiceInput):
 def verified_execution_metrics():
     from neural_core.sky_neural_memory import execution_report
     return execution_report()
+
+
+@router.get("/native-evolution")
+def native_evolution_status():
+    """Lectura protegida de aprendizaje estadístico local, sin secretos."""
+    from neural_core.sky_adaptive_policy import evolution_status
+    return evolution_status()
+
+
+@router.post("/adaptive-plan")
+def native_adaptive_plan(body: PlanInput):
+    """SKY propone una estrategia; no ejecuta herramientas ni cambia permisos."""
+    from neural_core.sky_adaptive_policy import adaptive_plan
+    return _respond(lambda: adaptive_plan(body.query, device=body.device))
