@@ -40,6 +40,73 @@ class SkyPremiumHistory(
             contentDescription = title
         }
 
+    private fun premiumPrompt(title: String, starting: String,
+                              onSave: (String) -> Unit) {
+        val body = LinearLayout(host).apply {
+            orientation = LinearLayout.VERTICAL
+            background = ui.shape(host, ui.background, 22)
+            setPadding(ui.dp(host, 18), ui.dp(host, 20),
+                ui.dp(host, 18), ui.dp(host, 16))
+        }
+        body.addView(ui.label(host, title, 19f, ui.white, true))
+        val editor = EditText(host).apply {
+            setText(starting)
+            setSingleLine(true)
+            filters = arrayOf(InputFilter.LengthFilter(100))
+            setTextColor(ui.white)
+            setHintTextColor(ui.muted)
+            background = ui.shape(host, ui.card, 13)
+            setPadding(ui.dp(host, 12), ui.dp(host, 12),
+                ui.dp(host, 12), ui.dp(host, 12))
+        }
+        body.addView(editor, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = ui.dp(host, 15)
+            bottomMargin = ui.dp(host, 15)
+        })
+        val actions = LinearLayout(host).apply { orientation = LinearLayout.HORIZONTAL }
+        lateinit var dialog: AlertDialog
+        actions.addView(button("Cancelar") { dialog.dismiss() },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        actions.addView(button("Guardar") {
+            val value = editor.text.toString().trim()
+            if (value.length >= 2) {
+                onSave(value)
+                dialog.dismiss()
+            } else editor.error = "Escribí un título de dos caracteres o más"
+        }, LinearLayout.LayoutParams(0, -2, 1f).apply {
+            leftMargin = ui.dp(host, 10)
+        })
+        body.addView(actions)
+        dialog = AlertDialog.Builder(host).setView(body).create()
+        ui.showDialog(host, dialog, 0.40)
+    }
+
+    private fun premiumConfirm(title: String, note: String, onApprove: () -> Unit) {
+        val body = LinearLayout(host).apply {
+            orientation = LinearLayout.VERTICAL
+            background = ui.shape(host, ui.background, 22)
+            setPadding(ui.dp(host, 18), ui.dp(host, 20),
+                ui.dp(host, 18), ui.dp(host, 16))
+        }
+        body.addView(ui.label(host, title, 19f, ui.white, true))
+        body.addView(ui.label(host, note, 14f, ui.muted).apply {
+            setPadding(0, ui.dp(host, 10), 0, ui.dp(host, 16))
+        })
+        val row = LinearLayout(host).apply { orientation = LinearLayout.HORIZONTAL }
+        lateinit var dialog: AlertDialog
+        row.addView(button("Cancelar") { dialog.dismiss() },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(button("Eliminar") {
+            dialog.dismiss()
+            onApprove()
+        }, LinearLayout.LayoutParams(0, -2, 1f).apply {
+            leftMargin = ui.dp(host, 10)
+        })
+        body.addView(row)
+        dialog = AlertDialog.Builder(host).setView(body).create()
+        ui.showDialog(host, dialog, 0.35)
+    }
+
     fun show(initialQuery: String = "", beforeId: Long? = null): AlertDialog {
         val filters = listOf("Todos", "Hoy", "Ayer", "Groq", "Gemini", "Favoritos")
         var activeFilter = "Todos"
@@ -159,20 +226,12 @@ class SkyPremiumHistory(
             }, host)
             ui.addRow(actions, button("✎  Renombrar título") {
                 detail.dismiss()
-                val editor = EditText(host).apply {
-                    setText(item.title)
-                    filters = arrayOf(InputFilter.LengthFilter(100))
-                    setSingleLine(true)
+                premiumPrompt("Renombrar consulta", item.title) { changed ->
+                    if (runCatching { archive.rename(item.id, changed) }.getOrDefault(false)) {
+                        onHistoryChanged()
+                        refresh()
+                    }
                 }
-                AlertDialog.Builder(host).setTitle("Renombrar consulta")
-                    .setView(editor)
-                    .setPositiveButton("Guardar") { _, _ ->
-                        if (runCatching { archive.rename(item.id, editor.text.toString()) }
-                                .getOrDefault(false)) {
-                            onHistoryChanged()
-                            refresh()
-                        }
-                    }.setNegativeButton("Cancelar", null).show()
             }, host)
             ui.addRow(actions, button("⬇  Exportar respuesta") {
                 detail.dismiss()
@@ -180,14 +239,13 @@ class SkyPremiumHistory(
             }, host)
             ui.addRow(actions, button("Eliminar esta consulta") {
                 detail.dismiss()
-                AlertDialog.Builder(host).setTitle("Eliminar consulta")
-                    .setMessage("Se eliminará solo esta consulta del teléfono. Esta acción no se puede deshacer.")
-                    .setPositiveButton("Eliminar") { _, _ ->
-                        if (archive.delete(item.id)) {
-                            onHistoryChanged()
-                            refresh()
-                        }
-                    }.setNegativeButton("Cancelar", null).show()
+                premiumConfirm("Eliminar consulta",
+                    "Se eliminará solo esta consulta del teléfono. Esta acción no se puede deshacer.") {
+                    if (archive.delete(item.id)) {
+                        onHistoryChanged()
+                        refresh()
+                    }
+                }
             }, host)
             body.addView(actions)
             detail = AlertDialog.Builder(host).setView(body).create()
