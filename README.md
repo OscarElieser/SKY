@@ -21,7 +21,7 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 
 El módulo móvil integra controles Android con resultados observables: cambios de volumen comprobados antes/después, notas reabiertas tras guardar, evidencias persistentes diferenciadas de simples solicitudes, métricas locales por tipo de resultado y validación explícita del origen del propietario al ejecutar órdenes por voz. Las aperturas de apps y los eventos musicales **no** se consideran tareas terminadas si Android solo aceptó la solicitud. El trabajo conserva los límites de permisos y no modifica SKY Windows.
 
-**Pruebas y distribución:** código en `main`, sujeto a CI de Android 15/16 y comprobación en Samsung; nunca inferir que la APK está publicada a partir del número de versión en el código. [Ver guía de ejecución verificable](mobile/android-agent/docs/SKY_EXECUTION_EVIDENCE_0.8.27.md) · [Ver APK publicadas](https://github.com/OscarElieser/SKY/releases).
+**Publicación verificada el 29/10/2026:** la versión firmada [SKY Android 0.8.27](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.27) está publicada como beta personal. [Compilación y controles de firma aprobados](https://github.com/OscarElieser/SKY/actions/runs/40859332903) y [pruebas del emulador Android 15/16 aprobadas](https://github.com/OscarElieser/SKY/actions/runs/40859332929). Estas verificaciones no equivalen a aceptación en el Samsung real: siguen pendientes las pruebas de voz, batería, pantalla bloqueada, proveedores externos y reproducción audible. [Guía de ejecución](mobile/android-agent/docs/SKY_EXECUTION_EVIDENCE_0.8.27.md) · [Protocolo de aceptación física](mobile/android-agent/docs/ANDROID_REAL_DEVICE_ACCEPTANCE.md).
 
 ---
 
