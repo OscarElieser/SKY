@@ -1,0 +1,34 @@
+name: SKY Instagram Meta profile verification
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/sky-instagram/**'
+      - 'tests/sky_instagram_profile_contract.test.mjs'
+      - 'mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyInstagramMobileLink.kt'
+      - '.github/workflows/sky-instagram-profile.yml'
+  pull_request:
+    paths:
+      - 'supabase/functions/sky-instagram/**'
+      - 'tests/sky_instagram_profile_contract.test.mjs'
+      - 'mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyInstagramMobileLink.kt'
+      - '.github/workflows/sky-instagram-profile.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-instagram-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Static checks for the Instagram profile gateway
+        run: deno check supabase/functions/sky-instagram/index.ts
+      - name: Regression checks without exposing tokens or contacting Meta
+        run: node --test tests/sky_instagram_profile_contract.test.mjs tests/sky_instagram_credential.test.mjs
