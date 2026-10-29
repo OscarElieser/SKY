@@ -33,8 +33,12 @@ def test_sensitive_actions_reject_global_consent_without_per_action_approval():
         decision = core.inspect(action, "owner_spoken", platform_permission=True)
         assert not decision["allowed"] and decision["requires_confirmation"]
         decision = core.inspect(action, "owner_typed", platform_permission=True,
-                                per_action_approved=True)
+                                per_action_approved=True, local_ui_approved=True)
         assert decision["allowed"] and decision["requires_confirmation"]
+        if core.contract()["actions"][action]["risk"] == "high":
+            no_ui = core.inspect(action, "owner_spoken", platform_permission=True,
+                                 per_action_approved=True)
+            assert not no_ui["allowed"] and no_ui["reason"] == "local_ui_approval"
 
 
 def test_untrusted_input_cannot_execute_even_when_approved():
