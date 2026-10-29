@@ -114,6 +114,28 @@ def test_research_never_sends_obvious_secrets():
         brain.academic_research("mi correo personal en investigación", external_search=True)
 
 
+def test_primary_assistant_metadata_does_not_modify_actions():
+    from metaverse.asistente_api import _decorate_cognition
+    raw = {"tipo": "respuesta", "mensaje": "**Hola**, qué gusto."}
+    result = _decorate_cognition(raw, "Qué alegría, funcionó")
+    assert raw.get("sky_cognition") is None
+    assert result["sky_cognition"]["persona"]["animation"] == "alegre"
+    assert result["sky_cognition"]["emotion_is_simulated"]
+    assert "**" not in result["sky_cognition"]["speech_text"]
+    action = {"tipo": "accion", "mensaje": "Ejecutar", "propuesta": {"action": "open_url"}}
+    assert _decorate_cognition(action, "Abrí YouTube") is action
+
+
+def test_hud_additive_integration_keeps_existing_controls():
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "metaverse" / "static" / "hud.js").read_text(encoding="utf-8")
+    assert src.count("cognitive: true") == 2
+    assert "data.sky_cognition?.speech_text" in src
+    assert "document.body.dataset.skyMood = selected" in src
+    assert "soltarFrases(false)" in src
+    assert "confirmar(card, titulo" in src
+
+
 def test_authenticated_endpoints(monkeypatch):
     from fastapi.testclient import TestClient
     monkeypatch.setenv("SKY_API_KEY", "sky-owner-cognition-tests-key-2026")
