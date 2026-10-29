@@ -1337,10 +1337,22 @@ class MainActivity : Activity() {
             return
         }
         if (chatPending) return
+        // Everyday greetings are resolved immediately and completely offline.
+        // They never burn free Gemini/Groq quota.
+        val local = SkyLocalConversation.reply(message)
+        if (local != null) {
+            chatInput.setText("")
+            val keepFace = voiceReplyOnFace
+            voiceReplyOnFace = false
+            home.addExchange(message, local, "SKY · local", revealPanel = !keepFace)
+            voicePanel.speakReply(local)
+            return
+        }
         val mobileCloud = tokens.cloudEnabled()
+        val groqReady = tokens.groqEnabled()
         val id = tokens.deviceId()
         val token = tokens.chatToken()
-        if (!mobileCloud && (id.isEmpty() || token.isEmpty())) {
+        if (!mobileCloud && !groqReady && (id.isEmpty() || token.isEmpty())) {
             setStatus("Configurá SKY móvil independiente desde Ajustes.")
             showSettings()
             return
@@ -1364,31 +1376,65 @@ class MainActivity : Activity() {
                 val provider: String
                 val sources: List<SkyPhoneCloud.Source>
                 val searchSuggestions: String
-                if (mobileCloud) {
-                    // Google Search grounding is used for factual, recent queries.
-                    // Responses only claim live verification if Google returned sources.
-                    val live = SkyPhoneCloud.replyWithSources(
-                        tokens.personalCloudKey(), message, history)
-                    answer = live.answer
-                    sources = live.sources
-                    searchSuggestions = live.googleSearchHtml
-                    provider = if (live.searchedWeb) "Gemini · Google Search"
-                        else "Gemini · SKY Android"
-                } else {
-                    val payload = JSONObject()
-                        .put("device_id", id)
-                        .put("texto", message)
-                        .put("historial", history)
-                        .put("proveedor", "auto")
-                        .put("datos", "privados")
-                        .put("autorizar_nube", cloud)
-                        .put("autorizar_datos_privados", privateData)
-                    val reply = SkyNetwork.requestChat(tokens.server(), "/api/sky/mobile-chat/chat",
-                        token, payload)
-                    answer = reply.optString("respuesta", "SKY no devolvió texto.")
-                    provider = reply.optString("proveedor", "SKY Core")
-                    sources = emptyList()
-                    searchSuggestions = ""
+                val needsLiveSources = SkyPhoneCloud.requiresLiveVerification(message)
+                when {
+                    // For up-to-date information, Groq is NOT substituted for a
+                    // verified web search: it has no search tool in this client.
+                    needsLiveSources && mobileCloud -> {
+                        val live = SkyPhoneCloud.replyWithSources(
+                            tokens.personalCloudKey(), message, history)
+                        answer = live.answer
+                        sources = live.sources
+                        searchSuggestions = live.googleSearchHtml
+                        provider = "Gemini · búsqueda verificable"
+                    }
+                    needsLiveSources && groqReady -> {
+                        answer = "Para darte información de hoy necesito consultar fuentes web. " +
+                            "Groq no verifica noticias en directo. Podés decirme " +
+                            "«busca en internet " + message.take(100) + "» " +
+                            "para abrir una búsqueda actualizada en tu navegador."
+                        provider = "SKY · información sin verificar"
+                        sources = emptyList()
+                        searchSuggestions = ""
+                    }
+                    groqReady -> {
+                        val result = try {
+                            Pair(SkyGroqCloud.reply(tokens.groqKey(), message, history),
+                                "Groq · Llama 3.1")
+                        } catch (error: Exception) {
+                            if (!mobileCloud) throw error
+                            // Gemini fallback only for normal conversation: no
+                            // accidental paid/grounded search on simple messages.
+                            Pair(SkyPhoneCloud.reply(tokens.personalCloudKey(), message, history),
+                                "Gemini · respaldo")
+                        }
+                        answer = result.first
+                        provider = result.second
+                        sources = emptyList()
+                        searchSuggestions = ""
+                    }
+                    mobileCloud -> {
+                        answer = SkyPhoneCloud.reply(tokens.personalCloudKey(), message, history)
+                        provider = "Gemini · sin búsqueda (ahorro)"
+                        sources = emptyList()
+                        searchSuggestions = ""
+                    }
+                    else -> {
+                        val payload = JSONObject()
+                            .put("device_id", id)
+                            .put("texto", message)
+                            .put("historial", history)
+                            .put("proveedor", "auto")
+                            .put("datos", "privados")
+                            .put("autorizar_nube", cloud)
+                            .put("autorizar_datos_privados", privateData)
+                        val reply = SkyNetwork.requestChat(tokens.server(),
+                            "/api/sky/mobile-chat/chat", token, payload)
+                        answer = reply.optString("respuesta", "SKY no devolvió texto.")
+                        provider = reply.optString("proveedor", "SKY Core")
+                        sources = emptyList()
+                        searchSuggestions = ""
+                    }
                 }
                 chatHistory.put(JSONObject().put("role", "user").put("content", message))
                 chatHistory.put(JSONObject().put("role", "assistant").put("content", answer.take(2000)))
@@ -1404,7 +1450,7 @@ class MainActivity : Activity() {
                     voicePanel.speakReply(answer)
                 }
             } catch (error: Exception) {
-                if (!mobileCloud && (error.message?.contains("HTTP 401") == true ||
+                if (!mobileCloud && !groqReady && (error.message?.contains("HTTP 401") == true ||
                     error.message?.contains("HTTP 403") == true)) {
                     tokens.clearChat()
                     voiceReplyOnFace = false
@@ -1415,12 +1461,12 @@ class MainActivity : Activity() {
                     }
                 } else {
                     voiceReplyOnFace = false
-                    val reason = if (mobileCloud) when (error) {
+                    val reason = if (mobileCloud || groqReady) when (error) {
                         is java.net.UnknownHostException -> "No hay acceso a internet."
-                        is java.net.SocketTimeoutException -> "Gemini tardó demasiado en responder."
-                        is IllegalStateException -> error.message ?: "Gemini no respondió."
+                        is java.net.SocketTimeoutException -> "El proveedor tardó demasiado en responder."
+                        is IllegalStateException -> error.message ?: "El proveedor no respondió."
                         is IllegalArgumentException -> error.message ?: "Revisá la configuración."
-                        else -> "No se pudo conectar con Gemini. Revisá tu internet y tu clave."
+                        else -> "No pude conectar con Groq o Gemini. Revisá tu conexión y las claves."
                     } else "No fue posible consultar SKY Core. Revisá tu conexión."
                     runOnUiThread {
                         home.failSending(reason, message)
