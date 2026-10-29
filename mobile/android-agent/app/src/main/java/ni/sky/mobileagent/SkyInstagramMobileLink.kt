@@ -75,9 +75,8 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
     fun show() {
         val choices=arrayOf("Vincular este teléfono con código temporal",
             "Consultar conexión verificada","Desvincular este teléfono")
+        // setMessage + setItems oculta las opciones en AlertDialog.
         AlertDialog.Builder(host).setTitle("SKY · Instagram seguro")
-            .setMessage("El servidor ya dispone de autorización Meta. " +
-                "La APK solo recibirá una credencial de dispositivo, nunca el secreto principal.")
             .setItems(choices){_,which->when(which){
                 0->pair()
                 1->check()
@@ -85,7 +84,15 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
                     .setMessage("¿Revocar el acceso de este teléfono? No se revoca el permiso global de Meta.")
                     .setPositiveButton("Revocar"){_,_->disconnect()}
                     .setNegativeButton("Cancelar",null).show()
-            }}.setNegativeButton("Cerrar",null).show()
+            }}
+            .setNeutralButton("Seguridad"){_,_->
+                AlertDialog.Builder(host).setTitle("Autorización segura")
+                    .setMessage("Meta ya autorizó el servidor. La APK recibe solo una credencial " +
+                        "revocable de este dispositivo, nunca la clave maestra ni el token Meta. " +
+                        "La identidad exacta del perfil debe verificarse aparte.")
+                    .setPositiveButton("Entendido",null).show()
+            }
+            .setNegativeButton("Cerrar",null).show()
     }
     private fun pair(){
         val input=EditText(host).apply{
