@@ -68,4 +68,12 @@ class SkyPhoneCloudTest {
         assertFalse(SkyPhoneCloud.validPersonalKey("abc\nInjected"))
         assertTrue(SkyPhoneCloud.validPersonalKey("TESTSyEXAMPLEonly-for-validation_12345"))
     }
+    @Test fun changingFactsRequireWebVerification() {
+        assertTrue(SkyPhoneCloud.requiresLiveVerification("¿Cuáles son las noticias de hoy?"))
+        assertTrue(SkyPhoneCloud.requiresLiveVerification("Dime el precio actual del dólar"))
+        assertTrue(SkyPhoneCloud.requiresLiveVerification("¿Quién es el presidente hoy?"))
+        assertFalse(SkyPhoneCloud.requiresLiveVerification("Escribí un cuento original"))
+        assertFalse(SkyPhoneCloud.requiresLiveVerification("Dame una receta de nacatamales"))
+    }
+
 }
