@@ -157,7 +157,7 @@ object SkyPremiumUi {
                     orientation = LinearLayout.VERTICAL
                     setPadding(dp(activity, 13), dp(activity, 12),
                         dp(activity, 13), dp(activity, 16))
-                    background = shape(activity, background, 20)
+                    background = shape(activity, SkyPremiumUi.background, 20)
                 }
                 group.addView(child)
                 tabs[spec.key] = spec to group
@@ -167,7 +167,7 @@ object SkyPremiumUi {
                     val fallback = SectionSpec("Inicio", "Inicio", "", "✦")
                     val group = LinearLayout(activity).apply {
                         orientation = LinearLayout.VERTICAL
-                        background = shape(activity, background, 20)
+                        background = shape(activity, SkyPremiumUi.background, 20)
                     }
                     tabs[fallback.key] = fallback to group
                     current = group
@@ -178,7 +178,7 @@ object SkyPremiumUi {
         tabs.values.forEach { (_, group) -> styleChildren(activity, group) }
         val shell = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = shape(activity, background, 25)
+            background = shape(activity, SkyPremiumUi.background, 25)
             setPadding(dp(activity, 14), dp(activity, 15),
                 dp(activity, 14), dp(activity, 10))
         }
