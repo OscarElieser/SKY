@@ -39,6 +39,7 @@ class MainActivity : Activity() {
     private lateinit var voicePanel: SkyEyeVoicePanel
     private lateinit var dailyActions: SkyAndroidActions
     private lateinit var musicLauncher: SkyMusicLauncher
+    private var requestedMusicAfterPermission: SkyMusicCommand.Request? = null
     private lateinit var quickActions: SkyQuickActions
     private lateinit var replyStudio: SkyReplyStudio
     @Volatile private var replyPending = false
@@ -183,11 +184,13 @@ class MainActivity : Activity() {
             feedback = { message -> home.showMessage(message) }
         )
         musicLauncher = SkyMusicLauncher(
-            this, getSharedPreferences("sky_mobile_music", MODE_PRIVATE)
-        ) { message ->
-            home.showMessage(message)
-            if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(message)
-        }
+            this, getSharedPreferences("sky_mobile_music", MODE_PRIVATE),
+            tell = { message ->
+                // Spoken feedback can seize media audio focus and interrupt songs.
+                home.showMessage(message)
+            },
+            onNeedMusicPermission = { request -> showMusicControlDisclosure(request) }
+        )
         quickActions = SkyQuickActions(this) { message ->
             // Music commands must not talk over and interrupt the playing track.
             home.showMessage(message)
@@ -782,6 +785,10 @@ class MainActivity : Activity() {
                 .setNegativeButton("Cerrar", null)
                 .show()
         })
+        content.addView(actionButton("CONTROL REAL DE MÚSICA · AUTORIZACIÓN") {
+            showMusicControlDisclosure(SkyMusicCommand.Request(
+                "november rain", musicLauncher.preferred()))
+        })
         content.addView(actionButton("MÚSICA · Spotify / YouTube Music / YouTube") {
             val choices = SkyMusicCommand.Service.entries.toTypedArray()
             AlertDialog.Builder(this)
@@ -894,6 +901,41 @@ class MainActivity : Activity() {
         settingsDialog?.show()
     }
 
+    private fun showMusicControlDisclosure(request: SkyMusicCommand.Request) {
+        requestedMusicAfterPermission = request
+        val provider = SkyMusicCommand.label(request.service ?: musicLauncher.preferred())
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Reproducción musical sin tocar")
+            .setMessage(
+                "Querés escuchar «${request.query}» en $provider. Para buscar el título " +
+                "y seleccionar la canción sin tocar botones, SKY necesita el servicio opcional " +
+                "«SKY · Control musical asistido» en Accesibilidad de Android.\n\n" +
+                "Si lo autorizás, SKY verá temporalmente los nombres de botones y canciones " +
+                "que aparecen en YouTube Music, YouTube y Spotify, y podrá tocar el resultado " +
+                "que coincida con tu orden. No lee mensajes, no opera otras aplicaciones, " +
+                "no recopila pantallas ni envía datos de estas aplicaciones a servidores. " +
+                "La orden caduca automáticamente tras 35 segundos. Podés desactivar " +
+                "el permiso cuando querás. Android puede solicitar desbloqueo."
+            )
+            .setPositiveButton("Autorizar control musical") { _, _ ->
+                getSharedPreferences("sky_music_access", MODE_PRIVATE)
+                    .edit().putBoolean("consent", true).apply()
+                startActivity(android.content.Intent(
+                    android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                home.showMessage("En Accesibilidad, activá «SKY · Control musical asistido» " +
+                    "y regresá a SKY. La canción se buscará al volver.")
+            }
+            .setNeutralButton("Probar reproducción estándar") { _, _ ->
+                requestedMusicAfterPermission = null
+                musicLauncher.playViaAndroidIntent(request)
+            }
+            .setNegativeButton("Cancelar") { _, _ ->
+                requestedMusicAfterPermission = null
+                home.showMessage("Cancelé la reproducción. No activé el control musical.")
+            }
+            .show()
+    }
+
     private fun setHandsFreeEnabled(enabled: Boolean) {
         handsFreePrefs.edit().putBoolean("hands_free_opt_in", enabled).apply()
         if (!enabled) {
@@ -954,6 +996,13 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         visible = true
+        if (SkyMusicControlService.enabled()) {
+            val request = requestedMusicAfterPermission
+            if (request != null && ::musicLauncher.isInitialized) {
+                requestedMusicAfterPermission = null
+                handler.postDelayed({ if (!isFinishing) musicLauncher.play(request) }, 450L)
+            }
+        }
         if (::voicePanel.isInitialized) {
             voicePanel.onEnterForeground()
             voicePanel.setConversationMode(getSharedPreferences(
