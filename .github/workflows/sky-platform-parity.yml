@@ -6,6 +6,7 @@ on:
       - 'shared/sky_platform_parity.json'
       - 'shared/sky_core_contract_v1.json'
       - 'tests/test_sky_platform_parity.py'
+      - 'docs/SKY_WINDOWS_ANDROID_PARITY_2026-10-29.md'
       - 'tests/test_sky_cross_platform_regression_gates.py'
       - '.github/workflows/sky-platform-parity.yml'
   pull_request:
