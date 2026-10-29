@@ -18,6 +18,23 @@ object SkyPhoneCloud {
     const val MODEL = "gemini-3.5-flash-lite"
     private const val API = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
 
+    data class Source(val title: String, val url: String)
+    data class VerifiedReply(
+        val answer: String,
+        val sources: List<Source>,
+        val googleSearchHtml: String,
+        val searchedWeb: Boolean
+    )
+
+    /** Changing information must never be presented as verified without web evidence. */
+    fun requiresLiveVerification(message: String): Boolean {
+        val normalized = java.text.Normalizer.normalize(
+            message.lowercase(java.util.Locale.ROOT), java.text.Normalizer.Form.NFD
+        ).replace(Regex("""\p{M}+"""), "")
+        return Regex("""\b(hoy|ahora|actual|actuales|actualmente|ultimo|ultima|ultimos|ultimas|reciente|recientes|esta semana|este mes|en vivo|tiempo real|noticias|clima|temperatura|pronostico|precio|cotizacion|tipo de cambio|marcador|resultado del partido|resultados de las elecciones|quien es el presidente|quien gobierna|2026)\b""")
+            .containsMatchIn(normalized)
+    }
+
     /**
      * Remove clipboard whitespace and invisible Unicode formatting before HTTPS.
      * Samsung/Android clipboard can insert them, even inside the pasted value.
@@ -84,7 +101,7 @@ object SkyPhoneCloud {
         return 1000
     }
 
-    fun makePayload(message: String, history: JSONArray): JSONObject {
+    fun makePayload(message: String, history: JSONArray, useGoogleSearch: Boolean = false): JSONObject {
         require(message.isNotBlank() && message.length <= 4000) { "Escribí una consulta de hasta 4000 caracteres." }
         val contents = JSONArray()
         val start = (history.length() - 8).coerceAtLeast(0)
@@ -124,17 +141,67 @@ object SkyPhoneCloud {
                     "Si preguntan por música, pide la canción y aplicación si faltan; " +
                     "no asegures que ya suena sin confirmación. " +
                     "Explica claramente si Android exige desbloqueo o permisos. " +
-                    "No tienes acceso directo a contactos, chats, cámara ni Windows desde este modelo."))))
+                    "No tienes acceso directo a contactos, chats, cámara ni Windows desde este modelo. " +
+                    "Si la pregunta exige información reciente o cambiante, usa Google Search " +
+                    "cuando esté habilitado. Indica claramente cuando no puedas verificar " +
+                    "una noticia, precio, resultado o dato actual. Nunca inventes " +
+                    "herramientas ejecutadas, búsquedas, fuentes ni acciones realizadas. " +
+                    "La fecha y hora local actual del teléfono son: " +
+                    java.time.ZonedDateTime.now().toString() + "."))))
             .put("contents", contents)
+            .apply {
+                if (useGoogleSearch) put("tools",
+                    JSONArray().put(JSONObject().put("google_search", JSONObject())))
+            }
             .put("generationConfig", JSONObject()
                 .put("maxOutputTokens", responseTokenLimit(message))
-                .put("temperature", 0.7))
+                .put("temperature", 0.45))
     }
 
     fun reply(personalKey: String, message: String, history: JSONArray): String {
         require(validPersonalKey(personalKey)) { "Configurá una clave de Gemini para probar con Google." }
         val payload = makePayload(message, history).toString()
         return send(personalKey, payload)
+    }
+
+    /** Uses grounded Google Search, retaining source and Search Suggestions metadata. */
+    fun replyWithSources(personalKey: String, message: String, history: JSONArray): VerifiedReply {
+        require(validPersonalKey(personalKey)) { "Configurá una clave de Gemini en Ajustes." }
+        val response = request(personalKey, makePayload(message, history, useGoogleSearch = true).toString())
+        val candidate = response.optJSONArray("candidates")?.optJSONObject(0)
+        val answer = candidate?.optJSONObject("content")?.optJSONArray("parts")?.let { parts ->
+            (0 until parts.length()).mapNotNull { i ->
+                parts.optJSONObject(i)?.optString("text")?.trim()?.takeIf { it.isNotEmpty() }
+            }.joinToString("\n")
+        }.orEmpty().take(5000)
+        if (answer.isBlank()) throw IllegalStateException("Gemini no devolvió una respuesta.")
+        val metadata = candidate?.optJSONObject("groundingMetadata")
+        val chunks = metadata?.optJSONArray("groundingChunks")
+        val sources = mutableListOf<Source>()
+        if (chunks != null) {
+            for (i in 0 until minOf(chunks.length(), 12)) {
+                val web = chunks.optJSONObject(i)?.optJSONObject("web") ?: continue
+                val url = web.optString("uri")
+                if (!(url.startsWith("https://") || url.startsWith("http://")) || url.length > 2000)
+                    continue
+                if (sources.none { it.url == url }) {
+                    sources.add(Source(web.optString("title").take(100).ifBlank { "Fuente web" }, url))
+                }
+            }
+        }
+        val searched = metadata?.optJSONArray("webSearchQueries")?.length()?.let { it > 0 } == true
+        if (requiresLiveVerification(message) && (!searched || sources.isEmpty())) {
+            throw IllegalStateException(
+                "No pude verificar esta información en la web ahora. No voy a darte datos actuales sin fuentes."
+            )
+        }
+        return VerifiedReply(
+            answer = answer,
+            sources = sources.take(5),
+            googleSearchHtml = metadata?.optJSONObject("searchEntryPoint")
+                ?.optString("renderedContent").orEmpty().take(40000),
+            searchedWeb = searched
+        )
     }
 
     /**
@@ -164,6 +231,25 @@ object SkyPhoneCloud {
     }
 
     private fun send(personalKey: String, payload: String): String {
+        val response = request(personalKey, payload)
+        val content = response.optJSONArray("candidates")
+            ?.optJSONObject(0)?.optJSONObject("content")
+            ?.optJSONArray("parts")
+        val parts = ArrayList<String>()
+        if (content != null) {
+            for (i in 0 until content.length()) {
+                val text = content.optJSONObject(i)?.optString("text")?.trim().orEmpty()
+                if (text.isNotEmpty()) parts.add(text)
+            }
+        }
+        val answer = parts.joinToString("\n").take(5000)
+        if (answer.isBlank()) {
+            throw IllegalStateException("Gemini no devolvió texto. Revisá tu solicitud.")
+        }
+        return answer
+    }
+
+    private fun request(personalKey: String, payload: String): JSONObject {
         require(validPersonalKey(personalKey)) { "Revisá la clave Gemini en Ajustes." }
         require(payload.toByteArray(Charsets.UTF_8).size < 600_000) {
             "La conversación es demasiado larga; iniciá una sesión nueva."
@@ -201,22 +287,7 @@ object SkyPhoneCloud {
                     raw.write(buffer, 0, count)
                 }
             }
-            val response = JSONObject(raw.toString("UTF-8"))
-            val content = response.optJSONArray("candidates")
-                ?.optJSONObject(0)?.optJSONObject("content")
-                ?.optJSONArray("parts")
-            val parts = ArrayList<String>()
-            if (content != null) {
-                for (i in 0 until content.length()) {
-                    val text = content.optJSONObject(i)?.optString("text")?.trim().orEmpty()
-                    if (text.isNotEmpty()) parts.add(text)
-                }
-            }
-            val answer = parts.joinToString("\n").take(5000)
-            if (answer.isBlank()) {
-                throw IllegalStateException("Gemini no devolvió texto. Revisá tu solicitud.")
-            }
-            return answer
+            return JSONObject(raw.toString("UTF-8"))
         } finally {
             connection.disconnect()
         }
