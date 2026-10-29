@@ -2,6 +2,8 @@ package ni.sky.mobileagent
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Camera
+import android.graphics.Matrix
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
@@ -336,6 +338,17 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         if (move == "DANCE" || move == "SPIN") {
             val depth = (sin(motionT * 6.0) * 0.09).toFloat()
             canvas.scale(1f - depth, 1f + depth * 0.25f, 180f, 300f)
+            // Android Camera projects an actual Y-axis 3D rotation onto the
+            // Canvas. These are animated 2D eyes with a perspective transform.
+            val perspective = Matrix()
+            val camera = Camera()
+            camera.save()
+            camera.rotateY((sin(motionT * 4.6) * 15.0).toFloat())
+            camera.getMatrix(perspective)
+            camera.restore()
+            perspective.preTranslate(-180f, -300f)
+            perspective.postTranslate(180f, 300f)
+            canvas.concat(perspective)
         }
         light(canvas, 180f, 310f, 163f, Color.rgb(122, 92, 238), 36)
 
