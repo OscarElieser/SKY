@@ -34,6 +34,12 @@ class SkyMusicLauncher(
         prefs.edit().putString(MUSIC_PREF, value.name).apply()
     }
     fun play(request: SkyMusicCommand.Request) {
+        // Distributable standard build never asks for accessibility privileges.
+        // It requests playback via Android's documented music intent instead.
+        if (!BuildConfig.ENABLE_TEXT_ASSIST) {
+            playViaAndroidIntent(request)
+            return
+        }
         val chosen = request.service ?: preferred()
         val title = SkyMusicCommand.label(chosen)
         val pkg = packageName(chosen)
