@@ -27,7 +27,11 @@ import kotlin.math.sin
 class SkyFriendlyEyesView(context: Context) : View(context) {
 
     var mode: String = "IDLE"
-        set(value) { field = value; invalidate() }
+        set(value) {
+            if (field != value) expressionChangedAt = SystemClock.uptimeMillis()
+            field = value
+            invalidate()
+        }
     var amplitude: Float = 0f
         set(value) { field = value.coerceIn(0f, 1f); invalidate() }
 
@@ -387,6 +391,6 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
             canvas.drawArc(0f, 53f, 360f, 570f, 120f, 300f, false, brush)
         }
         canvas.restore()
-        if (isShown && windowVisibility == VISIBLE) postInvalidateDelayed(50L)
+        if (isShown && windowVisibility == VISIBLE) postInvalidateDelayed(33L)
     }
 }
