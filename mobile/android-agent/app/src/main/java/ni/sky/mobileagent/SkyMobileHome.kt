@@ -154,7 +154,7 @@ class SkyMobileHome(
         imeOptions = EditorInfo.IME_ACTION_SEND
         maxLines = 4
         minLines = 1
-        filters = arrayOf(InputFilter.LengthFilter(4000))
+        filters = arrayOf(InputFilter.LengthFilter(16000))
         setPadding(dp(15), dp(10), dp(7), dp(10))
         addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
