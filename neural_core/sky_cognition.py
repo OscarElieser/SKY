@@ -215,6 +215,34 @@ def prompt_addendum(context_data: dict[str, Any]) -> str:
     return "\n".join(parts)[:7000]
 
 
+
+def academic_research(query: str, *, provider: str = "openalex",
+                      external_search: bool = False) -> dict[str, Any]:
+    """Investigación académica: caché local por defecto, API pública solo con consentimiento.
+
+    Los resultados en vivo son metadatos, NO análisis de artículos completos.
+    """
+    classify(query)
+    if provider not in ("openalex", "crossref"):
+        raise ValueError("Proveedor académico no autorizado.")
+    if not external_search:
+        cached = context(query, execution="cloud", include_public=True)
+        return {"live_lookup": False, "provider": "cached",
+                "references": cached["references"],
+                "full_text_read": False,
+                "notice": "Solo referencias locales; solicitá external_search para consultar una API pública."}
+    if _PRIVATE_SIGNALS.search(_normalize(query)):
+        raise ValueError("La consulta incluye posibles datos privados; no se enviará a internet.")
+    from neural_core.sky_web_learning import enabled as internet_enabled
+    if not internet_enabled():
+        return {"live_lookup": False, "provider": provider, "references": [],
+                "full_text_read": False, "reason": "internet_disabled"}
+    from neural_core.sky_scholarly import search_papers
+    result = search_papers(query, provider=provider, limit=5)
+    return {**result, "owner_requested_external_search": True,
+            "fact_check_completed": False, "model_weights_updated": False}
+
+
 def capabilities() -> dict[str, Any]:
     return {
         "version": "1.0.0", "integration": "additive",
