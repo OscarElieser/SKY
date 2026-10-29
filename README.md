@@ -17,11 +17,31 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 ---
 
 
-## 📱 SKY Android — núcleo móvil autónomo (0.8.6)
+## 🧠 Núcleo evolutivo propio, seguridad y evidencias — actualización 28/10/2026
+
+La **API propia de SKY** utiliza FastAPI y el sistema existente de autorización. Ahora también contiene un **motor adaptativo nativo** en `neural_core/sky_adaptive_policy.py`: procesa datos operacionales agregados del propio SKY, calcula fiabilidad por rol (intervalos de Wilson) y sugiere cuándo revisar fallos o seguir con pruebas supervisadas. **Funciona sin llamar a Gemini, ChatGPT ni otro proveedor para esa operación.** Es aprendizaje estadístico consultivo, no un LLM independiente de producción, no entrenamiento automático de pesos y no sustituye el razonamiento generativo.
+
+**API nueva (requiere autenticación SKY):** `GET /api/sky/cognition/native-evolution` y `POST /api/sky/cognition/adaptive-plan`. La consulta no ejecuta comandos, no amplía permisos, no almacena texto ni cambia código. Los resultados de acción deben venir de un ejecutor real: la salida de una IA no es una prueba.
+
+**Seguridad por capas:** identidad y autenticación; validación de entrada y separación de fuentes no confiables; privacidad y memoria cifrada; planificación sin autoridad implícita; autorización y ejecución supervisada; evidencia de resultados; CI, firmas y distribución. La arquitectura se basa en mínimo privilegio y controles contra inyección de instrucciones, exceso de agencia y exposición de secretos. Los controles no equivalen a una certificación externa.
+
+**Evidencias y trazabilidad:** `.github/workflows/sky-native-core-evidence.yml` compila el componente nativo, ejecuta sus pruebas en GitHub Actions y conserva un manifiesto JSON con resultado real, commit, hashes SHA-256 y URL del run (**artefacto temporal de 90 días**). No incluye datos privados. La compilación firmada de Android tiene su propio workflow y requiere además pruebas en el teléfono.
+
+[**Arquitectura detallada, siete capas de seguridad, API y matriz de pruebas**](docs/arquitectura/SKY_CORE_EVOLUCION_SEGURIDAD_EVIDENCIAS.md) · [**Evidencia del núcleo en GitHub Actions**](https://github.com/OscarElieser/SKY/actions/workflows/sky-native-core-evidence.yml) · [**APK publicadas**](https://github.com/OscarElieser/SKY/releases)
+
+**Estado:** los cambios de código en `main` y la ejecución de GitHub Actions deben comprobarse por separado. No se afirma funcionamiento de la API en un servidor externo, aprendizaje autónomo ilimitado, equivalencia con otras IAs, ni soporte para 100 000 conexiones sin ensayos de carga.
+
+---
+
+## 📱 SKY Android — núcleo móvil autónomo (código 0.8.27; publicación independiente)
 
 **SKY Android funciona de forma independiente de SKY Windows** para
 conversaciones por Gemini y acciones locales autorizadas. El desarrollo
-Android no modifica los servicios del PC.
+Android no modifica los servicios del PC. **Versión de código actual: 0.8.27**;
+las APK de GitHub Releases pueden ir por detrás si CI o las pruebas todavía
+no han terminado. La autorización Meta de Instagram en Supabase existe,
+pero la identidad del perfil y la vinculación física del teléfono requieren
+verificación independiente. Los apartados 0.8.6 y anteriores son históricos.
 
 [**Ver APK realmente publicadas en GitHub Releases**](https://github.com/OscarElieser/SKY/releases) ·
 [Guía móvil](mobile/android-agent/README.md) ·
