@@ -1,3 +1,13 @@
+## SKY Android 0.8.24 — video generativo auténtico, bajo autorización de pago
+
+- Además del render H.264 **local** sin audio, SKY incluye **VIDEOS IA · GEMINI OMNI FLASH (API DE PAGO)** en Ajustes para crear videos auténticos desde texto con el modelo estable Gemini Omni Flash 1.1. Pide una descripción y muestra la advertencia de precio antes de enviar nada. No confunde un MP4 de texto animado con un video generado por IA.
+- La API **no tiene nivel gratuito**. El precio publicado por Google para 720p equivale aproximadamente a US$0.10/segundo, más posibles costos de entrada; la solicitud de SKY usa 360p y el precio real depende del proyecto y la facturación. SKY no cobra directamente ni controla la facturación del proveedor. Nunca se envía una solicitud sin pulsar la autorización de pago.
+- Se verifica el encabezado MP4 y una pista de video decodificable antes de presentar el archivo como creado. Los errores, la falta de acceso al modelo y las cuotas se informan sin ninguna imagen o video sustituto. El archivo puede guardarse en el teléfono vía Android Storage Access Framework.
+- Pruebas de protocolo en emulador sin realizar peticiones pagadas, más pruebas de XLSX, XML y formatos anteriores. Pendiente prueba en cuenta de Gemini con facturación activa y en Samsung real; una compilación aprobada no demuestra que la suscripción autoriza el modelo ni que el video se puede generar con la cuota del usuario.
+- No se conectaron ni modificaron servicios SKY Windows. No se integran claves en el código. Para distribución pública se requiere backend autenticado en lugar de la clave del móvil.
+
+---
+
 # SKY Android 0.8.24 — Excel real, imágenes Gemini y guardado MP4
 
 **Código en main. La APK requiere compilación firmada, CI y prueba en Samsung antes de declararse funcional en dispositivo.**
