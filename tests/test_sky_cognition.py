@@ -115,6 +115,10 @@ def test_research_never_sends_obvious_secrets():
 
 
 def test_primary_assistant_metadata_does_not_modify_actions():
+    # La app registra sus routers antes de importarse el submódulo del asistente.
+    # Importar primero el submódulo produce un ciclo api -> asistente -> api.
+    from metaverse.api import app
+    assert app is not None
     from metaverse.asistente_api import _decorate_cognition
     raw = {"tipo": "respuesta", "mensaje": "**Hola**, qué gusto."}
     result = _decorate_cognition(raw, "Qué alegría, funcionó")
