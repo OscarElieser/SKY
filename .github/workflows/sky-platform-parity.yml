@@ -9,6 +9,8 @@ on:
       - 'docs/SKY_WINDOWS_ANDROID_PARITY_2026-10-29.md'
       - 'tests/test_sky_cross_platform_regression_gates.py'
       - 'tests/test_sky_repository_layout.py'
+      - 'tests/test_sky_repository_audit.py'
+      - 'scripts/audit_repository_layout.py'
       - '.gitignore'
       - 'docs/arquitectura/ESTRUCTURA_REPOSITORIO_SKY.md'
       - '.github/workflows/sky-platform-parity.yml'
@@ -20,6 +22,8 @@ on:
       - 'docs/SKY_WINDOWS_ANDROID_PARITY_2026-10-29.md'
       - 'tests/test_sky_cross_platform_regression_gates.py'
       - 'tests/test_sky_repository_layout.py'
+      - 'tests/test_sky_repository_audit.py'
+      - 'scripts/audit_repository_layout.py'
       - '.gitignore'
       - 'docs/arquitectura/ESTRUCTURA_REPOSITORIO_SKY.md'
       - '.github/workflows/sky-platform-parity.yml'
@@ -38,7 +42,15 @@ jobs:
       - name: Install pytest
         run: python -m pip install pytest
       - name: Validate Windows and Android inventory
-        run: python -m pytest -q tests/test_sky_platform_parity.py tests/test_sky_cross_platform_regression_gates.py tests/test_sky_repository_layout.py
+        run: python -m pytest -q tests/test_sky_platform_parity.py tests/test_sky_cross_platform_regression_gates.py tests/test_sky_repository_layout.py tests/test_sky_repository_audit.py
+      - name: Generate duplicate and dependency inventory
+        run: python scripts/audit_repository_layout.py --output repository-audit.json
+      - name: Upload repository audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sky-repository-audit
+          path: repository-audit.json
+          retention-days: 30
   parity-windows:
     runs-on: windows-latest
     timeout-minutes: 12
@@ -52,4 +64,4 @@ jobs:
       - name: Compile shared Windows core
         run: python -m compileall -q neural_core
       - name: Verify parity contract on Windows
-        run: python -m pytest -q tests/test_sky_platform_parity.py tests/test_sky_cross_platform_regression_gates.py tests/test_sky_repository_layout.py
+        run: python -m pytest -q tests/test_sky_platform_parity.py tests/test_sky_cross_platform_regression_gates.py tests/test_sky_repository_layout.py tests/test_sky_repository_audit.py
