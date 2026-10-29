@@ -53,7 +53,7 @@ def render(manifest_path, output_path):
             subprocess.run(command, check=True)
             clips.append(clip)
         concat = temp / "clips.txt"
-        concat.write_text("".join(f"file '{clip.as_posix()}'\\n" for clip in clips), encoding="utf-8")
+        concat.write_text("".join(f"file '{clip.as_posix()}'\n" for clip in clips), encoding="utf-8")
         silent = temp / "silent.mp4"
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                         "-f", "concat", "-safe", "0", "-i", str(concat),
