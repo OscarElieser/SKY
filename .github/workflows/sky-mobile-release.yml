@@ -3,7 +3,7 @@ permissions:
   contents: read
 concurrency:
   group: sky-android-signed-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 on:
   workflow_dispatch:
   push:
@@ -130,6 +130,12 @@ jobs:
         run: |
           set -euo pipefail
           tag="sky-android-v${SKY_ANDROID_VERSION}"
+          # Nunca publicar una APK compilada desde un commit anterior al actual main.
+          newest="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$newest" != "$GITHUB_SHA" ]]; then
+            echo "No publicar versión obsoleta: main avanzó desde el inicio de esta compilación."
+            exit 0
+          fi
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release $tag already exists. Bump app versionCode/versionName before publishing a new APK."
             exit 0
