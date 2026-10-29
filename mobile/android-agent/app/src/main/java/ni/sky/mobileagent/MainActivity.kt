@@ -137,7 +137,8 @@ class MainActivity : Activity() {
         adaptiveMemory = SkyAdaptiveMemory(this)
         actionEvidence = SkyActionEvidence(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
-            if (!processQuickCommand(transcript) &&
+            if (!processPresenceCommand(transcript) &&
+                !processQuickCommand(transcript) &&
                 !processMusicCommand(transcript) &&
                 !processExpressionCommand(transcript) &&
                 !processReplyCommand(transcript) &&
@@ -2283,6 +2284,28 @@ class MainActivity : Activity() {
         startHandsFree()
     }
 
+    private fun processPresenceCommand(message: String): Boolean {
+        if (SkyVoicePresence.request(message) == SkyVoicePresence.Request.NONE) return false
+        if (!SkyHandsFreeService.ownerPresenceCommand(message)) {
+            home.showMessage("Activá manos libres en Voz para que SKY pueda permanecer atenta " +
+                "a la palabra de activación. El micrófono requiere tu permiso.")
+            return true
+        }
+        // The service gives the audible confirmation and persists the requested mode.
+        return true
+    }
+
+    private fun updatePresenceVisual() {
+        if (!::voicePanel.isInitialized || !handsFreePrefs.getBoolean("hands_free_opt_in", false))
+            return
+        val label = when (handsFreePrefs.getString("sky_presence_mode", "WAKE_ONLY")) {
+            "SLEEP_LOCKED" -> "SKY dormida por orden · decí SKY despierta"
+            "ATTENTIVE" -> "SKY atenta a tus orientaciones"
+            else -> "SKY en espera · decí SKY"
+        }
+        voicePanel.showHandsFreeState(label)
+    }
+
     private fun showHandsFreeFirstRun() {
         if (handsFreePrefs.getBoolean("hands_free_prompt_shown", false) ||
             handsFreePrefs.getBoolean("hands_free_opt_in", false) ||
@@ -2305,6 +2328,11 @@ class MainActivity : Activity() {
     }
 
     private fun startHandsFree() {
+        if (SkyHandsFreeService.health().active) {
+            home.setHandsFreeActive(true)
+            updatePresenceVisual()
+            return
+        }
         if (android.os.Build.VERSION.SDK_INT < 31 ||
             !android.speech.SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
             handsFreePrefs.edit().putBoolean("hands_free_opt_in", false).apply()
@@ -2383,6 +2411,7 @@ class MainActivity : Activity() {
                 android.content.pm.PackageManager.PERMISSION_GRANTED) startHandsFree()
         if (::home.isInitialized) home.setHandsFreeActive(
             handsFreePrefs.getBoolean("hands_free_opt_in", false))
+        updatePresenceVisual()
         handler.postDelayed({ showHandsFreeFirstRun() }, 1100L)
         companionController.onResume()
         handler.post(pollLoop)
@@ -2720,6 +2749,10 @@ class MainActivity : Activity() {
 
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
+        if (processPresenceCommand(message)) {
+            chatInput.setText("")
+            return
+        }
         if (SkyWordExportIntent.wantsExistingWord(message)) {
             chatInput.setText("")
             chooseExistingWordForExport()
