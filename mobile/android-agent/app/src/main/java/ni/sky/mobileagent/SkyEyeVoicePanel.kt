@@ -81,7 +81,9 @@ class SkyEyeVoicePanel(
 
     fun showHandsFreeState(label: String) {
         handsFreeAsleep = label.contains("durmi", ignoreCase = true) ||
-            label.contains("duerme", ignoreCase = true)
+            label.contains("duerme", ignoreCase = true) ||
+            label.contains("dormida", ignoreCase = true) ||
+            label.contains("en espera", ignoreCase = true)
         setMode(EyeMode.IDLE, label)
     }
 
