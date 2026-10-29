@@ -1999,6 +1999,27 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             exportLatestResponse()
         })
+        content.addView(actionButton("RESUMEN DE EJECUCIÓN · RESULTADOS COMPROBADOS") {
+            val measure = actionEvidence.summary()
+            AlertDialog.Builder(this)
+                .setTitle("SKY · Control de calidad real")
+                .setMessage(
+                    "Registros locales: " + measure.total +
+                    "\\nAcciones verificadas: " + measure.verified +
+                    "\\nÓrdenes enviadas sin comprobar: " + measure.sentUnverified +
+                    "\\nFallos: " + measure.failed +
+                    "\\nRechazos: " + measure.rejected +
+                    "\\nRespuestas remotas recibidas: " + measure.remoteResponse +
+                    "\\nEstados no identificados: " + measure.unknown +
+                    "\\n\\nSolo se declara éxito cuando SKY comprueba un efecto " +
+                    "observable, como un cambio de volumen o una nota guardada y releída. " +
+                    "Abrir otra app o enviar teclas multimedia NO demuestra que la tarea terminó." +
+                    "\\n\\nLos conteos son locales a este teléfono. No equivalen a métricas " +
+                    "de servidores ni a resultados en otras aplicaciones."
+                )
+                .setPositiveButton("Cerrar", null)
+                .show()
+        })
         content.addView(actionButton("EVIDENCIAS · ÓRDENES Y RESULTADOS REALES") {
             val entries = actionEvidence.recent(40)
             if (entries.isEmpty()) {
