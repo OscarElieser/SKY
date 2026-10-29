@@ -21,6 +21,10 @@ class SkyAndroidActions(
     private val onAccessibilityHelp: () -> Unit,
     private val installedApps: SkyInstalledApps
 ) {
+    var onReceipt: ((String, String, String) -> Unit)? = null
+    private fun receipt(action: String, status: String, detail: String) {
+        onReceipt?.invoke(action, status, detail)
+    }
     private val apps = linkedMapOf(
         "youtube" to Pair("YouTube", "com.google.android.youtube"),
         "chrome" to Pair("Chrome", "com.android.chrome"),
@@ -144,8 +148,12 @@ class SkyAndroidActions(
             limited.put(existing.getJSONObject(i))
         }
         if (prefs.edit().putString(key, limited.toString()).commit()) {
+            receipt("Guardar nota local", "VERIFIED_LOCAL", "Preferencia privada guardada en Android")
             feedback("Nota guardada en SKY. Decí «SKY, mostrame mis notas» para verla.")
-        } else feedback("No se pudo confirmar que la nota quedara guardada.")
+        } else {
+            receipt("Guardar nota local", "FAILED", "Error de confirmación en almacenamiento local")
+            feedback("No se pudo confirmar que la nota quedara guardada.")
+        }
     }
 
     private fun showNotes() {
@@ -211,12 +219,17 @@ class SkyAndroidActions(
     private fun launch(intent: Intent, message: String) {
         try {
             host.startActivity(intent)
+            receipt("Intent Android " + intent.action.orEmpty(), "SENT",
+                "Android aceptó la solicitud; resultado final requiere verificación")
             feedback(message)
         } catch (_: ActivityNotFoundException) {
+            receipt("Intent Android " + intent.action.orEmpty(), "FAILED", "Aplicación no encontrada")
             feedback("No se encontró una aplicación Android compatible.")
         } catch (_: SecurityException) {
+            receipt("Intent Android " + intent.action.orEmpty(), "FAILED", "Permiso denegado")
             feedback("Android bloqueó la acción por falta de autorización.")
         } catch (_: Exception) {
+            receipt("Intent Android " + intent.action.orEmpty(), "FAILED", "No se inició la acción")
             feedback("No se pudo iniciar la acción solicitada.")
         }
     }
