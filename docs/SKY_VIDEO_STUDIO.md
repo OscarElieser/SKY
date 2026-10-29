@@ -60,3 +60,20 @@ python scripts/sky_video_narration.py guion.txt narracion.wav --voice es --speed
 ```
 
 Después indicar `"voiceover": "narracion.wav"` en el manifiesto del video. El sintetizador es local, determinista y no usa servicios externos. Su timbre es robótico: **no representa una voz neuronal premium**. Para voces naturales será necesaria una integración TTS adicional, con autorización, gestión de credenciales y pruebas de calidad. La ejecución automática de ambos pasos desde Android aún no está integrada.
+
+## Producción en un único comando
+
+El orquestador `scripts/sky_video_production.py` recibe un proyecto JSON con escenas reales, texto de narración y las opciones existentes de título, subtítulos y música:
+
+```json
+{
+  "format": "vertical",
+  "fps": 30,
+  "title": "Descubrí Nicaragua",
+  "scenes": [{"file": "destino.mp4", "duration": 6}],
+  "narration": "Descubrí lugares inolvidables con BAQUEANO.",
+  "captions": [{"start": 0.2, "end": 4.5, "text": "Descubrí Nicaragua"}]
+}
+```
+
+Ejecutar `python scripts/sky_video_production.py proyecto.json resultado.mp4`. La narración local se sintetiza en un WAV temporal, y el renderizador compone el MP4 final. No requiere duplicar comandos manuales. Sigue necesitando medios reales y dependencias FFmpeg/eSpeak NG. No genera escenas con IA, no hace montaje semántico ni ofrece aún una interfaz Android; tampoco asegura calidad de voz premium.
