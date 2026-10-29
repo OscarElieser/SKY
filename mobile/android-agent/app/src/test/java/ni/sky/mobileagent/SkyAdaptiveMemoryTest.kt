@@ -21,6 +21,20 @@ class SkyAdaptiveMemoryTest {
         assertNull(SkyAdaptiveMemory.ineligibleReason("Explícame qué es un algoritmo"))
         assertNull(SkyAdaptiveMemory.ineligibleReason("Dame un ejemplo de una rúbrica"))
     }
+    @Test fun spanishVoiceCorrectionIsParsedLocally() {
+        assertEquals("Una rúbrica evalúa criterios.",
+            SkyAdaptiveMemory.correctionFromCommand(
+                "SKY, corregí tu última respuesta: Una rúbrica evalúa criterios."))
+        assertEquals("", SkyAdaptiveMemory.correctionFromCommand(
+            "corrige tu última respuesta"))
+        assertNull(SkyAdaptiveMemory.correctionFromCommand(
+            "¿Qué es una rúbrica?"))
+    }
+    @Test fun deepModelCommandIsNeverMistakenForCorrection() {
+        assertNull(SkyAdaptiveMemory.correctionFromCommand(
+            "Modo profundo: Explicá un Transformer"))
+    }
+
     @Test fun secretsAreNotStoredAsAnswers() {
         assertNotNull(SkyAdaptiveMemory.ineligibleReason(
             "Mi token: abcdefg12345 ¿es seguro?"))
