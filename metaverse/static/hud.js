@@ -85,6 +85,17 @@
   const COLOR = { idle: [0, 229, 255], listening: [0, 255, 170], thinking: [56, 214, 255], speaking: [235, 250, 255],
     executing: [255, 176, 32], error: [255, 51, 102] };
   let estado = 'idle', errorTimer = null;
+  // Estados expresivos de interfaz, no emociones reales ni diagnósticos.
+  let skyMood = 'serena';
+  const MOOD_COLOR = { serena: [0, 229, 255], alegre: [83, 244, 181],
+    apoyo: [135, 190, 255], atenta: [255, 188, 89] };
+  function aplicarEmocion(data) {
+    const selected = data && data.sky_cognition && data.sky_cognition.persona
+      && data.sky_cognition.persona.animation;
+    if (!Object.prototype.hasOwnProperty.call(MOOD_COLOR, selected)) return;
+    skyMood = selected;
+    document.body.dataset.skyMood = selected;
+  }
   function setState(s, sub) {
     estado = s;
     document.body.dataset.state = s;
@@ -109,7 +120,7 @@
     ctx.beginPath(); ctx.arc(0, 0, r, a0, a1); ctx.lineWidth = w; ctx.strokeStyle = col(alpha); ctx.stroke();
   }
   function frame(t) {
-    const target = COLOR[estado] || COLOR.idle;
+    const target = estado === 'idle' ? MOOD_COLOR[skyMood] : (COLOR[estado] || COLOR.idle);
     for (let i = 0; i < 3; i++) rgb[i] += (target[i] - rgb[i]) * 0.08;
     let raw = 0;
     const an = (S.speaking && S.outAn) ? S.outAn : S.analyser;
@@ -675,7 +686,7 @@
     if (window.ReadableStream) { await enviarStream(texto, modo, fileContext); return; }
     try {
       const data = await api('/api/asistente/mensaje', { method: 'POST', body: JSON.stringify({
-        texto, historial: S.historial.slice(-12), modo, dispositivo: 'local', file_context: fileContext }) });
+        texto, historial: S.historial.slice(-12), modo, dispositivo: 'local', file_context: fileContext, cognitive: true }) });
       S.historial.push({ role: 'user', content: texto });
       await responder(data, modo);
       if (fileContext) confirmarEnvioAdjuntos();
@@ -708,7 +719,7 @@
     try {
       const r = await fetch('/api/asistente/stream', {
         method: 'POST', headers: headers(), signal: control.signal,
-        body: JSON.stringify({ texto, historial: S.historial.slice(-12), modo, dispositivo: 'local', file_context: fileContext })
+        body: JSON.stringify({ texto, historial: S.historial.slice(-12), modo, dispositivo: 'local', file_context: fileContext, cognitive: true })
       });
       if (r.status === 423) { await desbloquear(); throw new Error('SKY estaba bloqueada. Ya la desbloqueaste: repetí tu pedido.'); }
       if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
@@ -730,6 +741,7 @@
           }
           if (ev.final) {
             finalizado = true;
+            aplicarEmocion(ev.final);
             if (vivo) vivo.classList.remove('live');
             if (ev.final.transmitido) {
               if (voz) soltarFrases(true);
@@ -764,11 +776,11 @@
       if (abortarRespuestaActual === cancelarEsta) abortarRespuestaActual = null;
     }
   }
-  async function decir(texto, extra) {
+  async function decir(texto, extra, vozTexto = null) {
     addMsg('sky', texto, extra);
     S.lastSky = texto;
     S.historial.push({ role: 'assistant', content: String(texto).slice(0, 4000) });
-    await speak(texto);
+    await speak(vozTexto || texto);
     seguirConversacion();
   }
   function seguirConversacion() {
@@ -881,6 +893,7 @@
   }
 
   async function responder(data, modo) {
+    aplicarEmocion(data);
     if (data.tipo === 'respuesta' || data.tipo === 'local') {
       if (Array.isArray(data.correos) && data.correos.length) {
         const c = addCard('Correos nuevos (' + data.correos.length + ')', 'sin marcar como leídos');
@@ -898,7 +911,7 @@
       else if (ventanas.has('auto')) AUTO.cargar();
       if (data.parada) { if (!data.parada.reanudar) { callar(); if (S.pending) S.pending.cancel(); } tarjetaParada(); setState('error', 'Parada de emergencia'); }
       if (data.aprendizaje && ventanas.has('kpi')) KPI.cargar();
-      await decir(data.mensaje || ''); return;
+      await decir(data.mensaje || '', undefined, data.sky_cognition?.speech_text || null); return;
     }
     if (data.tipo === 'error') { setState('error', 'Revisá el motor de IA'); addMsg('sky', data.mensaje || 'Error.', 'err'); await speak('Tengo un problema: ' + (data.mensaje || '').split('.')[0]); return; }
     if (data.tipo === 'ciclo') { await cicloUI(data, modo); return; }
