@@ -8,6 +8,9 @@ on:
       - 'tests/test_sky_platform_parity.py'
       - 'docs/SKY_WINDOWS_ANDROID_PARITY_2026-10-29.md'
       - 'tests/test_sky_cross_platform_regression_gates.py'
+      - 'tests/test_sky_repository_layout.py'
+      - '.gitignore'
+      - 'docs/arquitectura/ESTRUCTURA_REPOSITORIO_SKY.md'
       - '.github/workflows/sky-platform-parity.yml'
   pull_request:
     paths:
@@ -16,6 +19,9 @@ on:
       - 'tests/test_sky_platform_parity.py'
       - 'docs/SKY_WINDOWS_ANDROID_PARITY_2026-10-29.md'
       - 'tests/test_sky_cross_platform_regression_gates.py'
+      - 'tests/test_sky_repository_layout.py'
+      - '.gitignore'
+      - 'docs/arquitectura/ESTRUCTURA_REPOSITORIO_SKY.md'
       - '.github/workflows/sky-platform-parity.yml'
   workflow_dispatch:
 permissions:
@@ -32,7 +38,7 @@ jobs:
       - name: Install pytest
         run: python -m pip install pytest
       - name: Validate Windows and Android inventory
-        run: python -m pytest -q tests/test_sky_platform_parity.py tests/test_sky_cross_platform_regression_gates.py
+        run: python -m pytest -q tests/test_sky_platform_parity.py tests/test_sky_cross_platform_regression_gates.py tests/test_sky_repository_layout.py
   parity-windows:
     runs-on: windows-latest
     timeout-minutes: 12
@@ -46,4 +52,4 @@ jobs:
       - name: Compile shared Windows core
         run: python -m compileall -q neural_core
       - name: Verify parity contract on Windows
-        run: python -m pytest -q tests/test_sky_platform_parity.py tests/test_sky_cross_platform_regression_gates.py
+        run: python -m pytest -q tests/test_sky_platform_parity.py tests/test_sky_cross_platform_regression_gates.py tests/test_sky_repository_layout.py
