@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Producción: solo HTTPS validado con autoridades del sistema Android.
+         No confiar en CA añadidas por usuarios ni instalar excepciones de texto claro. -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
