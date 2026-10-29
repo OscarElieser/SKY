@@ -50,6 +50,14 @@ class SkyHandsFreeService : Service() {
         @Volatile var onWake: (() -> Unit)? = null
         @Volatile var onStatus: ((Boolean) -> Unit)? = null
         @Volatile var onStopped: (() -> Unit)? = null
+        /** Explicit text/voice control from the visible Activity, never from third-party content. */
+        fun ownerPresenceCommand(command: String): Boolean {
+            val service = current ?: return false
+            if (!service.running || SkyVoicePresence.request(command) ==
+                SkyVoicePresence.Request.NONE) return false
+            service.handler.post { service.process(command) }
+            return true
+        }
         fun pauseForReply() { current?.handler?.post { current?.suspendForSpeech() } }
         fun resumeAfterReply() { current?.handler?.post { current?.resumeFromSpeech() } }
         fun stop(context: android.content.Context) {
