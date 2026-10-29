@@ -9,13 +9,14 @@ import android.database.sqlite.SQLiteOpenHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.Calendar
 
 /**
  * Historial privado del teléfono: una entrada por consulta, con fecha/hora reales
  * del dispositivo y título deducido de la pregunta. No sincroniza ni sube datos.
  */
 class SkyConversationArchive(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "sky_conversations.db", null, 1) {
+    SQLiteOpenHelper(context.applicationContext, "sky_conversations.db", null, 2) {
 
     data class Entry(
         val id: Long,
@@ -23,7 +24,8 @@ class SkyConversationArchive(context: Context) :
         val question: String,
         val answer: String,
         val engine: String,
-        val createdAt: Long
+        val createdAt: Long,
+        val favorite: Boolean = false
     ) {
         fun localTime(): String = SimpleDateFormat("dd/MM/yyyy · HH:mm", Locale("es", "NI"))
             .format(Date(createdAt))
@@ -36,12 +38,17 @@ class SkyConversationArchive(context: Context) :
             question TEXT NOT NULL,
             answer TEXT NOT NULL,
             engine TEXT NOT NULL,
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            is_favorite INTEGER NOT NULL DEFAULT 0
         )""")
         db.execSQL("CREATE INDEX idx_conversations_date ON conversations(created_at DESC)")
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        // Migración aditiva: NO eliminar ni reemplazar el historial 0.8.20.
+        if (oldVersion < 2) db.execSQL(
+            "ALTER TABLE conversations ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
+    }
 
     fun append(question: String, answer: String, engine: String): Entry {
         val now = System.currentTimeMillis()
@@ -74,7 +81,8 @@ class SkyConversationArchive(context: Context) :
     }
 
     /** SQL parametrizado: búsqueda en título, pregunta y respuesta, sin perder registros antiguos. */
-    fun page(query: String = "", beforeId: Long? = null, limit: Int = 25): List<Entry> {
+    fun page(query: String = "", beforeId: Long? = null,
+             limit: Int = 25, filter: String = "Todos"): List<Entry> {
         val clauses = mutableListOf<String>()
         val args = mutableListOf<String>()
         if (beforeId != null) {
@@ -88,19 +96,62 @@ class SkyConversationArchive(context: Context) :
             clauses.add("(title LIKE ? ESCAPE '\\' OR question LIKE ? ESCAPE '\\' OR answer LIKE ? ESCAPE '\\')")
             repeat(3) { args.add("%$safe%") }
         }
+        when (filter) {
+            "Favoritos" -> clauses.add("is_favorite = 1")
+            "Groq" -> { clauses.add("engine LIKE ?"); args.add("%Groq%") }
+            "Gemini" -> { clauses.add("engine LIKE ?"); args.add("%Gemini%") }
+            "Hoy", "Ayer" -> {
+                val calendar = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                    if (filter == "Ayer") add(Calendar.DAY_OF_YEAR, -1)
+                }
+                val start = calendar.timeInMillis
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+                clauses.add("created_at >= ? AND created_at < ?")
+                args.add(start.toString()); args.add(calendar.timeInMillis.toString())
+            }
+        }
         val found = ArrayList<Entry>()
         readableDatabase.query("conversations",
-            arrayOf("id", "title", "question", "answer", "engine", "created_at"),
+            arrayOf("id", "title", "question", "answer", "engine", "created_at", "is_favorite"),
             clauses.joinToString(" AND ").ifEmpty { null }, args.toTypedArray().takeIf { it.isNotEmpty() },
             null, null, "id DESC", limit.coerceIn(1, 101).toString()
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 found.add(Entry(cursor.getLong(0), cursor.getString(1),
                     cursor.getString(2), cursor.getString(3), cursor.getString(4),
-                    cursor.getLong(5)))
+                    cursor.getLong(5), cursor.getInt(6) == 1))
             }
         }
         return found
+    }
+
+    /** Editar solo título: la pregunta y respuesta originales se conservan. */
+    fun rename(id: Long, rawTitle: String): Boolean {
+        require(id > 0)
+        val title = rawTitle.trim().replace(Regex("\\s+"), " ").take(100)
+        require(title.length in 2..100)
+        val values = android.content.ContentValues().apply { put("title", title) }
+        return writableDatabase.update("conversations", values,
+            "id = ?", arrayOf(id.toString())) == 1
+    }
+
+    fun setFavorite(id: Long, isFavorite: Boolean): Boolean {
+        require(id > 0)
+        val values = android.content.ContentValues().apply {
+            put("is_favorite", if (isFavorite) 1 else 0)
+        }
+        return writableDatabase.update("conversations", values,
+            "id = ?", arrayOf(id.toString())) == 1
+    }
+
+    fun delete(id: Long): Boolean {
+        require(id > 0)
+        return writableDatabase.delete("conversations", "id = ?",
+            arrayOf(id.toString())) == 1
     }
 
     /** Exportación voluntaria sin volcar todo el historial a RAM ni enviarlo a la nube. */
