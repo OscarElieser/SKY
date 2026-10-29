@@ -79,6 +79,8 @@ class SkyHandsFreeService : Service() {
     private var lastCycle = 0L
     private var lastPhraseAtMs = 0L
     private var lastErrorCode = 0
+    private var pendingBackgroundCommand: String? = null
+    private var pendingExpiresAt = 0L
     private val nextListen = Runnable { arm() }
     private val fallAsleep = Runnable {
         awake = false
@@ -360,6 +362,7 @@ class SkyHandsFreeService : Service() {
         if (!running) return
         val request = SkyVoicePresence.request(heard)
         if (request == SkyVoicePresence.Request.SLEEP) {
+            pendingBackgroundCommand = null
             setPresence(SkyVoicePresence.Mode.SLEEP_LOCKED)
             awake = false
             handler.removeCallbacks(fallAsleep)
@@ -372,6 +375,19 @@ class SkyHandsFreeService : Service() {
             request != SkyVoicePresence.Request.WAKE) {
             // Never treat unrelated sounds or a generic SKY as authorization.
             schedule(750)
+            return
+        }
+        if (request == SkyVoicePresence.Request.CANCEL) {
+            pendingBackgroundCommand = null
+            say("Entendido. Cancelé esa orden.")
+            return
+        }
+        if (request == SkyVoicePresence.Request.CONFIRM) {
+            val pending = pendingBackgroundCommand
+            pendingBackgroundCommand = null
+            if (pending != null && SystemClock.elapsedRealtime() <= pendingExpiresAt) {
+                handleWithoutVisibleUi(pending)
+            } else say("No hay ninguna orden pendiente de confirmación.")
             return
         }
         if (request == SkyVoicePresence.Request.ATTEND) {
@@ -425,15 +441,22 @@ class SkyHandsFreeService : Service() {
                         suspendForSpeech()
                         callback.invoke(decision.command)
                     } else {
-                        // Seguir aceptando órdenes hasta que termine la ventana
-                        // de 45 segundos; no exigir "SKY" después de cada turno.
-                        handleWithoutVisibleUi(decision.command)
+                        // Audio from the environment is not proof of speaker
+                        // identity: repeat and require a second explicit command
+                        // before executing even low-risk background controls.
+                        pendingBackgroundCommand = decision.command
+                        pendingExpiresAt = SystemClock.elapsedRealtime() + 20_000L
+                        notifyState("Orden escuchada · confirmación necesaria")
+                        say("Escuché: " + decision.command.take(140) +
+                            ". Si estás de acuerdo, decí SKY confirmo. " +
+                            "Para cancelarla, decí SKY cancela.")
                     }
                 }
         }
     }
 
     override fun onDestroy() {
+        pendingBackgroundCommand = null
         running = false
         handler.removeCallbacksAndMessages(null)
         stopRecognizer()
