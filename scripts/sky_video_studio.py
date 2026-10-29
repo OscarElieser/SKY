@@ -111,7 +111,7 @@ def render(manifest_path, output_path):
             def clean_text(value):
                 if not isinstance(value, str) or not value.strip() or len(value) > 200:
                     raise ValueError("Caption text must be 1-200 characters")
-                return value.replace("\\r", " ").replace("\\n", " ").strip()
+                return value.replace("\r", " ").replace("\n", " ").strip()
             def srt_line(value):
                 # SRT is plain text: prevent multiline injection and markup surprises.
                 return clean_text(value).replace("<", "‹").replace(">", "›")
@@ -125,9 +125,9 @@ def render(manifest_path, output_path):
                 if start < previous_end:
                     raise ValueError("Captions must be ordered and non-overlapping")
                 previous_end = end
-                lines.append(f"{index}\\n{stamp(start)} --> {stamp(end)}\\n{srt_line(caption['text'])}\\n")
+                lines.append(f"{index}\n{stamp(start)} --> {stamp(end)}\n{srt_line(caption['text'])}\n")
             subtitles = temp / "captions.srt"
-            subtitles.write_text("\\n".join(lines), encoding="utf-8")
+            subtitles.write_text("\n".join(lines), encoding="utf-8")
             captioned = temp / "captioned.mp4"
             subprocess.run(
                 ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
