@@ -602,22 +602,27 @@ class MainActivity : Activity() {
     }
 
     private fun reviewMemoryLines() {
-        val facts = SkyOwnerContext.memoryLines(this)
-        if (facts.isEmpty()) {
-            home.showMessage("Todavía no hay datos de perfil para revisar.")
+        val saved = longTermMemory.recent(150)
+        val profile = SkyOwnerContext.memoryLines(this)
+        if (saved.isEmpty() && profile.isEmpty()) {
+            home.showMessage("Todavía no hay recuerdos personales guardados.")
             return
         }
+        val labels = saved.map { "Memoria larga · " + it.text.take(95) } +
+            profile.map { "Perfil · " + it.take(95) }
         AlertDialog.Builder(this)
-            .setTitle("Memoria personal · elegir un dato")
-            .setItems(facts.toTypedArray()) { _, index ->
-                val selected = facts[index]
+            .setTitle("Memoria personal · consultar o eliminar")
+            .setItems(labels.toTypedArray()) { _, index ->
+                val inDatabase = index < saved.size
+                val detail = if (inDatabase) saved[index].text else profile[index - saved.size]
                 AlertDialog.Builder(this)
-                    .setTitle("Quitar este dato de la memoria local")
-                    .setMessage(selected + "\n\nEsta acción no borra su origen en SKY Windows.")
+                    .setTitle("Quitar este dato de SKY Android")
+                    .setMessage(detail + "\n\nLa eliminación no afecta otras copias ni SKY Windows.")
                     .setPositiveButton("Eliminar este dato") { _, _ ->
-                        val removed = SkyOwnerContext.removeLine(this, selected)
-                        home.showMessage(if (removed) "Dato retirado del perfil local."
-                            else "El dato no se encontró.")
+                        val removed = if (inDatabase) longTermMemory.delete(saved[index].id)
+                            else SkyOwnerContext.removeLine(this, detail)
+                        home.showMessage(if (removed) "Recuerdo eliminado del teléfono."
+                            else "No encontré ese recuerdo.")
                     }
                     .setNegativeButton("Cancelar", null)
                     .show()
@@ -2030,7 +2035,9 @@ class MainActivity : Activity() {
         if (!cognitionEnabled()) return false
         val answer = when {
             SkyAndroidCognition.memoryQuestion(message) -> {
-                SkyAndroidCognition.localMemoryAnswer(message, SkyOwnerContext.memoryLines(this))
+                SkyAndroidCognition.localMemoryAnswer(message,
+                    (longTermMemory.relevant(message, 8).map { "- " + it.text } +
+                        SkyOwnerContext.memoryLines(this)).distinct().take(20))
             }
             SkyAndroidCognition.historyQuestion(message) -> {
                 val terms = SkyAndroidCognition.searchTerms(message)
@@ -2054,11 +2061,12 @@ class MainActivity : Activity() {
         if (message.isEmpty()) return
         val explicitFact = SkyAndroidCognition.explicitFact(message)
         if (explicitFact != null) {
-            runCatching { SkyOwnerContext.remember(this, explicitFact) }
+            runCatching { longTermMemory.remember(explicitFact) }
                 .onSuccess {
                     chatInput.setText("")
-                    home.addExchange(message, "Guardé este dato en tu perfil personal local.",
-                        "SKY · memoria local")
+                    home.addExchange(message,
+                        "Guardé este dato en la memoria privada de largo plazo del teléfono.",
+                        "SKY · memoria larga local")
                 }
                 .onFailure { home.showMessage(it.message ?: "No pude guardar ese recuerdo.") }
             return
