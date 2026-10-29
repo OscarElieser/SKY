@@ -4,6 +4,11 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.webkit.WebResourceRequest
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -53,7 +58,13 @@ class SkyMobileHome(
         letterSpacing = 0.07f
         contentDescription = "Estado actual de SKY"
     }
-    private data class Exchange(val question: String, val answer: String, val engine: String)
+    private data class Exchange(
+        val question: String,
+        val answer: String,
+        val engine: String,
+        val sources: List<SkyPhoneCloud.Source>,
+        val googleSearchHtml: String
+    )
     private val history = ArrayList<Exchange>()
     private var activeModule = ""
     private var expandedHistory = false
@@ -331,6 +342,56 @@ class SkyMobileHome(
         return item
     }
 
+    private fun addVerifiedSources(exchange: Exchange) {
+        if (exchange.sources.isEmpty()) return
+        val sourceColumn = LinearLayout(host).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(4), dp(12), dp(8))
+        }
+        sourceColumn.addView(text("FUENTES CONSULTADAS EN INTERNET", 10f, cyan).apply {
+            letterSpacing = 0.07f
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        })
+        exchange.sources.forEachIndexed { index, source ->
+            val link = text("${index + 1}. ${source.title}", 12f, soft).apply {
+                setPadding(dp(3), dp(6), dp(3), dp(5))
+                paintFlags = paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
+                isClickable = true
+                contentDescription = "Abrir fuente de Internet: " + source.title
+                setOnClickListener {
+                    runCatching { host.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(source.url))) }
+                        .onFailure { Toast.makeText(host, "No se pudo abrir la fuente.", Toast.LENGTH_SHORT).show() }
+                }
+            }
+            sourceColumn.addView(link)
+        }
+        conversationRows.addView(sourceColumn)
+    }
+
+    private fun showGoogleSearchSuggestions(html: String) {
+        if (html.isBlank()) return
+        // Google requires displaying its original Search Suggestions.
+        // Never grant JavaScript or local file access to rendered web markup.
+        val view = WebView(host).apply {
+            settings.javaScriptEnabled = false
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            setBackgroundColor(Color.TRANSPARENT)
+            isVerticalScrollBarEnabled = false
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                    val uri = request?.url ?: return true
+                    if (uri.scheme == "https" || uri.scheme == "http") {
+                        runCatching { host.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                    }
+                    return true
+                }
+            }
+            loadDataWithBaseURL("https://www.google.com", html, "text/html", "UTF-8", null)
+        }
+        conversationRows.addView(view, LinearLayout.LayoutParams(-1, dp(68)))
+    }
+
     private fun renderConversation() {
         if (!::conversationRows.isInitialized) return
         conversationRows.removeAllViews()
@@ -339,9 +400,11 @@ class SkyMobileHome(
         chatOutput.visibility = if (history.isEmpty() && pendingQuestion == null &&
             pendingInfo == null) View.VISIBLE else View.GONE
         val entries = if (expandedHistory) history.toList() else history.takeLast(6)
-        entries.forEach { exchange ->
+        entries.forEachIndexed { index, exchange ->
             conversationRows.addView(makeBubble(exchange.question, true))
             conversationRows.addView(makeBubble(exchange.answer, false))
+            addVerifiedSources(exchange)
+            if (index == entries.lastIndex) showGoogleSearchSuggestions(exchange.googleSearchHtml)
         }
         pendingQuestion?.let { question ->
             conversationRows.addView(makeBubble(question, true))
@@ -524,10 +587,18 @@ class SkyMobileHome(
         }
     }
 
-    fun addExchange(question: String, answer: String, engine: String, revealPanel: Boolean = true) {
+    fun addExchange(
+        question: String,
+        answer: String,
+        engine: String,
+        revealPanel: Boolean = true,
+        sources: List<SkyPhoneCloud.Source> = emptyList(),
+        googleSearchHtml: String = ""
+    ) {
         pendingQuestion = null
         pendingInfo = null
-        history.add(Exchange(question.take(4000), answer.take(4000), engine))
+        history.add(Exchange(question.take(4000), answer.take(4000), engine,
+            sources, googleSearchHtml))
         if (history.size > 30) history.removeAt(0)
         renderConversation()
         if (revealPanel && !isPanelOpen()) openChat()
