@@ -54,6 +54,7 @@ class MainActivity : Activity() {
     private lateinit var cloudConsent: CheckBox
     private lateinit var privateConsent: CheckBox
     private lateinit var archive: SkyConversationArchive
+    private lateinit var longTermMemory: SkyLongTermMemory
     private val knowledgeSources by lazy { SkyAndroidKnowledgeSources(this) }
     private val cognitionPrefs by lazy { getSharedPreferences("sky_android_cognition", MODE_PRIVATE) }
     private fun cognitionEnabled(): Boolean = cognitionPrefs.getBoolean("enabled", true)
@@ -119,6 +120,7 @@ class MainActivity : Activity() {
         }
         tokens = PrivateTokenStore(this)
         archive = SkyConversationArchive(this)
+        longTermMemory = SkyLongTermMemory(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
             if (!processQuickCommand(transcript) &&
                 !processMusicCommand(transcript) &&
@@ -1694,6 +1696,8 @@ class MainActivity : Activity() {
         executor.shutdown()
         chatExecutor.shutdown()
         pollingExecutor.shutdown()
+        if (::longTermMemory.isInitialized) longTermMemory.close()
+        if (::archive.isInitialized) archive.close()
         super.onDestroy()
     }
 
