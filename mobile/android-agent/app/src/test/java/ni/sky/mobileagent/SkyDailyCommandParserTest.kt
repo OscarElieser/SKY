@@ -103,4 +103,19 @@ class SkyDailyCommandParserTest {
         assertEquals("¡Hola comunidad!", other.value)
         assertNull(SkyDailyCommandParser.parse("Respondé todos mis mensajes automáticamente"))
     }
+    @Test fun naturalRequestsOpenActuallyInstalledApps() {
+        for (utterance in listOf("Abrime Netflix", "Quiero que abras Netflix",
+                "¿Puedes abrir la aplicación de Netflix?", "Por favor abre TikTok",
+                "Abrí la aplicación de Spotify")) {
+            val command = SkyDailyCommandParser.parse(utterance)
+            assertEquals("La orden debe llegar al lanzador: $utterance", "netflix".takeIf {
+                utterance.contains("Netflix")
+            } ?: if (utterance.contains("TikTok")) "tiktok" else "spotify",
+                (command as SkyDailyCommandParser.Command.OpenApp).app)
+        }
+        assertEquals(SkyDailyCommandParser.Command.Capabilities,
+            SkyDailyCommandParser.parse("Dime cuáles son tus funcionalidades reales que puedes hacer"))
+        assertNull(SkyDailyCommandParser.parse("Escribe una historia sobre Netflix"))
+    }
+
 }
