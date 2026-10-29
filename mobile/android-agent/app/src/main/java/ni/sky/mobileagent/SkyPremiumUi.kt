@@ -145,7 +145,7 @@ object SkyPremiumUi {
      * Convierte los antiguos controles reales en paneles navegables.
      * Cada vista se mueve una sola vez; no recrea claves, permisos ni listeners.
      */
-    fun settingsShell(activity: Activity, original: LinearLayout): View {
+    fun settingsShell(activity: Activity, original: LinearLayout, onClose: () -> Unit): View {
         val elements = (0 until original.childCount).map { original.getChildAt(it) }
         original.removeAllViews()
         val tabs = LinkedHashMap<String, Pair<SectionSpec, LinearLayout>>()
@@ -182,11 +182,24 @@ object SkyPremiumUi {
             setPadding(dp(activity, 14), dp(activity, 15),
                 dp(activity, 14), dp(activity, 10))
         }
-        shell.addView(label(activity, "✦  SKY IA", 23f, white, true))
-        shell.addView(label(activity, "CENTRO DE CONFIGURACIÓN  ·  ANDROID",
-            11f, cyan, true).apply {
-            letterSpacing = 0.08f
-        })
+        val titleRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val identity = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        identity.addView(label(activity, "✦  SKY IA", 23f, white, true))
+        identity.addView(label(activity, "CENTRO DE CONFIGURACIÓN  ·  ANDROID",
+            11f, cyan, true).apply { letterSpacing = 0.08f })
+        titleRow.addView(identity, LinearLayout.LayoutParams(0, -2, 1f))
+        titleRow.addView(label(activity, "✕", 22f, white).apply {
+            gravity = Gravity.CENTER
+            background = shape(activity, elevated, 18)
+            contentDescription = "Cerrar configuración"
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onClose() }
+        }, LinearLayout.LayoutParams(dp(activity, 48), dp(activity, 48)))
+        shell.addView(titleRow)
         shell.addView(label(activity,
             "Elegí una categoría. Tus permisos y datos se mantienen como estaban.",
             12.5f, muted).apply { setPadding(0, dp(activity, 7), 0, dp(activity, 10)) })
