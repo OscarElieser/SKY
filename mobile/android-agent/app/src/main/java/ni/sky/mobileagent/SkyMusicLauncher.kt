@@ -15,7 +15,8 @@ import android.provider.MediaStore
 class SkyMusicLauncher(
     private val host: Activity,
     private val prefs: SharedPreferences,
-    private val tell: (String) -> Unit
+    private val tell: (String) -> Unit,
+    private val onNeedMusicPermission: (SkyMusicCommand.Request) -> Unit
 ) {
     companion object {
         private const val MUSIC_PREF = "preferred_music"
@@ -36,10 +37,35 @@ class SkyMusicLauncher(
         val chosen = request.service ?: preferred()
         val title = SkyMusicCommand.label(chosen)
         val pkg = packageName(chosen)
+        if (!SkyMusicControlService.enabled()) {
+            onNeedMusicPermission(request)
+            return
+        }
+        if (!SkyMusicControlService.arm(pkg, request.query, tell)) {
+            tell("No pude preparar el control musical. Revisá su autorización en Ajustes.")
+            return
+        }
+        try {
+            val launch = host.packageManager.getLaunchIntentForPackage(pkg)
+                ?: throw ActivityNotFoundException("La aplicación no está instalada")
+            host.startActivity(launch)
+            tell("Estoy buscando «${request.query}» en $title para reproducirla.")
+        } catch (_: Exception) {
+            SkyMusicControlService.cancelPending()
+            tell("No pude abrir $title. Verificá que esté instalado y disponible.")
+        }
+    }
+
+    /** Official Android action retained as a user-selected fallback. */
+    fun playViaAndroidIntent(request: SkyMusicCommand.Request) {
+        val chosen = request.service ?: preferred()
+        val title = SkyMusicCommand.label(chosen)
+        val pkg = packageName(chosen)
         val player = Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).apply {
             setPackage(pkg)
             addCategory(Intent.CATEGORY_DEFAULT)
-            putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
+            putExtra(MediaStore.EXTRA_MEDIA_FOCUS, MediaStore.Audio.Media.ENTRY_CONTENT_TYPE)
+            putExtra(MediaStore.EXTRA_MEDIA_TITLE, request.query)
             putExtra(SearchManager.QUERY, request.query)
         }
         val launched = try {
@@ -49,8 +75,8 @@ class SkyMusicLauncher(
         } catch (_: SecurityException) { false
         } catch (_: IllegalArgumentException) { false }
         if (launched) {
-            tell("Le pedí a $title que reproduzca «${request.query}». " +
-                "Verificá en la aplicación si comenzó a sonar.")
+            tell("Envié la orden oficial de reproducción a $title. " +
+                "Android no confirmó todavía que suene «${request.query}».")
             return
         }
         // Deep links are for SEARCH, not evidence of successful playback.
@@ -64,8 +90,8 @@ class SkyMusicLauncher(
         }
         try {
             host.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
-            tell("Abrí la búsqueda de «${request.query}» en $title. " +
-                "Tocá la canción para reproducirla.")
+            tell("Abrí la búsqueda de «${request.query}» en $title, " +
+                "pero esa app no aceptó la reproducción directa por Android.")
         } catch (_: Exception) {
             tell("No encontré una aplicación compatible para abrir música.")
         }
