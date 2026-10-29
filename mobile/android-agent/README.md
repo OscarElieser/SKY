@@ -1,3 +1,51 @@
+# SKY Android 0.8.23 — núcleo cognitivo y memoria local (sin SKY Windows)
+
+**Alcance:** cambios exclusivamente en `mobile/android-agent/` en la rama `main`.
+No modifica el código ni los servicios Windows. El código no equivale a una
+APK instalada: la compilación firmada y las pruebas en el Samsung deben confirmarse.
+
+- **Núcleo cognitivo Kotlin:** clasifica intenciones de conversación, docencia,
+  investigación, diseño y programación. Añade instrucciones breves para respuestas
+  naturales en español de Nicaragua y distingue una petición de control de una
+  acción realmente ejecutada. El núcleo es un apoyo al modelo, no un Transformer
+  reentrenado.
+- **Recuerdos explícitos sin internet:** las preguntas «¿qué recuerdas de mí?» y
+  «¿qué recuerdas sobre Flutter?» recuperan únicamente hechos guardados en
+  `SkyOwnerContext`; si no existen, SKY lo reconoce. El guardado con
+  «recuerda que...» y el menú para borrar recuerdos siguen disponibles.
+- **Historial local:** «¿qué hablamos sobre ...?» consulta el archivo SQLite
+  existente y muestra fechas, títulos y extractos, sin enviar ese historial
+  a Gemini, Groq ni SKY Windows.
+- **Investigación con fuentes:** las preguntas que requieren información actual
+  siguen usando la búsqueda fundamentada de Gemini cuando está habilitada.
+  La nueva biblioteca `SkyAndroidKnowledgeSources` guarda **solo** título,
+  enlace y fecha de referencias que la búsqueda devuelve. No copia conversaciones,
+  texto integral de sitios, fotos ni claves. Los enlaces son metadatos, no
+  verificación del contenido. Revisar y borrar desde Ajustes.
+- **Configuración Android:** control para activar/desactivar el asistente
+  cognitivo (activado inicialmente), sección de capacidades honestas y gestión
+  de referencias. Las memorias personales solo se envían a un proveedor en
+  la consulta para la que se marque expresamente «Enviar datos privados».
+- **Conservación:** chat, ojos y boca animados, TTS, voz con/sin manos libres,
+  adjuntos hasta 100 MB, acciones de aplicaciones, alarmas, redes, historial,
+  Groq/Gemini y las aprobaciones existentes no fueron eliminados.
+
+**Límites:** no hay control irrestricto de otras apps, escucha garantizada con
+el dispositivo bloqueado, sincronización automática con Windows, entrenamiento
+de pesos neuronales ni conexión real a Canva, Copilot, Claude o Gamma.
+Las acciones móviles dependen de permisos del sistema y APIs de cada plataforma.
+
+### Verificación Android
+
+El flujo `sky-mobile-agent.yml` ejecuta `assembleStandardDebug` y
+`testStandardDebugUnitTest`. El flujo `sky-mobile-release.yml` debe terminar
+bien, utilizar la firma privada correspondiente y publicar el APK 0.8.23 en
+[GitHub Releases](https://github.com/OscarElieser/SKY/releases) antes de presentarlo
+como descarga lista. No fuerces Play Protect ni desinstalés tu versión previa
+sin respaldo. Verificá firma, actualización y voz sobre el Samsung real.
+
+---
+
 # SKY Android 0.8.22 — exportación de respuestas y cargas controlables
 
 **Código integrado en main; verificar una APK firmada antes de instalarla.**
