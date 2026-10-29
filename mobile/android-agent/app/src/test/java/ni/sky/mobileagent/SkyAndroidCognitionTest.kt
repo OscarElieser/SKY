@@ -72,6 +72,21 @@ class SkyAndroidCognitionTest {
             "¿Qué hablamos sobre el proyecto BAQUEANO?").contains("baqueano"))
     }
 
+    @Test fun storesOnlyPlausiblePublicHttpsReferences() {
+        assertTrue(SkyAndroidKnowledgeSources.publicSourceUrl(
+            "https://www.nasa.gov/news/example"))
+        assertFalse(SkyAndroidKnowledgeSources.publicSourceUrl(
+            "http://www.nasa.gov/insecure"))
+        assertFalse(SkyAndroidKnowledgeSources.publicSourceUrl(
+            "https://localhost/admin"))
+        assertFalse(SkyAndroidKnowledgeSources.publicSourceUrl(
+            "https://192.168.1.10/secret"))
+        assertFalse(SkyAndroidKnowledgeSources.publicSourceUrl(
+            "https://person:pass@example.org/private"))
+        assertFalse(SkyAndroidKnowledgeSources.publicSourceUrl(
+            "javascript:alert(1)"))
+    }
+
     @Test fun descriptionsDoNotClaimModelTraining() {
         assertTrue(SkyAndroidCognition.description().contains(
             "No entrena pesos neuronales"))
