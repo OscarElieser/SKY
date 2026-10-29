@@ -40,3 +40,26 @@ def test_renders_real_mp4(tmp_path):
                            check=True, capture_output=True, text=True)
     stream = json.loads(probe.stdout)["streams"][0]
     assert (stream["width"], stream["height"]) == (1080, 1920)
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg") or not shutil.which("ffprobe"),
+                    reason="FFmpeg and ffprobe required")
+def test_renders_crossfade_between_scenes(tmp_path):
+    source = tmp_path / "source.mp4"
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                    "-f", "lavfi", "-i", "color=c=blue:s=320x568:r=30",
+                    "-t", "1.5", "-c:v", "mpeg4", str(source)], check=True)
+    manifest = tmp_path / "video.json"
+    manifest.write_text(json.dumps({
+        "format": "square", "fps": 30, "transition": "fade",
+        "transition_duration": 0.3,
+        "scenes": [{"file": "source.mp4", "duration": 1.5},
+                   {"file": "source.mp4", "duration": 1.5}]
+    }), encoding="utf-8")
+    output = module.render(manifest, tmp_path / "fade.mp4")
+    assert output.exists() and output.stat().st_size > 1000
+    probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                            "-show_entries", "stream=width,height", "-of", "json", str(output)],
+                           check=True, capture_output=True, text=True)
+    stream = json.loads(probe.stdout)["streams"][0]
+    assert (stream["width"], stream["height"]) == (1080, 1080)
