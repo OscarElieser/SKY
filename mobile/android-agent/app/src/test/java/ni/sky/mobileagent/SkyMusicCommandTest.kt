@@ -45,4 +45,13 @@ class SkyMusicCommandTest {
         assertEquals(SkyMusicCommand.Service.YOUTUBE, result?.service)
         assertNull(SkyMusicCommand.parse("Escuchame, ¿cómo estás?"))
     }
+    @Test fun exactNovemberRainCommandGoesToMusicController() {
+        val request = SkyMusicCommand.parse("SKY reproduce November Rain en YouTube Music")
+        assertEquals("november rain", request?.query)
+        assertEquals(SkyMusicCommand.Service.YOUTUBE_MUSIC, request?.service)
+        val explicit = SkyMusicCommand.parse("Abrí Spotify y reproducí la canción November Rain")
+        assertEquals(SkyMusicCommand.Service.SPOTIFY, explicit?.service)
+        assertEquals("november rain", explicit?.query)
+    }
+
 }
