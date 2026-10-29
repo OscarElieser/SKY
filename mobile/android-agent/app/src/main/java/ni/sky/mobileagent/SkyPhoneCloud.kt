@@ -342,8 +342,9 @@ object SkyPhoneCloud {
         return send(personalKey, payload, model = route.model, answerLimit = route.answerChars)
     }
 
-    private fun send(personalKey: String, payload: String, maxBytes: Int = 600_000): String {
-        val response = request(personalKey, payload, maxBytes)
+    private fun send(personalKey: String, payload: String, maxBytes: Int = 600_000,
+                     model: String = MODEL, answerLimit: Int = 5000): String {
+        val response = request(personalKey, payload, maxBytes, model)
         val content = response.optJSONArray("candidates")
             ?.optJSONObject(0)?.optJSONObject("content")
             ?.optJSONArray("parts")
@@ -354,24 +355,26 @@ object SkyPhoneCloud {
                 if (text.isNotEmpty()) parts.add(text)
             }
         }
-        val answer = parts.joinToString("\n").take(5000)
+        val answer = parts.joinToString("\n").take(answerLimit)
         if (answer.isBlank()) {
             throw IllegalStateException("Gemini no devolvió texto. Revisá tu solicitud.")
         }
         return answer
     }
 
-    private fun request(personalKey: String, payload: String, maxBytes: Int = 600_000): JSONObject {
+    private fun request(personalKey: String, payload: String, maxBytes: Int = 600_000,
+                        model: String = MODEL): JSONObject {
         require(validPersonalKey(personalKey)) { "Revisá la clave Gemini en Ajustes." }
         require(payload.toByteArray(Charsets.UTF_8).size < maxBytes.coerceAtMost(8_000_000)) {
             "El archivo es demasiado grande para enviarlo de forma segura."
         }
-        val connection = URL(API).openConnection() as HttpURLConnection
+        val connection = URL(SkyGeminiModes.endpointFor(model)).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
             connection.instanceFollowRedirects = false
             connection.connectTimeout = 9000
-            connection.readTimeout = if (maxBytes > 600_000) 90_000 else 45_000
+            connection.readTimeout = if (model == SkyGeminiModes.DEEP_MODEL) 120_000 else
+                if (maxBytes > 600_000) 90_000 else 45_000
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("x-goog-api-key", personalKey)
