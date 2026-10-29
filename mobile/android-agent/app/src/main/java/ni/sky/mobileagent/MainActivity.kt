@@ -705,7 +705,11 @@ class MainActivity : Activity() {
     }
 
     private fun showLearningDialog() {
-        val entry = archive.recent(1).lastOrNull()
+        // Evitar enseñar una respuesta local de "recuerda que..." o acción.
+        val entry = archive.recent(40).lastOrNull { saved ->
+            SkyAdaptiveMemory.ineligibleReason(saved.question) == null &&
+                !saved.engine.startsWith("SKY · memoria", ignoreCase = true)
+        }
         if (entry == null) {
             home.showMessage("Primero conversá con SKY para corregir una respuesta.")
             return
@@ -2645,7 +2649,10 @@ class MainActivity : Activity() {
                 showLearningDialog()
                 return
             }
-            val previous = archive.recent(1).lastOrNull()
+            val previous = archive.recent(40).lastOrNull { saved ->
+                SkyAdaptiveMemory.ineligibleReason(saved.question) == null &&
+                    !saved.engine.startsWith("SKY · memoria", ignoreCase = true)
+            }
             if (previous == null) {
                 home.showMessage("Primero preguntame algo para corregir esa respuesta.")
                 return
@@ -2767,10 +2774,24 @@ class MainActivity : Activity() {
             try {
                 val history = JSONArray()
                 if (cloud && (mobileCloud || groqReady)) {
-                    // Restaurar historial archivado SOLO con autorización específica.
-                    for (entry in archive.recent(40)) {
-                        history.put(JSONObject().put("role","user").put("content",entry.question))
-                        history.put(JSONObject().put("role","assistant").put("content",entry.answer))
+                    // Relevancia + recencia; cero historial persistente sin permiso.
+                    // Excluye órdenes Android, memorias explícitas y archivos.
+                    val eligible = archive.recent(150).map { saved ->
+                        SkyContextPlanner.Turn(saved.id, saved.question,
+                            saved.answer, saved.engine)
+                    }
+                    val maxContextChars = when (selection.tier) {
+                        SkyGeminiModes.Tier.DEEP -> 20000
+                        SkyGeminiModes.Tier.FLASH -> 10000
+                        SkyGeminiModes.Tier.ECONOMY -> 5500
+                    }
+                    val recovered = SkyContextPlanner.select(
+                        selection.prompt, eligible, authorized = true,
+                        maxPairs = (selection.historyTurns / 2).coerceAtLeast(1),
+                        maxChars = maxContextChars)
+                    for (turn in recovered) {
+                        history.put(JSONObject().put("role","user").put("content",turn.question))
+                        history.put(JSONObject().put("role","assistant").put("content",turn.answer))
                     }
                 } else {
                     // El contexto de la sesión actual nunca depende del motor de búsqueda.
