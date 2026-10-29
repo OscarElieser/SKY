@@ -2005,16 +2005,16 @@ class MainActivity : Activity() {
                 .setTitle("SKY · Control de calidad real")
                 .setMessage(
                     "Registros locales: " + measure.total +
-                    "\\nAcciones verificadas: " + measure.verified +
-                    "\\nÓrdenes enviadas sin comprobar: " + measure.sentUnverified +
-                    "\\nFallos: " + measure.failed +
-                    "\\nRechazos: " + measure.rejected +
-                    "\\nRespuestas remotas recibidas: " + measure.remoteResponse +
-                    "\\nEstados no identificados: " + measure.unknown +
-                    "\\n\\nSolo se declara éxito cuando SKY comprueba un efecto " +
+                    "\nAcciones verificadas: " + measure.verified +
+                    "\nÓrdenes enviadas sin comprobar: " + measure.sentUnverified +
+                    "\nFallos: " + measure.failed +
+                    "\nRechazos: " + measure.rejected +
+                    "\nRespuestas remotas recibidas: " + measure.remoteResponse +
+                    "\nEstados no identificados: " + measure.unknown +
+                    "\n\nSolo se declara éxito cuando SKY comprueba un efecto " +
                     "observable, como un cambio de volumen o una nota guardada y releída. " +
                     "Abrir otra app o enviar teclas multimedia NO demuestra que la tarea terminó." +
-                    "\\n\\nLos conteos son locales a este teléfono. No equivalen a métricas " +
+                    "\n\nLos conteos son locales a este teléfono. No equivalen a métricas " +
                     "de servidores ni a resultados en otras aplicaciones."
                 )
                 .setPositiveButton("Cerrar", null)
