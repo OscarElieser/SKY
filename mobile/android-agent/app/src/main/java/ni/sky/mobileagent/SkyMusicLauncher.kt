@@ -70,7 +70,9 @@ class SkyMusicLauncher(
         val player = Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).apply {
             setPackage(pkg)
             addCategory(Intent.CATEGORY_DEFAULT)
-            putExtra(MediaStore.EXTRA_MEDIA_FOCUS, MediaStore.Audio.Media.ENTRY_CONTENT_TYPE)
+            // Android documentation specifies this song-specific search mode;
+            // Audio.Media.ENTRY_CONTENT_TYPE is a provider MIME type, not this action's focus.
+            putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/audio")
             putExtra(MediaStore.EXTRA_MEDIA_TITLE, request.query)
             putExtra(SearchManager.QUERY, request.query)
         }
@@ -81,8 +83,9 @@ class SkyMusicLauncher(
         } catch (_: SecurityException) { false
         } catch (_: IllegalArgumentException) { false }
         if (launched) {
-            tell("Envié la orden oficial de reproducción a $title. " +
-                "Android no confirmó todavía que suene «${request.query}».")
+            tell("Solicité reproducir «${request.query}» en $title. " +
+                "La aplicación decidirá si puede iniciar esa canción. " +
+                "No he comprobado que esté sonando.")
             return
         }
         // Deep links are for SEARCH, not evidence of successful playback.
