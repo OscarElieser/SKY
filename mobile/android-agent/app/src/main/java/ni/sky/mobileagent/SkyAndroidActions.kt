@@ -32,13 +32,20 @@ class SkyAndroidActions(
         "gmail" to Pair("Gmail", "com.google.android.gm")
     )
 
+    /** La confianza local no sustituye la confirmación de cada envío. */
+    private fun localAppAuthorized(id: String): Boolean =
+        allowed.getBoolean(id, false) ||
+            host.getSharedPreferences("sky_trusted_launcher_apps",
+                android.content.Context.MODE_PRIVATE)
+                .getBoolean("global_supervised_control", false)
+
     /**
      * Prepare a real WhatsApp composer. SKY never presses Send or reads chats.
      * The user chooses the recipient and confirms the message in WhatsApp.
      */
     fun prepareWhatsApp(draft: SkyMessagingIntent.Draft) {
-        if (!allowed.getBoolean("whatsapp", false)) {
-            feedback("Activá «Permitir WhatsApp» en Ajustes de SKY para continuar.")
+        if (!localAppAuthorized("whatsapp")) {
+            feedback("Activá el control supervisado en Configuración de SKY para continuar.")
             return
         }
         val text = SkyMessagingIntent.preparedText(draft)
@@ -177,8 +184,8 @@ class SkyAndroidActions(
             installedApps.requestShare(id, text)
             return
         }
-        if (!allowed.getBoolean(id, false)) {
-            feedback("Autorizá " + details.first + " desde Ajustes antes de compartir.")
+        if (!localAppAuthorized(id)) {
+            feedback("Activá el control supervisado de SKY en Configuración antes de compartir.")
             return
         }
         val shareDialog = AlertDialog.Builder(host)
