@@ -82,7 +82,12 @@ class SkyInstalledApps(
                 AlertDialog.Builder(activity)
                     .setTitle("SKY · ¿Cuál aplicación?")
                     .setItems(available.map { it.name }.toTypedArray()) { _, position ->
-                        confirm(available[position])
+                        val selected = available[position]
+                        // Con autorización global solo se pregunta cuál app quiere abrir:
+                        // no volver a solicitar confianza individual.
+                        if (supervisedControlEnabled() ||
+                            trusted.getBoolean(selected.packageName, false)) launchDirect(selected)
+                        else confirm(selected)
                     }
                     .setNegativeButton("Cancelar", null)
                     .show()
