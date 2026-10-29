@@ -24,6 +24,12 @@ class SkyVoicePresenceTest {
             SkyVoicePresence.request("SKY escucha y ejecuta"))
         assertEquals(SkyVoicePresence.Request.WAKE,
             SkyVoicePresence.request("SKY despierta"))
+        assertEquals(SkyVoicePresence.Request.CONFIRM,
+            SkyVoicePresence.request("SKY confirmo"))
+        assertEquals(SkyVoicePresence.Request.CANCEL,
+            SkyVoicePresence.request("SKY cancela"))
+        assertEquals(SkyVoicePresence.Request.NONE,
+            SkyVoicePresence.request("Alguien en la televisión confirmó la orden"))
         assertEquals(SkyVoicePresence.Request.NONE,
             SkyVoicePresence.request("Un video dice que SKY escucha y ejecuta"))
         assertEquals(SkyVoicePresence.Request.NONE,
