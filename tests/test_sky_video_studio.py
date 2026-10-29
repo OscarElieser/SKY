@@ -63,3 +63,20 @@ def test_renders_crossfade_between_scenes(tmp_path):
                            check=True, capture_output=True, text=True)
     stream = json.loads(probe.stdout)["streams"][0]
     assert (stream["width"], stream["height"]) == (1080, 1080)
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg") or not shutil.which("ffprobe"),
+                    reason="FFmpeg and ffprobe required")
+def test_renders_captioned_mp4(tmp_path):
+    source = tmp_path / "source.mp4"
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                    "-f", "lavfi", "-i", "color=c=black:s=320x568:r=30",
+                    "-t", "1.5", "-c:v", "mpeg4", str(source)], check=True)
+    manifest = tmp_path / "video.json"
+    manifest.write_text(json.dumps({
+        "format": "vertical", "fps": 30,
+        "scenes": [{"file": "source.mp4", "duration": 1.5}],
+        "captions": [{"start": 0.1, "end": 1.2, "text": "SKY Video Studio"}]
+    }), encoding="utf-8")
+    output = module.render(manifest, tmp_path / "captions.mp4")
+    assert output.exists() and output.stat().st_size > 1000
