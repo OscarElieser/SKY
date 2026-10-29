@@ -1,0 +1,129 @@
+{
+  "schema": "sky.core.contract.v1",
+  "product": "SKY IA",
+  "version": 1,
+  "execution": "platform_native",
+  "unknown_action": "deny",
+  "allowed_origins": [
+    "owner_typed",
+    "owner_spoken"
+  ],
+  "untrusted_origins": [
+    "model_output",
+    "document",
+    "web_page",
+    "external_message",
+    "remote_server"
+  ],
+  "receipts": [
+    "VERIFICADA_LOCAL",
+    "ENVIADA_SIN_VERIFICAR",
+    "FALLIDA",
+    "RECHAZADA",
+    "RESPUESTA_REMOTA_RECIBIDA",
+    "ESTADO_DESCONOCIDO"
+  ],
+  "actions": {
+    "chat": {
+      "risk": "low",
+      "approval": "owner_intent"
+    },
+    "research": {
+      "risk": "low",
+      "approval": "owner_intent"
+    },
+    "create_document": {
+      "risk": "low",
+      "approval": "owner_intent"
+    },
+    "create_spreadsheet": {
+      "risk": "low",
+      "approval": "owner_intent"
+    },
+    "create_presentation": {
+      "risk": "low",
+      "approval": "owner_intent"
+    },
+    "open_app": {
+      "risk": "low",
+      "approval": "owner_intent"
+    },
+    "media_search": {
+      "risk": "low",
+      "approval": "owner_intent"
+    },
+    "media_control": {
+      "risk": "low",
+      "approval": "owner_intent"
+    },
+    "notes_read": {
+      "risk": "low",
+      "approval": "owner_intent"
+    },
+    "file_export": {
+      "risk": "medium",
+      "approval": "explicit_per_action"
+    },
+    "file_write": {
+      "risk": "medium",
+      "approval": "explicit_per_action"
+    },
+    "window_modify": {
+      "risk": "medium",
+      "approval": "explicit_per_action"
+    },
+    "clipboard_write": {
+      "risk": "medium",
+      "approval": "explicit_per_action"
+    },
+    "social_draft": {
+      "risk": "medium",
+      "approval": "explicit_per_action"
+    },
+    "delete_file": {
+      "risk": "high",
+      "approval": "explicit_per_action"
+    },
+    "send_message": {
+      "risk": "high",
+      "approval": "explicit_per_action"
+    },
+    "send_email": {
+      "risk": "high",
+      "approval": "explicit_per_action"
+    },
+    "social_publish": {
+      "risk": "high",
+      "approval": "explicit_per_action"
+    },
+    "payment": {
+      "risk": "high",
+      "approval": "explicit_per_action"
+    },
+    "permissions_change": {
+      "risk": "high",
+      "approval": "explicit_per_action"
+    },
+    "remote_device_control": {
+      "risk": "high",
+      "approval": "explicit_per_action"
+    }
+  },
+  "forbidden_actions": [
+    "raw_shell",
+    "bypass_screen_lock",
+    "disable_play_protect",
+    "secret_exfiltration",
+    "disable_security_controls"
+  ],
+  "security": {
+    "shared_owner_data_by_default": false,
+    "credentials_in_source": false,
+    "model_output_grants_authorization": false,
+    "biometric_voice_identity_verified": false,
+    "explicit_approval_is_per_action": true,
+    "independent_offline_mode": true,
+    "require_platform_permissions": true,
+    "unverified_receipt_is_not_success": true
+  }
+}
