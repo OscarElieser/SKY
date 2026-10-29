@@ -55,6 +55,7 @@ class SkyActionEvidence(context: Context) :
         fun normalized(raw: String): String = when (raw.uppercase()) {
             "SENT", "LAUNCHED", "REQUESTED" -> "ENVIADA_SIN_VERIFICAR"
             "VERIFIED_LOCAL" -> "VERIFICADA_LOCAL"
+            "RECEIVED_RESPONSE" -> "RESPUESTA_REMOTA_RECIBIDA"
             "FAILED", "ERROR" -> "FALLIDA"
             "REJECTED", "CANCELLED" -> "RECHAZADA"
             else -> "ESTADO_DESCONOCIDO"
