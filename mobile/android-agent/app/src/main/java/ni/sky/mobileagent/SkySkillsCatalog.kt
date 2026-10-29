@@ -45,9 +45,17 @@ object SkySkillsCatalog {
             "Organiza mi proyecto en un plan semanal con prioridades y entregables.",
             "planificacion"),
         Skill("Multimedia y video",
-            "Comprende imágenes, audio y video compatibles; edición multimedia avanzada pendiente.",
+            "Genera MP4 H.264 de animaciones de texto y analiza multimedia; video IA cinematográfico pendiente.",
             "Analiza este video adjunto y redacta una escaleta de producción.",
-            "multimedia")
+            "multimedia"),
+        Skill("Excel editable",
+            "Exporta XLSX con hojas Datos y Resumen, celdas y fórmulas numéricas seguras.",
+            "Crea una tabla Markdown con columnas Producto, Cantidad y Precio para exportarla a Excel.",
+            "excel"),
+        Skill("Imagen IA real",
+            "Generación con Gemini Nano Banana 2.1, clave y cuota necesarias; sin imagen falsa alternativa.",
+            "Genera una ilustración profesional de un volcán de Nicaragua al amanecer.",
+            "imagen")
     )
 
     fun instructionFor(query: String): String {

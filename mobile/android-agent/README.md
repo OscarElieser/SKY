@@ -1,3 +1,16 @@
+# SKY Android 0.8.24 — Excel real, imágenes Gemini y guardado MP4
+
+**Código en main. La APK requiere compilación firmada, CI y prueba en Samsung antes de declararse funcional en dispositivo.**
+
+- **Excel nativo (.xlsx):** exporta una respuesta de SKY como Office Open XML con dos hojas llamadas Datos y Resumen. Detecta tablas Markdown y TSV, crea celdas editables, reconoce números y añade SUM en columnas enteramente numéricas. Los valores recibidos no se ejecutan como fórmulas. Si la respuesta no tiene tabla, convierte líneas a filas sin inventar cifras. Hasta 500 filas y 12 columnas.
+- **Generación real de imágenes:** en Ajustes, IMÁGENES IA · GENERAR CON GEMINI Y GUARDAR solicita texto, proporción, confirmación de envío y posible cuota o cobro. Llama al modelo oficial gemini-nano-banana-2.1 por HTTPS, valida una imagen devuelta, la previsualiza y permite guardarla con el explorador Android. Requiere acceso a ese modelo y una clave válida. Si no hay imagen auténtica, SKY muestra el error, sin fallback artificial.
+- **Video H.264 auténtico:** en Ajustes, VIDEOS · RENDERIZAR MP4 LOCAL Y GUARDAR ejecuta el codificador MediaCodec/OpenGL preexistente y permite guardar el MP4 creado. Produce animaciones verticales con texto de 10 segundos, sin audio. **No equivale a video cinematográfico generado por IA.**
+- **Archivos y funciones conservadas:** DOCX, PPTX, SVG, MD y HTML editables; historial, voz, memoria, acciones con permisos y adjuntos de hasta 100 MB para formatos compatibles. SKY Windows sin modificar.
+- **Pruebas:** XLSX cuenta con pruebas de ZIP OOXML, fórmulas SUM, celdas, XML seguro y bloqueo de fórmulas externas. La apertura del archivo Excel, la respuesta del modelo de imágenes, el MP4 y la edición siguen pendientes de prueba en el Samsung.
+- **No afirmar funcionamiento al 100 % sin pruebas reales y autorizaciones de proveedores.** La compatibilidad, la cuota y el costo pueden variar.
+
+---
+
 # SKY Android 0.8.23 — creación nativa de Word, PowerPoint y SVG
 
 **Código integrado en main. Las funciones deben pasar CI y comprobarse en Samsung antes de considerarse verificadas en dispositivo.**
