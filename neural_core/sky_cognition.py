@@ -1,7 +1,7 @@
 """Puente cognitivo aditivo de SKY IA.
 
 No reemplaza los LLM, la memoria cifrada ni los agentes existentes.
-La planificación NO ejecuta acciones. La investigación usa SOLO cachés públicos.
+La planificación NO ejecuta acciones. Investigación: caché por defecto, API académica bajo consentimiento.
 La memoria personal se consulta exclusivamente con consentimiento expreso y motor local.
 """
 from __future__ import annotations
