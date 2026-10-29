@@ -642,6 +642,65 @@ class MainActivity : Activity() {
     }
 
     /** Aprender solo de una respuesta que el dueño revisó: no de cualquier web o chat. */
+    /** Prueba HTTPS REAL desde el teléfono. No usa conversaciones privadas. */
+    private fun testGeminiModelsOnDevice() {
+        if (!tokens.cloudEnabled()) {
+            home.showMessage("Primero configurá y verificá tu clave Gemini desde Ajustes.")
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Diagnóstico REAL de modelos")
+            .setMessage("SKY enviará tres consultas de prueba SIN información personal " +
+                "a Google Gemini (económico, Flash y profundo). " +
+                "Puede consumir cuota; las respuestas y errores quedarán registrados " +
+                "localmente como prueba de conexión, NO como prueba de razonamiento correcto. " +
+                "No es una validación del micrófono ni del control de aplicaciones.")
+            .setPositiveButton("Probar los tres modelos") { _, _ ->
+                home.showMessage("Comprobando las API de Gemini desde este teléfono...")
+                executor.execute {
+                    val commands = listOf(
+                        "Modo económico: Respondé únicamente la palabra LISTA.",
+                        "Modo flash: Respondé únicamente la palabra LISTA.",
+                        "Modo profundo: Respondé únicamente la palabra LISTA."
+                    )
+                    val results = mutableListOf<String>()
+                    for (command in commands) {
+                        val selected = SkyGeminiModes.select(command)
+                        val started = android.os.SystemClock.elapsedRealtime()
+                        val result = runCatching {
+                            SkyPhoneCloud.reply(tokens.personalCloudKey(), command, JSONArray())
+                        }
+                        val elapsed = android.os.SystemClock.elapsedRealtime() - started
+                        if (result.isSuccess && !result.getOrNull().isNullOrBlank()) {
+                            runCatching { actionEvidence.record(
+                                "Gemini · " + selected.model, "RECEIVED_RESPONSE",
+                                "Respuesta HTTP válida y no vacía, duración: " + elapsed +
+                                    " ms. Calidad de respuesta no verificada."
+                            ) }
+                            results.add(selected.model + ": respondió (" + elapsed + " ms)")
+                        } else {
+                            val reason = result.exceptionOrNull()?.message.orEmpty().take(190)
+                                .ifBlank { "Sin respuesta de texto" }
+                            runCatching { actionEvidence.record(
+                                "Gemini · " + selected.model, "FAILED", reason
+                            ) }
+                            results.add(selected.model + ": ERROR · " + reason)
+                        }
+                    }
+                    runOnUiThread {
+                        if (isFinishing || isDestroyed) return@runOnUiThread
+                        AlertDialog.Builder(this)
+                            .setTitle("Resultados reales · Gemini")
+                            .setMessage(results.joinToString("\n\n") +
+                                "\n\nRevisá también Ajustes → Evidencias. " +
+                                "Esta prueba no certifica la app completa.")
+                            .setPositiveButton("Entendido", null).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancelar", null).show()
+    }
+
     private fun showLearningDialog() {
         val entry = archive.recent(1).lastOrNull()
         if (entry == null) {
@@ -1900,6 +1959,10 @@ class MainActivity : Activity() {
                     }
                     .setNegativeButton("Cerrar", null).show()
             }
+        })
+        content.addView(actionButton("DIAGNÓSTICO REAL · PROBAR GEMINI EN ESTE TELÉFONO") {
+            settingsDialog?.dismiss()
+            testGeminiModelsOnDevice()
         })
         content.addView(actionButton("APRENDIZAJE REAL · MIS RESPUESTAS CORREGIDAS") {
             settingsDialog?.dismiss()
