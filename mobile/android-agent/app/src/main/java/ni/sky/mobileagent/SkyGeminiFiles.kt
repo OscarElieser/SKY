@@ -191,6 +191,7 @@ object SkyGeminiFiles {
         require(items.isNotEmpty() && items.size <= SkyAttachmentBatch.MAX_FILES)
         val uploaded = mutableListOf<Uploaded>()
         val extracted = mutableListOf<String>()
+        val receipts = mutableListOf<String>()
         var response: String? = null
         var cleanupFailures = 0
         try {
@@ -205,6 +206,7 @@ object SkyGeminiFiles {
                     onProgress(itemLabel + " · texto extraído")
                     extracted.add("Documento " + item.name +
                         " (extracción parcial de texto y valores, sin gráficos ni diseño):\n" + text)
+                    receipts.add(item.name.take(100) + ": texto parcial leído localmente")
                 } else {
                     val file = upload(context.contentResolver, apiKey, item, cancel) { value ->
                         onProgress(itemLabel + " · enviado " + value + "%")
@@ -212,6 +214,7 @@ object SkyGeminiFiles {
                     uploaded.add(file)
                     onProgress(itemLabel + " · procesando en Gemini...")
                     awaitReady(apiKey, file, cancel)
+                    receipts.add(item.name.take(100) + ": archivo aceptado y preparado por Gemini")
                 }
             }
             cancel.check()
@@ -224,7 +227,11 @@ object SkyGeminiFiles {
                 if (runCatching { delete(apiKey, file) }.isFailure) cleanupFailures++
             }
         }
-        return response.orEmpty() + if (cleanupFailures > 0)
+        val evidence = if (response.isNullOrBlank()) "" else
+            "\n\nTrazabilidad: " + receipts.size + "/" + items.size +
+                " archivos preparados. " + receipts.joinToString("; ").take(800) +
+                ". Esta traza comprueba la preparación, no la exactitud de cada conclusión."
+        return response.orEmpty() + evidence + if (cleanupFailures > 0)
             "\nAviso: Gemini no confirmó el borrado de " + cleanupFailures +
                 " archivo(s) temporal(es). Revisá tu cuenta; la retención puede ser de hasta 48 horas."
             else ""
