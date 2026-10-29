@@ -10,7 +10,7 @@ param(
     [switch]$SinVoz,
     [switch]$SoloVerificarDependencias, # solo lectura, sin descargas
     [switch]$SoloDependencias,          # no instala Ollama ni modelos
-    [switch]$ActualizarPip,            # sólo si se solicita explícitamente
+    [switch]$ActualizarPip,            # solo si se solicita explicitamente
     [switch]$Local,                # activa SKY_LOCAL_ONLY=1 (nada sale del equipo)
     [switch]$Siempre               # SKY 24/7: arranca con Windows y el equipo no se suspende enchufado
 )
