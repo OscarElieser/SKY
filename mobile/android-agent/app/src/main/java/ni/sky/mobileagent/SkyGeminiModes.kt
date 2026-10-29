@@ -8,7 +8,8 @@ internal object SkyGeminiModes {
 
     enum class Tier { ECONOMY, FLASH, DEEP }
 
-    data class Selection(val tier: Tier, val model: String, val prompt: String) {
+    data class Selection(val tier: Tier, val model: String, val prompt: String,
+                         val explicit: Boolean = false) {
         val historyTurns: Int get() = when (tier) {
             Tier.ECONOMY -> 8
             Tier.FLASH -> 14
@@ -54,7 +55,7 @@ internal object SkyGeminiModes {
             Triple(economy, Tier.ECONOMY, ECONOMY_MODEL)
         ).firstNotNullOfOrNull { (regex, tier, model) ->
             regex.matchEntire(withoutWake)?.groupValues?.get(1)?.trim()
-                ?.takeIf { it.isNotEmpty() }?.let { Selection(tier, model, it) }
+                ?.takeIf { it.isNotEmpty() }?.let { Selection(tier, model, it, explicit = true) }
         }
         return matched ?: Selection(Tier.ECONOMY, ECONOMY_MODEL, original)
     }
