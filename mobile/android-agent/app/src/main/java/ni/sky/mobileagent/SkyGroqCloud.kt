@@ -67,7 +67,7 @@ object SkyGroqCloud {
             .put("model", model)
             .put("messages", messages)
             .put("temperature", 0.5)
-            .put("max_completion_tokens", SkyPhoneCloud.responseTokenLimit(message).coerceAtMost(800))
+            .put("max_completion_tokens", SkyPhoneCloud.responseTokenLimit(message).coerceIn(300, 3500))
     }
 
     /**
@@ -134,7 +134,7 @@ object SkyGroqCloud {
         val candidates = if (selected != null) listOf(selected) else availableTextModels(key)
         for (model in candidates) {
             try {
-                val answer = send(key, payload(message, history, model).toString())
+                val answer = completeReply(key, message, history, model)
                 selectedModel = model
                 selectionKeyHash = modelKey
                 return answer
@@ -143,7 +143,7 @@ object SkyGroqCloud {
                 // and try a different known-compatible text model once.
                 for (alternate in availableTextModels(key).filter { it != model }) {
                     try {
-                        val answer = send(key, payload(message, history, alternate).toString())
+                        val answer = completeReply(key, message, history, alternate)
                         selectedModel = alternate
                         selectionKeyHash = modelKey
                         return answer
@@ -156,7 +156,45 @@ object SkyGroqCloud {
         throw IllegalStateException("No hay modelos Groq disponibles.")
     }
 
-    private fun send(key: String, payload: String): String {
+    private data class CompletionChunk(val text: String, val limited: Boolean)
+
+    /**
+     * Request additional text only when Groq explicitly reports finish_reason=length.
+     * Never silently remove the last part of a document. Respect user quota:
+     * two continuations maximum; report a remaining provider limit honestly.
+     */
+    private fun completeReply(key: String, message: String, history: JSONArray,
+                              model: String): String {
+        var chunk = send(key, payload(message, history, model).toString())
+        val completed = StringBuilder(chunk.text)
+        var attempts = 0
+        while (chunk.limited && attempts < 2 && completed.length < 65_000) {
+            attempts++
+            val continuedHistory = JSONArray(history.toString())
+            continuedHistory.put(JSONObject().put("role", "user")
+                .put("content", message.take(2500)))
+            continuedHistory.put(JSONObject().put("role", "assistant")
+                .put("content", completed.toString().takeLast(1600)))
+            chunk = try {
+                send(key, payload(
+                    "Continúa el texto pendiente desde la última frase, sin repetir " +
+                        "lo anterior. Conserva títulos y secciones. No inventes " +
+                        "información ni acciones.",
+                    continuedHistory, model).toString())
+            } catch (_: Exception) {
+                return completed.toString() +
+                    "\n\n[La respuesta quedó incompleta por un error o límite del proveedor. " +
+                    "Podés solicitar «continuar» para recuperar el resto.]"
+            }
+            completed.append("\n").append(chunk.text)
+        }
+        if (chunk.limited) completed.append(
+            "\n\n[El proveedor alcanzó su límite de respuesta. " +
+                "Podés solicitar «continuar» para completar la información.]")
+        return completed.toString()
+    }
+
+    private fun send(key: String, payload: String): CompletionChunk {
         val data = payload.toByteArray(Charsets.UTF_8)
         require(data.size < 100_000) { "El historial es demasiado largo." }
         val connection = URL(ENDPOINT).openConnection() as HttpURLConnection
@@ -196,7 +234,10 @@ object SkyGroqCloud {
             val answer = response.optJSONArray("choices")?.optJSONObject(0)
                 ?.optJSONObject("message")?.optString("content").orEmpty().trim()
             if (answer.isEmpty()) throw IllegalStateException("Groq no devolvió texto.")
-            return answer.take(5000)
+            require(answer.length <= 65_000) { "Groq devolvió demasiado texto." }
+            return CompletionChunk(answer,
+                response.optJSONArray("choices")?.optJSONObject(0)
+                    ?.optString("finish_reason") == "length")
         } finally {
             connection.disconnect()
         }
