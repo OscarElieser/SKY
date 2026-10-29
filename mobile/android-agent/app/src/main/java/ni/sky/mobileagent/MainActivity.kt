@@ -145,7 +145,7 @@ class MainActivity : Activity() {
                 !processMessagingCommand(transcript) &&
                 !processLocalPanelCommand(transcript, spoken = true) &&
                 !processCompanionCommand(transcript) &&
-                !processDailyCommand(transcript)) {
+                !processDailyCommand(transcript, spoken = true)) {
                 // Keep the animated face visible during spoken conversation.
                 voiceReplyOnFace = true
                 chatInput.setText(transcript)
