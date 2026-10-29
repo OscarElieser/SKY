@@ -54,4 +54,10 @@ class SkyMusicCommandTest {
         assertEquals("november rain", explicit?.query)
     }
 
+    @Test fun signedStandardVariantNeverEnablesMusicAccessibility() {
+        assertFalse(BuildConfig.ENABLE_TEXT_ASSIST)
+        assertFalse(SkyMusicControlService.enabled())
+        assertFalse(SkyMusicControlService.arm("com.spotify.music", "november rain") { })
+    }
+
 }
