@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="SkyPremiumTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:colorAccent">#5EDFF7</item>
+        <item name="android:colorBackground">#080D22</item>
+        <item name="android:windowBackground">#080D22</item>
+        <item name="android:textColorPrimary">#F7F9FF</item>
+        <item name="android:textColorSecondary">#B3C2DE</item>
+        <item name="android:statusBarColor">#080D22</item>
+        <item name="android:navigationBarColor">#080D22</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:alertDialogTheme">@style/SkyPremiumAlertDialog</item>
+    </style>
+    <style name="SkyPremiumAlertDialog" parent="@android:style/Theme.Material.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/sky_premium_dialog_background</item>
+        <item name="android:colorAccent">#5EDFF7</item>
+        <item name="android:textColorPrimary">#F7F9FF</item>
+        <item name="android:textColorSecondary">#B3C2DE</item>
+        <item name="android:windowMinWidthMajor">90%</item>
+        <item name="android:windowMinWidthMinor">90%</item>
+    </style>
+</resources>
