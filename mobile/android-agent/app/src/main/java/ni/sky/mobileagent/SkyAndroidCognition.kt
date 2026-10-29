@@ -49,6 +49,18 @@ object SkyAndroidCognition {
     private fun tokens(input: String): Set<String> =
         normalize(input).split(' ').filter { it.length > 2 }.toSet()
 
+    /** Orden explícita por texto o dictado; nunca extrae hechos por inferencia. */
+    fun explicitFact(query: String): String? {
+        val withoutWake = query.trim().replaceFirst(
+            Regex("""^(?:(?:oye|hey)\s+)?sky\s*[,.:;!?¡¿-]*\s*""",
+                RegexOption.IGNORE_CASE), ""
+        )
+        val match = Regex("""^(?:recuerda|aprende)\s+que\s+(.+)$""",
+            RegexOption.IGNORE_CASE).matchEntire(withoutWake) ?: return null
+        val value = match.groupValues[1].trim()
+        return value.takeIf { it.length >= 5 }
+    }
+
     fun memoryQuestion(query: String): Boolean {
         val phrase = normalize(query).removePrefix("sky ").trim()
         return phrase.startsWith("que recuerdas de mi") ||
