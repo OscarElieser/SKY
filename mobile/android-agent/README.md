@@ -1,3 +1,14 @@
+## SKY Android 0.8.28 — respuestas completas, Word descargable y órdenes musicales naturales
+
+**Implementado en el código de `main`; no equivale a APK publicada ni a instalación probada.** La nueva APK debe pasar compilación firmada, pruebas Android 15/16, auditoría y distribución de GitHub Releases antes de ofrecerse como descarga. SKY Windows no se modifica.
+
+- **Respuestas largas:** se ampliaron los límites de salida de Groq/Gemini para redacción y documentos; ambos solicitan continuación solo si el proveedor indica explícitamente que alcanzó el máximo de tokens. Si persiste el límite o hay un error, SKY lo informa en pantalla en lugar de fingir que el texto está completo.
+- **Historial y documentos:** se elimina el recorte silencioso a 5.000 caracteres al guardar en SQLite. Se admiten respuestas de hasta 100.000 caracteres en el archivo local y su posterior exportación (la capacidad real depende del proveedor y la memoria disponible).
+- **Word de verdad:** «Necesito descargar el archivo Word» permite elegir una respuesta existente y guardarla como `.docx` auténtico mediante el selector de archivos de Android. «Crea un documento Word sobre…» solicita primero el contenido y, una vez recibido, abre el guardado DOCX. Si el proveedor falla, no se crea un archivo vacío.
+- **Música por voz o texto:** se reconoce «Hola SKY quiero que reproduzca Spotify y reproduzca la canción November Rain» como orden musical local, sin que el chat de Groq responda que no puede abrir aplicaciones. También se mantiene el intérprete para YouTube y YouTube Music.
+- **Límite de reproducción:** una solicitud a Android o una búsqueda abierta **no** garantiza que Spotify/YouTube haya iniciado el audio exacto. La APK estándar no agrega servicios de accesibilidad ni elude autorizaciones, suscripciones ni protecciones del sistema. El audio correcto solo se certifica probándolo en el teléfono.
+- **Pruebas nuevas:** casos Kotlin del comando musical literal y solicitudes Word; persistencia SQLite y generación DOCX con respuestas extensas en emulador. La prueba física en Samsung SM-S711U/Android 16 continúa pendiente para esta versión.
+
 ## SKY Android 0.8.27 — ciclo de ejecución verificable (nuevo)
 
 **Cambios integrados en `main`, no equivalen a APK publicada ni a pruebas físicas en Samsung.**
