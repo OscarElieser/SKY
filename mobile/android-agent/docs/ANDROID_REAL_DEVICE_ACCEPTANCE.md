@@ -1,8 +1,18 @@
-# SKY Android 0.8.24 — pruebas de aceptación verificables
+# SKY Android 0.8.27 — pruebas de aceptación verificables
 
 Este protocolo distingue **código implementado**, **prueba de emulador aprobada**
 y **prueba real en el Samsung**. El teléfono nunca se considera validado solo
 porque GitHub Actions termine en verde.
+
+## Evidencias verificadas de la versión 0.8.27 (29/10/2026)
+
+- **Código y etiqueta de versión:** commit `3c0087cb093734796d818ded1135e88e199b2a70`. La etiqueta `sky-android-v0.8.27` apunta a ese mismo commit.
+- **Compilación Android:** [SKY Mobile Android Agent · éxito](https://github.com/OscarElieser/SKY/actions/runs/40859332611). Verificó el APK estándar, los comandos y pruebas del backend.
+- **Emuladores Android 15 y 16:** [runtime emulator smoke · éxito](https://github.com/OscarElieser/SKY/actions/runs/40859332929).
+- **Firma y publicación:** [Android Signed Release Candidate · éxito](https://github.com/OscarElieser/SKY/actions/runs/40859332903). La compilación firmada, auditoría de permisos, pruebas instrumentadas y publicación directa terminaron correctamente.
+- **APK publicada:** [SKY IA Android 0.8.27, beta personal](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.27), con archivo `SKY-IA-Android-v0.8.27-firmada.apk`, SHA-256 y huella del firmante.
+- **Alcance de la evidencia:** estos resultados **no** certifican instalación física, escucha sostenida con pantalla bloqueada, llamadas reales a Gemini/Groq con la clave del propietario, reproducción audible de canciones ni acceso irrestricto a aplicaciones. Esas comprobaciones continúan pendientes en el Samsung; la beta no está certificada por Google Play.
+- **Seguridad y privacidad:** conservar las protecciones de Android. No desactivar Play Protect para instalar. Ante bloqueo o diferencia de firma, detener la actualización y recopilar solo datos de error sin exponer claves.
 
 ## Paso 1. Verificaciones automáticas
 
@@ -15,7 +25,7 @@ porque GitHub Actions termine en verde.
   Spotify, YouTube ni micrófono físico.
 - `SKY Android Signed Release Candidate`: `testStandardDebugUnitTest`,
   compilación estándar con clave privada, firma verificada, paquete
-  `ni.sky.mobileagent` y publicación de APK 0.8.24 si todo el flujo pasa.
+  `ni.sky.mobileagent` y publicación de APK 0.8.27 si todo el flujo pasa.
 - Descargar exclusivamente una APK firmada y verificada en
   <https://github.com/OscarElieser/SKY/releases>.
 - No desinstalar la versión previa ni desactivar Play Protect para forzar
@@ -23,10 +33,10 @@ porque GitHub Actions termine en verde.
 
 ## Paso 2. Pruebas en Samsung (Android 16)
 
-Abrir SKY > Ajustes > Autodiagnóstico Android. Registrar versión 0.8.24,
+Abrir SKY > Ajustes > Autodiagnóstico Android. Registrar versión 0.8.27,
 modelo, permisos, motor de reconocimiento en dispositivo, voz, notificaciones,
 estado de servicio manos libres, última frase captada y códigos de error.
-Si no aparece `0.8.24`, la prueba corresponde a un APK anterior.
+Si no aparece `0.8.27`, la prueba corresponde a un APK anterior.
 
 ### A. Órdenes de aplicaciones, 5 intentos por orden
 
