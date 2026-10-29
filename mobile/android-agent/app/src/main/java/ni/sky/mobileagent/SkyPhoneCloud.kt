@@ -169,7 +169,38 @@ object SkyPhoneCloud {
         require(validPersonalKey(personalKey)) { "Configurá una clave de Gemini para probar con Google." }
         val route = selectedMode ?: SkyGeminiModes.select(message)
         val payload = makePayload(message, history, selectedMode = selectedMode).toString()
-        return send(personalKey, payload, model = route.model, answerLimit = route.answerChars)
+        var result = request(personalKey, payload, model = route.model)
+        val completed = StringBuilder(candidateText(result))
+        if (completed.isBlank()) throw IllegalStateException("Gemini no devolvió texto.")
+        var attempts = 0
+        while (result.optJSONArray("candidates")?.optJSONObject(0)
+                ?.optString("finishReason") == "MAX_TOKENS" &&
+            attempts < 2 && completed.length < 65_000) {
+            attempts++
+            val context = JSONArray(history.toString())
+            context.put(JSONObject().put("role", "user")
+                .put("content", route.prompt.take(3500)))
+            context.put(JSONObject().put("role", "assistant")
+                .put("content", completed.toString().takeLast(1800)))
+            result = try {
+                request(personalKey, makePayload(
+                    "Continúa la respuesta anterior desde donde se interrumpió, sin repetir " +
+                        "el texto ni inventar información. Termina todas las secciones.",
+                    context, selectedMode = route).toString(), model = route.model)
+            } catch (_: Exception) {
+                return completed.toString() +
+                    "\n\n[Gemini interrumpió la respuesta. Pedí «continuar» para completar lo pendiente.]"
+            }
+            val extra = candidateText(result)
+            if (extra.isBlank()) break
+            completed.append("\n").append(extra)
+        }
+        if (result.optJSONArray("candidates")?.optJSONObject(0)
+                ?.optString("finishReason") == "MAX_TOKENS") {
+            completed.append("\n\n[Gemini alcanzó su límite de respuesta. " +
+                "Pedí «continuar» si falta contenido.]")
+        }
+        return completed.toString()
     }
 
     /** Uses grounded Google Search, retaining source and Search Suggestions metadata. */
@@ -344,6 +375,15 @@ object SkyPhoneCloud {
                 .put("temperature", 0.4))
             .toString()
         return send(personalKey, payload, model = route.model, answerLimit = route.answerChars)
+    }
+
+    private fun candidateText(response: JSONObject): String {
+        val parts = response.optJSONArray("candidates")?.optJSONObject(0)
+            ?.optJSONObject("content")?.optJSONArray("parts") ?: return ""
+        return (0 until parts.length()).mapNotNull { index ->
+            parts.optJSONObject(index)?.optString("text")?.trim()
+                ?.takeIf { it.isNotEmpty() }
+        }.joinToString("\n")
     }
 
     private fun send(personalKey: String, payload: String, maxBytes: Int = 600_000,
