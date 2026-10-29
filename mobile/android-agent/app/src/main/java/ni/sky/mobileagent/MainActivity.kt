@@ -118,7 +118,8 @@ class MainActivity : Activity() {
                 // Keep the animated face visible during spoken conversation.
                 voiceReplyOnFace = true
                 chatInput.setText(transcript)
-                if (!tokens.cloudEnabled() && tokens.chatToken().isEmpty()) {
+                if (!tokens.cloudEnabled() && !tokens.groqEnabled() &&
+                    tokens.chatToken().isEmpty() && SkyLocalConversation.reply(transcript) == null) {
                     voiceReplyOnFace = false
                     voicePanel.showError("Activá el chat seguro en Ajustes.")
                     home.showMessage("Activá el chat desde Ajustes para conversar.")
@@ -225,7 +226,7 @@ class MainActivity : Activity() {
         }
         home.root.requestApplyInsets()
         refreshConnection()
-        if (tokens.token().isEmpty() && !tokens.cloudEnabled()) {
+        if (tokens.token().isEmpty() && !tokens.cloudEnabled() && !tokens.groqEnabled()) {
             home.root.post { if (!isFinishing) showSettings() }
         }
     }
@@ -646,7 +647,8 @@ class MainActivity : Activity() {
     }
 
     private fun refreshConnection() {
-        home.setConnection(tokens.token().isNotEmpty(), tokens.chatToken().isNotEmpty(), tokens.cloudEnabled())
+        home.setConnection(tokens.token().isNotEmpty(), tokens.chatToken().isNotEmpty(),
+            tokens.cloudEnabled() || tokens.groqEnabled())
     }
 
     /** La vinculación solo se muestra si aún no existe un token válido. */
@@ -765,6 +767,80 @@ class MainActivity : Activity() {
                 }
             }
             content.addView(activationButton)
+        }
+        content.addView(description("GROQ GRATIS · MODO PRINCIPAL DE CONVERSACIÓN"))
+        content.addView(description("GroqCloud ofrece modelos rápidos en un plan gratuito con límites. " +
+            "Usaremos Groq para conversaciones normales si lo configurás. " +
+            "Gemini quedará disponible para consultas web verificadas o como alternativa. " +
+            "Tu clave permanece cifrada en este teléfono; nunca se sube a GitHub."))
+        if (tokens.groqEnabled()) {
+            content.addView(description("Groq está configurado y tiene prioridad en el chat normal."))
+            content.addView(actionButton("Quitar clave de Groq") {
+                tokens.clearGroqKey()
+                refreshConnection()
+                settingsDialog?.dismiss()
+                showSettings()
+            })
+        } else {
+            val groqInput = input("Pegá tu clave de GroqCloud", true)
+            content.addView(groqInput)
+            val groqConsent = CheckBox(this).apply {
+                text = "Autorizo enviar mis preguntas y el contexto reciente a Groq. " +
+                    "Comprendo que el servicio tiene límites gratuitos y puedo quitar la clave."
+            }
+            content.addView(groqConsent)
+            content.addView(actionButton("Crear o copiar clave gratuita de Groq") {
+                startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse("https://console.groq.com/keys")))
+            })
+            lateinit var groqButton: Button
+            groqButton = actionButton("COMPROBAR Y ACTIVAR GROQ") {
+                val raw = groqInput.text.toString()
+                val key = SkyPhoneCloud.normalizePersonalKey(raw)
+                val problem = SkyGroqCloud.keyProblem(raw)
+                if (!groqConsent.isChecked) {
+                    AlertDialog.Builder(this).setTitle("Autorización necesaria")
+                        .setMessage("Autorizá el envío de mensajes a Groq antes de activarlo.")
+                        .setPositiveButton("Entendido", null).show()
+                } else if (problem != null) {
+                    AlertDialog.Builder(this).setTitle("Clave de Groq")
+                        .setMessage(problem)
+                        .setPositiveButton("Entendido", null).show()
+                } else {
+                    groqButton.isEnabled = false
+                    groqButton.text = "Comprobando Groq…"
+                    execute {
+                        try {
+                            SkyGroqCloud.reply(key, "Responde solo: lista.", JSONArray())
+                            runOnUiThread {
+                                if (isFinishing) return@runOnUiThread
+                                tokens.saveGroqKey(key)
+                                groqInput.setText("")
+                                refreshConnection()
+                                settingsDialog?.dismiss()
+                                AlertDialog.Builder(this)
+                                    .setTitle("Groq conectado")
+                                    .setMessage("SKY puede conversar usando Groq. " +
+                                        "Las consultas actuales necesitarán fuentes web verificadas.")
+                                    .setPositiveButton("Conversar") { _, _ -> home.openChat() }
+                                    .show()
+                            }
+                        } catch (error: Exception) {
+                            runOnUiThread {
+                                if (isFinishing) return@runOnUiThread
+                                groqButton.isEnabled = true
+                                groqButton.text = "COMPROBAR Y ACTIVAR GROQ"
+                                AlertDialog.Builder(this)
+                                    .setTitle("No se pudo activar Groq")
+                                    .setMessage(error.message?.take(240)
+                                        ?: "Revisá la clave o tu conexión a internet.")
+                                    .setPositiveButton("Entendido", null).show()
+                            }
+                        }
+                    }
+                }
+            }
+            content.addView(groqButton)
         }
         content.addView(actionButton(if (showOptionalWindowsLink || linked)
             "Ocultar conexión Windows (opcional)" else "Conexión Windows (opcional)") {
@@ -1198,8 +1274,10 @@ class MainActivity : Activity() {
     private fun checkHomeStatus() {
         val id = tokens.deviceId()
         val token = tokens.token()
-        if (tokens.cloudEnabled()) {
-            setStatus("SKY Android independiente · Gemini configurado. Windows no es necesario.")
+        if (tokens.groqEnabled() || tokens.cloudEnabled()) {
+            setStatus("SKY Android independiente · " +
+                (if (tokens.groqEnabled()) "Groq activo" else "Gemini activo") +
+                ". Windows no es necesario.")
             return
         }
         if (id.isEmpty() || token.isEmpty()) {
