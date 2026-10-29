@@ -1496,6 +1496,39 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             exportLatestResponse()
         })
+        content.addView(actionButton("EVIDENCIAS · ÓRDENES Y RESULTADOS REALES") {
+            val entries = actionEvidence.recent(40)
+            if (entries.isEmpty()) {
+                AlertDialog.Builder(this).setTitle("SKY · Ejecución verificable")
+                    .setMessage("Todavía no hay acciones registradas en este teléfono.")
+                    .setPositiveButton("Cerrar", null).show()
+            } else {
+                val labels = entries.map { it.status + " · " + it.action }.toTypedArray()
+                AlertDialog.Builder(this).setTitle("SKY · Evidencias locales")
+                    .setMessage("ENVIADA_SIN_VERIFICAR significa que Android recibió la orden, " +
+                        "no que la tarea se completó. VERIFICADA_LOCAL solo registra cambios " +
+                        "comprobados dentro del almacenamiento de SKY.")
+                    .setItems(labels) { _, index ->
+                        val receipt = entries[index]
+                        AlertDialog.Builder(this).setTitle(receipt.status)
+                            .setMessage(receipt.action + "\n\n" + receipt.detail +
+                                "\n\nFecha: " + java.text.SimpleDateFormat(
+                                    "dd/MM/yyyy HH:mm", java.util.Locale("es","NI"))
+                                    .format(java.util.Date(receipt.createdAt)))
+                            .setPositiveButton("Cerrar", null).show()
+                    }
+                    .setNeutralButton("Borrar evidencias") { _, _ ->
+                        AlertDialog.Builder(this).setTitle("Eliminar evidencias locales")
+                            .setMessage("Borrar este registro no revierte las acciones realizadas.")
+                            .setPositiveButton("Eliminar") { _, _ ->
+                                actionEvidence.deleteAll()
+                                home.showMessage("Se borraron las evidencias locales.")
+                            }
+                            .setNegativeButton("Cancelar", null).show()
+                    }
+                    .setNegativeButton("Cerrar", null).show()
+            }
+        })
         content.addView(actionButton("HISTORIAL · BUSCAR Y EXPORTAR CONSULTAS") {
             settingsDialog?.dismiss()
             showHistoryBrowser()
@@ -2217,6 +2250,9 @@ class MainActivity : Activity() {
                     needsLiveSources && mobileCloud -> {
                         val live = SkyPhoneCloud.replyWithSources(
                             tokens.personalCloudKey(), personalizedMessage, history, selectedMode = selection)
+                        require(live.searchedWeb && live.sources.isNotEmpty()) {
+                            "No recibí fuentes comprobables de Google Search para esta consulta."
+                        }
                         answer = live.answer
                         sources = live.sources
                         searchSuggestions = live.googleSearchHtml
