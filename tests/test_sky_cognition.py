@@ -16,11 +16,11 @@ def test_plans_never_execute_or_grant_permissions():
     assert all(step["state"] == "proposed" for step in result["steps"])
 
 
-@pytest.mark.parametrize("request", [
+@pytest.mark.parametrize("user_command", [
     "Borra todos los archivos", "Envía un mensaje", "Compra una suscripción",
 ])
-def test_sensitive_plans_require_confirmation(request):
-    result = brain.plan(request, device="windows")
+def test_sensitive_plans_require_confirmation(user_command):
+    result = brain.plan(user_command, device="windows")
     assert result["risk"] == "alto"
     assert result["requires_confirmation"]
     assert not result["execution_performed"]
