@@ -10,7 +10,7 @@ import java.util.Locale
  */
 object SkyVoicePresence {
     enum class Mode { WAKE_ONLY, ATTENTIVE, SLEEP_LOCKED }
-    enum class Request { SLEEP, ATTEND, WAKE, NONE }
+    enum class Request { SLEEP, ATTEND, WAKE, CONFIRM, CANCEL, NONE }
 
     fun normalized(raw: String): String = Normalizer.normalize(
         raw.lowercase(Locale.ROOT), Normalizer.Form.NFD
@@ -26,6 +26,10 @@ object SkyVoicePresence {
                 "a dormir", "descansa", "buenas noches",
                 "dormi hasta que yo te despierte", "duerme hasta que te despierte") ->
                 Request.SLEEP
+            cmd in setOf("confirmo", "confirmar", "confirma", "si confirmo") ->
+                Request.CONFIRM
+            cmd in setOf("cancela", "cancelar", "no confirmo", "olvidalo") ->
+                Request.CANCEL
             cmd in setOf("despierta", "desperta", "levantate",
                 "volver a activarte", "activarte", "volvete a activar") ->
                 Request.WAKE
