@@ -17,6 +17,11 @@ class SkyQuickActions(
     private val host: Activity,
     private val feedback: (String) -> Unit
 ) {
+    var onReceipt: ((String, String, String) -> Unit)? = null
+    private fun receipt(action: SkyQuickCommand.Action, state: String, detail: String) {
+        onReceipt?.invoke("Control Android " + action.name, state, detail)
+    }
+
     private val audio: AudioManager
         get() = host.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -30,6 +35,7 @@ class SkyQuickActions(
                 SkyQuickCommand.Action.VOLUME_UP,
                 SkyQuickCommand.Action.VOLUME_DOWN -> {
                     if (audio.isVolumeFixed) {
+                        receipt(action, "REJECTED", "El dispositivo informa volumen fijo")
                         feedback("El volumen es fijo en este dispositivo.")
                         return
                     }
@@ -39,6 +45,8 @@ class SkyQuickActions(
                     audio.adjustStreamVolume(AudioManager.STREAM_MUSIC,
                         direction, AudioManager.FLAG_SHOW_UI)
                     val after = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
+                    receipt(action, if (after != before) "VERIFIED_LOCAL" else "REJECTED",
+                        "Volumen multimedia observado antes=$before, despues=$after")
                     feedback(if (after != before) {
                         if (action == SkyQuickCommand.Action.VOLUME_UP)
                             "Subí un nivel el volumen multimedia."
@@ -60,6 +68,8 @@ class SkyQuickActions(
                         KeyEvent.ACTION_DOWN, keyCode, 0))
                     audio.dispatchMediaKeyEvent(KeyEvent(time, time,
                         KeyEvent.ACTION_UP, keyCode, 0))
+                    receipt(action, "SENT",
+                        "Android recibió teclas multimedia; reproducción o salto no verificados")
                     feedback(when (action) {
                         SkyQuickCommand.Action.NEXT ->
                             "Pedí pasar a la siguiente canción. Comprobá el reproductor."
@@ -76,8 +86,10 @@ class SkyQuickActions(
                 }
             }
         } catch (_: SecurityException) {
+            receipt(action, "FAILED", "Android denegó permiso para la acción multimedia")
             feedback("Android no autorizó este control multimedia.")
         } catch (_: RuntimeException) {
+            receipt(action, "FAILED", "Android lanzó un error al procesar el control multimedia")
             feedback("El reproductor no permitió completar la orden.")
         }
     }
@@ -86,6 +98,8 @@ class SkyQuickActions(
         try {
             val manager = host.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
             if (!manager.isKeyguardLocked) {
+                receipt(SkyQuickCommand.Action.REQUEST_UNLOCK, "VERIFIED_LOCAL",
+                    "Android informa que Keyguard no está bloqueado")
                 feedback("El teléfono ya está desbloqueado.")
                 return
             }
@@ -96,19 +110,29 @@ class SkyQuickActions(
             manager.requestDismissKeyguard(
                 host, object : KeyguardManager.KeyguardDismissCallback() {
                     override fun onDismissSucceeded() {
+                        receipt(SkyQuickCommand.Action.REQUEST_UNLOCK, "VERIFIED_LOCAL",
+                            "Android confirmó que se desestimó Keyguard")
                         feedback("Android confirmó el desbloqueo.")
                     }
                     override fun onDismissCancelled() {
+                        receipt(SkyQuickCommand.Action.REQUEST_UNLOCK, "REJECTED",
+                            "El propietario canceló la solicitud de desbloqueo")
                         feedback("Desbloqueo cancelado. La pantalla sigue protegida.")
                     }
                     override fun onDismissError() {
+                        receipt(SkyQuickCommand.Action.REQUEST_UNLOCK, "FAILED",
+                            "Android no presentó el desbloqueo seguro")
                         feedback("No pude mostrar el desbloqueo desde esta pantalla. " +
                             "Usá huella, PIN o la pantalla de bloqueo del Samsung.")
                     }
                 }
             )
+            receipt(SkyQuickCommand.Action.REQUEST_UNLOCK, "SENT",
+                "Solicitud presentada a Android; confirmación pendiente")
             feedback("Solicité mostrar el desbloqueo seguro de Android.")
         } catch (_: Exception) {
+            receipt(SkyQuickCommand.Action.REQUEST_UNLOCK, "FAILED",
+                "No se pudo solicitar el desbloqueo seguro a Android")
             feedback("No pude solicitar el desbloqueo seguro. " +
                 "Usá la huella o el PIN del Samsung.")
         }
