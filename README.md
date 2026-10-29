@@ -17,6 +17,14 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 ---
 
 
+## 📱 SKY Android 0.8.27 — ejecución verificable y aprendizaje de resultados
+
+El módulo móvil integra controles Android con resultados observables: cambios de volumen comprobados antes/después, notas reabiertas tras guardar, evidencias persistentes diferenciadas de simples solicitudes, métricas locales por tipo de resultado y validación explícita del origen del propietario al ejecutar órdenes por voz. Las aperturas de apps y los eventos musicales **no** se consideran tareas terminadas si Android solo aceptó la solicitud. El trabajo conserva los límites de permisos y no modifica SKY Windows.
+
+**Pruebas y distribución:** código en `main`, sujeto a CI de Android 15/16 y comprobación en Samsung; nunca inferir que la APK está publicada a partir del número de versión en el código. [Ver guía de ejecución verificable](mobile/android-agent/docs/SKY_EXECUTION_EVIDENCE_0.8.27.md) · [Ver APK publicadas](https://github.com/OscarElieser/SKY/releases).
+
+---
+
 ## 🧠 Núcleo evolutivo propio, seguridad y evidencias — actualización 28/10/2026
 
 La **API propia de SKY** utiliza FastAPI y el sistema existente de autorización. Ahora también contiene un **motor adaptativo nativo** en `neural_core/sky_adaptive_policy.py`: procesa datos operacionales agregados del propio SKY, calcula fiabilidad por rol (intervalos de Wilson) y sugiere cuándo revisar fallos o seguir con pruebas supervisadas. **Funciona sin llamar a Gemini, ChatGPT ni otro proveedor para esa operación.** Es aprendizaje estadístico consultivo, no un LLM independiente de producción, no entrenamiento automático de pesos y no sustituye el razonamiento generativo.
