@@ -22,6 +22,10 @@ class SkyInstalledApps(
     private val activity: Activity,
     private val say: (String) -> Unit
 ) {
+    var onReceipt: ((String, String, String) -> Unit)? = null
+    private fun receipt(action: String, status: String, detail: String) {
+        onReceipt?.invoke(action, status, detail)
+    }
     private val trusted = activity.getSharedPreferences(
         "sky_trusted_launcher_apps", android.content.Context.MODE_PRIVATE
     )
@@ -211,6 +215,7 @@ class SkyInstalledApps(
             if (current == null) {
                 trusted.edit().remove(app.packageName).apply()
                 say("Esta aplicación ya no aparece instalada o visible.")
+                receipt("Abrir " + app.name, "FAILED", "App no encontrada al verificar Android")
                 return
             }
             val launchIntent = Intent(Intent.ACTION_MAIN)
@@ -218,8 +223,12 @@ class SkyInstalledApps(
                 .setComponent(ComponentName(current.packageName, current.className))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             activity.startActivity(launchIntent)
-            say("Android recibió la orden para abrir " + current.name + ".")
+            receipt("Abrir " + current.name, "SENT",
+                "Android aceptó startActivity; apertura completa no comprobada")
+            say("Android recibió la orden para abrir " + current.name +
+                ". No puedo confirmar que terminó de cargar.")
         } catch (_: Exception) {
+            receipt("Abrir " + app.name, "FAILED", "Android rechazó la apertura")
             say("Android no permitió abrir " + app.name + ".")
         }
     }
