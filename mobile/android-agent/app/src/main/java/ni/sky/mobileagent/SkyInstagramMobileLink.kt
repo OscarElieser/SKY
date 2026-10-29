@@ -49,7 +49,7 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
     }
     private fun clear(){prefs.edit().remove("iv").remove("credential").apply()}
     private fun request(path:String,verb:String,credential:String?=null,data:JSONObject?=null):JSONObject {
-        require(path in setOf("/pair-claim","/mobile-status","/mobile-disconnect"))
+        require(path in setOf("/pair-claim","/mobile-status","/mobile-profile","/mobile-disconnect"))
         val conn=URL(base+path).openConnection() as HttpURLConnection
         try {
             conn.requestMethod=verb;conn.instanceFollowRedirects=false
@@ -74,13 +74,15 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
     }
     fun show() {
         val choices=arrayOf("Vincular este teléfono con código temporal",
-            "Consultar conexión verificada","Desvincular este teléfono")
+            "Consultar conexión verificada","Verificar identidad real con Meta",
+            "Desvincular este teléfono")
         // setMessage + setItems oculta las opciones en AlertDialog.
         AlertDialog.Builder(host).setTitle("SKY · Instagram seguro")
             .setItems(choices){_,which->when(which){
                 0->pair()
                 1->check()
-                2->AlertDialog.Builder(host).setTitle("Desvincular Instagram")
+                2->verifyProfile()
+                3->AlertDialog.Builder(host).setTitle("Desvincular Instagram")
                     .setMessage("¿Revocar el acceso de este teléfono? No se revoca el permiso global de Meta.")
                     .setPositiveButton("Revocar"){_,_->disconnect()}
                     .setNegativeButton("Cancelar",null).show()
@@ -126,6 +128,69 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
                 ". Identidad de perfil aún pendiente de verificación."
             else "Instagram: el servidor todavía no registra una autorización activa."
         }
+    }
+
+    /** Independent live API check; never assumes a public profile means OAuth identity. */
+    private fun verifyProfile(){
+        val credential=token()
+        if(credential.isBlank()){
+            feedback("Vinculá primero este teléfono con un código temporal.")
+            return
+        }
+        Thread {
+            val message=try {
+                val response=request("/mobile-profile","GET",credential)
+                val tokenValid=response.optBoolean("token_valid",false)
+                val verified=response.optBoolean("profile_verified",false)
+                val expires=response.optString("token_expires_at","").ifBlank{"No informada por Meta"}
+                if(verified && tokenValid) {
+                    val username=response.optString("username","")
+                    val accountType=response.optString("account_type","Sin especificar")
+                    // Compare against the one locally identified Instagram profile when unambiguous.
+                    val prefs=host.getSharedPreferences("sky_public_social_profiles",Context.MODE_PRIVATE)
+                    val profiles=org.json.JSONArray(prefs.getString("public_profiles_v1","[]"))
+                    val handles=(0 until profiles.length()).mapNotNull { index ->
+                        val entry=profiles.optJSONObject(index)
+                        if(entry?.optString("platform")=="Instagram")entry.optString("handle").trimStart('@') else null
+                    }.filter {it.isNotBlank()}
+                    val matches=handles.size==1 && handles[0].equals(username,true)
+                    val comparison=when {
+                        handles.size!=1 -> "Comprobá que @"+username+" sea tu perfil autorizado."
+                        matches -> "Coincide con el perfil local @"+handles[0]+"."
+                        else -> "ATENCIÓN: no coincide con el perfil local @"+handles[0]+"."
+                    }
+                    "Meta verificó la identidad @"+username+". Cuenta: "+accountType+
+                        ". "+comparison+" Vigencia del token: "+expires+
+                        ". Publicaciones y mensajes siguen deshabilitados hasta sus pruebas."
+                } else {
+                    val reason=when(response.optString("reason","")) {
+                        "missing_facebook_page_permissions" ->
+                            "El token usa Facebook Login pero faltan pages_show_list y pages_read_engagement. " +
+                            "La vinculación del teléfono sigue activa; hay que actualizar los permisos oficiales en Meta."
+                        "token_expired","token_invalid_or_unavailable" ->
+                            "El token Meta expiró, fue revocado o no responde. Se requiere renovar la autorización de Meta."
+                        "facebook_page_profile_unavailable" ->
+                            "Meta no devolvió un perfil profesional asociado a una Página de Facebook."
+                        "multiple_authorized_profiles" ->
+                            "Meta devolvió varios perfiles y no se puede seleccionar uno automáticamente."
+                        "instagram_profile_unavailable" ->
+                            "Meta no devolvió el perfil mediante Instagram Login; revisar permisos."
+                        "not_connected" -> "La autorización del servidor ya no está disponible."
+                        else -> "La identidad todavía no puede verificarse mediante Meta."
+                    }
+                    "Identidad NO verificada. "+reason+" Token válido: "+
+                        (if(tokenValid)"Sí" else "No")+". No se ha publicado nada."
+                }
+            } catch (_: Exception) {
+                "No se pudo completar la consulta oficial con Meta. Revisá la conexión e intentá nuevamente."
+            }
+            host.runOnUiThread {
+                if(!host.isFinishing) AlertDialog.Builder(host)
+                    .setTitle("SKY · Identidad oficial de Instagram")
+                    .setMessage(message)
+                    .setPositiveButton("Entendido",null).show()
+            }
+        }.start()
     }
     private fun disconnect(){
         val credential=token()
