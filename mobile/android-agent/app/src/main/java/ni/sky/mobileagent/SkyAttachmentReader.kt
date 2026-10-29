@@ -62,8 +62,18 @@ object SkyAttachmentReader {
         } ?: throw IllegalArgumentException("Android no permitió leer el archivo.")
 
         if (bytes.isEmpty()) throw IllegalArgumentException("El archivo está vacío.")
-        if (mime.startsWith("image/") || suffix in setOf("png", "jpg", "jpeg", "webp")) {
-            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        if (mime.startsWith("image/") && suffix != "svg" ||
+            suffix in setOf("png", "jpg", "jpeg", "webp")) {
+            // Limitar memoria incluso si una imagen pequeña está descomprimida a gran resolución.
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            val longest = maxOf(bounds.outWidth, bounds.outHeight)
+            if (longest <= 0) return Attachment(name, mime,
+                note = "Formato de imagen no decodificable.")
+            var sample = 1
+            while (longest / sample > 1600) sample *= 2
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size,
+                BitmapFactory.Options().apply { inSampleSize = sample })
                 ?: return Attachment(name, mime, note = "Formato de imagen no decodificable.")
             val jpeg = jpegForModel(bitmap)
             bitmap.recycle()
