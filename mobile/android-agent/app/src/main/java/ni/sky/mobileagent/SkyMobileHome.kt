@@ -47,6 +47,7 @@ class SkyMobileHome(
     private val onRemoveAttachment: () -> Unit,
     private val onCancelUpload: () -> Unit,
     private val onHistory: () -> Unit,
+    private val onTeach: () -> Unit,
     private val archive: SkyConversationArchive,
     private val onDiagnostics: () -> Unit,
     private val onStopHandsFree: () -> Unit
@@ -469,6 +470,10 @@ class SkyMobileHome(
             gravity = Gravity.CENTER_VERTICAL
         }
         header.addView(panelTitle, LinearLayout.LayoutParams(0, dp(50), 1f))
+        header.addView(pill("Enseñar", Color.rgb(54, 76, 113), onTeach).apply {
+            textSize = 12f
+            contentDescription = "Enseñar a SKY una corrección comprobable"
+        }, LinearLayout.LayoutParams(dp(82), dp(40)).apply { rightMargin = dp(6) })
         header.addView(pill("Historial", Color.rgb(53, 56, 107), onHistory).apply {
             textSize = 12f
             contentDescription = "Buscar, leer y exportar historial guardado"
