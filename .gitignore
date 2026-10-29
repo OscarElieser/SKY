@@ -42,3 +42,22 @@ node_modules/
 *.jks
 *.keystore
 *.p12
+
+# Additional Android and Python build products (safe for both platforms)
+*.apk
+*.aab
+*.apks
+*.idsig
+*.hprof
+*.log
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.gradle/
+.kotlin/
+local.properties
+*.iml
+*.egg-info/
+dist/
