@@ -1,0 +1,37 @@
+name: SKY Tiny Transformer actual CPU smoke and optional TPU preflight
+permissions:
+  contents: read
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'neural_core/sky_tiny_transformer.py'
+      - 'tests/test_sky_tiny_transformer.py'
+      - '.github/workflows/sky-tiny-transformer.yml'
+  pull_request:
+    paths:
+      - 'neural_core/sky_tiny_transformer.py'
+      - 'tests/test_sky_tiny_transformer.py'
+jobs:
+  cpu-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install isolated CPU training dependencies
+        run: |
+          python -m pip install 'pytest>=8,<10'
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: Verify syntax of optional model
+        run: python -m py_compile neural_core/sky_tiny_transformer.py
+      - name: Real one-step CPU training, causal mask and rights safeguards
+        run: python -m pytest -q tests/test_sky_tiny_transformer.py
+      - name: Read-only training preflight of original approved sample corpus
+        run: |
+          python -m neural_core.sky_tiny_transformer --preflight --device cpu --dataset data/training/sky_seed_v1.jsonl --output /tmp/sky-tiny-preflight
+      - name: Explain limitation
+        run: echo 'CPU training tested; NO TPU runtime, APK integration, model quality or user-device execution verified.'
