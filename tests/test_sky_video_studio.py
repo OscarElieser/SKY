@@ -80,3 +80,29 @@ def test_renders_captioned_mp4(tmp_path):
     }), encoding="utf-8")
     output = module.render(manifest, tmp_path / "captions.mp4")
     assert output.exists() and output.stat().st_size > 1000
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg") or not shutil.which("ffprobe"),
+                    reason="FFmpeg and ffprobe required")
+def test_renders_voiceover_and_music_mix(tmp_path):
+    video = tmp_path / "source.mp4"
+    voice = tmp_path / "voice.wav"
+    music = tmp_path / "music.wav"
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                    "-f", "lavfi", "-i", "color=c=blue:s=320x568:r=30",
+                    "-t", "1", "-c:v", "mpeg4", str(video)], check=True)
+    for filename, frequency in [(voice, 440), (music, 220)]:
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                        "-f", "lavfi", "-i", f"sine=frequency={frequency}:sample_rate=48000",
+                        "-t", "1", str(filename)], check=True)
+    manifest = tmp_path / "video.json"
+    manifest.write_text(json.dumps({
+        "format": "square", "fps": 30,
+        "scenes": [{"file": "source.mp4", "duration": 1}],
+        "voiceover": "voice.wav", "audio": "music.wav", "music_volume": 0.15
+    }), encoding="utf-8")
+    output = module.render(manifest, tmp_path / "mixed.mp4")
+    assert output.exists() and output.stat().st_size > 1000
+    probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type",
+                            "-of", "json", str(output)], capture_output=True, text=True, check=True)
+    assert {"video", "audio"} <= {stream["codec_type"] for stream in json.loads(probe.stdout)["streams"]}
