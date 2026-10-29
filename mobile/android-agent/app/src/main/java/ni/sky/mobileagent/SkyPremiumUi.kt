@@ -15,9 +15,12 @@ import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.HorizontalScrollView
+import android.widget.ScrollView
 
 /** Identidad visual SKY: sin librerías de pago ni reemplazo de funciones existentes. */
 object SkyPremiumUi {
+    data class SectionSpec(val key: String, val title: String, val description: String, val icon: String)
     val background: Int = Color.rgb(8, 13, 34)
     val card: Int = Color.rgb(24, 34, 67)
     val elevated: Int = Color.rgb(31, 43, 81)
@@ -82,7 +85,7 @@ object SkyPremiumUi {
         val wrapper = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(activity, 16), 0, dp(activity, 8))
-            tag = "sky_premium_section"
+            tag = SectionSpec(title, title, description, symbol)
         }
         wrapper.addView(label(activity, "$symbol  $title", 18f, white, true))
         wrapper.addView(label(activity, description, 12.5f, muted))
@@ -92,7 +95,7 @@ object SkyPremiumUi {
     fun styleChildren(activity: Activity, root: ViewGroup) {
         for (i in 0 until root.childCount) {
             val child = root.getChildAt(i)
-            if (child.tag == "sky_premium_section") continue
+            if (child.tag is SectionSpec) continue
             when (child) {
                 is Button -> {
                     child.isAllCaps = false
@@ -136,6 +139,103 @@ object SkyPremiumUi {
             }
             if (child is ViewGroup) styleChildren(activity, child)
         }
+    }
+
+    /**
+     * Convierte los antiguos controles reales en paneles navegables.
+     * Cada vista se mueve una sola vez; no recrea claves, permisos ni listeners.
+     */
+    fun settingsShell(activity: Activity, original: LinearLayout): View {
+        val elements = (0 until original.childCount).map { original.getChildAt(it) }
+        original.removeAllViews()
+        val tabs = LinkedHashMap<String, Pair<SectionSpec, LinearLayout>>()
+        var current: LinearLayout? = null
+        elements.forEach { child ->
+            val spec = child.tag as? SectionSpec
+            if (spec != null) {
+                val group = LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(activity, 13), dp(activity, 12),
+                        dp(activity, 13), dp(activity, 16))
+                    background = shape(activity, background, 20)
+                }
+                group.addView(child)
+                tabs[spec.key] = spec to group
+                current = group
+            } else {
+                if (current == null) {
+                    val fallback = SectionSpec("Inicio", "Inicio", "", "✦")
+                    val group = LinearLayout(activity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        background = shape(activity, background, 20)
+                    }
+                    tabs[fallback.key] = fallback to group
+                    current = group
+                }
+                current?.addView(child)
+            }
+        }
+        tabs.values.forEach { (_, group) -> styleChildren(activity, group) }
+        val shell = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            background = shape(activity, background, 25)
+            setPadding(dp(activity, 14), dp(activity, 15),
+                dp(activity, 14), dp(activity, 10))
+        }
+        shell.addView(label(activity, "✦  SKY IA", 23f, white, true))
+        shell.addView(label(activity, "CENTRO DE CONFIGURACIÓN  ·  ANDROID",
+            11f, cyan, true).apply {
+            letterSpacing = 0.08f
+        })
+        shell.addView(label(activity,
+            "Elegí una categoría. Tus permisos y datos se mantienen como estaban.",
+            12.5f, muted).apply { setPadding(0, dp(activity, 7), 0, dp(activity, 10)) })
+        val tabRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
+        val sectionHolder = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        val scroll = ScrollView(activity).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = false
+            addView(sectionHolder)
+        }
+        shell.addView(HorizontalScrollView(activity).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(tabRow)
+        })
+        shell.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        var active = tabs.keys.firstOrNull().orEmpty()
+        fun select(key: String) {
+            active = key
+            tabRow.removeAllViews()
+            tabs.forEach { (name, pair) ->
+                val selected = name == active
+                val chip = label(activity, pair.first.icon + " " + name, 13f,
+                    if (selected) background else white, selected).apply {
+                    gravity = Gravity.CENTER
+                    setPadding(dp(activity, 15), dp(activity, 11),
+                        dp(activity, 15), dp(activity, 11))
+                    this.background = shape(activity,
+                        if (selected) cyan else elevated, 18,
+                        if (selected) cyan else border)
+                    setOnClickListener { select(name) }
+                    isClickable = true
+                    isFocusable = true
+                    contentDescription = "Abrir sección " + name
+                }
+                tabRow.addView(chip, LinearLayout.LayoutParams(-2, -2).apply {
+                    rightMargin = dp(activity, 8)
+                    bottomMargin = dp(activity, 10)
+                })
+            }
+            sectionHolder.removeAllViews()
+            val group = tabs[key]?.second
+            if (group != null) {
+                (group.parent as? ViewGroup)?.removeView(group)
+                sectionHolder.addView(group, LinearLayout.LayoutParams(-1, -2))
+            }
+            scroll.post { scroll.scrollTo(0, 0) }
+        }
+        if (active.isNotEmpty()) select(active)
+        return shell
     }
 
     /** Pinta oscuro también el contenedor del diálogo: no deja marco blanco. */
