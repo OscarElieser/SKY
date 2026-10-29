@@ -44,6 +44,7 @@ class SkyMobileHome(
     private val onSettings: () -> Unit,
     private val onChatAccess: () -> Unit,
     private val onAttach: () -> Unit,
+    private val onRemoveAttachment: () -> Unit,
     private val archive: SkyConversationArchive,
     private val onDiagnostics: () -> Unit,
     private val onStopHandsFree: () -> Unit
@@ -87,7 +88,9 @@ class SkyMobileHome(
     private val attachmentLabel = text("", 12f, cyan).apply {
         visibility = View.GONE
         setPadding(dp(12), dp(6), dp(12), dp(6))
-        contentDescription = "Archivo adjunto para la siguiente consulta"
+        contentDescription = "Archivo adjunto. Tocar para quitar de la consulta."
+        isClickable = true
+        setOnClickListener { onRemoveAttachment() }
     }
     private lateinit var panelLayout: FrameLayout.LayoutParams
     private val progressLabel = text("SKY lista para conversar", 11f, soft).apply {
@@ -549,7 +552,8 @@ class SkyMobileHome(
     }
 
     fun setAttachmentLabel(filename: String?) {
-        attachmentLabel.text = if (filename.isNullOrBlank()) "" else "Adjunto: " + filename.take(120)
+        attachmentLabel.text = if (filename.isNullOrBlank()) "" else
+            "Adjunto: " + filename.take(95) + " · TOCÁ PARA QUITAR"
         attachmentLabel.visibility = if (filename.isNullOrBlank()) View.GONE else View.VISIBLE
     }
 
