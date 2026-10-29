@@ -138,15 +138,40 @@ def render(manifest_path, output_path):
             )
             silent = captioned
         audio = spec.get("audio")
-        if audio:
-            audio_path = (manifest_path.parent / audio).resolve()
-            if not audio_path.is_file():
-                raise ValueError("Audio file not found")
+        voice = spec.get("voiceover")
+        if audio or voice:
+            audio_inputs = []
+            if voice:
+                voice_path = (manifest_path.parent / voice).resolve()
+                if not voice_path.is_file():
+                    raise ValueError("Voiceover file not found")
+                audio_inputs += ["-i", str(voice_path)]
+            if audio:
+                audio_path = (manifest_path.parent / audio).resolve()
+                if not audio_path.is_file():
+                    raise ValueError("Music file not found")
+                audio_inputs += ["-stream_loop", "-1", "-i", str(audio_path)]
             command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                       "-i", str(silent), "-i", str(audio_path),
-                       "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
-                       "-c:a", "aac", "-b:a", "192k", "-af", "afade=t=in:st=0:d=0.5",
-                       "-shortest", "-movflags", "+faststart", str(output_path)]
+                       "-i", str(silent), *audio_inputs]
+            if voice and audio:
+                volume = float(spec.get("music_volume", 0.18))
+                if not math.isfinite(volume) or not 0 <= volume <= 1:
+                    raise ValueError("music_volume must be between 0 and 1")
+                command += ["-filter_complex",
+                            f"[1:a]aresample=48000[voice];[2:a]aresample=48000,volume={volume}[music];"
+                            "[voice][music]amix=inputs=2:duration=longest:dropout_transition=0[a]",
+                            "-map", "0:v:0", "-map", "[a]"]
+            else:
+                command += ["-map", "0:v:0", "-map", "1:a:0"]
+                if audio:
+                    volume = float(spec.get("music_volume", 1.0))
+                    if not math.isfinite(volume) or not 0 <= volume <= 1:
+                        raise ValueError("music_volume must be between 0 and 1")
+                    command += ["-af", f"volume={volume}"]
+            command += ["-t", str(sum(float(scene.get("duration", 4)) for scene in scenes)
+                                      - ((len(scenes) - 1) * fade_seconds if transition == "fade" else 0)),
+                        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+                        "-movflags", "+faststart", str(output_path)]
         else:
             command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                        "-i", str(silent), "-c", "copy", "-movflags", "+faststart",
