@@ -33,10 +33,10 @@ class SkyInstalledApps(
     private val trusted = activity.getSharedPreferences(
         "sky_trusted_launcher_apps", android.content.Context.MODE_PRIVATE
     )
+    private val control = SkySupervisedControl(activity)
 
     /** Solo autoriza órdenes locales explícitas; no incluye tareas remotas. */
-    fun supervisedControlEnabled(): Boolean =
-        trusted.getBoolean("global_supervised_control", false)
+    fun supervisedControlEnabled(): Boolean = control.isAuthorized()
 
     data class Launchable(
         val name: String,
@@ -151,7 +151,7 @@ class SkyInstalledApps(
                     "seguirán instaladas y tus datos no se modificarán."
                 )
                 .setPositiveButton("REVOCAR AUTORIZACIÓN") { _, _ ->
-                    if (trusted.edit().putBoolean("global_supervised_control", false).commit()) {
+                    if (control.setAuthorized(false)) {
                         say("Revocaste la apertura general de aplicaciones en SKY.")
                         onChanged?.invoke()
                     } else say("No pude guardar la revocación en el teléfono.")
@@ -175,7 +175,7 @@ class SkyInstalledApps(
                 "de la operación. Las órdenes remotas nunca heredan este permiso."
             )
             .setPositiveButton("ACEPTO · CONTROL SUPERVISADO") { _, _ ->
-                if (trusted.edit().putBoolean("global_supervised_control", true).commit()) {
+                if (control.setAuthorized(true)) {
                     say("Control supervisado autorizado. Ya podés decirme qué aplicación abrir.")
                     onChanged?.invoke()
                 } else say("No pude guardar tu autorización; no se activó.")
