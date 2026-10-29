@@ -37,6 +37,17 @@ class SkyAndroidCognitionTest {
         assertTrue(generic.contains("Mi perro"))
     }
 
+    @Test fun learnsOnlyFromExplicitUserCommandsAndWakeWord() {
+        assertEquals("mañana tengo clases", SkyAndroidCognition.explicitFact(
+            "SKY, recuerda que mañana tengo clases"))
+        assertEquals("mi proyecto se llama BAQUEANO", SkyAndroidCognition.explicitFact(
+            "Aprende que mi proyecto se llama BAQUEANO"))
+        assertNull(SkyAndroidCognition.explicitFact(
+            "Investigá en internet toda mi vida"))
+        assertNull(SkyAndroidCognition.explicitFact(
+            "¿Qué recuerdas de mí?"))
+    }
+
     @Test fun emptyAndMissingMemoriesDoNotBecomeHallucinations() {
         val none = SkyAndroidCognition.localMemoryAnswer("¿Qué recuerdas de mí?", emptyList())
         assertTrue(none.contains("no hay recuerdos"))
