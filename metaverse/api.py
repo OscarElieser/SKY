@@ -317,6 +317,8 @@ class ChatRequest(BaseModel):
     provider:str='local'
     area:str='Metaverso'
     file_context:Optional[str]=None
+    cognitive:bool=False
+    cognitive_private:bool=False
 
 class SkillRequest(BaseModel):
     name:str
@@ -600,6 +602,15 @@ def chat(body:ChatRequest):
         prompt = f"Archivos y documentos adjuntos por el usuario:\n{body.file_context}\n\nInstrucción o solicitud del usuario sobre estos datos:\n{body.message}"
     
     prov = 'auto' if body.provider in ('auto', 'sky') else body.provider
+    if body.cognitive:
+        from neural_core.sky_cognition import context as cognitive_context, prompt_addendum
+        if body.cognitive_private and prov != 'ollama':
+            raise HTTPException(422, 'La memoria neuronal privada requiere seleccionar Ollama local.')
+        ctx = cognitive_context(body.message,
+                                execution='local' if prov == 'ollama' else 'cloud',
+                                include_personal=body.cognitive_private,
+                                include_public=True)
+        prompt = prompt_addendum(ctx) + '\n\nSOLICITUD DEL USUARIO:\n' + prompt
     try:
         from neural_core.assistant import responder
         answer, evidencias = responder(prompt, body.area, proveedor=prov, idioma=body.language)
@@ -1681,3 +1692,7 @@ def sky_learning_delete(procedure_id:str,body:SKYExperienceDelete,request:Reques
         raise HTTPException(422,str(exc)) from exc
     except LearningUnavailable as exc:
         raise HTTPException(503,str(exc)) from exc
+
+# Extensión cognitiva opcional: usa el mismo control de propietario/MFA.
+from .sky_cognition_api import router as sky_cognition_router
+app.include_router(sky_cognition_router)
