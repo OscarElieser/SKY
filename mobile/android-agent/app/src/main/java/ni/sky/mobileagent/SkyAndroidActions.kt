@@ -80,7 +80,7 @@ class SkyAndroidActions(
             is SkyDailyCommandParser.Command.OpenApp -> installedApps.requestLaunch(action.app)
             SkyDailyCommandParser.Command.ShowApps -> installedApps.showCatalog()
             SkyDailyCommandParser.Command.Capabilities -> explainCapabilities()
-            is SkyDailyCommandParser.Command.Note -> saveNote(action.value)
+            is SkyDailyCommandParser.Command.Note -> confirmNote(action.value, origin)
             is SkyDailyCommandParser.Command.WebSearch -> webSearch(action.query)
             is SkyDailyCommandParser.Command.Share -> share(action.app, action.value)
             SkyDailyCommandParser.Command.ShowNotes -> showNotes()
@@ -146,6 +146,44 @@ class SkyAndroidActions(
             android.net.Uri.encode(query))
         val intent = Intent(Intent.ACTION_VIEW, uri)
         launch(intent, "Abrí en el navegador una búsqueda de: " + query.take(90))
+    }
+
+    /**
+     * A note changes private on-device data. Unlike a general one-time app
+     * consent, every saved note needs a specific confirmation. The shared SKY
+     * policy only validates intent; Android still performs the actual write.
+     */
+    private fun confirmNote(value: String, origin: SkyActionTrustBoundary.Origin) {
+        val originName = when (origin) {
+            SkyActionTrustBoundary.Origin.OWNER_TYPED -> "owner_typed"
+            SkyActionTrustBoundary.Origin.OWNER_SPOKEN -> "owner_spoken"
+            else -> "untrusted"
+        }
+        val pending = SkyCoreContract.inspect(host, "file_write", originName,
+            platformPermission = true)
+        if (pending.reason != "per_action_approval") {
+            receipt("Guardar nota local", "REJECTED", "Política SKY impidió el guardado")
+            feedback("Esta acción no está autorizada. No se guardó la nota.")
+            return
+        }
+        AlertDialog.Builder(host)
+            .setTitle("SKY · Confirmar nota privada")
+            .setMessage("¿Querés guardar esta nota en tu teléfono?\\n\\n" +
+                value.trim().take(250))
+            .setPositiveButton("GUARDAR") { _, _ ->
+                val decision = SkyCoreContract.inspect(host, "file_write", originName,
+                    perActionApproved = true, platformPermission = true)
+                if (decision.allowed) saveNote(value)
+                else {
+                    receipt("Guardar nota local", "REJECTED",
+                        "No se concedió autorización válida para esta nota")
+                    feedback("Por seguridad no guardé la nota.")
+                }
+            }
+            .setNegativeButton("Cancelar") { _, _ ->
+                receipt("Guardar nota local", "REJECTED", "El propietario canceló la nota")
+            }
+            .show()
     }
 
     private fun saveNote(value: String) {
