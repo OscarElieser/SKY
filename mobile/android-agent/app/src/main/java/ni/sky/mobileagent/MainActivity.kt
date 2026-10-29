@@ -57,6 +57,8 @@ class MainActivity : Activity() {
     private val attachmentRequest = 1666
     private val profileImportRequest = 1667
     private val historyExportRequest = 1668
+    private val responseExportRequest = 1669
+    private var responseExportPending: Pair<SkyConversationArchive.Entry, SkyResponseExport.Format>? = null
     private val selectedAttachments = mutableListOf<SkyAttachmentBatch.Item>()
     @Volatile private var pendingFileCancel: SkyGeminiFiles.CancelToken? = null
     private val chatHistory = JSONArray()
@@ -642,6 +644,7 @@ class MainActivity : Activity() {
                     .setTitle(item.title)
                     .setMessage(item.localTime() + "\n\nVOS:\n" + item.question +
                         "\n\nSKY:\n" + item.answer)
+                    .setNeutralButton("Guardar respuesta") { _, _ -> chooseResponseExport(item) }
                     .setPositiveButton("Cerrar", null).show()
             })
         }
@@ -658,6 +661,38 @@ class MainActivity : Activity() {
             .setPositiveButton("Exportar todo") { _, _ -> confirmHistoryExport() }
             .setNegativeButton("Cerrar", null)
             .show()
+    }
+
+    private fun chooseResponseExport(entry: SkyConversationArchive.Entry) {
+        val formats = SkyResponseExport.Format.values()
+        AlertDialog.Builder(this)
+            .setTitle("Guardar respuesta editable")
+            .setMessage("El documento puede contener información personal. " +
+                "Se guardará donde vos elijás; no es un archivo PowerPoint ni Canva.")
+            .setItems(formats.map { it.label }.toTypedArray()) { _, option ->
+                val format = formats[option]
+                responseExportPending = entry to format
+                val intent = android.content.Intent(
+                    android.content.Intent.ACTION_CREATE_DOCUMENT
+                ).apply {
+                    addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                    type = format.mime
+                    putExtra(android.content.Intent.EXTRA_TITLE,
+                        SkyResponseExport.filename(entry, format))
+                }
+                runCatching { startActivityForResult(intent, responseExportRequest) }
+                    .onFailure {
+                        responseExportPending = null
+                        home.showMessage("No pude abrir el guardado del documento.")
+                    }
+            }
+            .setNegativeButton("Cancelar", null).show()
+    }
+
+    private fun exportLatestResponse() {
+        val entry = archive.recent(1).lastOrNull()
+        if (entry == null) home.showMessage("Todavía no hay consultas guardadas.")
+        else chooseResponseExport(entry)
     }
 
     private fun confirmHistoryExport() {
@@ -732,6 +767,25 @@ class MainActivity : Activity() {
                         confirmOwnerImport(prepared)
                     } }.onFailure { error -> runOnUiThread {
                         home.showMessage(error.message ?: "No pude importar el perfil.")
+                    } }
+                }
+            }
+            return
+        }
+        if (requestCode == responseExportRequest) {
+            val pending = responseExportPending
+            responseExportPending = null
+            if (resultCode == RESULT_OK && data?.data != null && pending != null) {
+                val uri = data.data!!
+                execute {
+                    runCatching {
+                        val output = contentResolver.openOutputStream(uri, "w")
+                            ?: throw IllegalArgumentException("No pude crear el documento.")
+                        output.use { SkyResponseExport.write(it, pending.first, pending.second) }
+                    }.onSuccess { size -> runOnUiThread {
+                        home.showMessage("Respuesta guardada: " + size + " bytes.")
+                    } }.onFailure { error -> runOnUiThread {
+                        home.showMessage(error.message ?: "No pude guardar la respuesta.")
                     } }
                 }
             }
@@ -1325,6 +1379,10 @@ class MainActivity : Activity() {
         content.addView(actionButton("MI PERFIL PERSONAL · EDITAR / IMPORTAR DE WINDOWS") {
             settingsDialog?.dismiss()
             showOwnerProfile()
+        })
+        content.addView(actionButton("DOCUMENTOS · GUARDAR RESPUESTA (MD / HTML)") {
+            settingsDialog?.dismiss()
+            exportLatestResponse()
         })
         content.addView(actionButton("HISTORIAL · BUSCAR Y EXPORTAR CONSULTAS") {
             settingsDialog?.dismiss()
