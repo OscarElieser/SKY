@@ -60,3 +60,18 @@
 - **Seguridad a revisar:** el linter reporta `public.rls_auto_enable()` SECURITY DEFINER con permisos de ejecución públicos; evaluar revocación sin afectar el event trigger.
 
 Los tokens, claves privadas y URLs temporales con `code`/`state` no deben copiarse al repositorio ni a incidencias.
+
+## Renovación desde Android (SKY 0.8.31)
+
+La configuración de Meta se actualizó el 29/10/2026 para añadir la selección de Páginas y los permisos `pages_show_list` y `pages_read_engagement`. **Guardar el ajuste no cambia el token anterior.** El propietario debe autorizar de nuevo en Meta.
+
+La versión 0.8.31 incorpora una acción para iniciar la renovación directamente desde el dispositivo ya vinculado:
+
+1. SKY Android → Ajustes → Mis redes → Instagram → Conexión segura → **Renovar autorización oficial con Meta**.
+2. Confirmar la apertura de Meta. Android solicita `POST /mobile-start` con su credencial móvil de Android Keystore; la función verifica la credencial revocable y genera un estado CSRF de un solo uso y una URL oficial de consentimiento con caducidad de diez minutos.
+3. El usuario autoriza los permisos necesarios en el navegador oficial. El callback del servidor recibe el código, verifica el token de Meta y actualiza su copia cifrada. La credencial del teléfono no se cambia.
+4. Volver a SKY Android → **Verificar identidad real con Meta**. Confirmar que Meta proporciona el ID y usuario esperados. Si faltan los permisos de página o no hay una cuenta de Instagram profesional vinculada, mostrar el resultado real sin afirmar que la cuenta está verificada.
+
+El dispositivo **nunca** recibe claves maestras ni tokens de Meta. La ruta `/mobile-start` no es pública: requiere el mismo token de dispositivo que `/mobile-profile`. La URL de autorización solo se abre si usa HTTPS y el host oficial esperado. No se habilitan publicaciones ni respuestas automáticas con este cambio. Mantener intacto SKY Windows y BAQUEANO.
+
+La disponibilidad real de 0.8.31 requiere verificar compilación, pruebas, firma y una GitHub Release publicada. No recomendar instalar un artefacto de Actions sin esa evidencia.
