@@ -230,8 +230,8 @@ class SkyMusicControlService : AccessibilityService() {
             }
             Phase.SUBMIT_SEARCH -> {
                 val field = editable(items)
-                if (field != null && field.performAction(
-                        AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)) {
+                if (field != null && android.os.Build.VERSION.SDK_INT >= 30 &&
+                    field.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)) {
                     request.phase = Phase.FIND_SONG
                     request.lastActionAt = now
                 } else if (now - request.changedAt > 900) {
