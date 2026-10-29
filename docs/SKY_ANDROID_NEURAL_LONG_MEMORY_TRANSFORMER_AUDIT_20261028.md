@@ -108,3 +108,64 @@ https://ai.google.dev/gemini-api/docs/models
 
 Nada de lo anterior requiere borrar SKY Windows, sus agentes, bases de datos,
 proveedores ni funcionalidades ya existentes.
+
+
+## Aprendizaje práctico aprobado por el propietario (ampliación Android)
+
+`SkyAdaptiveMemory.kt` guarda en SQLite una **respuesta revisada por el usuario**
+asociada a la pregunta original. La misma pregunta (ignorando diferencias
+menores de acentos y puntuación) puede contestarse localmente aunque Gemini,
+Groq y SKY Windows estén desconectados. No afirma que la respuesta sea un
+hecho científicamente verificado: solamente registra que fue enseñada por
+el propietario. Se cuenta cuántas veces se reutilizó.
+
+**Cómo enseñarle:** preguntá cualquier tema estable (por ejemplo,
+«¿Qué es una rúbrica?»), abrí Conversación y tocá **Enseñar**. Modificá
+el texto o aprobalo expresamente y elegí **Guardar corrección**.
+Alternativamente, por voz o por escrito, decí:
+«SKY, corregí tu última respuesta: [texto corregido]».
+La orden «SKY, corregí tu última respuesta» sin texto abre el editor.
+Después repetí la pregunta original: la respuesta guardada debe
+reproducirse sin acceso a Internet. El permiso de nube no se utiliza
+para guardar o recuperar estas correcciones.
+
+En Ajustes → **Aprendizaje real · mis respuestas corregidas** se pueden
+revisar, contar usos y borrar individualmente. No se reaprovechan correcciones
+para preguntas con datos actuales, clima, noticias, precios, comandos
+Android, órdenes de memoria o credenciales. Nunca se sustituye un
+modo profundo elegido por el usuario con la respuesta aprendida localmente.
+
+Esta modalidad **no reentrena el Transformer automáticamente**. Reentrenar
+un modelo requiere datos consentidos, entrenamiento aislado, evaluación
+antes/después y permiso de activación para evitar degradaciones y filtraciones.
+La ruta pequeña de entrenamiento desde cero sigue siendo experimental
+y ajena al asistente Android de producción.
+
+## Prueba real de Gemini desde el Samsung del propietario
+
+Ajustes → **Diagnóstico real · probar Gemini en este teléfono** envía,
+solo cuando el usuario confirme, tres preguntas sintéticas sin historial
+personal a los modelos económico, equilibrado y profundo.
+Muestra por modelo la respuesta no vacía o el error real y el tiempo medido.
+Se guarda un recibo `RESPUESTA_REMOTA_RECIBIDA` cuando la API responde;
+**no** certifica calidad de razonamiento, capacidad del modelo ni acciones
+externas ejecutadas. El servicio aplica sus propias cuotas y facturación.
+
+Para completar la aceptación de la APK, comprobar manualmente:
+1. Que se instala sin superar las advertencias de Android o Play Protect.
+2. Que una corrección se guarda y se reutiliza sin Internet, también por voz.
+3. Que el historial mantiene fechas, que se pueden borrar recuerdos y que
+   no se transfieren al modelo sin permiso privado.
+4. Que adjuntos simultáneos regresan trazabilidad por archivo y no se
+   inventa lectura de datos ilegibles.
+5. Que el diagnóstico Gemini devuelve estados de API medidos y errores
+   cuando no hay cuota, permiso o red.
+6. Que apertura de aplicaciones, alarmas y música se registran como
+   `ENVIADA_SIN_VERIFICAR` hasta que exista una señal independiente de
+   ejecución; no equiparar un intent con reproducción o envío confirmado.
+7. Que las animaciones, voz, micrófono, batería y restricciones al bloquear
+   pantalla se verifican en el dispositivo físico.
+
+**Estado que no debe tergiversarse:** commit en `main` no equivale a
+APK descargable ni a prueba física aprobada. No copiar claves ni
+archivos personales a GitHub.
