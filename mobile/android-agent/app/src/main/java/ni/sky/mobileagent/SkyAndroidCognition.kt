@@ -57,8 +57,9 @@ object SkyAndroidCognition {
         )
         val match = Regex("""^(?:recuerda|aprende)\s+que\s+(.+)$""",
             RegexOption.IGNORE_CASE).matchEntire(withoutWake) ?: return null
-        val value = match.groupValues[1].trim()
-        return value.takeIf { it.length >= 5 }
+        // También devolver frases cortas: SkyOwnerContext.remember mostrará el
+        // error de longitud localmente, en lugar de enviarlas por accidente a la nube.
+        return match.groupValues[1].trim()
     }
 
     fun memoryQuestion(query: String): Boolean {
