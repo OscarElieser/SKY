@@ -135,7 +135,7 @@ class MainActivity : Activity() {
                 if (!tokens.cloudEnabled() && !tokens.groqEnabled() &&
                     tokens.chatToken().isEmpty() &&
                     SkyLocalConversation.reply(transcript) == null &&
-                    !transcript.startsWith("recuerda que ", ignoreCase = true) &&
+                    SkyAndroidCognition.explicitFact(transcript) == null &&
                     !SkyWeatherNow.isWeatherQuery(transcript) &&
                     !(cognitionEnabled() && (SkyAndroidCognition.memoryQuestion(transcript) ||
                         SkyAndroidCognition.historyQuestion(transcript)))) {
@@ -2003,9 +2003,9 @@ class MainActivity : Activity() {
 
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
-        if (message.startsWith("recuerda que ", ignoreCase = true)) {
-            val fact = message.substringAfter(' ').substringAfter(' ').trim()
-            runCatching { SkyOwnerContext.remember(this, fact) }
+        val explicitFact = SkyAndroidCognition.explicitFact(message)
+        if (explicitFact != null) {
+            runCatching { SkyOwnerContext.remember(this, explicitFact) }
                 .onSuccess {
                     chatInput.setText("")
                     home.addExchange(message, "Guardé este dato en tu perfil personal local.",
