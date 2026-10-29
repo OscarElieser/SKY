@@ -1,4 +1,19 @@
-# SKY Android — Redes y autorización oficial Instagram 0.8.6
+# SKY Android — versión de código 0.8.18 · memoria, historial y adjuntos
+
+**Novedades en la rama `main` (pendientes de validar en un teléfono real):**
+
+- **Historial por consulta:** SQLite privado; fecha y hora local `dd/MM/yyyy · HH:mm`, título derivado de la pregunta, consulta y respuesta. El botón **Historial** permite expandir las últimas 150 consultas guardadas; el registro permanente no se borra al cerrar la app. Ajustes → **HISTORIAL · BORRAR CONSULTAS** borra el historial Android tras confirmación.
+- **Voz opcional:** SKY continúa funcionando por **chat escrito**, voz tocando los ojos o activación **manos libres** opcional mediante el servicio de micrófono con notificación. No se exige activar manos libres para escribir o usar otras herramientas. Android puede detener la escucha en segundo plano; no se promete presencia garantizada mientras el teléfono esté bloqueado.
+- **Adjuntar archivo:** botón **＋** en el cuadro de conversación. El selector nativo permite elegir archivos sin permiso de almacenamiento global. SKY extrae hasta 3.100 caracteres iniciales de texto/código y texto de **DOCX/XLSX/PPTX**; acepta imágenes compatibles y **renderiza solo la primera página de PDF** para Gemini. Tamaño máximo de lectura: 8 MB. Audio, video, archivos cifrados y otros formatos pueden seleccionarse pero **no se interpretan todavía**, y SKY debe informarlo, sin inventar contenido. Antes de enviar texto extraído o imagen a la IA, pide autorización para ese archivo. El original no se guarda en SKY.
+- **Perfil personal local:** en Ajustes → **MI PERFIL PERSONAL · EDITAR / IMPORTAR DE WINDOWS**, editar o importar el archivo `USER.md` desde `~/.neuralt/USER.md` en SKY Windows (cópialo voluntariamente al teléfono). Android también acepta JSON con campos `profile` y `facts[].text`. El perfil se conserva solo en preferencias privadas del teléfono; límite de 8.000 caracteres. No permite guardar PIN, contraseñas o API keys. Para incluirlo en un mensaje remoto, abrir **Privacidad** dentro del chat y autorizar **Enviar datos privados** para esa consulta concreta.
+- **Memoria explícita:** la orden de texto **«recuerda que ...»** añade ese hecho al perfil local, sujeto a la validación de seguridad. No se asume entrenamiento de pesos del modelo ni aprendizaje fiable sin evaluación.
+- **SKY Windows:** la importación voluntaria del perfil es el primer puente portable. No copia automáticamente bases SQLite cifradas, procesos, claves ni todos los módulos de Windows a Android. La sincronización continua requiere autenticación y autorización separadas.
+
+**Instalación:** no es suficiente con encontrar estos cambios en GitHub. Esperá a que finalicen las pruebas y exista una APK **firmada** de esta misma versión en [GitHub Releases](https://github.com/OscarElieser/SKY/releases); seguí la guía de instalación y no fuerces Play Protect.
+
+---
+
+## Documentación anterior (versiones 0.8.x)
 
 **Beta Android independiente de Windows.** Diseño con **solo ojos y boca animados**, sin máscara ni rostro. Órdenes del teléfono por texto y voz, supervisadas por el usuario.
 
