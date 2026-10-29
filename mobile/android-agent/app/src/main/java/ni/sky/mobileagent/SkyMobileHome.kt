@@ -544,6 +544,8 @@ class SkyMobileHome(
         panel.addView(privacy)
         updateSendButton()
         updateSuggestions()
+        // Volver a dibujar las consultas restauradas al crear la pantalla.
+        renderConversation()
     }
 
     fun setAttachmentLabel(filename: String?) {
