@@ -14,9 +14,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SKIP = {".git", ".venv", "venv", "node_modules", "build", "dist", ".gradle",
         ".dart_tool", "__pycache__", ".pytest_cache", ".idea", ".vscode"}
-EXTS = {".py", ".kt", ".java", ".json", ".yml", ".yaml", ".md", ".sh", ".ps1", ".gradle"}
+EXTS = {".py", ".kt", ".java", ".json", ".yml", ".yaml", ".md", ".sh", ".ps1", ".gradle", ".kts"}
 MAX_BYTES = 2_000_000
-REFERENCE_EXTS = {".ps1", ".kt", ".kts", ".gradle", ".yml", ".yaml", ".sh", ".json"}
+REFERENCE_EXTS = {".ps1", ".kt", ".kts", ".gradle", ".yml", ".yaml", ".sh", ".json", ".md"}
 REFERENCE_PATTERN = re.compile(r"[A-Za-z0-9_./-]+\.(?:py|ps1|kt|kts|gradle|json|ya?ml|sh)")
 
 
