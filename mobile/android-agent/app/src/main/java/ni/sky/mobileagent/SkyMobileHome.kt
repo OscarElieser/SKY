@@ -470,14 +470,6 @@ class SkyMobileHome(
             gravity = Gravity.CENTER_VERTICAL
         }
         header.addView(panelTitle, LinearLayout.LayoutParams(0, dp(50), 1f))
-        header.addView(pill("Enseñar", Color.rgb(54, 76, 113), onTeach).apply {
-            textSize = 12f
-            contentDescription = "Enseñar a SKY una corrección comprobable"
-        }, LinearLayout.LayoutParams(dp(82), dp(40)).apply { rightMargin = dp(6) })
-        header.addView(pill("Historial", Color.rgb(53, 56, 107), onHistory).apply {
-            textSize = 12f
-            contentDescription = "Buscar, leer y exportar historial guardado"
-        }, LinearLayout.LayoutParams(dp(90), dp(40)).apply { rightMargin = dp(8) })
         header.addView(pill("×", Color.rgb(60, 62, 119)) { closePanel() }.apply {
             textSize = 28f
             contentDescription = "Cerrar panel y volver a SKY"
@@ -549,19 +541,9 @@ class SkyMobileHome(
         composer.addView(sendButton, LinearLayout.LayoutParams(dp(52), dp(50)))
         panel.addView(attachmentLabel, LinearLayout.LayoutParams(-1, -2))
         panel.addView(composer, LinearLayout.LayoutParams(-1, -2))
-        footerBar = LinearLayout(host).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        footerBar.addView(pill("Privacidad", Color.TRANSPARENT) {
-            privacy.visibility = if (privacy.visibility == View.GONE) View.VISIBLE else View.GONE
-        }, LinearLayout.LayoutParams(0, dp(44), 1f))
-        footerBar.addView(pill("Motor", Color.TRANSPARENT, onDiagnostics),
-            LinearLayout.LayoutParams(0, dp(44), 1f))
-        footerBar.addView(pill("Acceso", Color.TRANSPARENT, onChatAccess),
-            LinearLayout.LayoutParams(0, dp(44), 1f))
-        panel.addView(footerBar)
-        panel.addView(privacy)
+        // Privacidad, Motor, Acceso, Enseñar e Historial viven en Configuración.
+        // Los permisos para la siguiente consulta permanecen en los CheckBox
+        // originales, solo se presentan desde Ajustes.
         updateSendButton()
         updateSuggestions()
         // Volver a dibujar las consultas restauradas al crear la pantalla.
@@ -586,6 +568,26 @@ class SkyMobileHome(
         archive.deleteAll()
         history.clear()
         expandedHistory = false
+        renderConversation()
+    }
+
+    /** Abrir una consulta histórica sin volver a guardarla ni perder su texto. */
+    fun openSavedExchange(entry: SkyConversationArchive.Entry) {
+        history.clear()
+        history.add(Exchange(entry.question, entry.answer, entry.engine,
+            emptyList(), "", entry.title, entry.localTime()))
+        expandedHistory = true
+        openChat()
+        renderConversation()
+    }
+
+    /** Recargar historial tras editar, borrar o renombrar; no toca la base. */
+    fun reloadHistory() {
+        history.clear()
+        archive.recent(150).forEach { entry ->
+            history.add(Exchange(entry.question, entry.answer, entry.engine,
+                emptyList(), "", entry.title, entry.localTime()))
+        }
         renderConversation()
     }
 
