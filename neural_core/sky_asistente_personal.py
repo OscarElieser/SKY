@@ -86,8 +86,8 @@ def interpretar(texto: str) -> dict | None:
                 'mode_mini', 'mode_expanded', 'mode_fullscreen', 'mode_normal',
                 'pause', 'play', 'next', 'previous', 'restart', 'close'
             } and re.search(
-                r'\\b(?:el video|reproductor|ponelo|modo mini|modo normal|'
-                r'pantalla completa|ventana|siguiente video|anterior video)\\b',
+                r'\b(?:el video|reproductor|ponelo|modo mini|modo normal|'
+                r'pantalla completa|ventana|siguiente video|anterior video)\b',
                 norm(_limpiar_wake(str(texto or ''))))):
         return jarvis
 
