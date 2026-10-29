@@ -89,7 +89,7 @@ async function encryptionKey() {
   try { bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0)); }
   catch { throw Error("Invalid server encryption key"); }
   if (bytes.length !== 32) throw Error("Invalid server encryption key length");
-  return crypto.subtle.importKey("raw", bytes, { name: "AES-GCM" }, false, ["encrypt"]);
+  return crypto.subtle.importKey("raw", bytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
 async function encryptToken(token: string) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -178,6 +178,93 @@ async function oauthCallback(req: Request) {
     return page(false);
   }
 }
+
+/** Read-only profile diagnostics. Instagram and Meta tokens never reach Android. */
+async function decryptToken(record: Json): Promise<string> {
+  const iv = Uint8Array.from(atob(String(record.token_iv || "")), c => c.charCodeAt(0));
+  const ciphertext = Uint8Array.from(atob(String(record.token_ciphertext || "")), c => c.charCodeAt(0));
+  if (iv.length !== 12 || ciphertext.length < 17) throw Error("Invalid stored encryption");
+  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv },
+    await encryptionKey(), ciphertext);
+  return new TextDecoder("utf-8", { fatal: true }).decode(plaintext);
+}
+async function graphRead(host: "graph.facebook.com" | "graph.instagram.com",
+                         path: string, fields: string, token: string): Promise<Json | null> {
+  const u = new URL("https://" + host + "/v26.0/" + path);
+  u.searchParams.set("fields", fields);
+  try {
+    const response = await fetch(u, {
+      headers: { authorization: "Bearer " + token, accept: "application/json" },
+      redirect: "error", signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return null;
+    const data = await response.json() as Json;
+    return data && typeof data === "object" && !Array.isArray(data) ? data : null;
+  } catch { return null; }
+}
+const validHandle = (v: unknown) => typeof v === "string" &&
+  /^[a-zA-Z0-9._]{1,30}$/.test(v);
+const validId = (v: unknown) => typeof v === "string" && /^[0-9]{5,30}$/.test(v);
+
+async function verifiedProfile(): Promise<Response> {
+  const result = await database("sky_instagram_connections", "GET",
+    "?id=eq.owner&select=token_ciphertext,token_iv,token_expires_at,verified_at");
+  const row = Array.isArray(result) && result.length === 1 ? result[0] as Json : null;
+  if (!row) return json({ token_valid: false, profile_verified: false, reason: "not_connected" });
+  if (typeof row.token_expires_at === "string" &&
+      Date.parse(row.token_expires_at) <= Date.now()) {
+    return json({ token_valid: false, profile_verified: false, reason: "token_expired" });
+  }
+  let token: string;
+  let tokenInfo: { scopes: string[]; expires_at: string | null };
+  try {
+    token = await decryptToken(row);
+    tokenInfo = await inspectToken(token);
+  } catch {
+    return json({ token_valid: false, profile_verified: false, reason: "token_invalid_or_unavailable" });
+  }
+  const expiresAt = tokenInfo.expires_at;
+  if (expiresAt && Date.parse(expiresAt) <= Date.now()) {
+    return json({ token_valid: false, profile_verified: false,
+      token_expires_at: expiresAt, reason: "token_expired" });
+  }
+  const baseStatus = { token_valid: true, profile_verified: false, token_expires_at: expiresAt };
+  // The token grants decide the host. Facebook Login cannot impersonate Instagram Login.
+  if (tokenInfo.scopes.includes("instagram_business_basic")) {
+    const p = await graphRead("graph.instagram.com", "me", "id,username,account_type", token);
+    if (p && validHandle(p.username) && validId(String(p.id || ""))) {
+      return json({ ...baseStatus, profile_verified: true, username: p.username,
+        profile_id: String(p.id), account_type: typeof p.account_type === "string" ?
+        p.account_type : null, login_type: "instagram" });
+    }
+    return json({ ...baseStatus, reason: "instagram_profile_unavailable" });
+  }
+  if (tokenInfo.scopes.includes("instagram_basic")) {
+    // Facebook Login requires a connected Facebook Page and Page grants.
+    if (!tokenInfo.scopes.includes("pages_show_list") ||
+        !tokenInfo.scopes.includes("pages_read_engagement")) {
+      return json({ ...baseStatus, reason: "missing_facebook_page_permissions" });
+    }
+    const p = await graphRead("graph.facebook.com", "me/accounts",
+      "instagram_business_account{id,username}", token);
+    const accounts = Array.isArray(p?.data) ? p.data : [];
+    const profiles = accounts.map((x: unknown) => {
+      if (!x || typeof x !== "object") return null;
+      const item = x as Json;
+      const ig = item.instagram_business_account as Json | undefined;
+      return ig && validId(String(ig.id || "")) && validHandle(ig.username) ?
+        { profile_id: String(ig.id), username: ig.username as string } : null;
+    }).filter((x): x is { profile_id: string; username: string } => x !== null);
+    if (profiles.length === 1) {
+      return json({ ...baseStatus, ...profiles[0], profile_verified: true,
+        login_type: "facebook" });
+    }
+    return json({ ...baseStatus, reason: profiles.length > 1 ?
+      "multiple_authorized_profiles" : "facebook_page_profile_unavailable" });
+  }
+  return json({ ...baseStatus, reason: "instagram_basic_permission_missing" });
+}
+
 async function status() {
   const data = await database("sky_instagram_connections", "GET",
     "?id=eq.owner&select=verified_at,token_expires_at,scopes");
@@ -285,6 +372,10 @@ Deno.serve(async (req: Request) => {
       if (!(await mobileAuthorized(req)))return json({error:"unauthorized"},401);
       return await mobileStatus();
     }
+    if (path === "mobile-profile" && req.method === "GET") {
+      if (!(await mobileAuthorized(req))) return json({ error: "unauthorized" }, 401);
+      return await verifiedProfile();
+    }
     if (path === "mobile-disconnect" && req.method === "POST") {
       if (!(await mobileAuthorized(req)))return json({error:"unauthorized"},401);
       return await mobileRevoke(req);
@@ -294,6 +385,7 @@ Deno.serve(async (req: Request) => {
     if (path === "pair-create" && req.method === "POST") return await pairCreate();
     if (path === "start" && req.method === "POST") return await start();
     if (path === "status" && req.method === "GET") return await status();
+    if (path === "profile" && req.method === "GET") return await verifiedProfile();
     if (path === "disconnect" && req.method === "POST") return await disconnect();
     return json({ error: "not_found" }, 404);
   } catch {
