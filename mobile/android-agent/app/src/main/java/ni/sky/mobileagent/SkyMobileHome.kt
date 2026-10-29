@@ -334,6 +334,8 @@ class SkyMobileHome(
     private fun renderConversation() {
         if (!::conversationRows.isInitialized) return
         conversationRows.removeAllViews()
+        // Keep the empty-state view attached after re-rendering the conversation.
+        conversationRows.addView(chatOutput)
         chatOutput.visibility = if (history.isEmpty() && pendingQuestion == null &&
             pendingInfo == null) View.VISIBLE else View.GONE
         val entries = if (expandedHistory) history.toList() else history.takeLast(6)
