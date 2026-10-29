@@ -1513,8 +1513,8 @@ class MainActivity : Activity() {
             return
         }
         val instruction = query.ifBlank { "Analiza este archivo y explicame su contenido." }
-        if (selected.jpeg != null && !tokens.cloudEnabled()) {
-            home.showMessage("Para analizar una imagen o PDF se necesita Gemini configurado en Ajustes.")
+        if ((selected.jpeg != null || selected.media != null) && !tokens.cloudEnabled()) {
+            home.showMessage("Para analizar imágenes, PDF, audio o video se necesita Gemini configurado en Ajustes.")
             return
         }
         AlertDialog.Builder(this)
@@ -1526,7 +1526,9 @@ class MainActivity : Activity() {
             .setPositiveButton("Enviar una vez") { _, _ ->
                 chosenAttachment = null
                 home.setAttachmentLabel(null)
-                if (selected.jpeg != null) {
+                if (selected.media != null) {
+                    sendMediaAttachment(instruction, selected)
+                } else if (selected.jpeg != null) {
                     sendVisualAttachment(instruction, selected)
                 } else {
                     val embedded = ("Consulta: " + instruction.take(600) +
@@ -1560,6 +1562,33 @@ class MainActivity : Activity() {
                 runOnUiThread {
                     home.failSending(error.message ?: "No pude analizar este archivo.", instruction)
                     voicePanel.showError("Falló el análisis del archivo.")
+                }
+            } finally {
+                chatPending = false
+            }
+        }
+    }
+
+    private fun sendMediaAttachment(instruction: String, attachment: SkyAttachmentReader.Attachment) {
+        val data = attachment.media ?: return
+        if (chatPending) return
+        chatPending = true
+        val question = instruction + " [Adjunto: " + attachment.filename + "]"
+        home.beginSending(question)
+        voicePanel.showThinking()
+        chatExecutor.execute {
+            try {
+                val answer = SkyPhoneCloud.analyzeMediaAttachment(
+                    tokens.personalCloudKey(), data, attachment.mime, attachment.filename, instruction)
+                runOnUiThread {
+                    home.addExchange(question, answer, "Gemini · archivo multimedia")
+                    voicePanel.express(answer)
+                    voicePanel.speakReply(answer)
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    home.failSending(error.message ?: "No pude analizar el archivo.", instruction)
+                    voicePanel.showError("No pude procesar el archivo multimedia.")
                 }
             } finally {
                 chatPending = false
