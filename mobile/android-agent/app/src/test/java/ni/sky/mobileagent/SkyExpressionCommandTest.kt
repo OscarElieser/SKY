@@ -16,6 +16,14 @@ class SkyExpressionCommandTest {
         assertEquals("sueno", SkyExpressionCommand.parse("SKY duerme"))
     }
 
+    @Test fun activeEyesCanDanceJumpRunAndRotateOffline() {
+        assertEquals("baila", SkyExpressionCommand.parse("SKY baila"))
+        assertEquals("salta", SkyExpressionCommand.parse("SKY salta"))
+        assertEquals("corre", SkyExpressionCommand.parse("SKY corre"))
+        assertEquals("gira", SkyExpressionCommand.parse("SKY gira"))
+        assertNull(SkyExpressionCommand.parse("¿Por qué corre un atleta?"))
+    }
+
     @Test fun regularConversationNeverGetsHijackedByExpressions() {
         assertNull(SkyExpressionCommand.parse("Dime cómo ayudar a un niño triste"))
         assertNull(SkyExpressionCommand.parse("¿Qué noticias hay hoy en Nicaragua?"))
