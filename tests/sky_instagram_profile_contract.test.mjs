@@ -41,3 +41,15 @@ test("Android has explicit identity-check action and does not publish", () => {
   assert.match(android, /"ATENCIÓN: no coincide con el perfil local @"/);
   assert.doesNotMatch(android, /"\/mobile-publish"/);
 });
+
+test("mobile reauthorization is device authenticated, OAuth-only and opt-in", () => {
+  assert.match(backend, /path === "mobile-start" && req\.method === "POST"/);
+  assert.match(backend, /path === "mobile-start"[\s\S]{0,150}mobileAuthorized\(req\)/);
+  assert.match(backend, /return await start\(\)/);
+  assert.match(backend, /const raw = crypto\.getRandomValues\(new Uint8Array\(32\)\)/);
+  assert.match(android, /"Renovar autorización oficial con Meta"/);
+  assert.match(android, /"\/mobile-start","POST",credential/);
+  assert.match(android, /Intent\(Intent\.ACTION_VIEW,url\)/);
+  assert.match(android, /url\.scheme=="https"/);
+  assert.match(android, /"www\.facebook\.com","business\.facebook\.com","www\.instagram\.com"/);
+});
