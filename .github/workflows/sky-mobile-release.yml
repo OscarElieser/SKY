@@ -66,10 +66,21 @@ jobs:
           test -s "$apk"
           "$build_tools/apksigner" verify --verbose "$apk"
           "$build_tools/aapt" dump badging "$apk" | grep -F "package: name='ni.sky.mobileagent'"
-          if "$build_tools/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -E 'SkyTextAssistService|android.permission.BIND_ACCESSIBILITY_SERVICE'; then
-            echo "::error::Standard release must not include accessibility service"
+          manifest_dump=$("$build_tools/aapt" dump xmltree "$apk" AndroidManifest.xml)
+          if printf '%s\n' "$manifest_dump" | grep -q 'SkyTextAssistService'; then
+            echo "::error::Broad text assist cannot be distributed in standard APK"
             exit 1
           fi
+          if ! printf '%s\n' "$manifest_dump" | grep -q 'SkyMusicControlService'; then
+            echo "::error::Missing explicit opt-in music controller"
+            exit 1
+          fi
+          if ! printf '%s\n' "$manifest_dump" | grep -q 'android.permission.BIND_ACCESSIBILITY_SERVICE'; then
+            echo "::error::Music controller must require Android system binding"
+            exit 1
+          fi
+          grep -q 'android:packageNames="com.google.android.apps.youtube.music,com.google.android.youtube,com.spotify.music"' \
+            mobile/android-agent/app/src/main/res/xml/sky_music_control_config.xml
           mkdir -p mobile/android-agent/apk
           cp "$apk" mobile/android-agent/apk/SKY-IA-Android-standard-release.apk
           cd mobile/android-agent/apk
