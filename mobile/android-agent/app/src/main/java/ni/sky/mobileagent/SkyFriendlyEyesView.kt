@@ -16,6 +16,7 @@ import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.max
 import kotlin.math.sin
+import kotlin.math.cos
 
 /**
  * SKY · Aura Face (Android).
@@ -42,6 +43,8 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
     private var expressionChangedAt = 0L
     private var emotionUntil = 0L
     private var touchCount = 0
+    private var motion = "NONE"
+    private var motionUntil = 0L
 
     init {
         contentDescription = "Ojos y boca animados de SKY. Tocá para cambiar su expresión."
@@ -64,6 +67,28 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
 
     /** Aplica una emoción visible sin alterar el estado de voz, el chat ni los permisos. */
     fun showExpression(value: String): String {
+        val move = when {
+            value.contains("baila", ignoreCase = true) -> "DANCE"
+            value.contains("salta", ignoreCase = true) -> "JUMP"
+            value.contains("corre", ignoreCase = true) -> "RUN"
+            value.contains("gira", ignoreCase = true) -> "SPIN"
+            else -> "NONE"
+        }
+        if (move != "NONE") {
+            motion = move
+            emotion = SkyEmotionLexicon.Mood.EXCITED
+            expressionChangedAt = SystemClock.uptimeMillis()
+            motionUntil = expressionChangedAt + 7000L
+            emotionUntil = motionUntil
+            invalidate()
+            return when (move) {
+                "DANCE" -> "¡Mirá mis ojos bailando!"
+                "JUMP" -> "¡Estoy saltando!"
+                "RUN" -> "¡Estoy corriendo!"
+                else -> "¡Dando una vuelta!"
+            }
+        }
+        motion = "NONE"
         emotion = SkyEmotionLexicon.requested(value)
         expressionChangedAt = SystemClock.uptimeMillis()
         emotionUntil = expressionChangedAt + 7500L
@@ -290,7 +315,28 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         // The entire screen is the stage. Only the eyes and mouth are visible;
         // no outline, head, facial frame, nose or cheeks.
         canvas.save()
-        canvas.translate(0f, (sin(t * 1.25) * 4.5).toFloat())
+        // Perspective-like transformations are native Canvas transforms, not a
+        // simulated external 3D engine. Animation stays on-device, no cloud.
+        val move = if (now < motionUntil && mode != "SLEEPING") motion else "NONE"
+        val motionT = (now - expressionChangedAt).coerceAtLeast(0L) / 1000.0
+        val shiftX = when (move) {
+            "RUN" -> (sin(motionT * 12.0) * 14.0).toFloat()
+            "DANCE" -> (sin(motionT * 6.0) * 18.0).toFloat()
+            else -> 0f
+        }
+        val shiftY = when (move) {
+            "JUMP" -> (-abs(sin(motionT * 4.0)) * 42.0).toFloat()
+            "DANCE" -> (sin(motionT * 11.0) * 12.0).toFloat()
+            "RUN" -> (sin(motionT * 17.0) * 9.0).toFloat()
+            else -> (sin(t * 1.25) * 4.5).toFloat()
+        }
+        canvas.translate(shiftX, shiftY)
+        if (move == "SPIN") canvas.rotate(
+            (sin(motionT * 5.5) * 17.0).toFloat(), 180f, 300f)
+        if (move == "DANCE" || move == "SPIN") {
+            val depth = (sin(motionT * 6.0) * 0.09).toFloat()
+            canvas.scale(1f - depth, 1f + depth * 0.25f, 180f, 300f)
+        }
         light(canvas, 180f, 310f, 163f, Color.rgb(122, 92, 238), 36)
 
         // Expressive pupils track conversation state, blink naturally.
@@ -391,6 +437,9 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
             canvas.drawArc(0f, 53f, 360f, 570f, 120f, 300f, false, brush)
         }
         canvas.restore()
-        if (isShown && windowVisibility == VISIBLE) postInvalidateDelayed(33L)
+        if (isShown && windowVisibility == VISIBLE) {
+            // Avoid 30 fps when SKY is asleep and conserve Samsung battery.
+            postInvalidateDelayed(if (mode == "SLEEPING") 120L else 33L)
+        }
     }
 }
