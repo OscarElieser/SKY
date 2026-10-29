@@ -1,0 +1,68 @@
+name: SKY Native Core - Verifiable Evolution Evidence
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sky-native-evidence-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile SKY native core and run regression tests
+        id: verify
+        shell: bash
+        run: |
+          set +e
+          python -m py_compile neural_core/sky_adaptive_policy.py neural_core/sky_cognition.py metaverse/sky_cognition_api.py tests/test_sky_adaptive_policy.py > "$RUNNER_TEMP/sky-compile.log" 2>&1
+          compile_code=$?
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_adaptive_policy.py' -v > "$RUNNER_TEMP/sky-test.log" 2>&1
+          test_code=$?
+          echo "compile_exit=$compile_code" >> "$GITHUB_OUTPUT"
+          echo "test_exit=$test_code" >> "$GITHUB_OUTPUT"
+          echo "SKY core compile exit: $compile_code | native unit tests exit: $test_code"
+          if [[ "$compile_code" -ne 0 || "$test_code" -ne 0 ]]; then
+            echo "::error::SKY core verification failed; inspect test execution"
+            tail -n 35 "$RUNNER_TEMP/sky-compile.log" "$RUNNER_TEMP/sky-test.log"
+          fi
+          exit 0
+      - name: Create privacy-safe SHA-256 evidence record
+        id: manifest
+        shell: bash
+        run: |
+          python scripts/sky_evolution_build_evidence.py \
+            --compile-exit "${{ steps.verify.outputs.compile_exit }}" \
+            --test-exit "${{ steps.verify.outputs.test_exit }}" \
+            --test-log "$RUNNER_TEMP/sky-test.log" \
+            --output dist/sky-native-evidence.json
+          sha256sum dist/sky-native-evidence.json > dist/sky-native-evidence.json.sha256
+          cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
+          ## SKY native core — build evidence
+          The attached JSON records the exact SHA-256 values of verified sources, commit,
+          run link, compilation status and count of tests. This job does not test Android
+          hardware or guarantee model-quality improvements.
+          SUMMARY
+      - name: Keep evidence with GitHub run
+        if: always() && steps.manifest.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sky-native-core-evidence
+          path: |
+            dist/sky-native-evidence.json
+            dist/sky-native-evidence.json.sha256
+          retention-days: 90
+          if-no-files-found: error
+      - name: Gate release on genuine verification
+        shell: bash
+        run: |
+          test "${{ steps.verify.outputs.compile_exit }}" = "0"
+          test "${{ steps.verify.outputs.test_exit }}" = "0"
+          python -c 'import json; from pathlib import Path; assert json.loads(Path("dist/sky-native-evidence.json").read_text())["result"] == "passed"'
