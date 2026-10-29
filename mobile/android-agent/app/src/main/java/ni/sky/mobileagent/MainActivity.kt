@@ -785,18 +785,27 @@ class MainActivity : Activity() {
                 .setNegativeButton("Cerrar", null)
                 .show()
         })
-        content.addView(actionButton("CONTROL REAL DE MÚSICA · AUTORIZACIÓN") {
-            showMusicControlDisclosure(SkyMusicCommand.Request(
-                "november rain", musicLauncher.preferred()))
-        })
-        content.addView(actionButton("Desactivar control musical asistido") {
-            getSharedPreferences("sky_music_access", MODE_PRIVATE)
-                .edit().putBoolean("consent", false).apply()
-            requestedMusicAfterPermission = null
-            SkyMusicControlService.cancelPending()
-            home.showMessage("Control musical asistido desactivado. " +
-                "Podés apagar el servicio desde Accesibilidad de Android.")
-        })
+        if (BuildConfig.ENABLE_TEXT_ASSIST) {
+            // Only the separate, non-distributed experimental build exposes
+            // sensitive AccessibilityService authorization.
+            content.addView(actionButton("CONTROL MUSICAL ASISTIDO · AUTORIZACIÓN") {
+                showMusicControlDisclosure(SkyMusicCommand.Request(
+                    "november rain", musicLauncher.preferred()))
+            })
+            content.addView(actionButton("Desactivar control musical asistido") {
+                getSharedPreferences("sky_music_access", MODE_PRIVATE)
+                    .edit().putBoolean("consent", false).apply()
+                requestedMusicAfterPermission = null
+                SkyMusicControlService.cancelPending()
+                home.showMessage("Control musical asistido desactivado. " +
+                    "Podés apagar el servicio desde Accesibilidad de Android.")
+            })
+        } else {
+            content.addView(description("La versión estándar usa controles multimedia " +
+                "oficiales de Android. No solicita Accesibilidad ni puede tocar botones " +
+                "dentro de otras apps. Algunas canciones necesitarán una acción " +
+                "dentro del reproductor."))
+        }
         content.addView(actionButton("MÚSICA · Spotify / YouTube Music / YouTube") {
             val choices = SkyMusicCommand.Service.entries.toTypedArray()
             AlertDialog.Builder(this)
@@ -910,6 +919,10 @@ class MainActivity : Activity() {
     }
 
     private fun showMusicControlDisclosure(request: SkyMusicCommand.Request) {
+        if (!BuildConfig.ENABLE_TEXT_ASSIST) {
+            musicLauncher.playViaAndroidIntent(request)
+            return
+        }
         requestedMusicAfterPermission = request
         val provider = SkyMusicCommand.label(request.service ?: musicLauncher.preferred())
         AlertDialog.Builder(this)
