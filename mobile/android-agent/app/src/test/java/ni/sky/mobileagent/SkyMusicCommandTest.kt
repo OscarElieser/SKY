@@ -60,4 +60,15 @@ class SkyMusicCommandTest {
         assertFalse(SkyMusicControlService.arm("com.spotify.music", "november rain") { })
     }
 
+    @Test fun researchAndLiveNewsMustNotStartMusic() {
+        assertNull(SkyMusicCommand.parse("busca noticias de Nicaragua de hoy"))
+        assertNull(SkyMusicCommand.parse("SKY busca información en internet"))
+        assertNull(SkyMusicCommand.parse("buscame la cotización del dólar"))
+        val music = SkyMusicCommand.parse("SKY busca la canción November Rain en YouTube Music")
+        assertEquals("november rain", music?.query)
+        assertEquals(SkyMusicCommand.Service.YOUTUBE_MUSIC, music?.service)
+        assertEquals("carlos vives",
+            SkyMusicCommand.parse("Buscá música de Carlos Vives en YouTube")?.query)
+    }
+
 }
