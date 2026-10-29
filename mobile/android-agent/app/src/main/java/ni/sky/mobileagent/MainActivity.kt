@@ -63,6 +63,8 @@ class MainActivity : Activity() {
     private val historyExportRequest = 1668
     private val responseExportRequest = 1669
     private val nativeOfficeExportRequest = 1670
+    private val vectorExportRequest = 1671
+    private var vectorExportPending: SkyConversationArchive.Entry? = null
     private var nativeOfficeExportPending:
         Pair<SkyConversationArchive.Entry, SkyNativeOfficeExport.Format>? = null
     private var responseExportPending: Pair<SkyConversationArchive.Entry, SkyResponseExport.Format>? = null
@@ -681,19 +683,26 @@ class MainActivity : Activity() {
     private fun chooseResponseExport(entry: SkyConversationArchive.Entry) {
         val textFormats = SkyResponseExport.Format.values()
         val officeFormats = SkyNativeOfficeExport.Format.values()
-        val choices = textFormats.map { it.label } + officeFormats.map { it.label }
+        val choices = textFormats.map { it.label } + officeFormats.map { it.label } +
+            listOf("Infografía SVG vectorial editable")
         AlertDialog.Builder(this)
             .setTitle("Guardar respuesta de SKY")
             .setMessage("Elegí un formato editable. Word y PowerPoint son archivos " +
                 "Office Open XML auténticos: texto y formas editables. Las diapositivas " +
-                "se organizan por secciones, sin inventar imágenes ni contenido. " +
-                "El archivo puede contener información personal: revisalo antes de compartir.")
+                "se organizan por secciones. El SVG contiene hasta cuatro ideas en " +
+                "objetos vectoriales editables. Revisá los datos antes de compartir.")
             .setItems(choices.toTypedArray()) { _, option ->
-                val isOffice = option >= textFormats.size
+                val isVector = option == textFormats.size + officeFormats.size
+                val isOffice = option >= textFormats.size && !isVector
                 val mime: String
                 val name: String
                 val code: Int
-                if (isOffice) {
+                if (isVector) {
+                    vectorExportPending = entry
+                    mime = SkyVectorExport.MIME
+                    name = SkyVectorExport.filename(entry)
+                    code = vectorExportRequest
+                } else if (isOffice) {
                     val format = officeFormats[option - textFormats.size]
                     nativeOfficeExportPending = entry to format
                     mime = format.mime
@@ -715,7 +724,8 @@ class MainActivity : Activity() {
                 }
                 runCatching { startActivityForResult(intent, code) }
                     .onFailure {
-                        if (isOffice) nativeOfficeExportPending = null
+                        if (isVector) vectorExportPending = null
+                        else if (isOffice) nativeOfficeExportPending = null
                         else responseExportPending = null
                         home.showMessage("Android no abrió el destino de guardado.")
                     }
@@ -801,6 +811,26 @@ class MainActivity : Activity() {
                         confirmOwnerImport(prepared)
                     } }.onFailure { error -> runOnUiThread {
                         home.showMessage(error.message ?: "No pude importar el perfil.")
+                    } }
+                }
+            }
+            return
+        }
+        if (requestCode == vectorExportRequest) {
+            val selected = vectorExportPending
+            vectorExportPending = null
+            if (resultCode == RESULT_OK && data?.data != null && selected != null) {
+                val uri = data.data!!
+                execute {
+                    runCatching {
+                        val file = contentResolver.openOutputStream(uri, "w")
+                            ?: throw IllegalArgumentException("No se pudo crear el SVG.")
+                        file.use { SkyVectorExport.write(it, selected) }
+                    }.onSuccess { runOnUiThread {
+                        home.showMessage("Infografía SVG editable guardada. " +
+                            "Contiene un máximo de cuatro ideas de la respuesta.")
+                    } }.onFailure { error -> runOnUiThread {
+                        home.showMessage(error.message ?: "No pude exportar el SVG.")
                     } }
                 }
             }
@@ -1451,7 +1481,7 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             showOwnerProfile()
         })
-        content.addView(actionButton("DOCUMENTOS · WORD / POWERPOINT / MD / HTML") {
+        content.addView(actionButton("CREAR · WORD / POWERPOINT / SVG / MD / HTML") {
             settingsDialog?.dismiss()
             exportLatestResponse()
         })
