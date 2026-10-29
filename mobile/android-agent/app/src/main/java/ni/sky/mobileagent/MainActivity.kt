@@ -55,6 +55,7 @@ class MainActivity : Activity() {
     private lateinit var privateConsent: CheckBox
     private lateinit var archive: SkyConversationArchive
     private lateinit var longTermMemory: SkyLongTermMemory
+    private lateinit var actionEvidence: SkyActionEvidence
     private val knowledgeSources by lazy { SkyAndroidKnowledgeSources(this) }
     private val cognitionPrefs by lazy { getSharedPreferences("sky_android_cognition", MODE_PRIVATE) }
     private fun cognitionEnabled(): Boolean = cognitionPrefs.getBoolean("enabled", true)
@@ -126,6 +127,7 @@ class MainActivity : Activity() {
         tokens = PrivateTokenStore(this)
         archive = SkyConversationArchive(this)
         longTermMemory = SkyLongTermMemory(this)
+        actionEvidence = SkyActionEvidence(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
             if (!processQuickCommand(transcript) &&
                 !processMusicCommand(transcript) &&
@@ -185,6 +187,9 @@ class MainActivity : Activity() {
             home.showMessage(feedback)
             if (!isFinishing && voicePanel.isVoiceEnabled()) voicePanel.speakReply(feedback)
         }
+        installedApps.onReceipt = { action, state, detail ->
+            runCatching { actionEvidence.record(action, state, detail) }
+        }
         dailyActions = SkyAndroidActions(
             this,
             getSharedPreferences("sky_private_notes", MODE_PRIVATE),
@@ -196,6 +201,9 @@ class MainActivity : Activity() {
             onAccessibilityHelp = { showTextAssistDisclosure() },
             installedApps = installedApps
         )
+        dailyActions.onReceipt = { action, state, detail ->
+            runCatching { actionEvidence.record(action, state, detail) }
+        }
         socialStudio = SkySocialStudio(this,
             feedback = { message ->
                 home.showMessage(message)
@@ -226,6 +234,9 @@ class MainActivity : Activity() {
             },
             onNeedMusicPermission = { request -> showMusicControlDisclosure(request) }
         )
+        musicLauncher.onReceipt = { action, state, detail ->
+            runCatching { actionEvidence.record(action, state, detail) }
+        }
         quickActions = SkyQuickActions(this) { message ->
             // Music commands must not talk over and interrupt the playing track.
             home.showMessage(message)
@@ -1776,6 +1787,7 @@ class MainActivity : Activity() {
         executor.shutdown()
         chatExecutor.shutdown()
         pollingExecutor.shutdown()
+        if (::actionEvidence.isInitialized) actionEvidence.close()
         if (::longTermMemory.isInitialized) longTermMemory.close()
         if (::archive.isInitialized) archive.close()
         super.onDestroy()
@@ -2365,6 +2377,8 @@ class MainActivity : Activity() {
     }
 
     private fun finish(command: String, state: String, detail: String) {
+        // La recepción de un intent NO es verificación del resultado final.
+        runCatching { actionEvidence.record("Agente remoto " + command.take(60), state, detail) }
         val id = tokens.deviceId()
         val token = tokens.token()
         execute {
