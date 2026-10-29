@@ -14,6 +14,7 @@ import android.view.View
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.max
 import kotlin.math.sin
 
 /**
@@ -24,7 +25,6 @@ import kotlin.math.sin
  * de voz: escucha, respuesta, pensamiento y error. No transmite audio.
  */
 class SkyFriendlyEyesView(context: Context) : View(context) {
-    private enum class Emotion { CALM, HAPPY, CURIOUS, SURPRISED, LOVING, SLEEPY, SAD, CRYING, ANGRY, EXCITED, SHY }
 
     var mode: String = "IDLE"
         set(value) { field = value; invalidate() }
@@ -34,7 +34,8 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
     private val brush = Paint(Paint.ANTI_ALIAS_FLAG)
     private val shape = Path()
     private val bounds = RectF()
-    private var emotion = Emotion.CALM
+    private var emotion = SkyEmotionLexicon.Mood.CALM
+    private var expressionChangedAt = 0L
     private var emotionUntil = 0L
     private var touchCount = 0
 
@@ -46,60 +47,33 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
 
     fun nextEmotion(): String {
         val sequence = arrayOf(
-            Emotion.HAPPY, Emotion.CURIOUS, Emotion.SURPRISED,
-            Emotion.LOVING, Emotion.EXCITED, Emotion.SHY, Emotion.SAD,
-            Emotion.CRYING, Emotion.ANGRY, Emotion.SLEEPY, Emotion.CALM
+            SkyEmotionLexicon.Mood.HAPPY, SkyEmotionLexicon.Mood.CURIOUS, SkyEmotionLexicon.Mood.SURPRISED,
+            SkyEmotionLexicon.Mood.LOVING, SkyEmotionLexicon.Mood.EXCITED, SkyEmotionLexicon.Mood.SHY, SkyEmotionLexicon.Mood.SAD,
+            SkyEmotionLexicon.Mood.CRYING, SkyEmotionLexicon.Mood.ANGRY, SkyEmotionLexicon.Mood.SLEEPY, SkyEmotionLexicon.Mood.CALM
         )
         emotion = sequence[touchCount++ % sequence.size]
+        expressionChangedAt = SystemClock.uptimeMillis()
         emotionUntil = SystemClock.uptimeMillis() + 4500L
         invalidate()
-        return when (emotion) {
-            Emotion.HAPPY -> "¡Qué alegría verte! 😊"
-            Emotion.CURIOUS -> "¡Contame más! 🤔"
-            Emotion.SURPRISED -> "¡Guau! ¡Qué sorpresa! ✨"
-            Emotion.LOVING -> "¡Un abrazo virtual! 💜"
-            Emotion.SLEEPY -> "Mis ojitos descansan un momento… 😴"
-            Emotion.CALM -> "Aquí estoy para ti. 💙"
-            Emotion.SAD -> "Expresión de tristeza. Estoy contigo. 💙"
-            Emotion.CRYING -> "Ojitos llorosos de SKY. 💧"
-            Emotion.ANGRY -> "SKY pone carita de enojo. 😠"
-            Emotion.EXCITED -> "¡Qué emoción! ✨"
-            Emotion.SHY -> "Una sonrisa tímida. 🌸"
-        }
+        return SkyEmotionLexicon.message(emotion)
     }
 
+    /** Aplica una emoción visible sin alterar el estado de voz, el chat ni los permisos. */
     fun showExpression(value: String): String {
-        val clean = java.text.Normalizer.normalize(
-            value.lowercase(Locale.ROOT), java.text.Normalizer.Form.NFD
-        ).replace(Regex("""\p{M}+"""), "")
-        emotion = when {
-            "llora" in clean || "llanto" in clean || "lagrima" in clean -> Emotion.CRYING
-            "triste" in clean || "pena" in clean || "melancol" in clean -> Emotion.SAD
-            "enoj" in clean || "molest" in clean || "furios" in clean -> Emotion.ANGRY
-            "timid" in clean || "vergonz" in clean -> Emotion.SHY
-            "sorprend" in clean || "sorpresa" in clean || "asombr" in clean -> Emotion.SURPRISED
-            "emocion" in clean || "entusiasm" in clean || "eufor" in clean -> Emotion.EXCITED
-            "amor" in clean || "carino" in clean || "quiero" in clean -> Emotion.LOVING
-            "feliz" in clean || "alegre" in clean || "sonri" in clean ||
-                "risa" in clean || "hola" in clean || "gracias" in clean -> Emotion.HAPPY
-            "sueno" in clean || "dormi" in clean -> Emotion.SLEEPY
-            else -> Emotion.CURIOUS
-        }
-        emotionUntil = SystemClock.uptimeMillis() + 6500L
+        emotion = SkyEmotionLexicon.requested(value)
+        expressionChangedAt = SystemClock.uptimeMillis()
+        emotionUntil = expressionChangedAt + 7500L
         invalidate()
-        return "SKY muestra una expresión de " + emotion.name.lowercase(Locale.ROOT) + "."
+        return SkyEmotionLexicon.message(emotion)
     }
 
+    /** El lenguaje explícito de una respuesta puede activar una expresión temporal. */
     fun reactTo(text: String) {
-        val clean = java.text.Normalizer.normalize(
-            text.lowercase(Locale.ROOT), java.text.Normalizer.Form.NFD
-        ).replace(Regex("""\p{M}+"""), "")
-        when {
-            "llora" in clean || "llanto" in clean || "lagrima" in clean ||
-                "triste" in clean || "alegre" in clean || "feliz" in clean ||
-                "enoj" in clean || "emocion" in clean || "sonri" in clean ||
-                "te quiero" in clean || "sorpresa" in clean || "sorprend" in clean ||
-                "hola" in clean || "gracias" in clean -> showExpression(clean)
+        SkyEmotionLexicon.dialogue(text)?.let { detected ->
+            emotion = detected
+            expressionChangedAt = SystemClock.uptimeMillis()
+            emotionUntil = expressionChangedAt + 6500L
+            invalidate()
         }
     }
 
@@ -141,46 +115,126 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         canvas.drawCircle(x, y, 1.7f, brush)
     }
 
+    /**
+     * Ojo anime vectorial: párpados almendrados, pestañas, cejas expresivas,
+     * iris turquesa con gradiente, pupila oscura y reflejos especulares.
+     * Se recorta el iris al área real del párpado, incluso al parpadear.
+     */
     private fun eyes(canvas: Canvas, x: Float, y: Float, look: Float, blink: Float,
-                     mood: Emotion, iris: Int, speaking: Boolean) {
-        val open = when (mood) {
-            Emotion.SLEEPY -> 0.33f
-            Emotion.SURPRISED -> 1.13f
-            Emotion.HAPPY, Emotion.EXCITED -> 0.87f
-            Emotion.SAD, Emotion.CRYING, Emotion.SHY -> 0.73f
-            Emotion.ANGRY -> 0.62f
+                     mood: SkyEmotionLexicon.Mood, iris: Int, speaking: Boolean) {
+        val left = x < 180f
+        val angry = mood == SkyEmotionLexicon.Mood.ANGRY
+        val sad = mood == SkyEmotionLexicon.Mood.SAD || mood == SkyEmotionLexicon.Mood.CRYING
+        val sleepy = mood == SkyEmotionLexicon.Mood.SLEEPY
+        val squint = mood == SkyEmotionLexicon.Mood.HAPPY || mood == SkyEmotionLexicon.Mood.EXCITED
+        val open = when {
+            sleepy -> 0.24f
+            mood == SkyEmotionLexicon.Mood.SURPRISED -> 1.15f
+            angry -> 0.78f
+            sad -> 0.77f
+            squint -> 0.94f
+            mood == SkyEmotionLexicon.Mood.SHY -> 0.83f
             else -> 1f
         }
-        val halfHeight = 69f * open * (1f - blink * 0.97f)
-        val radius = 38f
-        // Floating, softly rounded eyes: no robotic square frames.
-        fill(Color.rgb(23, 18, 67), 105)
-        canvas.drawOval(x - 67f, y - halfHeight + 8f,
-            x + 67f, y + halfHeight + 12f, brush)
-        brush.shader = LinearGradient(x, y - 80f, x, y + 80f,
-            Color.WHITE, Color.rgb(212, 220, 251), Shader.TileMode.CLAMP)
-        brush.style = Paint.Style.FILL
-        canvas.drawOval(x - 65f, y - halfHeight, x + 65f, y + halfHeight, brush)
-        brush.shader = null
-        if (halfHeight < 17f) {
-            outline(Color.rgb(157, 133, 215), 5f)
-            canvas.drawLine(x - 40f, y, x + 40f, y, brush)
-        } else {
-            val pupilY = y + if (mode == "THINKING") -18f else if (speaking) 3f else 0f
-            light(canvas, x + look, pupilY + 7f, 45f, iris, 72)
-            fill(iris)
-            canvas.drawCircle(x + look, pupilY, 39f, brush)
-            fill(Color.rgb(38, 33, 86))
-            canvas.drawCircle(x + look, pupilY + 4f, 23f, brush)
-            fill(Color.rgb(12, 15, 49))
-            canvas.drawCircle(x + look, pupilY + 5f, 14f, brush)
-            fill(Color.WHITE)
-            canvas.drawCircle(x + look - 14f, pupilY - 15f, 12f, brush)
-            canvas.drawCircle(x + look + 13f, pupilY + 15f, 5f, brush)
-            fill(Color.WHITE, 132)
-            canvas.drawCircle(x + look + 18f, pupilY - 17f, 3.5f, brush)
-        }
+        val halfHeight = max(2.5f, 61f * open * (1f - blink * 0.98f))
+        val leftX = x - 61f
+        val rightX = x + 61f
 
+        // Ceja: las puntas interiores cambian de inclinación según el ánimo.
+        val outerX = x + if (left) -54f else 54f
+        val innerX = x + if (left) 48f else -48f
+        val browOuter = y - 112f + if (sad) 8f else 0f
+        val browInner = y - 112f + when {
+            angry -> 31f
+            sad -> -18f
+            mood == SkyEmotionLexicon.Mood.SURPRISED -> -14f
+            sleepy -> 9f
+            else -> 0f
+        }
+        outline(Color.rgb(216, 233, 251), if (angry) 8f else 6f, 240)
+        shape.reset()
+        shape.moveTo(outerX, browOuter)
+        shape.cubicTo(x, (browOuter + browInner) / 2f - 18f,
+            x, (browOuter + browInner) / 2f - 17f, innerX, browInner)
+        canvas.drawPath(shape, brush)
+
+        // Párpados: no es una pupila flotando; la forma tiene contorno propio.
+        shape.reset()
+        shape.moveTo(leftX, y - 1f)
+        shape.cubicTo(x - 32f, y - halfHeight * 1.28f,
+            x + 32f, y - halfHeight * 1.28f, rightX, y - 2f)
+        shape.cubicTo(x + 36f, y + halfHeight * 0.95f,
+            x - 36f, y + halfHeight * 0.95f, leftX, y - 1f)
+        shape.close()
+        canvas.save()
+        canvas.clipPath(shape)
+        brush.style = Paint.Style.FILL
+        brush.shader = LinearGradient(x, y - 67f, x, y + 72f,
+            Color.rgb(251, 253, 255), Color.rgb(183, 219, 241), Shader.TileMode.CLAMP)
+        canvas.drawPath(shape, brush)
+        brush.shader = null
+
+        if (halfHeight > 8f) {
+            val pupilX = x + look.coerceIn(-17f, 17f)
+            val pupilY = y + when {
+                mode == "THINKING" -> -12f
+                speaking -> 5f
+                else -> 2f
+            }
+            light(canvas, pupilX, pupilY, 64f, Color.rgb(30, 226, 240), 95)
+            brush.shader = RadialGradient(pupilX - 10f, pupilY - 16f, 50f,
+                intArrayOf(Color.rgb(123, 251, 250), iris, Color.rgb(19, 66, 162)),
+                floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+            brush.style = Paint.Style.FILL
+            canvas.drawCircle(pupilX, pupilY, 48f, brush)
+            brush.shader = null
+            outline(Color.rgb(20, 80, 148), 3.4f, 204)
+            canvas.drawCircle(pupilX, pupilY, 47f, brush)
+            // Fibras de iris para generar volumen sin texturas externas.
+            for (i in 0..18) {
+                val angle = i * Math.PI * 2 / 19
+                val xx = kotlin.math.cos(angle).toFloat()
+                val yy = sin(angle).toFloat()
+                outline(Color.rgb(143, 255, 255), 1.35f, 112)
+                canvas.drawLine(pupilX + xx * 30f, pupilY + yy * 30f,
+                    pupilX + xx * 43f, pupilY + yy * 43f, brush)
+            }
+            fill(Color.rgb(14, 36, 91))
+            canvas.drawCircle(pupilX, pupilY + 3f, 26f, brush)
+            fill(Color.rgb(5, 15, 46))
+            canvas.drawCircle(pupilX, pupilY + 4f, 19f, brush)
+            fill(Color.WHITE, 250)
+            canvas.drawCircle(pupilX - 15f, pupilY - 19f, 13.5f, brush)
+            canvas.drawCircle(pupilX + 15f, pupilY + 15f, 5.5f, brush)
+            fill(Color.rgb(199, 251, 255), 165)
+            canvas.drawCircle(pupilX + 21f, pupilY - 18f, 3.5f, brush)
+        }
+        canvas.restore()
+
+        // Delineado exterior, línea inferior más suave y pestañas en abanico.
+        outline(Color.rgb(9, 21, 58), 8f, 253)
+        shape.reset()
+        shape.moveTo(leftX, y - 1f)
+        shape.cubicTo(x - 32f, y - halfHeight * 1.28f,
+            x + 32f, y - halfHeight * 1.28f, rightX, y - 2f)
+        canvas.drawPath(shape, brush)
+        outline(Color.rgb(115, 200, 226), 3f, 170)
+        shape.reset()
+        shape.moveTo(leftX + 7f, y + 7f)
+        shape.quadTo(x, y + halfHeight * 1.1f, rightX - 7f, y + 7f)
+        canvas.drawPath(shape, brush)
+        val outer = if (left) leftX else rightX
+        val dir = if (left) -1f else 1f
+        outline(Color.rgb(9, 21, 58), 5f, 250)
+        for (i in 0..2) {
+            val lx = outer - dir * i * 14f
+            val ly = y - halfHeight * (0.1f + i * 0.32f)
+            shape.reset()
+            shape.moveTo(lx, ly)
+            shape.quadTo(lx + dir * 13f, ly - 16f,
+                lx + dir * (21f - i * 2f), ly - (27f - i * 6f))
+            canvas.drawPath(shape, brush)
+        }
     }
 
     private fun heart(canvas: Canvas, x: Float, y: Float, radius: Float) {
@@ -205,11 +259,11 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         val pulse = ((sin(t * 2.2) + 1.0) / 2.0).toFloat()
         val speaking = mode == "SPEAKING"
         val mood = when (mode) {
-            "SLEEPING" -> Emotion.SLEEPY
-            "LISTENING", "THINKING" -> Emotion.CURIOUS
-            "ERROR" -> Emotion.CURIOUS
+            "SLEEPING" -> SkyEmotionLexicon.Mood.SLEEPY
+            "LISTENING", "THINKING" -> SkyEmotionLexicon.Mood.CURIOUS
+            "ERROR" -> SkyEmotionLexicon.Mood.SAD
             else -> if (now < emotionUntil) emotion else
-                if (speaking) Emotion.HAPPY else Emotion.CALM
+                if (speaking) SkyEmotionLexicon.Mood.HAPPY else SkyEmotionLexicon.Mood.CALM
         }
         val accent = when (mode) {
             "LISTENING" -> Color.rgb(69, 228, 214)
@@ -246,41 +300,55 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
             "THINKING" -> -13f
             else -> (sin(t * 0.58) * 9.0).toFloat()
         }
-        eyes(canvas, 112f, 290f, gaze, blink, mood, accent, speaking)
-        eyes(canvas, 248f, 290f, gaze, if (mood == Emotion.LOVING) 0.3f else blink,
-            mood, accent, speaking)
-        if (mood == Emotion.CRYING || mood == Emotion.SAD) {
-            fill(Color.rgb(112, 218, 250), if (mood == Emotion.CRYING) 245 else 180)
+        val entrance = ((now - expressionChangedAt).coerceAtLeast(0L) / 320f).coerceIn(0f, 1f)
+        val bounce = if (entrance < 1f) (1f - entrance) * 5f else 0f
+        val irisBlue = Color.rgb(47, 202, 233)
+        eyes(canvas, 111f, 286f - bounce, gaze, blink, mood, irisBlue, speaking)
+        eyes(canvas, 249f, 286f - bounce, gaze,
+            if (mood == SkyEmotionLexicon.Mood.LOVING) 0.28f else blink, mood, irisBlue, speaking)
+        // Rubor sutil, incluso en reposo; más visible en alegría y timidez.
+        val blushAlpha = when (mood) {
+            SkyEmotionLexicon.Mood.SHY -> 135
+            SkyEmotionLexicon.Mood.HAPPY, SkyEmotionLexicon.Mood.LOVING -> 98
+            else -> 36
+        }
+        light(canvas, 47f, 364f, 26f, Color.rgb(255, 131, 186), blushAlpha)
+        light(canvas, 313f, 364f, 26f, Color.rgb(255, 131, 186), blushAlpha)
+        // Naricita mínima que acompaña al rostro anime de referencia.
+        outline(Color.rgb(192, 214, 239), 2.8f, 172)
+        canvas.drawLine(176f, 392f, 182f, 394f, brush)
+        if (mood == SkyEmotionLexicon.Mood.CRYING || mood == SkyEmotionLexicon.Mood.SAD) {
+            fill(Color.rgb(112, 218, 250), if (mood == SkyEmotionLexicon.Mood.CRYING) 245 else 180)
             val drop = (now % 1300L) / 1300f
             canvas.drawOval(92f, 325f + drop * 75f, 107f, 350f + drop * 75f, brush)
-            if (mood == Emotion.CRYING)
+            if (mood == SkyEmotionLexicon.Mood.CRYING)
                 canvas.drawOval(257f, 327f + drop * 70f, 270f, 349f + drop * 70f, brush)
         }
-        if (mood == Emotion.SHY) {
+        if (mood == SkyEmotionLexicon.Mood.SHY) {
             light(canvas, 45f, 380f, 30f, Color.rgb(255, 130, 173), 126)
             light(canvas, 315f, 380f, 30f, Color.rgb(255, 130, 173), 126)
         }
 
-        val talkOpen = if (speaking) 12f + ((sin(t * 11.0) + 1) * 16f).toFloat() else 0f
+        val talkOpen = if (speaking) 5f + ((sin(t * 12.5) + 1) * 11f).toFloat() else 0f
         when {
             mode == "ERROR" -> {
                 outline(Color.rgb(255, 203, 220), 6f)
                 bounds.set(147f, 462f, 213f, 489f)
                 canvas.drawArc(bounds, 194f, 155f, false, brush)
             }
-            mood == Emotion.SLEEPY -> {
+            mood == SkyEmotionLexicon.Mood.SLEEPY -> {
                 outline(Color.rgb(229, 211, 250), 6f)
                 canvas.drawLine(160f, 474f, 200f, 474f, brush)
             }
-            mood == Emotion.SAD || mood == Emotion.CRYING -> {
+            mood == SkyEmotionLexicon.Mood.SAD || mood == SkyEmotionLexicon.Mood.CRYING -> {
                 outline(Color.rgb(165, 220, 255), 7f)
                 canvas.drawArc(147f, 463f, 213f, 513f, 190f, 160f, false, brush)
             }
-            mood == Emotion.ANGRY -> {
+            mood == SkyEmotionLexicon.Mood.ANGRY -> {
                 outline(Color.rgb(255, 180, 180), 7f)
                 canvas.drawLine(153f, 486f, 207f, 486f, brush)
             }
-            mood == Emotion.SURPRISED || speaking -> {
+            mood == SkyEmotionLexicon.Mood.SURPRISED || speaking -> {
                 fill(Color.rgb(41, 29, 94))
                 canvas.drawOval(154f, 453f - talkOpen * 0.34f,
                     206f, 492f + talkOpen * 0.72f, brush)
@@ -288,7 +356,7 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
                 canvas.drawOval(169f, 481f + talkOpen * 0.2f,
                     191f, 490f + talkOpen * 0.55f, brush)
             }
-            mood == Emotion.HAPPY || mood == Emotion.LOVING || mood == Emotion.EXCITED || mood == Emotion.SHY -> {
+            mood == SkyEmotionLexicon.Mood.HAPPY || mood == SkyEmotionLexicon.Mood.LOVING || mood == SkyEmotionLexicon.Mood.EXCITED || mood == SkyEmotionLexicon.Mood.SHY -> {
                 outline(Color.rgb(241, 214, 255), 7f)
                 canvas.drawArc(138f, 441f, 222f, 503f, 8f, 168f, false, brush)
             }
@@ -301,7 +369,7 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
                 canvas.drawPath(shape, brush)
             }
         }
-        if (mood == Emotion.SURPRISED || mood == Emotion.EXCITED || speaking) {
+        if (mood == SkyEmotionLexicon.Mood.SURPRISED || mood == SkyEmotionLexicon.Mood.EXCITED || speaking) {
             sparkle(canvas, 320f, 127f, 12f + pulse * 4f, Color.rgb(255, 210, 140))
         }
         if (mode == "THINKING") {
@@ -319,6 +387,6 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
             canvas.drawArc(0f, 53f, 360f, 570f, 120f, 300f, false, brush)
         }
         canvas.restore()
-        if (isShown && windowVisibility == VISIBLE) postInvalidateDelayed(65L)
+        if (isShown && windowVisibility == VISIBLE) postInvalidateDelayed(50L)
     }
 }
