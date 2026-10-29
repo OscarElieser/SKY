@@ -103,11 +103,18 @@ class SkyEyeVoicePanel(
         })
         addView(eye, LayoutParams(LayoutParams.MATCH_PARENT, dp(220)))
         eye.setOnClickListener {
+            if (!handsFreeOn) {
+                // The face is the microphone surface: no visible TALK button.
+                listen()
+            } else {
+                val reaction = eye.nextEmotion()
+                message.text = reaction
+            }
+        }
+        eye.setOnLongClickListener {
             val reaction = eye.nextEmotion()
             message.text = reaction
-            if (readAloud.isChecked && !listening) {
-                speakReply(reaction)
-            }
+            true
         }
         addView(TextView(host).apply {
             text = "Tocá los ojitos de SKY para descubrir sus gestos ✨"
@@ -116,29 +123,19 @@ class SkyEyeVoicePanel(
             gravity = android.view.Gravity.CENTER
         })
         addView(message.apply {
-            text = "SKY lista. Tocá «Hablar con SKY»."
+            text = "SKY lista. Tocá los ojos o activá manos libres."
             textSize = 15f
             setTextColor(Color.rgb(74, 84, 139))
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, dp(8))
         })
-        val controls = LinearLayout(host).apply { orientation = HORIZONTAL }
-        controls.addView(Button(host).apply {
-            text = "Hablar con SKY"
-            setOnClickListener { listen() }
-        }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-        controls.addView(Button(host).apply {
-            text = "Detener"
-            setOnClickListener { stop() }
-        }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-        addView(controls)
         addView(readAloud.apply {
             text = "SKY responde con voz"
             setTextColor(Color.WHITE)
             isChecked = true
         })
         addView(TextView(host).apply {
-            text = "El micrófono solo se activa al tocar Hablar. La voz depende del motor instalado en Android."
+            text = "El micrófono se activa al tocar los ojos o al autorizar manos libres en Ajustes. Una notificación indica la escucha."
             textSize = 12f
             setTextColor(Color.rgb(110, 113, 150))
         })
@@ -269,7 +266,7 @@ class SkyEyeVoicePanel(
             EyeMode.ERROR -> "REVISÁ EL AVISO DE SKY"
             EyeMode.IDLE -> if (handsFreeOn) {
                 if (handsFreeAsleep) "SKY DURMIENDO · DECÍ SKY" else "SKY ESTÁ ESCUCHÁNDOTE"
-            } else "SKY LISTA · TOCÁ PARA HABLAR"
+            } else "SKY LISTA · TOCÁ MIS OJOS"
         })
     }
 
@@ -293,6 +290,9 @@ class SkyEyeVoicePanel(
     fun express(message: String) {
         eye.reactTo(message)
     }
+
+    /** UI animation, not a diagnosis of anyone's real emotion. */
+    fun chooseExpression(mood: String): String = eye.showExpression(mood)
 
     fun isVoiceEnabled(): Boolean = readAloud.isChecked
     fun isSpeechEngineReady(): Boolean = speechReady
@@ -384,7 +384,7 @@ class SkyEyeVoicePanel(
                 override fun onError(error: Int) {
                     handler.removeCallbacks(resumeListening)
                     listening = false
-                    setMode(EyeMode.ERROR, "No pude escucharte bien. Tocá Hablar para intentar otra vez.")
+                    setMode(EyeMode.ERROR, "No pude escucharte bien. Tocá los ojos o decí SKY en manos libres.")
                 }
                 override fun onResults(results: Bundle?) {
                     listening = false
