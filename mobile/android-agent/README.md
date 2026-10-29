@@ -1,3 +1,19 @@
+## SKY Android 0.8.27 — ciclo de ejecución verificable (nuevo)
+
+**Cambios integrados en `main`, no equivalen a APK publicada ni a pruebas físicas en Samsung.**
+
+- **Voz y permisos:** se reparó el encaminamiento de órdenes de voz que no pasaba el parámetro de origen autorizado al ejecutor; la distinción entre voz del propietario y contenido externo se conserva.
+- **Acciones comprobadas:** subir/bajar volumen mide el valor multimedia antes y después; solo se registra `VERIFICADA_LOCAL` si realmente cambió. La reproducción musical y apertura de otras apps solo registran `ENVIADA_SIN_VERIFICAR` mientras el resultado no sea comprobable.
+- **Notas locales:** SKY comprueba escritura persistente y lectura posterior de la última nota antes de informar que se guardó.
+- **Calidad cuantificable:** Configuración → **RESUMEN DE EJECUCIÓN · RESULTADOS COMPROBADOS** muestra contadores SQLite de acciones verificadas, enviadas, fallidas y rechazadas, sin recopilar contenido.
+- **Aprendizaje supervisado:** los controles de audio con resultado verificado alimentan su categoría de aprendizaje; una orden enviada nunca se contabiliza como éxito.
+- **Integridad funcional:** se conserva la autorización única de aplicaciones, sin confirmación individual adicional tras resolver nombres ambiguos; se mantienen los flujos y servicios de SKY Windows sin modificaciones.
+- **Pruebas:** se incorporó `SkyExecutionEvidenceRuntimeTest.kt` y pruebas unitarias de categorías de audio. GitHub Actions y aceptación en el teléfono son obligatorias antes de declarar completado el lanzamiento.
+
+[**Guía de verificación, límites reales y pruebas Samsung**](docs/SKY_EXECUTION_EVIDENCE_0.8.27.md). La versión del APK y su disponibilidad se comprueban exclusivamente en [GitHub Releases](https://github.com/OscarElieser/SKY/releases).
+
+---
+
 ## SKY Android 0.8.25 — requisito de pruebas antes de publicar APK
 
 - El flujo de publicación `sky-mobile-release.yml` exige ahora **tres resultados satisfactorios**: compilación y firma de APK, pruebas instrumentadas en emulador **Android 15 (API 35)** y pruebas instrumentadas en emulador **Android 16 (API 36)**. Si falla cualquiera de ellos, GitHub Actions **no publica una APK nueva**.
