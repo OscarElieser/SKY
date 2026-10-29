@@ -55,6 +55,7 @@ class MainActivity : Activity() {
     private lateinit var privateConsent: CheckBox
     private lateinit var archive: SkyConversationArchive
     private lateinit var longTermMemory: SkyLongTermMemory
+    private lateinit var adaptiveMemory: SkyAdaptiveMemory
     private lateinit var actionEvidence: SkyActionEvidence
     private val verifiedLearning by lazy { SkyVerifiedLearning(this) }
     private val knowledgeSources by lazy { SkyAndroidKnowledgeSources(this) }
@@ -133,6 +134,7 @@ class MainActivity : Activity() {
         tokens = PrivateTokenStore(this)
         archive = SkyConversationArchive(this)
         longTermMemory = SkyLongTermMemory(this)
+        adaptiveMemory = SkyAdaptiveMemory(this)
         actionEvidence = SkyActionEvidence(this)
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
             if (!processQuickCommand(transcript) &&
@@ -180,6 +182,7 @@ class MainActivity : Activity() {
                 home.showUploadProgress("Cancelando cuando termine el fragmento actual...")
             },
             onHistory = { showHistoryBrowser() },
+            onTeach = { showLearningDialog() },
             archive = archive,
             onDiagnostics = { checkHomeStatus() },
             onStopHandsFree = { setHandsFreeEnabled(false) }
@@ -2085,6 +2088,7 @@ class MainActivity : Activity() {
         chatExecutor.shutdown()
         pollingExecutor.shutdown()
         if (::actionEvidence.isInitialized) actionEvidence.close()
+        if (::adaptiveMemory.isInitialized) adaptiveMemory.close()
         if (::longTermMemory.isInitialized) longTermMemory.close()
         if (::archive.isInitialized) archive.close()
         super.onDestroy()
