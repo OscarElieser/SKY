@@ -34,6 +34,7 @@ class SkyInstalledApps(
         "sky_trusted_launcher_apps", android.content.Context.MODE_PRIVATE
     )
     private val control = SkySupervisedControl(activity)
+    private val launchLimiter = SkyLocalActionLimiter()
 
     /** Solo autoriza órdenes locales explícitas; no incluye tareas remotas. */
     fun supervisedControlEnabled(): Boolean = control.isAuthorized()
@@ -362,6 +363,12 @@ class SkyInstalledApps(
     }
 
     private fun launchDirect(app: Launchable) {
+        if (!launchLimiter.allow("launch:" + app.packageName)) {
+            receipt("Abrir " + app.name, "REJECTED",
+                "Límite local por órdenes duplicadas o demasiado frecuentes")
+            say("Recibí varias órdenes seguidas. Esperá un momento para evitar aperturas duplicadas.")
+            return
+        }
         try {
             // Revalidación necesaria: el catálogo es dinámico.
             val current = discover().firstOrNull {
