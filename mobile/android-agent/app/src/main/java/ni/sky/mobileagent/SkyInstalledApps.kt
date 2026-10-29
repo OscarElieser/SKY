@@ -152,6 +152,8 @@ class SkyInstalledApps(
                 )
                 .setPositiveButton("REVOCAR AUTORIZACIÓN") { _, _ ->
                     if (control.setAuthorized(false)) {
+                        receipt("Control supervisado", "VERIFIED_LOCAL",
+                            "Revocación de confianza local guardada en Android")
                         say("Revocaste la apertura general de aplicaciones en SKY.")
                         onChanged?.invoke()
                     } else say("No pude guardar la revocación en el teléfono.")
@@ -176,6 +178,8 @@ class SkyInstalledApps(
             )
             .setPositiveButton("ACEPTO · CONTROL SUPERVISADO") { _, _ ->
                 if (control.setAuthorized(true)) {
+                    receipt("Control supervisado", "VERIFIED_LOCAL",
+                        "Consentimiento local guardado; no incluye control remoto ni permisos Android")
                     say("Control supervisado autorizado. Ya podés decirme qué aplicación abrir.")
                     onChanged?.invoke()
                 } else say("No pude guardar tu autorización; no se activó.")
