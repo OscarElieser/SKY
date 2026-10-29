@@ -146,6 +146,10 @@ class MainActivity : Activity() {
             onSettings = { showSettings() },
             onChatAccess = { showSettings() },
             onAttach = { chooseChatAttachment() },
+            onRemoveAttachment = {
+                chosenAttachment = null
+                home.setAttachmentLabel(null)
+            },
             archive = archive,
             onDiagnostics = { checkHomeStatus() },
             onStopHandsFree = { setHandsFreeEnabled(false) }
