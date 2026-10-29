@@ -45,8 +45,7 @@ object SkyVoicePresence {
         }
     }
 
-    fun permits(mode: Mode, wake: SkyWakePhrase.Decision): Boolean =
-        mode != Mode.SLEEP_LOCKED ||
-            wake.kind == SkyWakePhrase.Kind.WAKE ||
-            wake.kind == SkyWakePhrase.Kind.SLEEP
+    /** A generic wake-word is not authorization to leave an explicit sleep lock. */
+    fun permits(mode: Mode, heard: String): Boolean =
+        mode != Mode.SLEEP_LOCKED || request(heard) == Request.WAKE
 }
