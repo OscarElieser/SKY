@@ -50,3 +50,13 @@ El manifiesto admite `"voiceover": "narracion.wav"` y `"audio": "musica.mp3"` si
 ## Título de apertura
 
 Añadir `"title": "Descubrí Nicaragua"` y opcionalmente `"title_duration": 2.5` (0.3–10 segundos). FFmpeg incrusta un título centrado en blanco, con fondo semitransparente, durante los primeros segundos del video. Requiere soporte `drawtext` y una fuente instalada en el sistema de renderizado. La tipografía y las animaciones premium todavía no están implementadas.
+
+## Narración local automática (eSpeak NG)
+
+Instalar `espeak-ng` en el entorno de renderizado. Crear `guion.txt` (UTF-8) y ejecutar:
+
+```bash
+python scripts/sky_video_narration.py guion.txt narracion.wav --voice es --speed 155
+```
+
+Después indicar `"voiceover": "narracion.wav"` en el manifiesto del video. El sintetizador es local, determinista y no usa servicios externos. Su timbre es robótico: **no representa una voz neuronal premium**. Para voces naturales será necesaria una integración TTS adicional, con autorización, gestión de credenciales y pruebas de calidad. La ejecución automática de ambos pasos desde Android aún no está integrada.
