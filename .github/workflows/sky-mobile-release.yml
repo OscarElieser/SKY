@@ -147,6 +147,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Read repository history for release provenance
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Download verified Android release package
         uses: actions/download-artifact@v4
         with:
@@ -174,11 +178,30 @@ jobs:
         run: |
           set -euo pipefail
           tag="sky-android-v${SKY_ANDROID_VERSION}"
-          # Nunca publicar una APK compilada desde un commit anterior al actual main.
+          # Rechazar builds obsoletos SOLO cuando cambió algo que afecta a la APK
+          # o a la seguridad de su integración. No rechazar por cambios ajenos.
           newest="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')"
           if [[ "$newest" != "$GITHUB_SHA" ]]; then
-            echo "::error::APK firmada desde un commit obsoleto; main avanzó. La publicación se ha bloqueado por seguridad. Volvé a ejecutar este flujo sobre el HEAD de main."
-            exit 1
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            fetched="$(git rev-parse refs/remotes/origin/main)"
+            if [[ "$fetched" != "$newest" ]]; then
+              echo "::error::main avanzó durante la verificación del lanzamiento; reintentar desde main."
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" "$newest"; then
+              echo "::error::El commit compilado no es ancestro de main. No publicar."
+              exit 1
+            fi
+            changed_files="$(git diff --name-only "$GITHUB_SHA" "$newest")"
+            while IFS= read -r changed; do
+              case "$changed" in
+                mobile/android-agent/*|shared/*|supabase/functions/sky-instagram/*|.github/workflows/sky-mobile-release.yml)
+                  echo "::error::Cambio relevante posterior a la compilación: $changed. Recompilar desde main."
+                  exit 1
+                  ;;
+              esac
+            done <<< "$changed_files"
+            echo "::notice::main avanzó solo en archivos ajenos a Android/Instagram; APK validada contra fuentes sin cambios."
           fi
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release $tag already exists. Bump app versionCode/versionName before publishing a new APK."
