@@ -62,6 +62,9 @@ class MainActivity : Activity() {
     private val profileImportRequest = 1667
     private val historyExportRequest = 1668
     private val responseExportRequest = 1669
+    private val nativeOfficeExportRequest = 1670
+    private var nativeOfficeExportPending:
+        Pair<SkyConversationArchive.Entry, SkyNativeOfficeExport.Format>? = null
     private var responseExportPending: Pair<SkyConversationArchive.Entry, SkyResponseExport.Format>? = null
     private val selectedAttachments = mutableListOf<SkyAttachmentBatch.Item>()
     @Volatile private var pendingFileCancel: SkyGeminiFiles.CancelToken? = null
@@ -671,26 +674,45 @@ class MainActivity : Activity() {
     }
 
     private fun chooseResponseExport(entry: SkyConversationArchive.Entry) {
-        val formats = SkyResponseExport.Format.values()
+        val textFormats = SkyResponseExport.Format.values()
+        val officeFormats = SkyNativeOfficeExport.Format.values()
+        val choices = textFormats.map { it.label } + officeFormats.map { it.label }
         AlertDialog.Builder(this)
-            .setTitle("Guardar respuesta editable")
-            .setMessage("El documento puede contener información personal. " +
-                "Se guardará donde vos elijás; no es un archivo PowerPoint ni Canva.")
-            .setItems(formats.map { it.label }.toTypedArray()) { _, option ->
-                val format = formats[option]
-                responseExportPending = entry to format
+            .setTitle("Guardar respuesta de SKY")
+            .setMessage("Elegí un formato editable. Word y PowerPoint son archivos " +
+                "Office Open XML auténticos: texto y formas editables. Las diapositivas " +
+                "se organizan por secciones, sin inventar imágenes ni contenido. " +
+                "El archivo puede contener información personal: revisalo antes de compartir.")
+            .setItems(choices.toTypedArray()) { _, option ->
+                val isOffice = option >= textFormats.size
+                val mime: String
+                val name: String
+                val code: Int
+                if (isOffice) {
+                    val format = officeFormats[option - textFormats.size]
+                    nativeOfficeExportPending = entry to format
+                    mime = format.mime
+                    name = SkyNativeOfficeExport.filename(entry, format)
+                    code = nativeOfficeExportRequest
+                } else {
+                    val format = textFormats[option]
+                    responseExportPending = entry to format
+                    mime = format.mime
+                    name = SkyResponseExport.filename(entry, format)
+                    code = responseExportRequest
+                }
                 val intent = android.content.Intent(
                     android.content.Intent.ACTION_CREATE_DOCUMENT
                 ).apply {
                     addCategory(android.content.Intent.CATEGORY_OPENABLE)
-                    type = format.mime
-                    putExtra(android.content.Intent.EXTRA_TITLE,
-                        SkyResponseExport.filename(entry, format))
+                    type = mime
+                    putExtra(android.content.Intent.EXTRA_TITLE, name)
                 }
-                runCatching { startActivityForResult(intent, responseExportRequest) }
+                runCatching { startActivityForResult(intent, code) }
                     .onFailure {
-                        responseExportPending = null
-                        home.showMessage("No pude abrir el guardado del documento.")
+                        if (isOffice) nativeOfficeExportPending = null
+                        else responseExportPending = null
+                        home.showMessage("Android no abrió el destino de guardado.")
                     }
             }
             .setNegativeButton("Cancelar", null).show()
@@ -774,6 +796,29 @@ class MainActivity : Activity() {
                         confirmOwnerImport(prepared)
                     } }.onFailure { error -> runOnUiThread {
                         home.showMessage(error.message ?: "No pude importar el perfil.")
+                    } }
+                }
+            }
+            return
+        }
+        if (requestCode == nativeOfficeExportRequest) {
+            val pending = nativeOfficeExportPending
+            nativeOfficeExportPending = null
+            if (resultCode == RESULT_OK && data?.data != null && pending != null) {
+                val uri = data.data!!
+                execute {
+                    runCatching {
+                        val stream = contentResolver.openOutputStream(uri, "w")
+                            ?: throw IllegalArgumentException("Android no permitió crear el archivo.")
+                        stream.use {
+                            SkyNativeOfficeExport.write(it, pending.first, pending.second)
+                        }
+                    }.onSuccess { runOnUiThread {
+                        home.showMessage("Documento " + pending.second.extension.uppercase() +
+                            " guardado. Abrilo en Word, PowerPoint o un editor compatible.")
+                    } }.onFailure { error -> runOnUiThread {
+                        home.showMessage("No se pudo crear el archivo Office: " +
+                            (error.message ?: "error de exportación"))
                     } }
                 }
             }
@@ -1401,7 +1446,7 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             showOwnerProfile()
         })
-        content.addView(actionButton("DOCUMENTOS · GUARDAR RESPUESTA (MD / HTML)") {
+        content.addView(actionButton("DOCUMENTOS · WORD / POWERPOINT / MD / HTML") {
             settingsDialog?.dismiss()
             exportLatestResponse()
         })
