@@ -37,6 +37,12 @@ function equalBytes(left: Uint8Array, right: Uint8Array) {
   return diff === 0;
 }
 const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+// A fresh ArrayBuffer satisfies strict WebCrypto types in current Deno/TypeScript.
+const ownedBuffer = (data: Uint8Array): ArrayBuffer => {
+  const result = new ArrayBuffer(data.byteLength);
+  new Uint8Array(result).set(data);
+  return result;
+};
 async function owner(req: Request) {
   const secret = env("SKY_INSTAGRAM_OWNER_KEY");
   const input = req.headers.get("authorization") || "";
@@ -89,7 +95,7 @@ async function encryptionKey() {
   try { bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0)); }
   catch { throw Error("Invalid server encryption key"); }
   if (bytes.length !== 32) throw Error("Invalid server encryption key length");
-  return crypto.subtle.importKey("raw", bytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  return crypto.subtle.importKey("raw", ownedBuffer(bytes), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
 async function encryptToken(token: string) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -281,7 +287,7 @@ async function signatureOk(body: Uint8Array, signature: string) {
   if (!secret || !/^sha256=[0-9a-f]{64}$/.test(signature)) return false;
   const key = await crypto.subtle.importKey("raw", encoder(secret),
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const expected = new Uint8Array(await crypto.subtle.sign("HMAC", key, body));
+  const expected = new Uint8Array(await crypto.subtle.sign("HMAC", key, ownedBuffer(body)));
   const provided = Uint8Array.from(signature.slice(7).match(/.{2}/g) || [],
     s => parseInt(s, 16));
   return equalBytes(expected, provided);
