@@ -34,3 +34,7 @@ Formatos: vertical 1080x1920, horizontal 1920x1080, cuadrado 1080x1080. Exportac
 - Seguridad: el manifiesto no ejecuta comandos; las rutas se pasan como argumentos a FFmpeg. Los archivos multimedia siguen siendo entrada no confiable: procesarlos en un entorno aislado y con límites de recursos antes de exponer el servicio a usuarios.
 
 Este componente no reemplaza la experiencia existente de SKY; es un motor independiente para integrar tras superar pruebas.
+
+## Transiciones
+
+El manifiesto acepta `"transition": "cut"` (por defecto) o `"transition": "fade"`, con `"transition_duration": 0.4` en segundos. Las escenas deben durar más que la transición. El fundido se renderiza mediante el filtro `xfade` de FFmpeg; no se simula en la interfaz. El tiempo final disminuye por el solapamiento de cada transición. El nuevo modo requiere superar la prueba de CI antes de considerarse verificado.
