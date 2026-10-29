@@ -59,18 +59,27 @@ class SkySocialAccounts(
                 (if (p.handle.isNotBlank()) "@" + p.handle else p.displayName) +
                 " · identificada, sin autorización OAuth"
         }
-        val actions = labels + listOf("＋ Agregar una red", "↓ Importar perfiles JSON")
+        // Un AlertDialog con setMessage y setItems oculta la lista de acciones.
+        // La entrada directa no depende de registrar antes un perfil público.
+        val actions = listOf("Instagram · Conexión segura") + labels +
+            listOf("＋ Agregar una red", "↓ Importar perfiles JSON")
         AlertDialog.Builder(host)
             .setTitle("SKY · Mis redes personales")
-            .setMessage("Estos perfiles se guardan solo en este teléfono. " +
-                "No están conectados a sus estadísticas ni a publicación automática. " +
-                "Para conectar una cuenta necesitaremos autorización oficial.")
             .setItems(actions.toTypedArray()) { _, index ->
                 when (index) {
-                    profiles.size -> showEditor()
-                    profiles.size + 1 -> chooseImport()
-                    else -> showProfile(profiles[index])
+                    0 -> SkyInstagramMobileLink(host, feedback).show()
+                    in 1..profiles.size -> showProfile(profiles[index - 1])
+                    profiles.size + 1 -> showEditor()
+                    profiles.size + 2 -> chooseImport()
                 }
+            }
+            .setNeutralButton("Información") { _, _ ->
+                AlertDialog.Builder(host)
+                    .setTitle("Perfiles y autorización")
+                    .setMessage("Los identificadores públicos se guardan en este teléfono. " +
+                        "No proporcionan acceso a estadísticas, publicaciones ni mensajes. " +
+                        "La conexión segura requiere autorización oficial.")
+                    .setPositiveButton("Entendido", null).show()
             }
             .setNegativeButton("Cerrar", null)
             .show()
@@ -85,9 +94,6 @@ class SkySocialAccounts(
                 arrayOf("Conexión segura con Instagram", "Guía de cuenta Creador") else emptyArray<String>()
         AlertDialog.Builder(host)
             .setTitle(profile.platform + " · " + label)
-            .setMessage("Perfil identificado localmente. Sin acceso a estadísticas, " +
-                "publicación automática o mensajes privados. " +
-                "SKY no tiene sesión OAuth de esta cuenta.")
             .setItems(choices) { _, which ->
                 when (which) {
                     0 -> if (url == null) feedback("Necesito el usuario o enlace público exacto de este perfil.") else {
@@ -112,6 +118,14 @@ class SkySocialAccounts(
                         showInstagramPreparation(profile)
                 }
             }
+            .setNeutralButton("Estado") { _, _ ->
+                AlertDialog.Builder(host)
+                    .setTitle("Identificación local")
+                    .setMessage("El perfil está identificado localmente. " +
+                        "Esto no verifica su identidad mediante Meta ni autoriza " +
+                        "estadísticas, publicaciones o mensajes.")
+                    .setPositiveButton("Entendido", null).show()
+            }
             .setNegativeButton("Cerrar", null).show()
     }
 
@@ -134,10 +148,6 @@ class SkySocialAccounts(
         )
         AlertDialog.Builder(host)
             .setTitle("SKY · Preparar Instagram")
-            .setMessage("@" + handle + "\n\n" + current +
-                "\n\nTu cuenta y tus publicaciones siguen bajo tu control. " +
-                "Una cuenta profesional normalmente será pública. " +
-                "SKY NO tiene aún permiso OAuth para métricas ni publicaciones.")
             .setItems(options) { _, index ->
                 when (index) {
                     0 -> {
@@ -192,6 +202,15 @@ class SkySocialAccounts(
                             "Este botón NO solicita autorización todavía.")
                         .setPositiveButton("Entendido", null).show()
                 }
+            }
+            .setNeutralButton("Estado") { _, _ ->
+                AlertDialog.Builder(host)
+                    .setTitle("Preparación de Instagram · @" + handle)
+                    .setMessage(current +
+                        "\n\nTu cuenta y tus publicaciones siguen bajo tu control. " +
+                        "Una cuenta profesional normalmente es pública. " +
+                        "Declarar que es Creador no equivale a una autorización OAuth.")
+                    .setPositiveButton("Entendido", null).show()
             }
             .setNegativeButton("Cerrar", null)
             .show()
