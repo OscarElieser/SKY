@@ -152,6 +152,9 @@ class MainActivity : Activity() {
                 if (!tokens.cloudEnabled() && !tokens.groqEnabled() &&
                     tokens.chatToken().isEmpty() &&
                     SkyLocalConversation.reply(transcript) == null &&
+                    SkyAdaptiveMemory.correctionFromCommand(transcript) == null &&
+                    (SkyAdaptiveMemory.ineligibleReason(transcript) != null ||
+                        adaptiveMemory.find(transcript) == null) &&
                     SkyAndroidCognition.explicitFact(transcript) == null &&
                     !SkyWeatherNow.isWeatherQuery(transcript) &&
                     !(cognitionEnabled() && (SkyAndroidCognition.memoryQuestion(transcript) ||
