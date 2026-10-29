@@ -160,12 +160,20 @@ class SkyAndroidActions(
         for (i in maxOf(0, existing.length() - 100) until existing.length()) {
             limited.put(existing.getJSONObject(i))
         }
-        if (prefs.edit().putString(key, limited.toString()).commit()) {
-            receipt("Guardar nota local", "VERIFIED_LOCAL", "Preferencia privada guardada en Android")
-            feedback("Nota guardada en SKY. Decí «SKY, mostrame mis notas» para verla.")
+        val committed = prefs.edit().putString(key, limited.toString()).commit()
+        // La escritura confirmada no basta: releer el último valor almacenado.
+        val readBack = if (committed) runCatching {
+            val saved = JSONArray(prefs.getString(key, "[]"))
+            saved.length() > 0 &&
+                saved.optJSONObject(saved.length() - 1)?.optString("text") == clean
+        }.getOrDefault(false) else false
+        if (readBack) {
+            receipt("Guardar nota local", "VERIFIED_LOCAL",
+                "La última nota se releyó desde almacenamiento local de SKY")
+            feedback("Nota guardada y comprobada en SKY. Decí «SKY, mostrame mis notas» para verla.")
         } else {
-            receipt("Guardar nota local", "FAILED", "Error de confirmación en almacenamiento local")
-            feedback("No se pudo confirmar que la nota quedara guardada.")
+            receipt("Guardar nota local", "FAILED", "Guardado no confirmado tras releer almacenamiento")
+            feedback("No pude comprobar que la nota quedara guardada. Revisá el almacenamiento.")
         }
     }
 
