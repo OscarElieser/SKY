@@ -98,6 +98,36 @@ class PrivateTokenStore(context: Context) {
     fun clearPersonalCloudKey() {
         prefs.edit().remove("cloud_iv").remove("cloud_key").remove("cloud_enabled").apply()
     }
+    /** Separate Groq credential; encrypted with Android Keystore and never compiled into APK. */
+    fun saveGroqKey(value: String) {
+        require(SkyGroqCloud.validKey(value)) { "Clave Groq no válida." }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key())
+        prefs.edit()
+            .putString("groq_iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            .putString("groq_key", Base64.encodeToString(
+                cipher.doFinal(value.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP))
+            .apply()
+    }
+
+    fun groqEnabled(): Boolean = !prefs.getString("groq_key", "").isNullOrBlank() &&
+        groqKey().isNotBlank()
+
+    fun groqKey(): String = try {
+        val iv = prefs.getString("groq_iv", "").orEmpty()
+        val ciphertext = prefs.getString("groq_key", "").orEmpty()
+        if (iv.isBlank() || ciphertext.isBlank()) "" else {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, key(),
+                GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)))
+            String(cipher.doFinal(Base64.decode(ciphertext, Base64.NO_WRAP)), Charsets.UTF_8)
+        }
+    } catch (_: Exception) { "" }
+
+    fun clearGroqKey() {
+        prefs.edit().remove("groq_key").remove("groq_iv").apply()
+    }
+
     /** Revocar Windows jamás debe borrar la clave independiente del teléfono. */
     fun clear() {
         prefs.edit().remove("server").remove("id").remove("iv").remove("token")
