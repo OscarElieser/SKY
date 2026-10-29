@@ -801,6 +801,23 @@ class MainActivity : Activity() {
         } else {
             val groqInput = input("Pegá tu clave de GroqCloud", true)
             content.addView(groqInput)
+            content.addView(actionButton("PEGAR CLAVE GROQ COPIADA") {
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as?
+                    android.content.ClipboardManager
+                val clip = clipboard?.primaryClip
+                val raw = if (clip != null && clip.itemCount > 0)
+                    clip.getItemAt(0).coerceToText(this)?.toString().orEmpty() else ""
+                val problem = SkyGroqCloud.keyProblem(raw)
+                if (problem != null) {
+                    AlertDialog.Builder(this).setTitle("Clave Groq no reconocida")
+                        .setMessage(problem).setPositiveButton("Entendido", null).show()
+                } else {
+                    val value = SkyPhoneCloud.normalizePersonalKey(raw)
+                    groqInput.setText(value)
+                    groqInput.setSelection(value.length)
+                    home.showMessage("Clave Groq copiada. Activala para verificar conexión.")
+                }
+            })
             val groqConsent = CheckBox(this).apply {
                 text = "Autorizo enviar mis preguntas y el contexto reciente a Groq. " +
                     "Comprendo que el servicio tiene límites gratuitos y puedo quitar la clave."
