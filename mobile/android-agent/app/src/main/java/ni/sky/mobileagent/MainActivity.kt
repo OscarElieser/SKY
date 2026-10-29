@@ -1468,9 +1468,13 @@ class MainActivity : Activity() {
     }
 
     /** Acción autorizada del teléfono, incluso si SKY Core está desconectado. */
-    private fun processDailyCommand(message: String): Boolean {
+    private fun processDailyCommand(message: String, spoken: Boolean): Boolean {
         val command = SkyDailyCommandParser.parse(message) ?: return false
-        dailyActions.run(command)
+        // Este punto recibe solamente texto escrito o transcripción de voz
+        // iniciados por el propietario; jamás una respuesta del LLM.
+        val origin = if (spoken) SkyActionTrustBoundary.Origin.OWNER_SPOKEN
+            else SkyActionTrustBoundary.Origin.OWNER_TYPED
+        dailyActions.run(command, origin)
         return true
     }
 
@@ -2711,7 +2715,7 @@ class MainActivity : Activity() {
             processCreatorCommand(message) ||
             processMessagingCommand(message) ||
             processLocalPanelCommand(message, spoken = false) ||
-            processCompanionCommand(message) || processDailyCommand(message)) {
+            processCompanionCommand(message) || processDailyCommand(message, spoken = voiceReplyOnFace)) {
             chatInput.setText("")
             return
         }
