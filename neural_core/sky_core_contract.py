@@ -24,7 +24,7 @@ def contract() -> dict:
 
 
 def inspect(action: str, origin: str, *, per_action_approved: bool = False,
-            platform_permission: bool = False) -> dict:
+            platform_permission: bool = False, local_ui_approved: bool = False) -> dict:
     """Return a decision; never treat this as having executed an operation."""
     data = contract()
     key = str(action or "").strip()
@@ -40,6 +40,11 @@ def inspect(action: str, origin: str, *, per_action_approved: bool = False,
         return {"allowed": False, "requires_confirmation": confirmation, "reason": "platform_permission"}
     if confirmation and not per_action_approved:
         return {"allowed": False, "requires_confirmation": True, "reason": "per_action_approval"}
+    if (definition["risk"] == "high" and
+            data["security"].get("high_risk_requires_local_ui_confirmation") is not False and
+            not local_ui_approved):
+        return {"allowed": False, "requires_confirmation": True,
+                "reason": "local_ui_approval"}
     return {"allowed": True, "requires_confirmation": confirmation,
             "reason": "authorized_by_policy_not_executed"}
 
