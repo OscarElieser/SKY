@@ -362,6 +362,11 @@ class MainActivity : Activity() {
         }
         val unlocked = !(getSystemService(KEYGUARD_SERVICE) as
             android.app.KeyguardManager).isKeyguardLocked
+        val voiceHealth = SkyHandsFreeService.health()
+        val lastVoice = if (voiceHealth.lastPhraseAtMs <= 0L) "sin registro" else
+            java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss",
+                java.util.Locale("es", "NI")).format(
+                    java.util.Date(voiceHealth.lastPhraseAtMs))
         val lines = listOf(
             "SKY IA: $version · paquete estándar",
             "Equipo: $model",
@@ -373,6 +378,10 @@ class MainActivity : Activity() {
             "Notificaciones autorizadas: " + if (notificationsAllowed) "Sí" else "No",
             "Reconocimiento de voz: " + if (speechAvailable) "Disponible" else "No disponible",
             "Reconocimiento local sin nube: " + if (offlineSpeech) "Disponible" else "No disponible",
+            "Servicio manos libres vivo: " + if (voiceHealth.active) "Sí" else "No",
+            "Reconocedor escuchando: " + if (voiceHealth.recognizing) "Sí" else "No",
+            "Última frase detectada: $lastVoice",
+            "Último error de reconocimiento: ${voiceHealth.errorCode} · reintentos ${voiceHealth.retries}",
             "Voz de SKY: " + if (voicePanel.isSpeechEngineReady()) "Lista" else "Pendiente",
             "Apps visibles para abrir: ${installedApps.discover().size}",
             "Notas privadas guardadas: $notes",
