@@ -43,6 +43,8 @@ class SkyMobileHome(
     private val onSend: () -> Unit,
     private val onSettings: () -> Unit,
     private val onChatAccess: () -> Unit,
+    private val onAttach: () -> Unit,
+    private val archive: SkyConversationArchive,
     private val onDiagnostics: () -> Unit,
     private val onStopHandsFree: () -> Unit
 ) {
@@ -62,9 +64,16 @@ class SkyMobileHome(
         val answer: String,
         val engine: String,
         val sources: List<SkyPhoneCloud.Source>,
-        val googleSearchHtml: String
+        val googleSearchHtml: String,
+        val title: String = SkyConversationArchive.titleFor(question),
+        val dateLabel: String = ""
     )
-    private val history = ArrayList<Exchange>()
+    private val history = ArrayList<Exchange>().apply {
+        archive.recent(150).forEach { saved ->
+            add(Exchange(saved.question, saved.answer, saved.engine,
+                emptyList(), "", saved.title, saved.localTime()))
+        }
+    }
     private var activeModule = ""
     private var expandedHistory = false
     private var keyboardVisible = false
@@ -75,6 +84,11 @@ class SkyMobileHome(
     private lateinit var footerBar: LinearLayout
     private lateinit var suggestionBar: HorizontalScrollView
     private lateinit var sendButton: TextView
+    private val attachmentLabel = text("", 12f, cyan).apply {
+        visibility = View.GONE
+        setPadding(dp(12), dp(6), dp(12), dp(6))
+        contentDescription = "Archivo adjunto para la siguiente consulta"
+    }
     private lateinit var panelLayout: FrameLayout.LayoutParams
     private val progressLabel = text("SKY lista para conversar", 11f, soft).apply {
         gravity = Gravity.CENTER_VERTICAL
@@ -393,6 +407,10 @@ class SkyMobileHome(
             pendingInfo == null) View.VISIBLE else View.GONE
         val entries = if (expandedHistory) history.toList() else history.takeLast(6)
         entries.forEachIndexed { index, exchange ->
+            conversationRows.addView(text(
+                exchange.title + if (exchange.dateLabel.isNotBlank()) " · " + exchange.dateLabel else "",
+                11f, cyan
+            ).apply { setPadding(dp(10), dp(14), dp(7), dp(3)) })
             conversationRows.addView(makeBubble(exchange.question, true))
             conversationRows.addView(makeBubble(exchange.answer, false))
             addVerifiedSources(exchange)
@@ -496,6 +514,10 @@ class SkyMobileHome(
             }
             setPadding(dp(2), dp(3), dp(4), dp(3))
         }
+        composer.addView(pill("＋", Color.rgb(49, 64, 117), onAttach).apply {
+            textSize = 24f
+            contentDescription = "Adjuntar archivo para analizar con SKY"
+        }, LinearLayout.LayoutParams(dp(46), dp(50)))
         composer.addView(chatInput, LinearLayout.LayoutParams(0, -2, 1f))
         sendButton = pill("➤", violet) {
             if (chatInput.text.isNotBlank() && pendingQuestion == null) onSend()
@@ -505,6 +527,7 @@ class SkyMobileHome(
             elevation = dp(3).toFloat()
         }
         composer.addView(sendButton, LinearLayout.LayoutParams(dp(52), dp(50)))
+        panel.addView(attachmentLabel, LinearLayout.LayoutParams(-1, -2))
         panel.addView(composer, LinearLayout.LayoutParams(-1, -2))
         footerBar = LinearLayout(host).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -521,6 +544,18 @@ class SkyMobileHome(
         panel.addView(privacy)
         updateSendButton()
         updateSuggestions()
+    }
+
+    fun setAttachmentLabel(filename: String?) {
+        attachmentLabel.text = if (filename.isNullOrBlank()) "" else "Adjunto: " + filename.take(120)
+        attachmentLabel.visibility = if (filename.isNullOrBlank()) View.GONE else View.VISIBLE
+    }
+
+    fun clearHistory() {
+        archive.deleteAll()
+        history.clear()
+        expandedHistory = false
+        renderConversation()
     }
 
     fun isPanelOpen() = dialogBackdrop.visibility == View.VISIBLE
@@ -586,9 +621,11 @@ class SkyMobileHome(
     ) {
         pendingQuestion = null
         pendingInfo = null
-        history.add(Exchange(question.take(4000), answer.take(4000), engine,
-            sources, googleSearchHtml))
-        if (history.size > 30) history.removeAt(0)
+        // Persistir solamente consultas completadas, en el almacenamiento privado.
+        val saved = archive.append(question, answer, engine)
+        history.add(Exchange(saved.question, saved.answer, saved.engine,
+            sources, googleSearchHtml, saved.title, saved.localTime()))
+        if (history.size > 150) history.removeAt(0)
         renderConversation()
         if (revealPanel && !isPanelOpen()) openChat()
     }
