@@ -2105,7 +2105,7 @@ class MainActivity : Activity() {
                         searchSuggestions = live.googleSearchHtml
                         provider = "Gemini · búsqueda verificable"
                         // Sólo metadatos públicos; sin guardar preguntas o datos del usuario.
-                        if (cognitionEnabled() && live.searchedWeb && live.sources.isNotEmpty()) {
+                        if (cognitionEnabled() && !privateData && live.searchedWeb && live.sources.isNotEmpty()) {
                             runCatching { knowledgeSources.saveGrounded(live.sources, live.searchedWeb) }
                         }
                     }
