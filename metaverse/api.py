@@ -785,6 +785,8 @@ from .creative_api import router as creative_router
 app.include_router(creative_router)
 from .video_studio_api import router as sky_video_studio_router
 app.include_router(sky_video_studio_router)
+from .academic_projects_api import router as sky_academic_projects_router
+app.include_router(sky_academic_projects_router)
 from .creative_evolution_api import router as sky_creative_evolution_router
 app.include_router(sky_creative_evolution_router)
 from .local_creator_api import router as sky_local_creator_router
