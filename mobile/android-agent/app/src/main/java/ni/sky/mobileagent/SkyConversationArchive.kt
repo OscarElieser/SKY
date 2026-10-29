@@ -52,8 +52,11 @@ class SkyConversationArchive(context: Context) :
 
     fun append(question: String, answer: String, engine: String): Entry {
         val now = System.currentTimeMillis()
+        // No cortar respuestas de IA ni documentos a mitad de una frase.
+        // La salida extensa permanece íntegra en SQLite y al exportar DOCX.
+        require(answer.length <= 100_000) { "La respuesta supera 100.000 caracteres." }
         val entry = Entry(0, titleFor(question), question.take(4000),
-            answer.take(5000), engine.take(120), now)
+            answer, engine.take(120), now)
         val values = android.content.ContentValues().apply {
             put("title", entry.title)
             put("question", entry.question)
