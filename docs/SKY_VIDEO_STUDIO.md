@@ -92,3 +92,25 @@ Para usar una voz neuronal con licencia y modelo propios, instalar el ejecutable
 ```
 
 El orquestador invoca Piper, genera WAV y lo mezcla con el video. Si no hay Piper o modelo, devuelve un error explícito: **no afirma haber sintetizado una voz que no existe**. El modo `espeak` permanece disponible. La prueba de integración real con una voz neuronal requiere instalar un modelo autorizado y comprobar el audio resultante. No se distribuyen modelos ni voces de terceros con SKY.
+
+## Integración en la API propia de SKY
+
+La API principal registra `metaverse.video_studio_api` y exige `X-SKY-KEY` y, cuando esté habilitado, el segundo factor del propietario. Las rutas son:
+
+- `GET /api/video-studio/capabilities`: informa de las dependencias realmente disponibles.
+- `POST /api/video-studio/produce`: recibe escenas por `asset_id`, no rutas arbitrarias, y devuelve el registro de un MP4 almacenado en SKY Creative.
+
+Ejemplo de cuerpo JSON (los identificadores deben existir en la biblioteca privada):
+
+```json
+{
+  "format": "vertical",
+  "fps": 30,
+  "title": "Descubrí Nicaragua",
+  "scenes": [{"asset_id": "asset_0123456789abcdef0123", "duration": 6}],
+  "narration": "Descubrí Nicaragua con SKY.",
+  "captions": [{"start": 0.2, "end": 4, "text": "Descubrí Nicaragua"}]
+}
+```
+
+La ruta impone límites de duración y cantidad de escenas para evitar saturación del servidor. El procesamiento es síncrono; antes de servir múltiples usuarios se requiere cola de trabajos, control de concurrencia, cuotas, cancelación y métricas. La compatibilidad real con Android y la carga masiva de trabajo **no están validadas**. La voz neuronal Piper todavía está disponible solo en el orquestador local, no expuesta en esta ruta hasta asegurar la gestión de modelos y permisos.
