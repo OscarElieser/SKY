@@ -25,12 +25,16 @@ object SkyAttachmentReader {
         val mime: String,
         val text: String? = null,
         val jpeg: ByteArray? = null,
+        val media: ByteArray? = null,
         val note: String = ""
     ) {
-        val interpretable: Boolean get() = !text.isNullOrBlank() || jpeg != null
+        val interpretable: Boolean get() = !text.isNullOrBlank() || jpeg != null || media != null
     }
 
     private const val MAX_FILE = 8 * 1024 * 1024
+    // Subida inline temporal. El servicio remoto puede rechazar archivos
+    // dependiendo de la cuota o del modelo autorizado por el propietario.
+    private const val MAX_CLOUD_MEDIA = 5 * 1024 * 1024
     private const val MAX_TEXT = 3100
     private val textExtensions = setOf(
         "txt", "md", "csv", "tsv", "json", "xml", "html", "htm", "log",
@@ -81,10 +85,40 @@ object SkyAttachmentReader {
                 note = if (jpeg == null) "Imagen demasiado grande para analizar." else "Imagen lista para analizar.")
         }
         if (suffix == "pdf" || mime == "application/pdf") {
+            if (bytes.size <= MAX_CLOUD_MEDIA) {
+                return Attachment(name, "application/pdf", media = bytes,
+                    note = "Gemini podrá analizar el PDF completo, sujeto a los límites del modelo.")
+            }
             val jpeg = renderFirstPdfPage(context, uri)
             return Attachment(name, mime, jpeg = jpeg,
-                note = if (jpeg == null) "No pude leer esta página PDF." else
-                    "PDF: se analizará visualmente solamente la primera página.")
+                note = if (jpeg == null) "PDF mayor de 5 MB: no pude leer su primera página." else
+                    "PDF mayor de 5 MB: se analizará visualmente solo la primera página.")
+        }
+        val mediaMime = when (suffix) {
+            "mp3" -> "audio/mpeg"
+            "wav" -> "audio/wav"
+            "m4a" -> "audio/m4a"
+            "aac" -> "audio/aac"
+            "flac" -> "audio/flac"
+            "ogg", "oga" -> "audio/ogg"
+            "mp4", "m4v" -> "video/mp4"
+            "mov" -> "video/mov"
+            "webm" -> if (mime.startsWith("audio/")) "audio/webm" else "video/webm"
+            "mpeg", "mpg" -> "video/mpeg"
+            "avi" -> "video/avi"
+            "3gp" -> "video/3gpp"
+            else -> when {
+                mime in setOf("audio/mpeg", "audio/wav", "audio/aac", "audio/ogg",
+                    "audio/flac", "audio/webm", "video/mp4", "video/webm", "video/mpeg") -> mime
+                else -> null
+            }
+        }
+        if (mediaMime != null) {
+            return if (bytes.size <= MAX_CLOUD_MEDIA)
+                Attachment(name, mediaMime, media = bytes,
+                    note = "Audio o video listo para analizar con Gemini, previa autorización.")
+            else Attachment(name, mediaMime, note =
+                "Audio o video mayor de 5 MB: requiere carga segura de archivos grandes, aún pendiente.")
         }
         if (suffix in setOf("docx", "xlsx", "pptx")) {
             val text = officeText(bytes, suffix)
