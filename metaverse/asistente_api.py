@@ -45,6 +45,22 @@ class Mensaje(BaseModel):
     lesson_id: str = Field(default='', max_length=80)
     source_text: str = Field(default='', max_length=12000)
     file_context: str = Field(default='', max_length=12000)
+    cognitive: bool = False
+
+
+def _decorate_cognition(result: dict, user_text: str) -> dict:
+    """Metadatos opcionales para voz/HUD, sin modificar el contenido ni ejecutar acciones."""
+    if not isinstance(result, dict) or result.get('tipo') != 'respuesta' or not result.get('mensaje'):
+        return result
+    from neural_core.sky_cognition import emotion_style, spoken_text
+    enriched = dict(result)
+    enriched['sky_cognition'] = {
+        'persona': emotion_style(user_text),
+        'speech_text': spoken_text(str(result['mensaje'])),
+        'action_executed': False,
+        'emotion_is_simulated': True,
+    }
+    return enriched
 
 
 class OrdenCasa(BaseModel):
@@ -284,6 +300,8 @@ def mensaje(body: Mensaje, request: Request):
     def terminar(resultado):
         if isinstance(resultado,dict):
             _guardar_turno_seguro('assistant',str(resultado.get('mensaje') or ''),body.modo)
+        if body.cognitive:
+            resultado = _decorate_cognition(resultado, body.texto)
         return _medir_turno(resultado,inicio)
     if body.file_context:
         return terminar(_respuesta_archivos(body))
@@ -339,6 +357,8 @@ def mensaje_stream(body: Mensaje, request: Request):
         def final(resultado):
             if isinstance(resultado,dict):
                 _guardar_turno_seguro('assistant',str(resultado.get('mensaje') or ''),body.modo)
+            if body.cognitive:
+                resultado = _decorate_cognition(resultado, body.texto)
             return linea({'final': _medir_turno(resultado, inicio)})
         if body.file_context:
             yield final(_respuesta_archivos(body))
