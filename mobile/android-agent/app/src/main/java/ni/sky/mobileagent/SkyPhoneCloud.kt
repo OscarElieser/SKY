@@ -397,12 +397,16 @@ object SkyPhoneCloud {
                 throw IllegalStateException(reason)
             }
             val raw = ByteArrayOutputStream()
+            // Contexto profundo y grounding pueden incluir metadatos además del texto.
+            val responseMaxBytes = if (model == SkyGeminiModes.DEEP_MODEL) 262_144 else 131_072
             connection.inputStream.use { input ->
                 val buffer = ByteArray(2048)
                 while (true) {
                     val count = input.read(buffer)
                     if (count < 0) break
-                    require(raw.size() + count <= 65536) { "Respuesta excesivamente larga de Gemini." }
+                    require(raw.size() + count <= responseMaxBytes) {
+                        "La respuesta de Gemini excedió el límite seguro de memoria."
+                    }
                     raw.write(buffer, 0, count)
                 }
             }
