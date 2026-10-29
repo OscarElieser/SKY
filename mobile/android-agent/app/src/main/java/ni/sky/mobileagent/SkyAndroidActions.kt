@@ -32,12 +32,12 @@ class SkyAndroidActions(
         "gmail" to Pair("Gmail", "com.google.android.gm")
     )
 
+    private val supervisedControl = SkySupervisedControl(host)
+
     /** La confianza local no sustituye la confirmación de cada envío. */
     private fun localAppAuthorized(id: String): Boolean =
         allowed.getBoolean(id, false) ||
-            host.getSharedPreferences("sky_trusted_launcher_apps",
-                android.content.Context.MODE_PRIVATE)
-                .getBoolean("global_supervised_control", false)
+            supervisedControl.isAuthorized()
 
     /**
      * Prepare a real WhatsApp composer. SKY never presses Send or reads chats.
