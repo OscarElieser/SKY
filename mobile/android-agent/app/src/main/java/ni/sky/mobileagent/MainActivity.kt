@@ -265,35 +265,83 @@ class MainActivity : Activity() {
     /** Comprobaciones de capacidad local; no confundir con ejecución validada. */
     private fun showDeviceDiagnostics() {
         val pm = packageManager
-        val mic = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
+        val model = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
+        val version = runCatching { pm.getPackageInfo(packageName, 0).versionName }
+            .getOrDefault("desconocida")
+        val accessibilityInstalled = runCatching {
+            @Suppress("DEPRECATION")
+            val packageInfo = pm.getPackageInfo(packageName,
+                android.content.pm.PackageManager.GET_SERVICES)
+            packageInfo.services?.any {
+                it.permission == android.Manifest.permission.BIND_ACCESSIBILITY_SERVICE
+            } == true
+        }.getOrDefault(false)
+        val micAllowed = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED
-        val recognize = android.speech.SpeechRecognizer.isRecognitionAvailable(this)
-        val clock = android.content.Intent(android.provider.AlarmClock.ACTION_SET_ALARM)
-            .resolveActivity(pm) != null
+        val notificationsAllowed = android.os.Build.VERSION.SDK_INT < 33 ||
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        val speechAvailable = android.speech.SpeechRecognizer.isRecognitionAvailable(this)
+        val offlineSpeech = android.os.Build.VERSION.SDK_INT >= 31 &&
+            android.speech.SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
         val notes = runCatching {
             org.json.JSONArray(getSharedPreferences("sky_private_notes", MODE_PRIVATE)
                 .getString("sky_notes_v1", "[]")).length()
         }.getOrDefault(0)
+        val players = listOf(
+            "YouTube Music" to "com.google.android.apps.youtube.music",
+            "YouTube" to "com.google.android.youtube",
+            "Spotify" to "com.spotify.music"
+        ).map { (name, pkg) ->
+            val installed = pm.getLaunchIntentForPackage(pkg) != null
+            val intent = android.content.Intent(
+                android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH
+            ).setPackage(pkg)
+            val acceptsIntent = installed && intent.resolveActivity(pm) != null
+            "$name: " + when {
+                !installed -> "no detectada"
+                acceptsIntent -> "instalada · acepta orden musical de Android"
+                else -> "instalada · no declara orden musical compatible"
+            }
+        }
+        val unlocked = !(getSystemService(KEYGUARD_SERVICE) as
+            android.app.KeyguardManager).isKeyguardLocked
         val lines = listOf(
-            "Android: " + android.os.Build.VERSION.RELEASE,
-            "Micrófono autorizado: " + if (mic) "Sí" else "No",
-            "Reconocedor de voz disponible: " + if (recognize) "Sí" else "No",
-            "Motor de voz listo: " + if (voicePanel.isSpeechEngineReady()) "Sí" else "No",
-            "Reloj compatible con alarmas: " + if (clock) "Detectado" else "No detectado",
-            "Notas guardadas: " + notes,
-            "Aplicaciones abribles visibles: " + installedApps.discover().size,
-            "Escritura asistida conectada: " +
-                if (SkyTextAssistService.enabled()) "Sí" else "No",
-            "Vinculación SKY Core: " + if (tokens.token().isNotEmpty()) "Configurada" else "Pendiente",
-            "Chat: " + if (tokens.cloudEnabled()) "Gemini Android activo" else
-                if (tokens.chatToken().isNotEmpty()) "Token almacenado" else "Sin autorizar",
-            "Conversación fluida: " + if (voicePanel.isConversationModeEnabled()) "Activada" else "Desactivada"
-        ).joinToString("\n")
+            "SKY IA: $version · paquete estándar",
+            "Equipo: $model",
+            "Android: ${android.os.Build.VERSION.RELEASE} · API ${android.os.Build.VERSION.SDK_INT}",
+            "Pantalla desbloqueada: " + if (unlocked) "Sí" else "No",
+            "Servicio de accesibilidad en esta APK: " +
+                if (accessibilityInstalled) "SÍ · REVISAR" else "No (esperado)",
+            "Micrófono autorizado: " + if (micAllowed) "Sí" else "No",
+            "Notificaciones autorizadas: " + if (notificationsAllowed) "Sí" else "No",
+            "Reconocimiento de voz: " + if (speechAvailable) "Disponible" else "No disponible",
+            "Reconocimiento local sin nube: " + if (offlineSpeech) "Disponible" else "No disponible",
+            "Voz de SKY: " + if (voicePanel.isSpeechEngineReady()) "Lista" else "Pendiente",
+            "Apps visibles para abrir: ${installedApps.discover().size}",
+            "Notas privadas guardadas: $notes",
+            "Gemini: " + if (tokens.cloudEnabled()) "Configurado (conexión no comprobada)"
+                else "No configurado",
+            "Manos libres: " + if (handsFreePrefs.getBoolean("hands_free_opt_in", false))
+                "Activado" else "Desactivado",
+            "--- Reproductores ---"
+        ).joinToString("\n") + "\n" + players.joinToString("\n") +
+            "\n\nEl reproductor puede rechazar una orden aunque esté instalado. " +
+            "Play Protect verifica las APK fuera de SKY; esta pantalla no certifica " +
+            "la seguridad, no comprueba el audio ni prueba automáticamente servicios remotos."
         AlertDialog.Builder(this)
-            .setTitle("SKY · Autodiagnóstico Android")
-            .setMessage(lines + "\n\n" +
-                "Este chequeo verifica capacidades locales, no prueba conexiones remotas " +
-                "ni garantiza que una alarma haya sonado o un mensaje se haya enviado.")
+            .setTitle("SKY · Diagnóstico del Galaxy")
+            .setMessage(lines)
+            .setNeutralButton("Copiar diagnóstico") { _, _ ->
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as
+                    android.content.ClipboardManager
+                clipboard.setPrimaryClip(
+                    android.content.ClipData.newPlainText("Diagnóstico SKY Android", lines)
+                )
+                android.widget.Toast.makeText(this,
+                    "Diagnóstico copiado sin claves ni identificadores privados.",
+                    android.widget.Toast.LENGTH_SHORT).show()
+            }
             .setPositiveButton("Cerrar", null)
             .show()
     }
