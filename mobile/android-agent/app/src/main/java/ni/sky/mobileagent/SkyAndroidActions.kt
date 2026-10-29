@@ -67,7 +67,13 @@ class SkyAndroidActions(
             .show()
     }
 
-    fun run(action: SkyDailyCommandParser.Command) {
+    fun run(action: SkyDailyCommandParser.Command, origin: SkyActionTrustBoundary.Origin) {
+        if (!SkyActionTrustBoundary.allowsLocalCommand(origin)) {
+            receipt("Comando Android", "REJECTED",
+                "Origen no autorizado; los datos externos y respuestas IA no son órdenes")
+            feedback("Por seguridad solo ejecuto acciones que vos me ordenés directamente.")
+            return
+        }
         when (action) {
             is SkyDailyCommandParser.Command.Alarm -> alarm(action)
             is SkyDailyCommandParser.Command.Timer -> timer(action.seconds)
