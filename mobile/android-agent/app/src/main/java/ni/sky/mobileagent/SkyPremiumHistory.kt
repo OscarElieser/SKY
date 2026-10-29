@@ -51,6 +51,8 @@ class SkyPremiumHistory(
             setPadding(ui.dp(host, 17), ui.dp(host, 15), ui.dp(host, 17), ui.dp(host, 14))
         }
         lateinit var dialog: AlertDialog
+        lateinit var refresh: () -> Unit
+        lateinit var updateChips: () -> Unit
         val top = LinearLayout(host).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -192,7 +194,7 @@ class SkyPremiumHistory(
             ui.showDialog(host, detail, 0.82)
         }
 
-        fun updateChips() {
+        updateChips = {
             chipContainer.removeAllViews()
             filters.forEach { filter ->
                 chipContainer.addView(button(filter, filter == activeFilter) {
@@ -206,7 +208,7 @@ class SkyPremiumHistory(
             }
         }
 
-        fun refresh() {
+        refresh = {
             list.removeAllViews()
             val entries = archive.page(query, cursor, 26, activeFilter)
             val shown = entries.take(25)
