@@ -14,6 +14,19 @@ object SkyLocalConversation {
         val clean = normalized.replace(Regex("^sky\\s+"), "")
             .replace(Regex("\\s+sky$"), "").trim()
         return when (clean) {
+            "que hora es", "que hora es ahora", "dime la hora", "decime la hora",
+            "hora actual", "hora de hoy", "me das la hora" -> {
+                val now = java.time.ZonedDateTime.now()
+                val time = now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                "Son las $time, según la hora configurada en tu teléfono."
+            }
+            "que dia es hoy", "que fecha es hoy", "dime la fecha", "decime la fecha",
+            "fecha actual", "fecha de hoy" -> {
+                val now = java.time.ZonedDateTime.now()
+                val date = now.format(java.time.format.DateTimeFormatter
+                    .ofPattern("EEEE d 'de' MMMM 'de' yyyy", Locale("es", "NI")))
+                "Hoy es $date, según la fecha de tu teléfono."
+            }
             "hola", "holi", "buenas", "que onda", "que ondas", "hey",
             "buenos dias", "buenas tardes", "buenas noches" ->
                 "¡Qué onda! Aquí estoy, lista para ayudarte. ¿Qué hacemos?"
