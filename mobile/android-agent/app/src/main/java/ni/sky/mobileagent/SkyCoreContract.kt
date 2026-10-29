@@ -14,7 +14,8 @@ object SkyCoreContract {
 
     fun inspect(context: Context, action: String, origin: String,
                 perActionApproved: Boolean = false,
-                platformPermission: Boolean = false): Decision {
+                platformPermission: Boolean = false,
+                localUiApproved: Boolean = false): Decision {
         // Fail closed on missing, malformed or changed contract.
         return try {
             val text = context.assets.open("sky_core_contract_v1.json").bufferedReader()
@@ -38,6 +39,8 @@ object SkyCoreContract {
                 return Decision(false, needsApproval, "platform_permission")
             if (needsApproval && !perActionApproved)
                 return Decision(false, true, "per_action_approval")
+            if (definition.optString("risk") == "high" && !localUiApproved)
+                return Decision(false, true, "local_ui_approval")
             Decision(true, needsApproval, "authorized_by_policy_not_executed")
         } catch (_: Exception) {
             Decision(false, false, "contract_unavailable")
