@@ -1,3 +1,13 @@
+## SKY Android 0.8.25 — requisito de pruebas antes de publicar APK
+
+- El flujo de publicación `sky-mobile-release.yml` exige ahora **tres resultados satisfactorios**: compilación y firma de APK, pruebas instrumentadas en emulador **Android 15 (API 35)** y pruebas instrumentadas en emulador **Android 16 (API 36)**. Si falla cualquiera de ellos, GitHub Actions **no publica una APK nueva**.
+- Las pruebas virtuales verifican instalación/rutas, componentes Android, memoria persistente y recibos de ejecución; **no certifican** reproducción de una canción concreta, funcionamiento ininterrumpido con pantalla bloqueada ni acceso a aplicaciones de terceros sin permisos.
+- La aprobación funcional definitiva requiere pruebas en el Samsung del propietario, documentadas en `docs/ANDROID_REAL_DEVICE_ACCEPTANCE.md`, sin eludir Play Protect ni el bloqueo de Android.
+- `0.8.25` en el código **no significa** que exista una `0.8.25` firmada, publicada o probada en teléfono. Comprobar antes de descargar en <https://github.com/OscarElieser/SKY/releases>.
+- Cambios limitados a SKY Android y su flujo de publicación; SKY Windows no se toca.
+
+---
+
 ## SKY Android 0.8.24 — video generativo auténtico, bajo autorización de pago
 
 - Además del render H.264 **local** sin audio, SKY incluye **VIDEOS IA · GEMINI OMNI FLASH (API DE PAGO)** en Ajustes para crear videos auténticos desde texto con el modelo estable Gemini Omni Flash 1.1. Pide una descripción y muestra la advertencia de precio antes de enviar nada. No confunde un MP4 de texto animado con un video generado por IA.
