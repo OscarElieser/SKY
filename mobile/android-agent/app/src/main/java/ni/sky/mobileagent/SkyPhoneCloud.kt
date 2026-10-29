@@ -100,10 +100,12 @@ object SkyPhoneCloud {
         return 1000
     }
 
-    fun makePayload(message: String, history: JSONArray, useGoogleSearch: Boolean = false): JSONObject {
-        val route = SkyGeminiModes.select(message)
+    fun makePayload(message: String, history: JSONArray, useGoogleSearch: Boolean = false,
+                    selectedMode: SkyGeminiModes.Selection? = null): JSONObject {
+        val route = selectedMode ?: SkyGeminiModes.select(message)
+        val actualPrompt = if (selectedMode != null) message else route.prompt
         val maximum = if (route.tier == SkyGeminiModes.Tier.DEEP) 16000 else 4000
-        require(route.prompt.isNotBlank() && route.prompt.length <= maximum) {
+        require(actualPrompt.isNotBlank() && actualPrompt.length <= maximum) {
             "Escribí una consulta de hasta $maximum caracteres."
         }
         val contents = JSONArray()
@@ -124,7 +126,7 @@ object SkyPhoneCloud {
         }
         contents.put(JSONObject()
             .put("role", "user")
-            .put("parts", JSONArray().put(JSONObject().put("text", route.prompt))))
+            .put("parts", JSONArray().put(JSONObject().put("text", actualPrompt))))
         return JSONObject()
             .put("systemInstruction", JSONObject().put("parts",
                 JSONArray().put(JSONObject().put("text",
@@ -162,19 +164,21 @@ object SkyPhoneCloud {
                 .put("temperature", 0.45))
     }
 
-    fun reply(personalKey: String, message: String, history: JSONArray): String {
+    fun reply(personalKey: String, message: String, history: JSONArray,
+              selectedMode: SkyGeminiModes.Selection? = null): String {
         require(validPersonalKey(personalKey)) { "Configurá una clave de Gemini para probar con Google." }
-        val route = SkyGeminiModes.select(message)
-        val payload = makePayload(message, history).toString()
+        val route = selectedMode ?: SkyGeminiModes.select(message)
+        val payload = makePayload(message, history, selectedMode = selectedMode).toString()
         return send(personalKey, payload, model = route.model, answerLimit = route.answerChars)
     }
 
     /** Uses grounded Google Search, retaining source and Search Suggestions metadata. */
-    fun replyWithSources(personalKey: String, message: String, history: JSONArray): VerifiedReply {
+    fun replyWithSources(personalKey: String, message: String, history: JSONArray,
+                         selectedMode: SkyGeminiModes.Selection? = null): VerifiedReply {
         require(validPersonalKey(personalKey)) { "Configurá una clave de Gemini en Ajustes." }
-        val route = SkyGeminiModes.select(message)
+        val route = selectedMode ?: SkyGeminiModes.select(message)
         val response = request(personalKey,
-            makePayload(message, history, useGoogleSearch = true).toString(),
+            makePayload(message, history, useGoogleSearch = true, selectedMode = selectedMode).toString(),
             model = route.model)
         val candidate = response.optJSONArray("candidates")?.optJSONObject(0)
         val answer = candidate?.optJSONObject("content")?.optJSONArray("parts")?.let { parts ->
@@ -198,7 +202,7 @@ object SkyPhoneCloud {
             }
         }
         val searched = metadata?.optJSONArray("webSearchQueries")?.length()?.let { it > 0 } == true
-        if (requiresLiveVerification(message) && (!searched || sources.isEmpty())) {
+        if (requiresLiveVerification(route.prompt) && (!searched || sources.isEmpty())) {
             throw IllegalStateException(
                 "No pude verificar esta información en la web ahora. No voy a darte datos actuales sin fuentes."
             )
