@@ -46,3 +46,7 @@ Añadir al manifiesto `"captions": [{"start": 0.1, "end": 2.0, "text": "Descubr�
 ## Narración y música mezcladas
 
 El manifiesto admite `"voiceover": "narracion.wav"` y `"audio": "musica.mp3"` simultáneamente. La música se repite hasta la duración del video y, si hay narración, su volumen predeterminado es 0.18. `"music_volume"` permite ajustar el nivel entre 0 y 1. Se mezclan con FFmpeg y se exportan como audio AAC. Es necesario aportar la narración y la música con autorización de uso; **este motor aún no sintetiza voces**. Las pruebas de CI incluyen la presencia de pistas de video y audio en el MP4 final.
+
+## Título de apertura
+
+Añadir `"title": "Descubrí Nicaragua"` y opcionalmente `"title_duration": 2.5` (0.3–10 segundos). FFmpeg incrusta un título centrado en blanco, con fondo semitransparente, durante los primeros segundos del video. Requiere soporte `drawtext` y una fuente instalada en el sistema de renderizado. La tipografía y las animaciones premium todavía no están implementadas.
