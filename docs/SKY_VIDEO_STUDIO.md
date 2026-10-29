@@ -77,3 +77,18 @@ El orquestador `scripts/sky_video_production.py` recibe un proyecto JSON con esc
 ```
 
 Ejecutar `python scripts/sky_video_production.py proyecto.json resultado.mp4`. La narración local se sintetiza en un WAV temporal, y el renderizador compone el MP4 final. No requiere duplicar comandos manuales. Sigue necesitando medios reales y dependencias FFmpeg/eSpeak NG. No genera escenas con IA, no hace montaje semántico ni ofrece aún una interfaz Android; tampoco asegura calidad de voz premium.
+
+## Voz neuronal local opcional (Piper)
+
+Para usar una voz neuronal con licencia y modelo propios, instalar el ejecutable `piper` en el servidor de renderizado y disponer de un modelo ONNX compatible. Añadir al proyecto:
+
+```json
+{
+  "narration": "Descubrí Nicaragua con SKY.",
+  "narration_engine": "piper",
+  "narration_model": "voces/es.onnx",
+  "narration_config": "voces/es.onnx.json"
+}
+```
+
+El orquestador invoca Piper, genera WAV y lo mezcla con el video. Si no hay Piper o modelo, devuelve un error explícito: **no afirma haber sintetizado una voz que no existe**. El modo `espeak` permanece disponible. La prueba de integración real con una voz neuronal requiere instalar un modelo autorizado y comprobar el audio resultante. No se distribuyen modelos ni voces de terceros con SKY.
