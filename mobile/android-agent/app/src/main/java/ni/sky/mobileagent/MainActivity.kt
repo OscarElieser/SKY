@@ -66,6 +66,11 @@ class MainActivity : Activity() {
     private val responseExportRequest = 1669
     private val nativeOfficeExportRequest = 1670
     private val vectorExportRequest = 1671
+    private val generatedImageSaveRequest = 1672
+    private val generatedVideoSaveRequest = 1673
+    private var generatedImageToSave: SkyGeneratedImage.Result? = null
+    private var generatedVideoToSave: java.io.File? = null
+    @Volatile private var imageGenerationPending = false
     private var vectorExportPending: SkyConversationArchive.Entry? = null
     private var nativeOfficeExportPending:
         Pair<SkyConversationArchive.Entry, SkyNativeOfficeExport.Format>? = null
@@ -846,6 +851,46 @@ class MainActivity : Activity() {
             }
             return
         }
+        if (requestCode == generatedImageSaveRequest) {
+            val image = generatedImageToSave
+            generatedImageToSave = null
+            if (resultCode == RESULT_OK && data?.data != null && image != null) {
+                val uri = data.data!!
+                execute {
+                    runCatching {
+                        contentResolver.openOutputStream(uri, "w")?.use {
+                            it.write(image.bytes)
+                        } ?: throw IllegalStateException("No se pudo guardar la imagen.")
+                    }.onSuccess { runOnUiThread {
+                        home.showMessage("Imagen de IA real guardada en el destino seleccionado.")
+                    } }.onFailure { error -> runOnUiThread {
+                        home.showMessage(error.message ?: "Falló el guardado de imagen.")
+                    } }
+                }
+            }
+            return
+        }
+        if (requestCode == generatedVideoSaveRequest) {
+            val file = generatedVideoToSave
+            if (resultCode == RESULT_OK && data?.data != null && file != null) {
+                val uri = data.data!!
+                execute {
+                    runCatching {
+                        require(file.isFile && file.length() > 1024) {
+                            "El MP4 aún no existe o está incompleto."
+                        }
+                        contentResolver.openOutputStream(uri, "w")?.use { output ->
+                            file.inputStream().use { input -> input.copyTo(output) }
+                        } ?: throw IllegalStateException("No se pudo guardar el MP4.")
+                    }.onSuccess { runOnUiThread {
+                        home.showMessage("Video MP4 real guardado correctamente.")
+                    } }.onFailure { error -> runOnUiThread {
+                        home.showMessage(error.message ?: "No pude guardar el MP4.")
+                    } }
+                }
+            }
+            return
+        }
         if (requestCode == vectorExportRequest) {
             val selected = vectorExportPending
             vectorExportPending = null
@@ -980,6 +1025,128 @@ class MainActivity : Activity() {
      * 10-second on-device silent H.264 animation. No external cloud for render.
      * Exported only to the Android application selected by the user.
      */
+    private fun startRealImageGeneration() {
+        if (!tokens.cloudEnabled()) {
+            home.showMessage("La generación real de imágenes necesita una clave Gemini en Ajustes.")
+            return
+        }
+        if (imageGenerationPending) {
+            home.showMessage("SKY está creando otra imagen. Terminá esa consulta primero.")
+            return
+        }
+        val field = EditText(this).apply {
+            hint = "Ejemplo: Ilustración editorial profesional de un volcán de Nicaragua al amanecer"
+            minLines = 3
+            maxLines = 6
+            setText(archive.recent(1).lastOrNull()?.question?.take(220).orEmpty())
+        }
+        val ratios = listOf("1:1", "16:9", "9:16", "4:3", "3:4")
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Imagen generada con IA real")
+            .setView(field)
+            .setMessage("Utilizaré el modelo de imágenes Gemini Nano Banana 2.1. " +
+                "La descripción se enviará a Google solamente si autorizás esta consulta. " +
+                "Puede consumir cuota o facturación del proyecto y no estar habilitado en tu clave. " +
+                "No crearé una plantilla como sustituto si el proveedor falla.")
+            .setSingleChoiceItems(ratios.toTypedArray(), 0) { dialog, choice ->
+                dialog.dismiss()
+                confirmRealImage(field.text.toString(), ratios[choice])
+            }
+            .setNegativeButton("Cancelar", null).show()
+    }
+
+    private fun confirmRealImage(prompt: String, ratio: String) {
+        val normalized = prompt.trim()
+        if (normalized.length !in 12..1500) {
+            home.showMessage("Describí la imagen con 12 a 1500 caracteres.")
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Autorizar una imagen de IA")
+            .setMessage("Modelo: Gemini Nano Banana 2.1 · proporción " + ratio +
+                ". Google procesará la descripción. La API puede consumir cuota o dinero. " +
+                "No se generará nada ni se enviará información hasta tu autorización.")
+            .setPositiveButton("Generar imagen") { _, _ ->
+                if (imageGenerationPending) return@setPositiveButton
+                imageGenerationPending = true
+                home.showMessage("Solicitando imagen auténtica al modelo Gemini...")
+                execute {
+                    try {
+                        val result = SkyGeneratedImage.generate(
+                            tokens.personalCloudKey(), normalized, ratio)
+                        runOnUiThread {
+                            imageGenerationPending = false
+                            val bitmap = android.graphics.BitmapFactory.decodeByteArray(
+                                result.bytes, 0, result.bytes.size)
+                            if (bitmap == null) {
+                                home.showMessage("Gemini respondió, pero Android no decodificó la imagen.")
+                            } else {
+                                val preview = android.widget.ImageView(this).apply {
+                                    setImageBitmap(bitmap)
+                                    adjustViewBounds = true
+                                    setPadding(20, 16, 20, 16)
+                                    contentDescription = "Imagen original generada con Gemini"
+                                }
+                                AlertDialog.Builder(this)
+                                    .setTitle("Imagen creada por " + result.model)
+                                    .setView(preview)
+                                    .setPositiveButton("Guardar imagen") { _, _ ->
+                                        generatedImageToSave = result
+                                        val extension = when (result.mime) {
+                                            "image/jpeg" -> "jpg"
+                                            "image/webp" -> "webp"
+                                            else -> "png"
+                                        }
+                                        val intent = android.content.Intent(
+                                            android.content.Intent.ACTION_CREATE_DOCUMENT).apply {
+                                            addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                                            type = result.mime
+                                            putExtra(android.content.Intent.EXTRA_TITLE,
+                                                "SKY-Imagen-IA." + extension)
+                                        }
+                                        runCatching { startActivityForResult(
+                                            intent, generatedImageSaveRequest) }
+                                            .onFailure {
+                                                generatedImageToSave = null
+                                                home.showMessage("No pude abrir el destino de imagen.")
+                                            }
+                                    }
+                                    .setNegativeButton("Descartar", null)
+                                    .show()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread {
+                            imageGenerationPending = false
+                            home.showMessage(e.message ?: "El generador de IA no devolvió imagen.")
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("Cancelar", null).show()
+    }
+
+    private fun startNativeVideoEditor() {
+        val previous = archive.recent(1).lastOrNull()?.answer.orEmpty()
+        val editor = EditText(this).apply {
+            hint = "Escribí un guion para cinco escenas de texto animado."
+            setText(previous.take(1800))
+            minLines = 5
+            maxLines = 11
+        }
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Crear un MP4 real")
+            .setMessage("Video local H.264, vertical, 10 segundos, escenas con texto " +
+                "animado y sin audio. No es video cinematográfico generado por IA.")
+            .setView(editor)
+            .setPositiveButton("Renderizar MP4") { _, _ ->
+                val script = editor.text.toString().trim()
+                if (script.length < 12) home.showMessage("Ingresá un guion de al menos 12 caracteres.")
+                else generateCreativeVideo(script)
+            }
+            .setNegativeButton("Cancelar", null).show()
+    }
+
     private fun generateCreativeVideo(script: String) {
         if (videoPending) {
             home.showMessage("El video anterior todavía se está generando.")
@@ -999,6 +1166,7 @@ class MainActivity : Activity() {
                         val file = SkyVerticalVideo.generate(applicationContext, script)
                         runOnUiThread {
                             videoPending = false
+                            generatedVideoToSave = file
                             AlertDialog.Builder(this)
                                 .setTitle("Video MP4 generado")
                                 .setMessage("SKY creó un video vertical sin audio, " +
@@ -1021,6 +1189,19 @@ class MainActivity : Activity() {
                                     } catch (_: Exception) {
                                         home.showMessage("No hay apps compatibles con video MP4.")
                                     }
+                                }
+                                .setNeutralButton("Guardar MP4") { _, _ ->
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_CREATE_DOCUMENT).apply {
+                                        addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                                        type = "video/mp4"
+                                        putExtra(android.content.Intent.EXTRA_TITLE,
+                                            "SKY-Video-Animado.mp4")
+                                    }
+                                    runCatching { startActivityForResult(
+                                        intent, generatedVideoSaveRequest) }
+                                        .onFailure { home.showMessage(
+                                            "No pude abrir el guardado del video.") }
                                 }
                                 .setNegativeButton("Cerrar", null).show()
                         }
@@ -1485,6 +1666,14 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             socialMetrics.show()
         })
+        content.addView(actionButton("IMÁGENES IA · GENERAR CON GEMINI Y GUARDAR") {
+            settingsDialog?.dismiss()
+            startRealImageGeneration()
+        })
+        content.addView(actionButton("VIDEOS · RENDERIZAR MP4 LOCAL Y GUARDAR") {
+            settingsDialog?.dismiss()
+            startNativeVideoEditor()
+        })
         content.addView(actionButton("ESTUDIO CREATIVO · MIS REDES SOCIALES") {
             settingsDialog?.dismiss()
             socialStudio.showCreatorMenu { request -> createSocialContent(request) }
@@ -1558,7 +1747,7 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             showOwnerProfile()
         })
-        content.addView(actionButton("CREAR · WORD / POWERPOINT / SVG / MD / HTML") {
+        content.addView(actionButton("CREAR · EXCEL / WORD / PPTX / SVG / MD / HTML") {
             settingsDialog?.dismiss()
             exportLatestResponse()
         })
