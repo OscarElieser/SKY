@@ -34,3 +34,16 @@ Para revocar el dispositivo: **Desvincular este teléfono**. Para revocar el acc
 ## Límite del alcance actual
 
 El emparejamiento y la consulta de estado no implementan ni habilitan publicación/mensajería. Falta revisión de seguridad, validación de identidad real y renovación del token Meta. Compilación CI y prueba manual pendientes. Ningún módulo Windows ni proyecto BAQUEANO fue modificado.
+
+## Verificación oficial de identidad (SKY Android 0.8.30)
+
+El emparejamiento exitoso no demuestra que el identificador local sea el propietario real del token de Meta. En la versión Android 0.8.30, desde **Ajustes → Mis redes → Instagram → Conexión segura**, elegí **Verificar identidad real con Meta**. Esto solicita a la función privada `GET /mobile-profile` que:
+
+1. Autentique la credencial revocable del teléfono.
+2. Descifre el token solo en Supabase y consulte a Meta para comprobar su validez actual.
+3. Diferencie la API de Instagram Login (`instagram_business_basic`) de la de Facebook Login (`instagram_basic`).
+4. Solicite el ID y usuario reales. Muestra coincidencia solo si Meta devuelve un único perfil y coincide con el identificador guardado en el teléfono. No habilita publicar, leer mensajes ni comentar.
+
+**Limitación del token autorizado el 28/10/2026:** los permisos observados fueron `instagram_basic`, `instagram_manage_comments`, `instagram_content_publish`, `instagram_manage_messages`, `public_profile`. NO se observaron `pages_show_list` ni `pages_read_engagement`, exigidos para identificar una cuenta vía Facebook Login con Página asociada. Si el backend indica `missing_facebook_page_permissions`, el emparejamiento del teléfono permanece intacto, pero hay que revisar los permisos configurados en Meta y completar una nueva autorización con los permisos faltantes. No declarar perfil verificado sin respuesta real de Meta.
+
+**Pruebas:** ejecución estática y seguridad en GitHub Actions; la lectura real del perfil y la prueba del Samsung requieren una llamada autorizada del dispositivo. Los tokens permanecen en Supabase; la APK no recibe secretos Meta ni credenciales maestras.
