@@ -38,6 +38,37 @@ class SkyActionEvidence(context: Context) :
         return writableDatabase.insertOrThrow("action_evidence", null, values)
     }
 
+    data class Summary(
+        val total: Int,
+        val verified: Int,
+        val sentUnverified: Int,
+        val failed: Int,
+        val rejected: Int,
+        val remoteResponse: Int,
+        val unknown: Int
+    )
+
+    /** Agrega estados reales de SQLite, sin leer contenido de notas ni mensajes. */
+    @Synchronized fun summary(): Summary {
+        val counts = mutableMapOf<String, Int>()
+        readableDatabase.rawQuery(
+            "SELECT state, COUNT(*) FROM action_evidence GROUP BY state", null
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                counts[cursor.getString(0)] = cursor.getInt(1)
+            }
+        }
+        return Summary(
+            total = counts.values.sum(),
+            verified = counts["VERIFICADA_LOCAL"] ?: 0,
+            sentUnverified = counts["ENVIADA_SIN_VERIFICAR"] ?: 0,
+            failed = counts["FALLIDA"] ?: 0,
+            rejected = counts["RECHAZADA"] ?: 0,
+            remoteResponse = counts["RESPUESTA_REMOTA_RECIBIDA"] ?: 0,
+            unknown = counts["ESTADO_DESCONOCIDO"] ?: 0
+        )
+    }
+
     fun recent(limit: Int = 30): List<Receipt> {
         val result = mutableListOf<Receipt>()
         readableDatabase.query("action_evidence",
