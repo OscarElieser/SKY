@@ -1395,6 +1395,9 @@ class MainActivity : Activity() {
     private fun sendChat() {
         val message = chatInput.text.toString().trim()
         if (message.isEmpty()) return
+        // Animate explicit emotional language in both typed and spoken turns.
+        // This is a character expression, never a claim to detect real emotions.
+        voicePanel.express(message)
         if (processQuickCommand(message) ||
             processMusicCommand(message) ||
             processExpressionCommand(message) ||
@@ -1517,6 +1520,7 @@ class MainActivity : Activity() {
                     home.addExchange(message, answer,
                         provider + " · " + String.format(java.util.Locale.US, "%.1f s", elapsedMs / 1000.0),
                         revealPanel = !keepFace, sources = sources, googleSearchHtml = searchSuggestions)
+                    voicePanel.express(answer)
                     voicePanel.speakReply(answer)
                 }
             } catch (error: Exception) {
