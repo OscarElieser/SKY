@@ -1484,6 +1484,26 @@ class MainActivity : Activity() {
                 .setMessage(SkyAndroidCognition.description())
                 .setPositiveButton("Entendido", null).show()
         })
+        content.addView(actionButton("MODELOS GEMINI · RÁPIDO / EQUILIBRADO / PROFUNDO") {
+            val options = arrayOf(
+                "Económico · 3.5 Flash-Lite · consultas rápidas",
+                "Equilibrado · 3.8 Flash · análisis",
+                "Profundo · 3.1 Pro Preview · mayor uso de cuota"
+            )
+            val commands = arrayOf("Modo económico: ", "Modo flash: ", "Modo profundo: ")
+            AlertDialog.Builder(this).setTitle("Elegí el modelo de ESTA consulta")
+                .setMessage("El modo se elige por mensaje. No modifica el modelo por defecto, " +
+                    "ni autoriza cargos o envíos privados automáticamente. " +
+                    "El acceso depende de tu clave y cuota Gemini.")
+                .setItems(options) { _, index ->
+                    val current = SkyGeminiModes.select(chatInput.text.toString()).prompt
+                    chatInput.setText(commands[index] + current.take(15500))
+                    chatInput.setSelection(chatInput.text.length)
+                    settingsDialog?.dismiss()
+                    home.openChat()
+                }
+                .setNegativeButton("Cancelar", null).show()
+        })
         content.addView(actionButton("HABILIDADES IA · INVESTIGAR / PROGRAMAR / DISEÑAR / PRESENTAR") {
             settingsDialog?.dismiss()
             showSkillsCatalog()
