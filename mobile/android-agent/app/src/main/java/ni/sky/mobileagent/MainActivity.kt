@@ -54,6 +54,7 @@ class MainActivity : Activity() {
     private lateinit var cloudConsent: CheckBox
     private lateinit var privateConsent: CheckBox
     private lateinit var archive: SkyConversationArchive
+    private val knowledgeSources by lazy { SkyAndroidKnowledgeSources(this) }
     private val cognitionPrefs by lazy { getSharedPreferences("sky_android_cognition", MODE_PRIVATE) }
     private fun cognitionEnabled(): Boolean = cognitionPrefs.getBoolean("enabled", true)
     private val attachmentRequest = 1666
@@ -1406,6 +1407,40 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             showHistoryBrowser()
         })
+        content.addView(actionButton("FUENTES APRENDIDAS · VER Y BORRAR REFERENCIAS") {
+            val entries = knowledgeSources.recent(15)
+            if (entries.isEmpty()) {
+                AlertDialog.Builder(this)
+                    .setTitle("SKY · Fuentes de investigación")
+                    .setMessage("Todavía no hay referencias web guardadas en este teléfono. " +
+                        "Se agregan únicamente enlaces que devuelva una búsqueda con fuentes.")
+                    .setPositiveButton("Cerrar", null).show()
+            } else {
+                val labels = entries.map { it.localDate() + " · " + it.title.take(65) }.toTypedArray()
+                AlertDialog.Builder(this)
+                    .setTitle("Fuentes consultadas · solo metadatos")
+                    .setItems(labels) { _, index ->
+                        val entry = entries[index]
+                        AlertDialog.Builder(this)
+                            .setTitle(entry.title)
+                            .setMessage(entry.url + "\n\nGuardada: " + entry.localDate() +
+                                "\nEsto NO confirma el contenido completo del sitio.")
+                            .setPositiveButton("Entendido", null).show()
+                    }
+                    .setNeutralButton("Borrar fuentes") { _, _ ->
+                        AlertDialog.Builder(this)
+                            .setTitle("Eliminar solo referencias web")
+                            .setMessage("Se borrarán los enlaces guardados en este teléfono. " +
+                                "No se eliminarán tu historial ni tus recuerdos personales.")
+                            .setPositiveButton("Eliminar") { _, _ ->
+                                knowledgeSources.clearAll()
+                                home.showMessage("Se borraron las referencias web locales.")
+                            }
+                            .setNegativeButton("Cancelar", null).show()
+                    }
+                    .setNegativeButton("Cerrar", null).show()
+            }
+        })
         content.addView(actionButton("MI MEMORIA · REVISAR Y BORRAR UN DATO") {
             settingsDialog?.dismiss()
             reviewMemoryLines()
@@ -2069,6 +2104,10 @@ class MainActivity : Activity() {
                         sources = live.sources
                         searchSuggestions = live.googleSearchHtml
                         provider = "Gemini · búsqueda verificable"
+                        // Sólo metadatos públicos; sin guardar preguntas o datos del usuario.
+                        if (cognitionEnabled() && live.searchedWeb && live.sources.isNotEmpty()) {
+                            runCatching { knowledgeSources.saveGrounded(live.sources, live.searchedWeb) }
+                        }
                     }
                     needsLiveSources && groqReady -> {
                         answer = "Para darte información de hoy necesito consultar fuentes web. " +
