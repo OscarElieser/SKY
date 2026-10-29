@@ -37,6 +37,15 @@ class SkyHandsFreeService : Service() {
         private const val NOTIFICATION_ID = 4107
         private const val IDLE_MS = 45_000L
         @Volatile private var current: SkyHandsFreeService? = null
+        /** No conserva voz ni transcripciones. Estado técnico de la sesión activa. */
+        data class Health(val active: Boolean, val recognizing: Boolean,
+                          val awake: Boolean, val lastPhraseAtMs: Long,
+                          val errorCode: Int, val retries: Int)
+        fun health(): Health {
+            val service = current ?: return Health(false, false, false, 0, 0, 0)
+            return Health(service.running, service.listening, service.awake,
+                service.lastPhraseAtMs, service.lastErrorCode, service.retryCount)
+        }
         @Volatile var onPhrase: ((String) -> Unit)? = null
         @Volatile var onWake: (() -> Unit)? = null
         @Volatile var onStatus: ((Boolean) -> Unit)? = null
@@ -58,6 +67,8 @@ class SkyHandsFreeService : Service() {
     private var speechSuspended = false
     private var retryCount = 0
     private var lastCycle = 0L
+    private var lastPhraseAtMs = 0L
+    private var lastErrorCode = 0
     private val nextListen = Runnable { arm() }
     private val fallAsleep = Runnable {
         awake = false
@@ -176,6 +187,7 @@ class SkyHandsFreeService : Service() {
                 override fun onEvent(eventType: Int, params: Bundle?) {}
 
                 override fun onError(error: Int) {
+                    lastErrorCode = error
                     if (!listening) return
                     stopRecognizer()
                     if (!running) return
@@ -201,6 +213,8 @@ class SkyHandsFreeService : Service() {
                         ?.firstOrNull().orEmpty()
                     stopRecognizer()
                     lastCycle = SystemClock.elapsedRealtime()
+                    lastPhraseAtMs = System.currentTimeMillis()
+                    lastErrorCode = 0
                     retryCount = 0
                     process(heard)
                 }
