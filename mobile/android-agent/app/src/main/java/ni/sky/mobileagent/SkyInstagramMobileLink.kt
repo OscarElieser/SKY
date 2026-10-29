@@ -3,6 +3,8 @@ package ni.sky.mobileagent
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.EditText
 import android.text.InputFilter
 import android.text.InputType
@@ -49,7 +51,7 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
     }
     private fun clear(){prefs.edit().remove("iv").remove("credential").apply()}
     private fun request(path:String,verb:String,credential:String?=null,data:JSONObject?=null):JSONObject {
-        require(path in setOf("/pair-claim","/mobile-status","/mobile-profile","/mobile-disconnect"))
+        require(path in setOf("/pair-claim","/mobile-status","/mobile-profile","/mobile-start","/mobile-disconnect"))
         val conn=URL(base+path).openConnection() as HttpURLConnection
         try {
             conn.requestMethod=verb;conn.instanceFollowRedirects=false
@@ -75,14 +77,15 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
     fun show() {
         val choices=arrayOf("Vincular este teléfono con código temporal",
             "Consultar conexión verificada","Verificar identidad real con Meta",
-            "Desvincular este teléfono")
+            "Renovar autorización oficial con Meta","Desvincular este teléfono")
         // setMessage + setItems oculta las opciones en AlertDialog.
         AlertDialog.Builder(host).setTitle("SKY · Instagram seguro")
             .setItems(choices){_,which->when(which){
                 0->pair()
                 1->check()
                 2->verifyProfile()
-                3->AlertDialog.Builder(host).setTitle("Desvincular Instagram")
+                3->renewAuthorization()
+                4->AlertDialog.Builder(host).setTitle("Desvincular Instagram")
                     .setMessage("¿Revocar el acceso de este teléfono? No se revoca el permiso global de Meta.")
                     .setPositiveButton("Revocar"){_,_->disconnect()}
                     .setNegativeButton("Cancelar",null).show()
@@ -192,6 +195,49 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
             }
         }.start()
     }
+
+    /** Initiate OAuth in the trusted browser using only this phone's revocable credential. */
+    private fun renewAuthorization() {
+        val credential=token()
+        if(credential.isBlank()){
+            feedback("Vinculá primero este teléfono con código temporal.")
+            return
+        }
+        AlertDialog.Builder(host)
+            .setTitle("Renovar permisos de Instagram")
+            .setMessage("SKY abrirá el inicio de sesión oficial de Meta. Revisá el perfil y los permisos solicitados antes de autorizar. Nunca introduzcás contraseñas en SKY: solo en el sitio oficial de Meta. El teléfono conservará su vinculación.")
+            .setPositiveButton("Abrir Meta"){_,_->
+                Thread {
+                    try {
+                        val response=request("/mobile-start","POST",credential,JSONObject())
+                        val url=Uri.parse(response.getString("authorization_url"))
+                        val trusted=url.scheme=="https" &&
+                            url.host in setOf("www.facebook.com","business.facebook.com","www.instagram.com") &&
+                            (url.path?.endsWith("/dialog/oauth")==true ||
+                             url.path?.endsWith("/oauth/authorize")==true) &&
+                            !url.getQueryParameter("state").isNullOrBlank()
+                        require(trusted) { "URL de autorización no válida" }
+                        host.runOnUiThread {
+                            if(!host.isFinishing){
+                                try {
+                                    host.startActivity(Intent(Intent.ACTION_VIEW,url))
+                                } catch (_:Exception) {
+                                    feedback("No se pudo abrir el navegador oficial de Meta.")
+                                }
+                            }
+                        }
+                    } catch (_:Exception) {
+                        host.runOnUiThread {
+                            if(!host.isFinishing)
+                                feedback("Instagram: no se pudo iniciar la renovación segura. Revisá tu conexión.")
+                        }
+                    }
+                }.start()
+            }
+            .setNegativeButton("Cancelar",null)
+            .show()
+    }
+
     private fun disconnect(){
         val credential=token()
         if(credential.isBlank()){clear();feedback("Este teléfono ya está desvinculado.");return}
