@@ -1,5 +1,7 @@
 ## SKY Core unificado · Windows y Android
 
+**Organización del repositorio:** [Mapa oficial de carpetas y plan de migración segura](docs/arquitectura/ESTRUCTURA_REPOSITORIO_SKY.md). Mantener las rutas existentes hasta superar pruebas de compatibilidad.
+
 SKY es un solo producto con dos ejecutores nativos independientes. El [contrato de seguridad común](shared/sky_core_contract_v1.json) establece autorizaciones, riesgos y evidencias compartidas; los conectores Python y Kotlin lo aplican sin compartir claves, permisos, datos privados ni exigir que Windows permanezca encendido. **No se ha implementado todavía sincronización de memoria ni paridad total**. Las acciones de alto riesgo exigen autorización individual y confirmación desde una interfaz local.
 
 [Arquitectura, seguridad y migración sin pérdida](docs/SKY_UNIFIED_CORE_SECURITY.md) · [Matriz de capacidades Windows/Android](docs/SKY_WINDOWS_ANDROID_PARITY_2026-10-29.md) · [Estado de compilaciones](https://github.com/OscarElieser/SKY/actions).
