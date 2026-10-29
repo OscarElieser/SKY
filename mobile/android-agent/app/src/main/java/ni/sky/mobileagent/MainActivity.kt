@@ -109,6 +109,7 @@ class MainActivity : Activity() {
         voicePanel = SkyEyeVoicePanel(this) { transcript ->
             if (!processQuickCommand(transcript) &&
                 !processMusicCommand(transcript) &&
+                !processExpressionCommand(transcript) &&
                 !processReplyCommand(transcript) &&
                 !processCreatorCommand(transcript) &&
                 !processMessagingCommand(transcript) &&
@@ -363,6 +364,14 @@ class MainActivity : Activity() {
     private fun processMusicCommand(message: String): Boolean {
         val request = SkyMusicCommand.parse(message) ?: return false
         musicLauncher.play(request)
+        return true
+    }
+
+    /** Perform requested playful expression locally, without using cloud quota. */
+    private fun processExpressionCommand(message: String): Boolean {
+        val expression = SkyExpressionCommand.parse(message) ?: return false
+        val feedback = voicePanel.chooseExpression(expression)
+        home.showMessage(feedback)
         return true
     }
 
@@ -1046,7 +1055,7 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, enabled -> setHandsFreeEnabled(enabled) }
         })
         content.addView(CheckBox(this).apply {
-            text = "Conversación fluida antigua (solo con la app abierta)"
+            text = "Conversación fluida al abrir SKY (opcional)"
             isChecked = getSharedPreferences("sky_voice_settings", MODE_PRIVATE)
                 .getBoolean("fluid_opt_in", false)
             setOnCheckedChangeListener { _, enabled ->
@@ -1054,7 +1063,7 @@ class MainActivity : Activity() {
                     .edit().putBoolean("fluid_opt_in", enabled).apply()
                 voicePanel.setConversationMode(enabled)
                 home.showMessage(if (enabled)
-                    "Conversación fluida activada. Tocá HABLAR para comenzar."
+                    "Conversación fluida activada. Tocá los ojos para comenzar."
                     else "Conversación fluida desactivada.")
             }
         })
@@ -1131,12 +1140,34 @@ class MainActivity : Activity() {
         startHandsFree()
     }
 
+    private fun showHandsFreeFirstRun() {
+        if (handsFreePrefs.getBoolean("hands_free_prompt_shown", false) ||
+            handsFreePrefs.getBoolean("hands_free_opt_in", false) ||
+            !visible || isFinishing || settingsDialog?.isShowing == true) return
+        handsFreePrefs.edit().putBoolean("hands_free_prompt_shown", true).apply()
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Activación por voz")
+            .setMessage("¿Querés activar SKY manos libres? Escuchará la palabra «SKY» " +
+                "con reconocimiento local disponible, mostrará una notificación " +
+                "permanente y se dormirá entre órdenes. El micrófono consume batería " +
+                "y Android 16 puede limitarlo cuando el teléfono está bloqueado. " +
+                "No reconoce de forma biométrica quién está hablando: responde a " +
+                "las palabras que escucha. Podés apagarlo desde la notificación " +
+                "o Ajustes de SKY.")
+            .setPositiveButton("Activar manos libres") { _, _ -> setHandsFreeEnabled(true) }
+            .setNegativeButton("Ahora no") { _, _ ->
+                home.showMessage("Manos libres apagadas. Tocá los ojos para hablar o escribí.")
+            }
+            .show()
+    }
+
     private fun startHandsFree() {
         if (android.os.Build.VERSION.SDK_INT < 31 ||
             !android.speech.SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
             handsFreePrefs.edit().putBoolean("hands_free_opt_in", false).apply()
             home.setHandsFreeActive(false)
-            voicePanel.showError("Este teléfono no tiene reconocimiento local compatible. Seguís pudiendo usar HABLAR.")
+            voicePanel.showError("El reconocimiento local continuo no está disponible. " +
+                "Podés tocar los ojos para un turno de voz mientras la app está abierta.")
             return
         }
         try {
@@ -1209,6 +1240,7 @@ class MainActivity : Activity() {
                 android.content.pm.PackageManager.PERMISSION_GRANTED) startHandsFree()
         if (::home.isInitialized) home.setHandsFreeActive(
             handsFreePrefs.getBoolean("hands_free_opt_in", false))
+        handler.postDelayed({ showHandsFreeFirstRun() }, 1100L)
         companionController.onResume()
         handler.post(pollLoop)
     }
@@ -1362,6 +1394,7 @@ class MainActivity : Activity() {
         if (message.isEmpty()) return
         if (processQuickCommand(message) ||
             processMusicCommand(message) ||
+            processExpressionCommand(message) ||
             processReplyCommand(message) ||
             processCreatorCommand(message) ||
             processMessagingCommand(message) ||
