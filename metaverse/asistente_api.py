@@ -57,7 +57,6 @@ def _decorate_cognition(result: dict, user_text: str) -> dict:
     enriched['sky_cognition'] = {
         'persona': emotion_style(user_text),
         'speech_text': spoken_text(str(result['mensaje'])),
-        'action_executed': False,
         'emotion_is_simulated': True,
     }
     return enriched
