@@ -6,6 +6,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
+import java.util.concurrent.CancellationException
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Gemini Files API por fragmentos de 4 MiB. No carga 100 MB en memoria.
@@ -13,6 +15,17 @@ import java.util.Locale
  */
 object SkyGeminiFiles {
     data class Uploaded(val name: String, val uri: String, val mime: String)
+
+    /** Cancelación cooperativa entre fragmentos, sondeos y etapas de análisis. */
+    class CancelToken {
+        private val cancelled = AtomicBoolean(false)
+        fun cancel() { cancelled.set(true) }
+        fun isCancelled(): Boolean = cancelled.get()
+        fun check() { if (cancelled.get()) throw CancellationException("Carga cancelada por vos.") }
+    }
+
+    private fun percent(done: Long, total: Long): Int =
+        if (total <= 0L) 0 else ((done.coerceIn(0L, total) * 100L) / total).toInt()
     private const val BASE = "https://generativelanguage.googleapis.com"
     private const val CHUNK = 4 * 1024 * 1024
     private val safeName = Regex("""files/[a-z0-9][a-z0-9-]{0,78}""")
@@ -56,7 +69,10 @@ object SkyGeminiFiles {
         return if (bytes.isEmpty()) JSONObject() else JSONObject(bytes.toString(Charsets.UTF_8))
     }
 
-    fun upload(resolver: ContentResolver, apiKey: String, item: SkyAttachmentBatch.Item): Uploaded {
+    fun upload(resolver: ContentResolver, apiKey: String, item: SkyAttachmentBatch.Item,
+               cancel: CancelToken = CancelToken(),
+               onProgress: (Int) -> Unit = {}): Uploaded {
+        cancel.check()
         require(SkyPhoneCloud.validPersonalKey(apiKey)) { "Configurá Gemini en Ajustes." }
         require(item.kind == SkyAttachmentBatch.Kind.CLOUD)
         val start = connection(BASE + "/upload/v1beta/files").apply {
@@ -91,9 +107,11 @@ object SkyGeminiFiles {
         resolver.openInputStream(item.uri)?.use { input ->
             val buffer = ByteArray(CHUNK)
             while (offset < item.size) {
+                cancel.check()
                 val length = minOf(CHUNK.toLong(), item.size - offset).toInt()
                 var filled = 0
                 while (filled < length) {
+                    cancel.check()
                     val n = input.read(buffer, filled, length - filled)
                     require(n > 0) { "El archivo cambió o terminó antes de la carga." }
                     filled += n
@@ -111,9 +129,11 @@ object SkyGeminiFiles {
                     part.outputStream.use { it.write(buffer, 0, filled) }
                     result = readResponse(part)
                     offset += filled
+                    onProgress(percent(offset, item.size))
                 } finally { part.disconnect() }
             }
         } ?: throw IllegalArgumentException("No se pudo abrir el archivo seleccionado.")
+        cancel.check()
         require(offset == item.size) { "El archivo no se envió completamente." }
         val info = result.optJSONObject("file")
             ?: throw IllegalStateException("Gemini no confirmó la carga final.")
@@ -125,10 +145,13 @@ object SkyGeminiFiles {
         return Uploaded(name, uri, item.mime)
     }
 
-    fun awaitReady(apiKey: String, file: Uploaded) {
+    fun awaitReady(apiKey: String, file: Uploaded,
+                   cancel: CancelToken = CancelToken()) {
+        cancel.check()
         require(safeName.matches(file.name))
         val start = SystemClock.elapsedRealtime()
         while (SystemClock.elapsedRealtime() - start < 150_000) {
+            cancel.check()
             val conn = connection(BASE + "/v1beta/" + file.name).apply {
                 requestMethod = "GET"
                 setRequestProperty("x-goog-api-key", apiKey)
@@ -162,27 +185,48 @@ object SkyGeminiFiles {
     }
 
     fun analyze(context: android.content.Context, apiKey: String,
-                items: List<SkyAttachmentBatch.Item>, question: String): String {
+                items: List<SkyAttachmentBatch.Item>, question: String,
+                cancel: CancelToken = CancelToken(),
+                onProgress: (String) -> Unit = {}): String {
         require(items.isNotEmpty() && items.size <= SkyAttachmentBatch.MAX_FILES)
         val uploaded = mutableListOf<Uploaded>()
         val extracted = mutableListOf<String>()
+        var response: String? = null
+        var cleanupFailures = 0
         try {
-            for (item in items) {
+            for ((index, item) in items.withIndex()) {
+                cancel.check()
+                val itemLabel = "Archivo " + (index + 1) + "/" + items.size +
+                    " · " + item.name.take(35)
+                onProgress(itemLabel + " · preparando...")
                 if (item.kind == SkyAttachmentBatch.Kind.OFFICE) {
                     val text = SkyOfficeStreaming.preview(context.contentResolver, item)
+                    cancel.check()
+                    onProgress(itemLabel + " · texto extraído")
                     extracted.add("Documento " + item.name +
                         " (extracción parcial de texto y valores, sin gráficos ni diseño):\n" + text)
                 } else {
-                    val file = upload(context.contentResolver, apiKey, item)
+                    val file = upload(context.contentResolver, apiKey, item, cancel) { value ->
+                        onProgress(itemLabel + " · enviado " + value + "%")
+                    }
                     uploaded.add(file)
-                    awaitReady(apiKey, file)
+                    onProgress(itemLabel + " · procesando en Gemini...")
+                    awaitReady(apiKey, file, cancel)
                 }
             }
-            return SkyPhoneCloud.analyzeFileReferences(apiKey, uploaded, extracted, question)
+            cancel.check()
+            onProgress("Gemini está analizando " + items.size + " archivo(s)...")
+            response = SkyPhoneCloud.analyzeFileReferences(apiKey, uploaded, extracted, question)
+            cancel.check()
         } finally {
+            if (uploaded.isNotEmpty()) onProgress("Solicitando eliminación de archivos temporales...")
             for (file in uploaded) {
-                runCatching { delete(apiKey, file) }
+                if (runCatching { delete(apiKey, file) }.isFailure) cleanupFailures++
             }
         }
+        return response.orEmpty() + if (cleanupFailures > 0)
+            "\nAviso: Gemini no confirmó el borrado de " + cleanupFailures +
+                " archivo(s) temporal(es). Revisá tu cuenta; la retención puede ser de hasta 48 horas."
+            else ""
     }
 }

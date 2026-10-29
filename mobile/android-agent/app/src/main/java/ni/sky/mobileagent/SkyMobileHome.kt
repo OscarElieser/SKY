@@ -45,6 +45,7 @@ class SkyMobileHome(
     private val onChatAccess: () -> Unit,
     private val onAttach: () -> Unit,
     private val onRemoveAttachment: () -> Unit,
+    private val onCancelUpload: () -> Unit,
     private val onHistory: () -> Unit,
     private val archive: SkyConversationArchive,
     private val onDiagnostics: () -> Unit,
@@ -86,6 +87,13 @@ class SkyMobileHome(
     private lateinit var footerBar: LinearLayout
     private lateinit var suggestionBar: HorizontalScrollView
     private lateinit var sendButton: TextView
+    private var uploadingFiles = false
+    private val cancelUploadButton = pill("Cancelar carga de archivos", Color.rgb(106, 48, 80)) {
+        onCancelUpload()
+    }.apply {
+        visibility = View.GONE
+        contentDescription = "Cancelar el envío de archivos a Gemini"
+    }
     private val attachmentLabel = text("", 12f, cyan).apply {
         visibility = View.GONE
         setPadding(dp(12), dp(6), dp(12), dp(6))
@@ -310,7 +318,8 @@ class SkyMobileHome(
 
     private fun updateSendButton() {
         if (!::sendButton.isInitialized) return
-        val canSend = chatInput.text.isNotBlank() && pendingQuestion == null
+        val canSend = (chatInput.text.isNotBlank() ||
+            attachmentLabel.visibility == View.VISIBLE) && pendingQuestion == null
         sendButton.alpha = if (canSend) 1f else 0.46f
         sendButton.contentDescription = if (pendingQuestion != null)
             "SKY está procesando un mensaje" else "Enviar mensaje escrito a SKY"
@@ -484,6 +493,7 @@ class SkyMobileHome(
         }
         panel.addView(conversationScroll, LinearLayout.LayoutParams(-1, 0, 1f))
         panel.addView(progressLabel, LinearLayout.LayoutParams(-1, -2))
+        panel.addView(cancelUploadButton, LinearLayout.LayoutParams(-1, dp(42)))
 
         val suggestions = LinearLayout(host).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -524,7 +534,8 @@ class SkyMobileHome(
         }, LinearLayout.LayoutParams(dp(46), dp(50)))
         composer.addView(chatInput, LinearLayout.LayoutParams(0, -2, 1f))
         sendButton = pill("➤", violet) {
-            if (chatInput.text.isNotBlank() && pendingQuestion == null) onSend()
+            if ((chatInput.text.isNotBlank() || attachmentLabel.visibility == View.VISIBLE) &&
+                pendingQuestion == null) onSend()
         }.apply {
             textSize = 23f
             contentDescription = "Enviar mensaje escrito a SKY"
@@ -556,6 +567,14 @@ class SkyMobileHome(
         attachmentLabel.text = if (filename.isNullOrBlank()) "" else
             "Adjuntos: " + filename.take(135) + " · TOCÁ PARA GESTIONAR"
         attachmentLabel.visibility = if (filename.isNullOrBlank()) View.GONE else View.VISIBLE
+        updateSendButton()
+    }
+
+    fun showUploadProgress(progress: String?) {
+        uploadingFiles = progress != null
+        cancelUploadButton.visibility = if (uploadingFiles) View.VISIBLE else View.GONE
+        if (progress != null) progressLabel.text = "● " + progress.take(130)
+        else renderConversation()
     }
 
     fun clearHistory() {

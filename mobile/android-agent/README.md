@@ -1,3 +1,16 @@
+# SKY Android 0.8.21 — progreso y cancelación de archivos grandes
+
+**Código en main. La APK se considera lista solo tras la compilación firmada y las pruebas.**
+
+- Se permite **enviar adjuntos sin escribir texto** (SKY usa una petición predeterminada).
+- Progreso por archivo, identificación del archivo actual, porcentaje de fragmentos enviados, estado de procesamiento y etapa de borrado remoto.
+- Botón «Cancelar carga de archivos» en el chat durante la transferencia. Es cancelación cooperativa **entre fragmentos de 4 MB y etapas**, no corte instantáneo de una petición HTTP ya en curso.
+- Si el envío se cancela o falla, se recupera la selección local de los archivos para revisar y reintentar. No se reanudan bytes a mitad de subida: el reintento empieza de cero.
+- Se muestra una advertencia si Gemini no confirma la eliminación de archivos remotos. Aun con solicitud de borrado, una desconexión o cierre forzado puede dejar archivos temporales en Google hasta su caducidad.
+- Se conservan los límites de 100 MB/archivo, 5 archivos, 300 MB/consulta y PDF máximo 50 MB, junto con todas las funciones anteriores. SKY Windows sin cambios.
+
+---
+
 # SKY Android 0.8.20 — archivos grandes, selección múltiple y habilidades
 
 **Implementación en la rama main; no instalar hasta comprobar compilación y APK firmada 0.8.20.**

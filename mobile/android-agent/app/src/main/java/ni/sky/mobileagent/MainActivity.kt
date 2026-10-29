@@ -58,6 +58,7 @@ class MainActivity : Activity() {
     private val profileImportRequest = 1667
     private val historyExportRequest = 1668
     private val selectedAttachments = mutableListOf<SkyAttachmentBatch.Item>()
+    @Volatile private var pendingFileCancel: SkyGeminiFiles.CancelToken? = null
     private val chatHistory = JSONArray()
     @Volatile private var chatPending = false
     @Volatile private var voiceReplyOnFace = false
@@ -152,6 +153,10 @@ class MainActivity : Activity() {
             onChatAccess = { showSettings() },
             onAttach = { chooseChatAttachment() },
             onRemoveAttachment = { manageSelectedAttachments() },
+            onCancelUpload = {
+                pendingFileCancel?.cancel()
+                home.showUploadProgress("Cancelando cuando termine el fragmento actual...")
+            },
             onHistory = { showHistoryBrowser() },
             archive = archive,
             onDiagnostics = { checkHomeStatus() },
@@ -1743,14 +1748,20 @@ class MainActivity : Activity() {
     private fun sendAttachmentBatch(instruction: String, selected: List<SkyAttachmentBatch.Item>) {
         if (chatPending) return
         chatPending = true
+        val cancel = SkyGeminiFiles.CancelToken()
+        pendingFileCancel = cancel
         val label = selected.joinToString(", ") { it.name.take(45) }
         val question = (instruction + "\n[Archivos: " + label + "]").take(3900)
         home.beginSending(question)
+        home.showUploadProgress("Preparando " + selected.size + " archivo(s)...")
         voicePanel.showThinking()
         chatExecutor.execute {
             try {
                 val answer = SkyGeminiFiles.analyze(this, tokens.personalCloudKey(),
-                    selected, instruction)
+                    selected, instruction, cancel) { progress ->
+                    runOnUiThread { if (pendingFileCancel === cancel)
+                        home.showUploadProgress(progress) }
+                }
                 runOnUiThread {
                     home.addExchange(question, answer, "Gemini · análisis de archivos")
                     voicePanel.express(answer)
@@ -1758,11 +1769,21 @@ class MainActivity : Activity() {
                 }
             } catch (error: Exception) {
                 runOnUiThread {
-                    home.failSending(error.message ?: "No pude analizar los archivos.", instruction)
-                    voicePanel.showError("Falló la lectura o el análisis de los adjuntos.")
+                    if (selectedAttachments.isEmpty()) {
+                        selectedAttachments.addAll(selected)
+                        refreshSelectedAttachments()
+                    }
+                    val reason = if (error is java.util.concurrent.CancellationException)
+                        "Cancelaste el envío. Podés editar o quitar los archivos y reintentar."
+                    else error.message ?: "No pude analizar los archivos."
+                    home.failSending(reason, instruction)
+                    if (error !is java.util.concurrent.CancellationException)
+                        voicePanel.showError("Falló la lectura o el análisis de los adjuntos.")
                 }
             } finally {
                 chatPending = false
+                pendingFileCancel = null
+                runOnUiThread { home.showUploadProgress(null) }
             }
         }
     }
