@@ -33,15 +33,32 @@ def produce(project_file, output_file):
         manifest = dict(project)
         if narration:
             wav = work / "narration.wav"
-            _load("sky_video_narration").synthesize(
-                narration, wav,
-                voice=project.get("narration_voice", "es"),
-                speed=int(project.get("narration_speed", 155)),
-            )
+            engine = project.get("narration_engine", "espeak")
+            if engine == "piper":
+                model = project.get("narration_model")
+                if not isinstance(model, str) or not model.strip():
+                    raise ValueError("Piper requires narration_model")
+                config = project.get("narration_config")
+                _load("sky_video_neural_voice").synthesize(
+                    narration, wav,
+                    model=project_file.parent / model,
+                    config=(project_file.parent / config) if config else None,
+                )
+            elif engine == "espeak":
+                _load("sky_video_narration").synthesize(
+                    narration, wav,
+                    voice=project.get("narration_voice", "es"),
+                    speed=int(project.get("narration_speed", 155)),
+                )
+            else:
+                raise ValueError("Unknown narration_engine")
             manifest["voiceover"] = str(wav)
         manifest.pop("narration", None)
         manifest.pop("narration_voice", None)
         manifest.pop("narration_speed", None)
+        manifest.pop("narration_engine", None)
+        manifest.pop("narration_model", None)
+        manifest.pop("narration_config", None)
         # Resolve all user-supplied media relative to the project, not the temp manifest.
         for scene in manifest["scenes"]:
             scene["file"] = str((project_file.parent / scene["file"]).resolve())
