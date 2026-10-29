@@ -314,8 +314,27 @@ def nivel_riesgo(accion: str, params: dict | None = None) -> int:
 
 
 def requiere_confirmacion(accion: str, params: dict, politica: dict) -> bool:
-    if accion == 'word_write':
-        return True  # El dueño confirma cada edición de su documento.
+    # El contrato común Android/Windows sólo endurece la política. Nunca
+    # sustituye permisos locales, autenticación ni confirmación de la interfaz.
+    from .sky_core_contract import inspect
+    comunes = {
+        'word_write': 'file_write',
+        'type_text': 'file_write',
+        'note_create': 'file_write',
+        'note_append': 'file_write',
+        'note_trash': 'delete_file',
+        'clipboard_set': 'clipboard_write',
+        'window_action': 'window_modify',
+        'social_action': 'social_publish',
+    }
+    if accion in comunes:
+        try:
+            decision = inspect(comunes[accion], 'owner_typed',
+                               platform_permission=True)
+            if decision['requires_confirmation'] or not decision['allowed']:
+                return True
+        except (OSError, ValueError, KeyError, TypeError):
+            return True   # contrato ausente o ilegible: fallo cerrado
     if nivel_riesgo(accion, params) >= 3:
         return True   # alto riesgo: confirmación expresa por acción, siempre
     return capacidad_para(accion, params) not in politica.get('auto_confirm', [])
