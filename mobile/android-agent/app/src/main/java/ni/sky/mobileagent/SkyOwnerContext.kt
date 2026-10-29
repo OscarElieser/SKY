@@ -36,7 +36,7 @@ object SkyOwnerContext {
         save(context, (read(context) + "\n- " + value).trim())
     }
 
-    fun importFromWindows(context: Context, raw: String): Int {
+    fun parseWindows(raw: String): String {
         require(raw.length <= 30_000) { "El archivo exportado supera el tamaño permitido." }
         val content = if (raw.trimStart().startsWith("{")) {
             val json = JSONObject(raw)
@@ -52,8 +52,39 @@ object SkyOwnerContext {
                 }
             }
         } else raw
-        save(context, content)
+        require(content.length <= MAX_CHARS) {
+            "El perfil importado supera $MAX_CHARS caracteres. Seleccioná un extracto."
+        }
+        require(!secretPattern.containsMatchIn(content)) {
+            "El perfil incluye contraseñas, PIN, tokens o claves API. Retiralos antes de importarlo."
+        }
+        return content.trim()
+    }
+
+    fun importFromWindows(context: Context, raw: String): Int {
+        save(context, parseWindows(raw))
         return read(context).length
+    }
+
+    fun merge(context: Context, newText: String): Int {
+        val previous = read(context)
+        val additions = newText.lines().map { it.trim() }
+            .filter { it.isNotBlank() && !previous.lines().contains(it) }
+        save(context, (previous + "\n" + additions.joinToString("\n")).trim())
+        return read(context).length
+    }
+
+    fun memoryLines(context: Context): List<String> =
+        read(context).lines().map { it.trim() }
+            .filter { it.startsWith("- ") }.take(150)
+
+    fun removeLine(context: Context, item: String): Boolean {
+        val lines = read(context).lines().toMutableList()
+        val index = lines.indexOfFirst { it.trim() == item.trim() }
+        if (index < 0) return false
+        lines.removeAt(index)
+        save(context, lines.joinToString("\n"))
+        return true
     }
 
     /** Sólo se envía a IA en nube cuando el dueño marque autorización privada. */

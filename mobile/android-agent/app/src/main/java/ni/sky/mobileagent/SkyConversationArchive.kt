@@ -1,6 +1,9 @@
 package ni.sky.mobileagent
 
 import android.content.Context
+import android.util.JsonWriter
+import java.io.OutputStream
+import java.io.OutputStreamWriter
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import java.text.SimpleDateFormat
@@ -68,6 +71,65 @@ class SkyConversationArchive(context: Context) :
             }
         }
         return result.asReversed()
+    }
+
+    /** SQL parametrizado: búsqueda en título, pregunta y respuesta, sin perder registros antiguos. */
+    fun page(query: String = "", beforeId: Long? = null, limit: Int = 25): List<Entry> {
+        val clauses = mutableListOf<String>()
+        val args = mutableListOf<String>()
+        if (beforeId != null) {
+            require(beforeId > 0) { "Cursor de historial inválido." }
+            clauses.add("id < ?")
+            args.add(beforeId.toString())
+        }
+        if (query.isNotBlank()) {
+            val safe = query.trim().take(100)
+                .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            clauses.add("(title LIKE ? ESCAPE '\\' OR question LIKE ? ESCAPE '\\' OR answer LIKE ? ESCAPE '\\')")
+            repeat(3) { args.add("%$safe%") }
+        }
+        val found = ArrayList<Entry>()
+        readableDatabase.query("conversations",
+            arrayOf("id", "title", "question", "answer", "engine", "created_at"),
+            clauses.joinToString(" AND ").ifEmpty { null }, args.toTypedArray().takeIf { it.isNotEmpty() },
+            null, null, "id DESC", limit.coerceIn(1, 101).toString()
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                found.add(Entry(cursor.getLong(0), cursor.getString(1),
+                    cursor.getString(2), cursor.getString(3), cursor.getString(4),
+                    cursor.getLong(5)))
+            }
+        }
+        return found
+    }
+
+    /** Exportación voluntaria sin volcar todo el historial a RAM ni enviarlo a la nube. */
+    fun writeJson(output: OutputStream): Int {
+        var count = 0
+        JsonWriter(OutputStreamWriter(output, Charsets.UTF_8)).use { json ->
+            json.setIndent("  ")
+            json.beginObject()
+            json.name("sky_history_export_version").value(1)
+            json.name("records").beginArray()
+            readableDatabase.query("conversations",
+                arrayOf("id", "title", "question", "answer", "engine", "created_at"),
+                null, null, null, null, "id ASC"
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    json.beginObject()
+                    json.name("id").value(cursor.getLong(0))
+                    json.name("title").value(cursor.getString(1))
+                    json.name("question").value(cursor.getString(2))
+                    json.name("answer").value(cursor.getString(3))
+                    json.name("engine").value(cursor.getString(4))
+                    json.name("timestamp_ms").value(cursor.getLong(5))
+                    json.endObject()
+                    count++
+                }
+            }
+            json.endArray().endObject()
+        }
+        return count
     }
 
     fun deleteAll() {

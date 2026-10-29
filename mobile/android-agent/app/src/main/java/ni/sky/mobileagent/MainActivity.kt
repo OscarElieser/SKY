@@ -56,6 +56,7 @@ class MainActivity : Activity() {
     private lateinit var archive: SkyConversationArchive
     private val attachmentRequest = 1666
     private val profileImportRequest = 1667
+    private val historyExportRequest = 1668
     private var chosenAttachment: SkyAttachmentReader.Attachment? = null
     private val chatHistory = JSONArray()
     @Volatile private var chatPending = false
@@ -91,6 +92,7 @@ class MainActivity : Activity() {
 
     private lateinit var home: SkyMobileHome
     private var settingsDialog: AlertDialog? = null
+    private var historyBrowserDialog: AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -125,7 +127,9 @@ class MainActivity : Activity() {
                 voiceReplyOnFace = true
                 chatInput.setText(transcript)
                 if (!tokens.cloudEnabled() && !tokens.groqEnabled() &&
-                    tokens.chatToken().isEmpty() && SkyLocalConversation.reply(transcript) == null) {
+                    tokens.chatToken().isEmpty() &&
+                    SkyLocalConversation.reply(transcript) == null &&
+                    !transcript.startsWith("recuerda que ", ignoreCase = true)) {
                     voiceReplyOnFace = false
                     voicePanel.showError("Activá el chat seguro en Ajustes.")
                     home.showMessage("Activá el chat desde Ajustes para conversar.")
@@ -150,6 +154,7 @@ class MainActivity : Activity() {
                 chosenAttachment = null
                 home.setAttachmentLabel(null)
             },
+            onHistory = { showHistoryBrowser() },
             archive = archive,
             onDiagnostics = { checkHomeStatus() },
             onStopHandsFree = { setHandsFreeEnabled(false) }
@@ -515,6 +520,117 @@ class MainActivity : Activity() {
             .show()
     }
 
+    private fun confirmOwnerImport(prepared: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Revisar perfil importado de Windows")
+            .setMessage("Vista previa:\n\n" + prepared.take(850) +
+                if (prepared.length > 850) "\n…\n\nConfirmá cómo guardar esta información." else
+                    "\n\nConfirmá cómo guardar esta información.")
+            .setPositiveButton("Fusionar sin duplicar") { _, _ ->
+                runCatching { SkyOwnerContext.merge(this, prepared) }
+                    .onSuccess { home.showMessage("Perfil fusionado: $it caracteres.") }
+                    .onFailure { home.showMessage(it.message ?: "No fue posible fusionar el perfil.") }
+            }
+            .setNeutralButton("Reemplazar perfil") { _, _ ->
+                runCatching { SkyOwnerContext.save(this, prepared) }
+                    .onSuccess { home.showMessage("Perfil reemplazado con confirmación.") }
+                    .onFailure { home.showMessage(it.message ?: "No se reemplazó el perfil.") }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun reviewMemoryLines() {
+        val facts = SkyOwnerContext.memoryLines(this)
+        if (facts.isEmpty()) {
+            home.showMessage("Todavía no hay datos de perfil para revisar.")
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Memoria personal · elegir un dato")
+            .setItems(facts.toTypedArray()) { _, index ->
+                val selected = facts[index]
+                AlertDialog.Builder(this)
+                    .setTitle("Quitar este dato de la memoria local")
+                    .setMessage(selected + "\n\nEsta acción no borra su origen en SKY Windows.")
+                    .setPositiveButton("Eliminar este dato") { _, _ ->
+                        val removed = SkyOwnerContext.removeLine(this, selected)
+                        home.showMessage(if (removed) "Dato retirado del perfil local."
+                            else "El dato no se encontró.")
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .show()
+            }
+            .setNegativeButton("Cerrar", null).show()
+    }
+
+    private fun showHistoryBrowser(query: String = "", beforeId: Long? = null) {
+        historyBrowserDialog?.dismiss()
+        val page = archive.page(query, beforeId, 26)
+        val shown = page.take(25)
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 12, 20, 12)
+        }
+        val filter = EditText(this).apply {
+            hint = "Buscar por título, pregunta o respuesta"
+            setSingleLine(true)
+            filters = arrayOf(InputFilter.LengthFilter(100))
+            setText(query)
+        }
+        container.addView(filter)
+        container.addView(actionButton("Buscar en todo mi historial") {
+            val term = filter.text.toString().trim()
+            showHistoryBrowser(term)
+        })
+        if (shown.isEmpty()) {
+            container.addView(description("No se encontraron consultas para este filtro."))
+        }
+        shown.forEach { item ->
+            container.addView(actionButton(item.title.take(80) +
+                "\n" + item.localTime() + " · " + item.engine.take(35)) {
+                AlertDialog.Builder(this)
+                    .setTitle(item.title)
+                    .setMessage(item.localTime() + "\n\nVOS:\n" + item.question +
+                        "\n\nSKY:\n" + item.answer)
+                    .setPositiveButton("Cerrar", null).show()
+            })
+        }
+        if (page.size > 25) {
+            val cursor = shown.last().id
+            container.addView(actionButton("Ver consultas anteriores") {
+                showHistoryBrowser(query, cursor)
+            })
+        }
+        val list = ScrollView(this).apply { addView(container) }
+        historyBrowserDialog = AlertDialog.Builder(this)
+            .setTitle("Historial de SKY · " + if (beforeId == null) "más recientes" else "anteriores")
+            .setView(list)
+            .setPositiveButton("Exportar todo") { _, _ -> confirmHistoryExport() }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun confirmHistoryExport() {
+        AlertDialog.Builder(this)
+            .setTitle("Exportar historial de SKY")
+            .setMessage("El archivo JSON contendrá consultas, respuestas y fechas. " +
+                "Puede incluir información personal. Se guardará donde vos elijás, " +
+                "sin subirlo automáticamente a internet. Protegelo antes de compartirlo.")
+            .setPositiveButton("Elegir destino") { _, _ ->
+                val filename = "SKY-Historial-" +
+                    java.time.LocalDate.now().toString() + ".json"
+                val intent = android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                    type = "application/json"
+                    putExtra(android.content.Intent.EXTRA_TITLE, filename)
+                }
+                runCatching { startActivityForResult(intent, historyExportRequest) }
+                    .onFailure { home.showMessage("Android no pudo abrir el guardado de archivos.") }
+            }
+            .setNegativeButton("Cancelar", null).show()
+    }
+
     @Deprecated("Uses the Android camera thumbnail; no image is stored.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -546,11 +662,28 @@ class MainActivity : Activity() {
                         val imported = contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)
                             ?.use { it.readText().take(30_001) }
                             ?: throw IllegalArgumentException("Android no pudo abrir USER.md.")
-                        SkyOwnerContext.importFromWindows(this, imported)
-                    }.onSuccess { size -> runOnUiThread {
-                        home.showMessage("Perfil de Windows importado: $size caracteres. Revisalo en Ajustes.")
+                        SkyOwnerContext.parseWindows(imported)
+                    }.onSuccess { prepared -> runOnUiThread {
+                        confirmOwnerImport(prepared)
                     } }.onFailure { error -> runOnUiThread {
                         home.showMessage(error.message ?: "No pude importar el perfil.")
+                    } }
+                }
+            }
+            return
+        }
+        if (requestCode == historyExportRequest) {
+            if (resultCode == RESULT_OK && data?.data != null) {
+                val uri = data.data!!
+                execute {
+                    runCatching {
+                        val output = contentResolver.openOutputStream(uri, "w")
+                            ?: throw IllegalArgumentException("No pude crear el archivo.")
+                        output.use { archive.writeJson(it) }
+                    }.onSuccess { count -> runOnUiThread {
+                        home.showMessage("Exportación terminada: $count consultas guardadas.")
+                    } }.onFailure { error -> runOnUiThread {
+                        home.showMessage(error.message ?: "No pude exportar el historial.")
                     } }
                 }
             }
@@ -1123,6 +1256,14 @@ class MainActivity : Activity() {
         content.addView(actionButton("MI PERFIL PERSONAL · EDITAR / IMPORTAR DE WINDOWS") {
             settingsDialog?.dismiss()
             showOwnerProfile()
+        })
+        content.addView(actionButton("HISTORIAL · BUSCAR Y EXPORTAR CONSULTAS") {
+            settingsDialog?.dismiss()
+            showHistoryBrowser()
+        })
+        content.addView(actionButton("MI MEMORIA · REVISAR Y BORRAR UN DATO") {
+            settingsDialog?.dismiss()
+            reviewMemoryLines()
         })
         content.addView(actionButton("HISTORIAL · BORRAR CONSULTAS DEL TELÉFONO") {
             AlertDialog.Builder(this)

@@ -45,6 +45,7 @@ class SkyMobileHome(
     private val onChatAccess: () -> Unit,
     private val onAttach: () -> Unit,
     private val onRemoveAttachment: () -> Unit,
+    private val onHistory: () -> Unit,
     private val archive: SkyConversationArchive,
     private val onDiagnostics: () -> Unit,
     private val onStopHandsFree: () -> Unit
@@ -459,9 +460,9 @@ class SkyMobileHome(
             gravity = Gravity.CENTER_VERTICAL
         }
         header.addView(panelTitle, LinearLayout.LayoutParams(0, dp(50), 1f))
-        header.addView(pill("Historial", Color.rgb(53, 56, 107)) { toggleHistory() }.apply {
+        header.addView(pill("Historial", Color.rgb(53, 56, 107), onHistory).apply {
             textSize = 12f
-            contentDescription = "Mostrar o reducir historial de conversación"
+            contentDescription = "Buscar, leer y exportar historial guardado"
         }, LinearLayout.LayoutParams(dp(90), dp(40)).apply { rightMargin = dp(8) })
         header.addView(pill("×", Color.rgb(60, 62, 119)) { closePanel() }.apply {
             textSize = 28f
