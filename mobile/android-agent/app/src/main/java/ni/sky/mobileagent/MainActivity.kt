@@ -1264,6 +1264,86 @@ class MainActivity : Activity() {
             .setNegativeButton("Cancelar", null).show()
     }
 
+    private fun startPaidAiVideoCreation() {
+        if (!tokens.cloudEnabled()) {
+            home.showMessage("Necesitás una clave Gemini con facturación activada para video de IA.")
+            return
+        }
+        if (videoPending) {
+            home.showMessage("Ya hay otro video en proceso.")
+            return
+        }
+        val editor = EditText(this).apply {
+            hint = "Ejemplo: Toma cinematográfica de un lago de Nicaragua al amanecer, dron lento, con sonido ambiente."
+            minLines = 4
+            maxLines = 8
+        }
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Generación de video IA de pago")
+            .setView(editor)
+            .setMessage("Modelo Gemini Omni Flash 1.1. El video se genera realmente " +
+                "con IA y puede incluir audio. La API no dispone de nivel gratuito. " +
+                "No se enviará ningún trabajo ni se cobrará sin tu autorización.")
+            .setPositiveButton("Revisar costo") { _, _ ->
+                val prompt = editor.text.toString().trim()
+                if (prompt.length !in 20..1400) {
+                    home.showMessage("Describí una escena de 20 a 1400 caracteres.")
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle("Autorización expresa · API de pago")
+                        .setMessage("Google cobra por generación de video. " +
+                            "Como referencia oficial, 720p ronda US$0.10 por segundo, " +
+                            "más costos de entrada; el precio real y 360p pueden variar. " +
+                            "El clip generado dura entre 3 y 10 segundos. " +
+                            "SKY no controla la facturación de tu proyecto Google. " +
+                            "La operación NO se enviará sin que elijás «Autorizar».")
+                        .setPositiveButton("Autorizar video de pago") { _, _ ->
+                            videoPending = true
+                            home.showMessage("Solicitando video auténtico a Gemini Omni Flash...")
+                            execute {
+                                try {
+                                    val file = SkyAiVideo.create(
+                                        applicationContext, tokens.personalCloudKey(),
+                                        prompt, "9:16")
+                                    runOnUiThread {
+                                        videoPending = false
+                                        generatedVideoToSave = file
+                                        AlertDialog.Builder(this)
+                                            .setTitle("Video generado con IA auténtica")
+                                            .setMessage("Gemini entregó un MP4 y Android comprobó " +
+                                                "que contiene una pista de video. " +
+                                                "Tamaño: " + file.length() +
+                                                " bytes. Guardalo para revisarlo antes de compartir.")
+                                            .setPositiveButton("Guardar MP4 IA") { _, _ ->
+                                                val intent = android.content.Intent(
+                                                    android.content.Intent.ACTION_CREATE_DOCUMENT).apply {
+                                                    addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                                                    type = "video/mp4"
+                                                    putExtra(android.content.Intent.EXTRA_TITLE,
+                                                        "SKY-Video-IA.mp4")
+                                                }
+                                                runCatching { startActivityForResult(
+                                                    intent, generatedVideoSaveRequest) }
+                                                    .onFailure { home.showMessage(
+                                                        "No pude abrir el destino del MP4.") }
+                                            }
+                                            .setNegativeButton("Cerrar", null).show()
+                                    }
+                                } catch (error: Exception) {
+                                    runOnUiThread {
+                                        videoPending = false
+                                        home.showMessage(error.message ?:
+                                            "Gemini no devolvió un video real.")
+                                    }
+                                }
+                            }
+                        }
+                        .setNegativeButton("Cancelar sin consumir", null).show()
+                }
+            }
+            .setNegativeButton("Cancelar", null).show()
+    }
+
     private fun startNativeVideoEditor() {
         val previous = archive.recent(1).lastOrNull()?.answer.orEmpty()
         val editor = EditText(this).apply {
@@ -1807,6 +1887,10 @@ class MainActivity : Activity() {
         content.addView(actionButton("IMÁGENES IA · GENERAR CON GEMINI Y GUARDAR") {
             settingsDialog?.dismiss()
             startRealImageGeneration()
+        })
+        content.addView(actionButton("VIDEOS IA · GEMINI OMNI FLASH (API DE PAGO)") {
+            settingsDialog?.dismiss()
+            startPaidAiVideoCreation()
         })
         content.addView(actionButton("VIDEOS · RENDERIZAR MP4 LOCAL Y GUARDAR") {
             settingsDialog?.dismiss()
