@@ -97,6 +97,23 @@ def test_no_automatic_learning_or_cross_device_sync():
     assert status["cross_device_memory_sync"] is False
 
 
+def test_research_requires_explicit_network_permission(monkeypatch):
+    from neural_core import sky_scholarly
+    monkeypatch.setattr(sky_scholarly, "search_papers", lambda *a, **kw: (
+        _ for _ in ()).throw(AssertionError("No consultar red sin permiso"))
+    )
+    offline = brain.academic_research("educación técnica", external_search=False)
+    assert offline["live_lookup"] is False
+    monkeypatch.setenv("SKY_WEB_LEARNING", "0")
+    blocked = brain.academic_research("educación técnica", external_search=True)
+    assert blocked["reason"] == "internet_disabled"
+
+
+def test_research_never_sends_obvious_secrets():
+    with pytest.raises(ValueError, match="datos privados"):
+        brain.academic_research("mi correo personal en investigación", external_search=True)
+
+
 def test_authenticated_endpoints(monkeypatch):
     from fastapi.testclient import TestClient
     monkeypatch.setenv("SKY_API_KEY", "sky-owner-cognition-tests-key-2026")
