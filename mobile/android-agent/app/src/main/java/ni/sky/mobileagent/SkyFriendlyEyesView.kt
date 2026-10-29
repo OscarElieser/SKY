@@ -24,7 +24,7 @@ import kotlin.math.sin
  * de voz: escucha, respuesta, pensamiento y error. No transmite audio.
  */
 class SkyFriendlyEyesView(context: Context) : View(context) {
-    private enum class Emotion { CALM, HAPPY, CURIOUS, SURPRISED, LOVING, SLEEPY }
+    private enum class Emotion { CALM, HAPPY, CURIOUS, SURPRISED, LOVING, SLEEPY, SAD, CRYING, ANGRY, EXCITED, SHY }
 
     var mode: String = "IDLE"
         set(value) { field = value; invalidate() }
@@ -47,7 +47,8 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
     fun nextEmotion(): String {
         val sequence = arrayOf(
             Emotion.HAPPY, Emotion.CURIOUS, Emotion.SURPRISED,
-            Emotion.LOVING, Emotion.SLEEPY, Emotion.CALM
+            Emotion.LOVING, Emotion.EXCITED, Emotion.SHY, Emotion.SAD,
+            Emotion.CRYING, Emotion.ANGRY, Emotion.SLEEPY, Emotion.CALM
         )
         emotion = sequence[touchCount++ % sequence.size]
         emotionUntil = SystemClock.uptimeMillis() + 4500L
@@ -58,20 +59,47 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
             Emotion.SURPRISED -> "¡Guau! ¡Qué sorpresa! ✨"
             Emotion.LOVING -> "¡Un abrazo virtual! 💜"
             Emotion.SLEEPY -> "Mis ojitos descansan un momento… 😴"
-            Emotion.CALM -> "Aquí estoy para vos. 💙"
+            Emotion.CALM -> "Aquí estoy para ti. 💙"
+            Emotion.SAD -> "Expresión de tristeza. Estoy contigo. 💙"
+            Emotion.CRYING -> "Ojitos llorosos de SKY. 💧"
+            Emotion.ANGRY -> "SKY pone carita de enojo. 😠"
+            Emotion.EXCITED -> "¡Qué emoción! ✨"
+            Emotion.SHY -> "Una sonrisa tímida. 🌸"
         }
     }
 
-    fun reactTo(text: String) {
-        val t = text.trim().lowercase(Locale.ROOT)
+    fun showExpression(value: String): String {
+        val clean = java.text.Normalizer.normalize(
+            value.lowercase(Locale.ROOT), java.text.Normalizer.Form.NFD
+        ).replace(Regex("""\p{M}+"""), "")
         emotion = when {
-            "te quiero" in t || "te amo" in t -> Emotion.LOVING
-            "sorpresa" in t || "increíble" in t -> Emotion.SURPRISED
-            "hola" in t || "gracias" in t || "buenos días" in t -> Emotion.HAPPY
-            else -> return
+            "llora" in clean || "llanto" in clean || "lagrima" in clean -> Emotion.CRYING
+            "triste" in clean || "pena" in clean || "melancol" in clean -> Emotion.SAD
+            "enoj" in clean || "molest" in clean || "furios" in clean -> Emotion.ANGRY
+            "timid" in clean || "vergonz" in clean -> Emotion.SHY
+            "sorprend" in clean || "sorpresa" in clean || "asombr" in clean -> Emotion.SURPRISED
+            "emocion" in clean || "entusiasm" in clean || "eufor" in clean -> Emotion.EXCITED
+            "amor" in clean || "carino" in clean || "quiero" in clean -> Emotion.LOVING
+            "feliz" in clean || "alegre" in clean || "sonri" in clean || "risa" in clean -> Emotion.HAPPY
+            "sueno" in clean || "dormi" in clean -> Emotion.SLEEPY
+            else -> Emotion.CURIOUS
         }
-        emotionUntil = SystemClock.uptimeMillis() + 4300L
+        emotionUntil = SystemClock.uptimeMillis() + 6500L
         invalidate()
+        return "SKY muestra una expresión de " + emotion.name.lowercase(Locale.ROOT) + "."
+    }
+
+    fun reactTo(text: String) {
+        val clean = java.text.Normalizer.normalize(
+            text.lowercase(Locale.ROOT), java.text.Normalizer.Form.NFD
+        ).replace(Regex("""\p{M}+"""), "")
+        when {
+            "llora" in clean || "llanto" in clean || "lagrima" in clean ||
+                "triste" in clean || "alegre" in clean || "feliz" in clean ||
+                "enoj" in clean || "emocion" in clean || "sonri" in clean ||
+                "te quiero" in clean || "sorpresa" in clean || "sorprend" in clean ||
+                "hola" in clean || "gracias" in clean -> showExpression(clean)
+        }
     }
 
     private fun fill(color: Int, alpha: Int = 255) {
@@ -117,7 +145,9 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         val open = when (mood) {
             Emotion.SLEEPY -> 0.33f
             Emotion.SURPRISED -> 1.13f
-            Emotion.HAPPY -> 0.87f
+            Emotion.HAPPY, Emotion.EXCITED -> 0.87f
+            Emotion.SAD, Emotion.CRYING, Emotion.SHY -> 0.73f
+            Emotion.ANGRY -> 0.62f
             else -> 1f
         }
         val halfHeight = 69f * open * (1f - blink * 0.97f)
@@ -218,6 +248,17 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
         eyes(canvas, 112f, 290f, gaze, blink, mood, accent, speaking)
         eyes(canvas, 248f, 290f, gaze, if (mood == Emotion.LOVING) 0.3f else blink,
             mood, accent, speaking)
+        if (mood == Emotion.CRYING || mood == Emotion.SAD) {
+            fill(Color.rgb(112, 218, 250), if (mood == Emotion.CRYING) 245 else 180)
+            val drop = (now % 1300L) / 1300f
+            canvas.drawOval(92f, 325f + drop * 75f, 107f, 350f + drop * 75f, brush)
+            if (mood == Emotion.CRYING)
+                canvas.drawOval(257f, 327f + drop * 70f, 270f, 349f + drop * 70f, brush)
+        }
+        if (mood == Emotion.SHY) {
+            light(canvas, 45f, 380f, 30f, Color.rgb(255, 130, 173), 126)
+            light(canvas, 315f, 380f, 30f, Color.rgb(255, 130, 173), 126)
+        }
 
         val talkOpen = if (speaking) 12f + ((sin(t * 11.0) + 1) * 16f).toFloat() else 0f
         when {
@@ -230,6 +271,14 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
                 outline(Color.rgb(229, 211, 250), 6f)
                 canvas.drawLine(160f, 474f, 200f, 474f, brush)
             }
+            mood == Emotion.SAD || mood == Emotion.CRYING -> {
+                outline(Color.rgb(165, 220, 255), 7f)
+                canvas.drawArc(147f, 463f, 213f, 513f, 190f, 160f, false, brush)
+            }
+            mood == Emotion.ANGRY -> {
+                outline(Color.rgb(255, 180, 180), 7f)
+                canvas.drawLine(153f, 486f, 207f, 486f, brush)
+            }
             mood == Emotion.SURPRISED || speaking -> {
                 fill(Color.rgb(41, 29, 94))
                 canvas.drawOval(154f, 453f - talkOpen * 0.34f,
@@ -238,7 +287,7 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
                 canvas.drawOval(169f, 481f + talkOpen * 0.2f,
                     191f, 490f + talkOpen * 0.55f, brush)
             }
-            mood == Emotion.HAPPY || mood == Emotion.LOVING -> {
+            mood == Emotion.HAPPY || mood == Emotion.LOVING || mood == Emotion.EXCITED || mood == Emotion.SHY -> {
                 outline(Color.rgb(241, 214, 255), 7f)
                 canvas.drawArc(138f, 441f, 222f, 503f, 8f, 168f, false, brush)
             }
@@ -251,7 +300,7 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
                 canvas.drawPath(shape, brush)
             }
         }
-        if (mood == Emotion.SURPRISED || speaking) {
+        if (mood == Emotion.SURPRISED || mood == Emotion.EXCITED || speaking) {
             sparkle(canvas, 320f, 127f, 12f + pulse * 4f, Color.rgb(255, 210, 140))
         }
         if (mode == "THINKING") {
