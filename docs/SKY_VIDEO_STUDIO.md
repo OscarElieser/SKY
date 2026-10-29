@@ -38,3 +38,7 @@ Este componente no reemplaza la experiencia existente de SKY; es un motor indepe
 ## Transiciones
 
 El manifiesto acepta `"transition": "cut"` (por defecto) o `"transition": "fade"`, con `"transition_duration": 0.4` en segundos. Las escenas deben durar más que la transición. El fundido se renderiza mediante el filtro `xfade` de FFmpeg; no se simula en la interfaz. El tiempo final disminuye por el solapamiento de cada transición. El nuevo modo requiere superar la prueba de CI antes de considerarse verificado.
+
+## Subtítulos incrustados (fase de validación)
+
+Añadir al manifiesto `"captions": [{"start": 0.1, "end": 2.0, "text": "Descubrí Nicaragua"}]`. Los tiempos están en segundos y deben ser crecientes, sin solaparse y dentro de la duración total. El texto se incrusta en el MP4 usando el filtro `subtitles` de FFmpeg (requiere una compilación con libass). Este bloque todavía no transcribe audio ni genera subtítulos automáticamente; acepta textos proporcionados. La prueba de CI determina si el renderizado es compatible con el entorno.
