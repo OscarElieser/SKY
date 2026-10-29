@@ -397,6 +397,10 @@ class MainActivity : Activity() {
             "Reconocimiento de voz: " + if (speechAvailable) "Disponible" else "No disponible",
             "Reconocimiento local sin nube: " + if (offlineSpeech) "Disponible" else "No disponible",
             "Servicio manos libres vivo: " + if (voiceHealth.active) "Sí" else "No",
+            "Presencia solicitada: " + (handsFreePrefs.getString("sky_presence_mode",
+                "WAKE_ONLY") ?: "WAKE_ONLY"),
+            "Identificación biométrica de voz: NO DISPONIBLE (no confundir voz a texto con voz del propietario)",
+            "Confirmación de órdenes fuera de pantalla: SKY confirmo / SKY cancela",
             "Reconocedor escuchando: " + if (voiceHealth.recognizing) "Sí" else "No",
             "Última frase detectada: $lastVoice",
             "Último error de reconocimiento: ${voiceHealth.errorCode} · reintentos ${voiceHealth.retries}",
@@ -2219,7 +2223,30 @@ class MainActivity : Activity() {
                     .edit().putBoolean("read_aloud", enabled).apply()
             }
         })
-        content.addView(description("Manos libres requiere Android 12 o posterior y reconocimiento de voz instalado en el dispositivo. Mientras está activa se muestra una notificación para apagarla. Puede consumir batería; si Android cierra el servicio, abrí SKY para reactivarlo. Con pantalla apagada puede ajustar volumen y enviar controles multimedia. Para abrir aplicaciones, Android puede exigir desbloquear el teléfono y tocar la notificación de SKY. Las acciones sensibles siguen exigiendo aprobación."))
+        content.addView(description("PRESENCIA CONTROLADA · La voz de SKY permanece disponible " +
+            "mientras Android mantenga vivo el servicio autorizado. " +
+            "Dormir impide ejecutar órdenes hasta escuchar la frase exacta SKY despierta."))
+        content.addView(actionButton("DORMIR · Solo despertar con mi orden") {
+            processPresenceCommand("SKY duerme")
+            updatePresenceVisual()
+        })
+        content.addView(actionButton("ESTAR ATENTA · Escuchar mis orientaciones") {
+            processPresenceCommand("SKY estate pendiente de mis orientaciones")
+            updatePresenceVisual()
+        })
+        content.addView(actionButton("DESPERTAR · Volver a escuchar") {
+            processPresenceCommand("SKY despierta")
+            updatePresenceVisual()
+        })
+        content.addView(description("IDENTIDAD DEL CREADOR · Sin verificación biométrica de " +
+            "voz habilitada. El reconocimiento de palabras NO reconoce a su dueño. " +
+            "Mientras se incorpora un verificador de hablante local confiable, " +
+            "las acciones fuera de pantalla requieren una segunda confirmación " +
+            "SKY confirmo y las sensibles mantienen los controles de Android."))
+        content.addView(description("Android 16 puede detener la captura en segundo plano. " +
+            "SKY usa reconocimiento local y una notificación permanente; " +
+            "no puede garantizar escuchar siempre con el teléfono bloqueado. " +
+            "Podés apagar el micrófono desde la notificación cuando querás."))
         val premium = SkyPremiumUi.settingsShell(this, content) {
             settingsDialog?.dismiss()
         }
