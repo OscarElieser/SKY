@@ -6,6 +6,10 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Typeface
+import android.view.Gravity
+import android.widget.Button
+import android.widget.ImageView
 import android.text.Editable
 import android.text.TextWatcher
 import android.widget.EditText
@@ -30,6 +34,10 @@ class SkyInstalledApps(
         "sky_trusted_launcher_apps", android.content.Context.MODE_PRIVATE
     )
 
+    /** Solo autoriza órdenes locales explícitas; no incluye tareas remotas. */
+    fun supervisedControlEnabled(): Boolean =
+        trusted.getBoolean("global_supervised_control", false)
+
     data class Launchable(
         val name: String,
         val packageName: String,
@@ -49,7 +57,7 @@ class SkyInstalledApps(
                     .orEmpty().ifEmpty { info.packageName.substringAfterLast('.') }
                 Launchable(name, info.packageName, info.name)
             }
-            .distinctBy { it.packageName to it.className }
+            .distinctBy { it.packageName to SkyAppNameMatcher.norm(it.name) }
         return entries.sortedWith(
             compareBy<Launchable> { SkyAppNameMatcher.norm(it.name) }.thenBy { it.packageName }
         )
@@ -66,7 +74,7 @@ class SkyInstalledApps(
                 "» entre las aplicaciones visibles. Podés revisar el catálogo en Ajustes.")
             1 -> {
                 val app = available.first()
-                if (trusted.getBoolean(app.packageName, false)) launchDirect(app)
+                if (supervisedControlEnabled() || trusted.getBoolean(app.packageName, false)) launchDirect(app)
                 else confirm(app)
             }
             else -> {
@@ -127,61 +135,204 @@ class SkyInstalledApps(
             .show()
     }
 
+
+    /**
+     * Un único consentimiento local para abrir apps sin 82 confirmaciones.
+     * No suplanta los permisos del sistema ni autoriza operaciones destructivas.
+     */
+    fun showControlAuthorization(onChanged: (() -> Unit)? = null) {
+        if (supervisedControlEnabled()) {
+            AlertDialog.Builder(activity)
+                .setTitle("SKY IA · Control supervisado")
+                .setMessage(
+                    "La apertura directa de aplicaciones está autorizada para " +
+                    "órdenes que vos dictés o escribás en SKY.\n\n" +
+                    "¿Querés revocar esta confianza general? Las aplicaciones " +
+                    "seguirán instaladas y tus datos no se modificarán."
+                )
+                .setPositiveButton("REVOCAR AUTORIZACIÓN") { _, _ ->
+                    if (trusted.edit().putBoolean("global_supervised_control", false).commit()) {
+                        say("Revocaste la apertura general de aplicaciones en SKY.")
+                        onChanged?.invoke()
+                    } else say("No pude guardar la revocación en el teléfono.")
+                }
+                .setNegativeButton("Conservar", null)
+                .show()
+            return
+        }
+        AlertDialog.Builder(activity)
+            .setTitle("SKY IA · Tu autorización")
+            .setMessage(
+                "Autorizo a SKY a abrir las aplicaciones actuales y futuras " +
+                "de mi teléfono cuando YO lo indique por voz o texto, sin " +
+                "confirmaciones individuales de apertura.\n\n" +
+                "SKY actuará únicamente bajo mis órdenes. Podré revocar " +
+                "este consentimiento desde Configuración.\n\n" +
+                "Esto NO concede acceso automático a contraseñas, mensajes, " +
+                "archivos ni al contenido de otras aplicaciones. Para escribir, " +
+                "modificar o eliminar, SKY necesita una función compatible y, " +
+                "cuando corresponda, los permisos de Android y confirmación " +
+                "de la operación. Las órdenes remotas nunca heredan este permiso."
+            )
+            .setPositiveButton("ACEPTO · CONTROL SUPERVISADO") { _, _ ->
+                if (trusted.edit().putBoolean("global_supervised_control", true).commit()) {
+                    say("Control supervisado autorizado. Ya podés decirme qué aplicación abrir.")
+                    onChanged?.invoke()
+                } else say("No pude guardar tu autorización; no se activó.")
+            }
+            .setNegativeButton("Ahora no", null)
+            .show()
+    }
+
+    /** Catálogo oscuro premium con búsqueda y un único control de confianza. */
     fun showCatalog() {
         val all = discover()
         if (all.isEmpty()) {
             say("Android no encontró aplicaciones con icono de inicio disponibles.")
             return
         }
-        val holder = LinearLayout(activity).apply {
+        val dp: (Int) -> Int = { SkyPremiumUi.dp(activity, it) }
+        val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(28, 16, 28, 8)
+            setPadding(dp(20), dp(20), dp(20), dp(14))
+            background = SkyPremiumUi.shape(activity, SkyPremiumUi.background, 23)
         }
+        val header = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val heading = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        heading.addView(SkyPremiumUi.label(activity, "✦  MIS APLICACIONES",
+            20f, SkyPremiumUi.white, true))
+        heading.addView(SkyPremiumUi.label(activity,
+            "SKY detectó " + all.size + " aplicaciones disponibles",
+            12f, SkyPremiumUi.muted))
+        header.addView(heading, LinearLayout.LayoutParams(0, -2, 1f))
+        val exit = SkyPremiumUi.label(activity, "✕", 22f, SkyPremiumUi.white).apply {
+            gravity = Gravity.CENTER
+            background = SkyPremiumUi.shape(activity, SkyPremiumUi.elevated, 16)
+            contentDescription = "Cerrar aplicaciones"
+        }
+        header.addView(exit, LinearLayout.LayoutParams(dp(46), dp(46)))
+        root.addView(header)
+
+        val state = SkyPremiumUi.label(activity, "", 13f, SkyPremiumUi.muted).apply {
+            setPadding(0, dp(14), 0, dp(8))
+        }
+        root.addView(state)
+        val authorization = Button(activity).apply {
+            isAllCaps = false
+            textSize = 13f
+            minHeight = dp(54)
+            setTextColor(SkyPremiumUi.background)
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        root.addView(authorization, LinearLayout.LayoutParams(-1, dp(56)))
+        root.addView(SkyPremiumUi.label(activity,
+            "Para escribir, modificar o eliminar en otras apps se requieren " +
+            "funciones compatibles, permisos adicionales y supervisión.",
+            11.5f, SkyPremiumUi.muted).apply {
+            setPadding(0, dp(10), 0, dp(11))
+        })
         val search = EditText(activity).apply {
             hint = "Buscar entre mis aplicaciones"
             setSingleLine(true)
             contentDescription = "Filtrar aplicaciones instaladas"
+            textSize = 14f
+            setTextColor(SkyPremiumUi.white)
+            setHintTextColor(SkyPremiumUi.muted)
+            setPadding(dp(15), dp(10), dp(15), dp(10))
+            background = SkyPremiumUi.shape(activity, SkyPremiumUi.card, 15)
         }
-        holder.addView(search)
-        val list = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
-        val scroll = ScrollView(activity).apply { addView(list) }
-        holder.addView(scroll, LinearLayout.LayoutParams(-1,
-            (activity.resources.displayMetrics.heightPixels * 0.52f).toInt()))
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle("SKY · Aplicaciones (" + all.size + ")")
-            .setView(holder)
-            .setPositiveButton("Cerrar", null)
-            .create()
+        root.addView(search, LinearLayout.LayoutParams(-1, dp(52)))
+        val list = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(12), 0, 0)
+        }
+        val scroll = ScrollView(activity).apply {
+            isVerticalScrollBarEnabled = false
+            addView(list)
+        }
+        root.addView(scroll, LinearLayout.LayoutParams(-1,
+            (activity.resources.displayMetrics.heightPixels * 0.46f).toInt()))
+        val dialog = AlertDialog.Builder(activity).setView(root).create()
+        exit.setOnClickListener { dialog.dismiss() }
         fun render(filter: String) {
             list.removeAllViews()
             val results = all.filter {
                 SkyAppNameMatcher.norm(it.name)
                     .contains(SkyAppNameMatcher.norm(filter))
-            }.take(100)
+            }
+            if (results.isEmpty()) {
+                list.addView(SkyPremiumUi.label(activity, "No encontré aplicaciones con ese nombre.",
+                    14f, SkyPremiumUi.muted))
+            }
             for (app in results) {
-                val row = TextView(activity).apply {
-                    text = (if (trusted.getBoolean(app.packageName, false)) "★ " else "") +
-                        app.name
-                    textSize = 16f
-                    setTextColor(Color.rgb(40, 45, 90))
-                    setPadding(20, 18, 20, 18)
+                val row = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    background = SkyPremiumUi.shape(activity, SkyPremiumUi.card, 14)
+                    setPadding(dp(12), dp(10), dp(12), dp(10))
+                    isClickable = true
+                    isFocusable = true
+                    contentDescription = "Abrir " + app.name
                     setOnClickListener {
                         dialog.dismiss()
-                        confirm(app)
+                        if (supervisedControlEnabled() ||
+                            trusted.getBoolean(app.packageName, false)) launchDirect(app)
+                        else confirm(app)
                     }
                 }
-                list.addView(row)
+                row.addView(ImageView(activity).apply {
+                    setImageDrawable(runCatching {
+                        activity.packageManager.getApplicationIcon(app.packageName)
+                    }.getOrNull())
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                }, LinearLayout.LayoutParams(dp(36), dp(36)))
+                val texts = LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(13), 0, 0, 0)
+                }
+                texts.addView(SkyPremiumUi.label(activity, app.name, 15f,
+                    SkyPremiumUi.white, true))
+                texts.addView(SkyPremiumUi.label(activity,
+                    if (supervisedControlEnabled()) "Apertura autorizada"
+                    else if (trusted.getBoolean(app.packageName, false)) "Confiable"
+                    else "Requiere autorización",
+                    11f, SkyPremiumUi.muted))
+                row.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
+                row.addView(SkyPremiumUi.label(activity, "›", 22f, SkyPremiumUi.cyan))
+                list.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+                    bottomMargin = dp(7)
+                })
             }
         }
+        fun refresh() {
+            val enabled = supervisedControlEnabled()
+            state.text = if (enabled)
+                "●  ACTIVADO · SKY puede abrir las apps cuando se lo ordenés."
+                else "○  DESACTIVADO · SKY te pedirá confianza para abrir apps."
+            state.setTextColor(if (enabled) SkyPremiumUi.cyan else SkyPremiumUi.muted)
+            authorization.text = if (enabled) "REVOCAR CONTROL SUPERVISADO"
+                else "ACEPTO · CONTROL SUPERVISADO"
+            authorization.background = SkyPremiumUi.shape(activity,
+                if (enabled) SkyPremiumUi.elevated else SkyPremiumUi.cyan, 15)
+            authorization.setTextColor(if (enabled) SkyPremiumUi.white
+                else SkyPremiumUi.background)
+            render(search.text?.toString().orEmpty())
+        }
+        authorization.setOnClickListener { showControlAuthorization { refresh() } }
         search.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 render(s?.toString().orEmpty())
             }
             override fun afterTextChanged(s: Editable?) {}
         })
-        render("")
-        dialog.show()
+        refresh()
+        SkyPremiumUi.showDialog(activity, dialog, 0.87)
     }
 
     private fun confirm(app: Launchable) {
