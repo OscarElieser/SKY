@@ -27,3 +27,13 @@ def test_ignores_generated_build_outputs(tmp_path):
     report = module.inventory(tmp_path)
     assert report["files_scanned"] == 1
     assert report["python_imports"] == [{"source": "real.py", "module": "json"}]
+
+
+def test_detects_powershell_gradle_and_kotlin_file_references(tmp_path):
+    (tmp_path / "setup.ps1").write_text("python scripts/setup.py", encoding="utf-8")
+    (tmp_path / "build.gradle.kts").write_text('apply(from = "gradle/config.gradle")', encoding="utf-8")
+    (tmp_path / "Main.kt").write_text('val file = "shared/contract.json"', encoding="utf-8")
+    references = module.inventory(tmp_path)["cross_language_file_references"]
+    assert {"scripts/setup.py", "gradle/config.gradle", "shared/contract.json"} <= {
+        item["reference"] for item in references
+    }
