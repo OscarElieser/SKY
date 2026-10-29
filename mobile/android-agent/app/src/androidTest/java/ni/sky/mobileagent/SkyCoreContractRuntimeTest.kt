@@ -28,8 +28,12 @@ class SkyCoreContractRuntimeTest {
             platformPermission = true)
         assertFalse(pending.allowed)
         assertTrue(pending.requiresConfirmation)
-        val approved = SkyCoreContract.inspect(context, "delete_file", "owner_typed",
+        val withoutUi = SkyCoreContract.inspect(context, "delete_file", "owner_spoken",
             perActionApproved = true, platformPermission = true)
+        assertFalse(withoutUi.allowed)
+        assertEquals("local_ui_approval", withoutUi.reason)
+        val approved = SkyCoreContract.inspect(context, "delete_file", "owner_typed",
+            perActionApproved = true, platformPermission = true, localUiApproved = true)
         assertTrue(approved.allowed)
         val untrusted = SkyCoreContract.inspect(context, "delete_file", "remote_server",
             perActionApproved = true, platformPermission = true)
