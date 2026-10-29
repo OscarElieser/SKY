@@ -8,6 +8,8 @@ class SkyActionEvidenceTest {
     }
     @Test fun onlyVerifiedLocalWriteIsMarkedVerified() {
         assertEquals("VERIFICADA_LOCAL", SkyActionEvidence.normalized("VERIFIED_LOCAL"))
+        assertEquals("RESPUESTA_REMOTA_RECIBIDA",
+            SkyActionEvidence.normalized("RECEIVED_RESPONSE"))
         assertEquals("FALLIDA", SkyActionEvidence.normalized("FAILED"))
         assertEquals("RECHAZADA", SkyActionEvidence.normalized("REJECTED"))
         assertEquals("ESTADO_DESCONOCIDO", SkyActionEvidence.normalized("SUCCESS"))
