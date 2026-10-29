@@ -50,8 +50,15 @@ object SkyMobileIntentRouter {
             "metaverso" to listOf("metaverso", "metaverse"),
             "deportes" to listOf("deporte", "deportes", "futbol")
         )
+        // A voice command such as "Abrí Word" refers to the real installed
+        // application, not to SKY's internal document panel.
+        val explicitPanel = Regex("""\b(?:panel|modulo|seccion|herramienta)\b""")
+            .containsMatchIn(command)
         val target = modules.entries.firstOrNull { entry ->
-            entry.value.any { word -> Regex("(^| )" + Regex.escape(word) + "( |$)").containsMatchIn(command) }
+            entry.value.any { word ->
+                Regex("(^| )" + Regex.escape(word) + "( |$)").containsMatchIn(command) &&
+                    (explicitPanel || word !in setOf("word", "office", "scholar"))
+            }
         }?.key
         return target?.let { Action(Action.Kind.OPEN_MODULE, it) }
     }
