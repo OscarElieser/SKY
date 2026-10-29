@@ -94,6 +94,33 @@ def render(manifest_path, output_path):
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                         "-f", "concat", "-safe", "0", "-i", str(concat),
                         "-c", "copy", str(silent)], check=True)
+        title = spec.get("title")
+        if title:
+            if not isinstance(title, str) or not title.strip() or len(title) > 100:
+                raise ValueError("title must be 1-100 characters")
+            title_duration = float(spec.get("title_duration", 2.5))
+            if not math.isfinite(title_duration) or not 0.3 <= title_duration <= 10:
+                raise ValueError("title_duration must be between 0.3 and 10 seconds")
+            title_file = temp / "title.txt"
+            title_file.write_text(title.replace("\\n", " ").replace("\\r", " "), encoding="utf-8")
+            titled = temp / "titled.mp4"
+            # Drawtext reads from a file, so punctuation is not interpolated into filters.
+            font_size = max(24, round(width * 0.055))
+            drawtext = (
+                f"drawtext=textfile={title_file.as_posix()}:"
+                f"fontcolor=white:fontsize={font_size}:"
+                "box=1:boxcolor=black@0.55:boxborderw=22:"
+                "x=(w-text_w)/2:y=(h-text_h)/2:"
+                f"enable='between(t,0,{title_duration})'"
+            )
+            subprocess.run(
+                ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                 "-i", str(silent), "-vf", drawtext, "-an",
+                 "-c:v", "libx264", "-preset", "medium", "-crf", "19",
+                 "-pix_fmt", "yuv420p", str(titled)],
+                check=True,
+            )
+            silent = titled
         # Burn optional, user-authored timed captions into the final video.
         captions = spec.get("captions", [])
         if captions:
