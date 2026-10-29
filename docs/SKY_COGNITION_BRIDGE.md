@@ -27,6 +27,7 @@ memoria existente, HUD, agente Windows ni SKY Android.
 | GET | `/capabilities` | Declara el alcance y los límites |
 | POST | `/plan` | Devuelve plan propuesto, sin ejecutar |
 | POST | `/context` | Recupera referencias públicas de caché y memoria cifrada bajo permiso |
+| POST | `/research` | Consulta metadatos de OpenAlex/Crossref solo con permiso explícito; sin permiso usa caché |
 | POST | `/personality` | Devuelve estilo y animación simulada |
 | POST | `/speech` | Prepara texto para TTS, no reproduce audio |
 | GET | `/execution-metrics` | Lee resultados verificados registrados previamente |
@@ -57,6 +58,15 @@ para el almacén existente y confirmar hechos mediante
 No enviar memorias a proveedores externos automáticamente. Si la clave cifrada no
 está disponible, el sistema devuelve una advertencia y continúa sin recuerdos.
 No hay sincronización de memoria Android ↔ Windows en esta versión.
+
+
+Para investigación académica externa, el propietario activa el envío de la consulta
+a una API pública con `external_search=true`. Las coincidencias son metadatos,
+no artículos completos, y requieren comprobar fuente y contenido.
+
+```json
+{"query":"inteligencia artificial en educación técnica", "provider":"openalex", "external_search":true}
+```
 
 ## Qué NO hace esta etapa
 
