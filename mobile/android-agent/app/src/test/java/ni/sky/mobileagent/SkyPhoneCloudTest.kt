@@ -12,14 +12,21 @@ class SkyPhoneCloudTest {
             "SKY, explícame en dos oraciones qué es la fotosíntesis"))
         assertEquals(400, SkyPhoneCloud.responseTokenLimit(
             "¿Qué es la fotosíntesis?"))
-        assertEquals(1000, SkyPhoneCloud.responseTokenLimit(
+        assertEquals(3500, SkyPhoneCloud.responseTokenLimit(
             "Redacta un documento con mi proyecto y sus objetivos"))
-        assertEquals(1000, SkyPhoneCloud.responseTokenLimit(
+        assertEquals(3500, SkyPhoneCloud.responseTokenLimit(
             "Explica paso a paso cómo implementar un modelo de lenguaje"))
-        assertEquals(1000, SkyPhoneCloud.responseTokenLimit(
+        assertEquals(3500, SkyPhoneCloud.responseTokenLimit(
             "Abrí WhatsApp y escribe un mensaje"))
-        assertEquals(1000, SkyPhoneCloud.responseTokenLimit(
+        assertEquals(3500, SkyPhoneCloud.responseTokenLimit(
             "Investiga estas cuatro fuentes científicas y prepara una bibliografía"))
+    }
+
+    @Test fun longFormAnswersGetEnoughOutputBudget() {
+        assertEquals(3500, SkyPhoneCloud.responseTokenLimit(
+            "Redacta el documento completo de inteligencia artificial en Word"))
+        assertEquals(1200, SkyPhoneCloud.responseTokenLimit(
+            "Contame un chiste sencillo"))
     }
 
     @Test fun modelIsPinnedToKnownStableGemini() {
