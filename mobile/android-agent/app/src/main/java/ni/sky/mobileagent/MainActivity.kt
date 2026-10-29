@@ -56,6 +56,7 @@ class MainActivity : Activity() {
     private lateinit var archive: SkyConversationArchive
     private lateinit var longTermMemory: SkyLongTermMemory
     private lateinit var actionEvidence: SkyActionEvidence
+    private val verifiedLearning by lazy { SkyVerifiedLearning(this) }
     private val knowledgeSources by lazy { SkyAndroidKnowledgeSources(this) }
     private val cognitionPrefs by lazy { getSharedPreferences("sky_android_cognition", MODE_PRIVATE) }
     private fun cognitionEnabled(): Boolean = cognitionPrefs.getBoolean("enabled", true)
@@ -188,7 +189,10 @@ class MainActivity : Activity() {
             if (!isFinishing && voicePanel.isVoiceEnabled()) voicePanel.speakReply(feedback)
         }
         installedApps.onReceipt = { action, state, detail ->
-            runCatching { actionEvidence.record(action, state, detail) }
+            runCatching {
+                actionEvidence.record(action, state, detail)
+                verifiedLearning.observe(action, state)
+            }
         }
         dailyActions = SkyAndroidActions(
             this,
@@ -202,7 +206,10 @@ class MainActivity : Activity() {
             installedApps = installedApps
         )
         dailyActions.onReceipt = { action, state, detail ->
-            runCatching { actionEvidence.record(action, state, detail) }
+            runCatching {
+                actionEvidence.record(action, state, detail)
+                verifiedLearning.observe(action, state)
+            }
         }
         socialStudio = SkySocialStudio(this,
             feedback = { message ->
@@ -235,7 +242,10 @@ class MainActivity : Activity() {
             onNeedMusicPermission = { request -> showMusicControlDisclosure(request) }
         )
         musicLauncher.onReceipt = { action, state, detail ->
-            runCatching { actionEvidence.record(action, state, detail) }
+            runCatching {
+                actionEvidence.record(action, state, detail)
+                verifiedLearning.observe(action, state)
+            }
         }
         quickActions = SkyQuickActions(this) { message ->
             // Music commands must not talk over and interrupt the playing track.
@@ -1478,6 +1488,33 @@ class MainActivity : Activity() {
                 home.showMessage(if (enabled) "Núcleo cognitivo activado en este teléfono."
                     else "Núcleo cognitivo desactivado. El chat y los controles siguen disponibles.")
             }
+        })
+        content.addView(actionButton("APRENDIZAJE COMPROBADO · RESULTADOS Y REINICIO") {
+            val records = verifiedLearning.report()
+            val evidence = records.joinToString("\n") { item ->
+                val confidence = if (item.examples == 0) "sin pruebas" else
+                    String.format(java.util.Locale.US, "%.0f%%", item.probability * 100.0)
+                item.category + ": " + item.verified + " verificadas, " +
+                    item.failures + " fallidas · indicador " + confidence
+            }
+            AlertDialog.Builder(this)
+                .setTitle("SKY Android · Aprendizaje por resultados")
+                .setMessage("Estos indicadores se ajustan solo ante acciones locales " +
+                    "verificadas o fallidas. Una orden enviada no es un éxito. " +
+                    "No es entrenamiento del modelo de lenguaje y nunca otorga permisos.\n\n" +
+                    evidence)
+                .setPositiveButton("Cerrar", null)
+                .setNeutralButton("Reiniciar aprendizaje") { _, _ ->
+                    AlertDialog.Builder(this)
+                        .setTitle("Reiniciar indicadores aprendidos")
+                        .setMessage("¿Borrar únicamente los pesos y contadores orientativos? " +
+                            "No modifica historial, permisos ni recuerdos.")
+                        .setPositiveButton("Reiniciar") { _, _ ->
+                            verifiedLearning.clear()
+                            home.showMessage("Indicadores de aprendizaje reiniciados.")
+                        }
+                        .setNegativeButton("Cancelar", null).show()
+                }.show()
         })
         content.addView(actionButton("NÚCLEO COGNITIVO · FUNCIONES Y PRIVACIDAD") {
             AlertDialog.Builder(this).setTitle("SKY Android · Núcleo cognitivo")
