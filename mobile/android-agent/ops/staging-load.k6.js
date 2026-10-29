@@ -9,7 +9,8 @@ const origin = (__ENV.SKY_STAGING_URL || '').replace(/\/$/, '');
 const device = __ENV.SKY_TEST_DEVICE_ID || '';
 const token = __ENV.SKY_TEST_DEVICE_TOKEN || '';
 const users = Number(__ENV.SKY_TEST_VUS || 10);
-if (!/^https:\/\//.test(origin) || !/staging|stage|sandbox|test/i.test(new URL(origin).hostname)) {
+const match = /^https:\/\/([^/:?#]+)(?::[0-9]{1,5})?$/.exec(origin);
+if (!match || !/staging|stage|sandbox|test/i.test(match[1])) {
   throw new Error('Se requiere una URL HTTPS de staging. Producción está prohibida.');
 }
 if (!/^[a-z0-9-]{8,128}$/i.test(device) || !token || token.length < 16) {
