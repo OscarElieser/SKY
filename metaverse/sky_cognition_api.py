@@ -28,6 +28,11 @@ class ContextInput(QueryInput):
     include_public: bool = True
 
 
+class ResearchInput(QueryInput):
+    provider: str = Field(default="openalex", pattern="^(openalex|crossref)$")
+    external_search: bool = False
+
+
 class VoiceInput(BaseModel):
     text: str = Field(min_length=1, max_length=12000)
 
@@ -56,6 +61,17 @@ def get_context(body: ContextInput):
         include_personal=body.include_personal,
         include_public=body.include_public,
     ))
+
+
+@router.post("/research")
+def academic_research(body: ResearchInput):
+    try:
+        return brain.academic_research(body.query, provider=body.provider,
+                                       external_search=body.external_search)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)[:200]) from exc
+    except (OSError, RuntimeError, TimeoutError) as exc:
+        raise HTTPException(503, "Fuente académica no disponible; reintentá luego.") from exc
 
 
 @router.post("/personality")
