@@ -1,0 +1,33 @@
+name: SKY Windows Android parity static gates
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'shared/sky_platform_parity.json'
+      - 'shared/sky_core_contract_v1.json'
+      - 'tests/test_sky_platform_parity.py'
+      - 'tests/test_sky_cross_platform_regression_gates.py'
+      - '.github/workflows/sky-platform-parity.yml'
+  pull_request:
+    paths:
+      - 'shared/sky_platform_parity.json'
+      - 'shared/sky_core_contract_v1.json'
+      - 'tests/test_sky_platform_parity.py'
+      - 'tests/test_sky_cross_platform_regression_gates.py'
+      - '.github/workflows/sky-platform-parity.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  parity-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pytest
+        run: python -m pip install pytest
+      - name: Validate Windows and Android inventory
+        run: python -m pytest -q tests/test_sky_platform_parity.py tests/test_sky_cross_platform_regression_gates.py
