@@ -69,7 +69,7 @@ jobs:
         run: gradle -p mobile/android-agent :app:assembleStandardDebug --no-daemon
       - name: Validate voice, application routing, and device commands
         run: gradle -p mobile/android-agent :app:testStandardDebugUnitTest --no-daemon
-      - name: Verify standard APK manifest does not declare AccessibilityService
+      - name: Verify only explicitly authorized music accessibility is in standard APK
         shell: bash
         run: |
           set -euo pipefail
@@ -78,9 +78,12 @@ jobs:
           manifests=$(find mobile/android-agent/app/build/intermediates -type f -name AndroidManifest.xml -path '*standardDebug*')
           test -n "$manifests"
           if echo "$manifests" | xargs grep -l 'SkyTextAssistService'; then
-            echo "ERROR: standard APK contains the optional accessibility service"
+            echo "ERROR: standard APK includes broad text assist accessibility"
             exit 1
           fi
+          manifest="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$manifest" dump xmltree "$apk" AndroidManifest.xml | grep -q 'SkyMusicControlService'
+          grep -q 'android:packageNames="com.google.android.apps.youtube.music,com.google.android.youtube,com.spotify.music"' mobile/android-agent/app/src/main/res/xml/sky_music_control_config.xml
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
       - name: Verify release signing with a disposable CI key (never distributed)
         shell: bash
