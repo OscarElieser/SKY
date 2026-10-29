@@ -134,6 +134,10 @@ object SkyDailyCommandParser {
         ).matchEntire(action)
         if (genericLaunch != null) {
             val name = genericLaunch.groupValues[1].trim()
+            // Una cadena compuesta no es una orden simple de apertura.
+            // Evita convertir instrucciones incrustadas en un nombre de app.
+            if (Regex("""\\b(?:y|luego|despues|tambien)\\s+(?:borra|borrar|elimina|eliminar|envia|enviar|escribe|escribir|modifica|modificar|instala|instalar|desinstala|desinstalar|paga|pagar|ejecuta|ejecutar)\\b""")
+                    .containsMatchIn(name)) return null
             if (name !in setOf("panel", "chat", "conversacion", "modulo",
                     "ajustes", "mis notas", "todas las aplicaciones", "aplicaciones")) {
                 return Command.OpenApp(name)
