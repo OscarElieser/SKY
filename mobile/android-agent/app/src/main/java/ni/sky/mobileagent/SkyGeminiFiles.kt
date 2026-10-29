@@ -169,15 +169,9 @@ object SkyGeminiFiles {
         try {
             for (item in items) {
                 if (item.kind == SkyAttachmentBatch.Kind.OFFICE) {
-                    require(item.size <= SkyAttachmentBatch.OFFICE_LOCAL_MAX) {
-                        "Este archivo Office supera 8 MB. Su análisis completo todavía necesita " +
-                            "un lector especializado: " + item.name
-                    }
-                    val content = SkyAttachmentReader.read(context, item.uri)
-                    require(!content.text.isNullOrBlank()) {
-                        "No encontré texto legible en " + item.name
-                    }
-                    extracted.add("Documento " + item.name + " (extracto):\n" + content.text)
+                    val text = SkyOfficeStreaming.preview(context.contentResolver, item)
+                    extracted.add("Documento " + item.name +
+                        " (extracción parcial de texto y valores, sin gráficos ni diseño):\n" + text)
                 } else {
                     val file = upload(context.contentResolver, apiKey, item)
                     uploaded.add(file)
