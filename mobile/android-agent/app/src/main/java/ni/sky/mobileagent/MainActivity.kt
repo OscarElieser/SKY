@@ -372,6 +372,7 @@ class MainActivity : Activity() {
         val expression = SkyExpressionCommand.parse(message) ?: return false
         val feedback = voicePanel.chooseExpression(expression)
         home.showMessage(feedback)
+        if (voicePanel.isVoiceEnabled()) voicePanel.speakReply("Mira, esta es mi expresión.")
         return true
     }
 
@@ -760,6 +761,7 @@ class MainActivity : Activity() {
                                 personalKey.setText("")
                                 refreshConnection()
                                 settingsDialog?.dismiss()
+                                handler.postDelayed({ showHandsFreeFirstRun() }, 1200L)
                                 AlertDialog.Builder(this)
                                     .setTitle("SKY Android activada")
                                     .setMessage("Conexión con Gemini verificada. Ya podés conversar " +
@@ -861,6 +863,7 @@ class MainActivity : Activity() {
                                 groqInput.setText("")
                                 refreshConnection()
                                 settingsDialog?.dismiss()
+                                handler.postDelayed({ showHandsFreeFirstRun() }, 1200L)
                                 AlertDialog.Builder(this)
                                     .setTitle("Groq conectado")
                                     .setMessage("SKY puede conversar usando Groq. " +
