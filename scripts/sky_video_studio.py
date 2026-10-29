@@ -5,6 +5,7 @@ Input media must be supplied by the user or obtained through authorized provider
 """
 import argparse
 import json
+import math
 import shutil
 import subprocess
 import tempfile
@@ -93,6 +94,49 @@ def render(manifest_path, output_path):
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                         "-f", "concat", "-safe", "0", "-i", str(concat),
                         "-c", "copy", str(silent)], check=True)
+        # Burn optional, user-authored timed captions into the final video.
+        captions = spec.get("captions", [])
+        if captions:
+            if not isinstance(captions, list) or len(captions) > 100:
+                raise ValueError("captions must be a list of at most 100 entries")
+            total = sum(float(scene.get("duration", 4)) for scene in scenes)
+            if transition == "fade":
+                total -= (len(scenes) - 1) * fade_seconds
+            def stamp(seconds):
+                millis = round(seconds * 1000)
+                hours, rem = divmod(millis, 3_600_000)
+                minutes, rem = divmod(rem, 60_000)
+                secs, ms = divmod(rem, 1000)
+                return f"{hours:02}:{minutes:02}:{secs:02},{ms:03}"
+            def clean_text(value):
+                if not isinstance(value, str) or not value.strip() or len(value) > 200:
+                    raise ValueError("Caption text must be 1-200 characters")
+                return value.replace("\\r", " ").replace("\\n", " ").strip()
+            def srt_line(value):
+                # SRT is plain text: prevent multiline injection and markup surprises.
+                return clean_text(value).replace("<", "‹").replace(">", "›")
+            lines = []
+            previous_end = 0.0
+            for index, caption in enumerate(captions, 1):
+                start = float(caption["start"])
+                end = float(caption["end"])
+                if not all(math.isfinite(v) for v in (start, end)) or not (0 <= start < end <= total + 0.05):
+                    raise ValueError("Caption timestamps must fit the rendered duration")
+                if start < previous_end:
+                    raise ValueError("Captions must be ordered and non-overlapping")
+                previous_end = end
+                lines.append(f"{index}\\n{stamp(start)} --> {stamp(end)}\\n{srt_line(caption['text'])}\\n")
+            subtitles = temp / "captions.srt"
+            subtitles.write_text("\\n".join(lines), encoding="utf-8")
+            captioned = temp / "captioned.mp4"
+            subprocess.run(
+                ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                 "-i", str(silent), "-vf", f"subtitles={subtitles.as_posix()}",
+                 "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "19",
+                 "-pix_fmt", "yuv420p", str(captioned)],
+                check=True,
+            )
+            silent = captioned
         audio = spec.get("audio")
         if audio:
             audio_path = (manifest_path.parent / audio).resolve()
