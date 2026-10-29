@@ -1166,11 +1166,18 @@ class MainActivity : Activity() {
                 }
                 val answer: String
                 val provider: String
+                val sources: List<SkyPhoneCloud.Source>
+                val searchSuggestions: String
                 if (mobileCloud) {
-                    // Requiere consentimiento explícito al activar modo móvil en Ajustes.
-                    // No requiere ni solicita llaves ni módulos de Windows.
-                    answer = SkyPhoneCloud.reply(tokens.personalCloudKey(), message, history)
-                    provider = "Gemini · SKY Android"
+                    // Google Search grounding is used for factual, recent queries.
+                    // Responses only claim live verification if Google returned sources.
+                    val live = SkyPhoneCloud.replyWithSources(
+                        tokens.personalCloudKey(), message, history)
+                    answer = live.answer
+                    sources = live.sources
+                    searchSuggestions = live.googleSearchHtml
+                    provider = if (live.searchedWeb) "Gemini · Google Search"
+                        else "Gemini · SKY Android"
                 } else {
                     val payload = JSONObject()
                         .put("device_id", id)
@@ -1184,6 +1191,8 @@ class MainActivity : Activity() {
                         token, payload)
                     answer = reply.optString("respuesta", "SKY no devolvió texto.")
                     provider = reply.optString("proveedor", "SKY Core")
+                    sources = emptyList()
+                    searchSuggestions = ""
                 }
                 chatHistory.put(JSONObject().put("role", "user").put("content", message))
                 chatHistory.put(JSONObject().put("role", "assistant").put("content", answer.take(2000)))
@@ -1195,7 +1204,7 @@ class MainActivity : Activity() {
                     val elapsedMs = android.os.SystemClock.elapsedRealtime() - started
                     home.addExchange(message, answer,
                         provider + " · " + String.format(java.util.Locale.US, "%.1f s", elapsedMs / 1000.0),
-                        revealPanel = !keepFace)
+                        revealPanel = !keepFace, sources = sources, googleSearchHtml = searchSuggestions)
                     voicePanel.speakReply(answer)
                 }
             } catch (error: Exception) {
