@@ -62,12 +62,29 @@ class SkyAndroidActions(
             is SkyDailyCommandParser.Command.Timer -> timer(action.seconds)
             is SkyDailyCommandParser.Command.OpenApp -> installedApps.requestLaunch(action.app)
             SkyDailyCommandParser.Command.ShowApps -> installedApps.showCatalog()
+            SkyDailyCommandParser.Command.Capabilities -> explainCapabilities()
             is SkyDailyCommandParser.Command.Note -> saveNote(action.value)
             is SkyDailyCommandParser.Command.WebSearch -> webSearch(action.query)
             is SkyDailyCommandParser.Command.Share -> share(action.app, action.value)
             SkyDailyCommandParser.Command.ShowNotes -> showNotes()
             is SkyDailyCommandParser.Command.Unsupported -> feedback(action.reason)
         }
+    }
+
+    private fun explainCapabilities() {
+        val count = runCatching { installedApps.discover().size }.getOrDefault(0)
+        feedback(
+            "Puedo abrir las aplicaciones instaladas en tu teléfono cuando Android " +
+                "lo permita; detecto $count aplicaciones con acceso de inicio. " +
+                "Probá «abre Netflix», «abrí Word», «mostrame mis aplicaciones» " +
+                "o «pon una canción en Spotify». " +
+                "También puedo solicitar alarmas, guardar notas, preparar textos " +
+                "para compartir y controlar la música. " +
+                "Para noticias e información actual puedo consultar Google con internet. " +
+                "Todavía no puedo navegar ni escribir libremente dentro de todas " +
+                "las aplicaciones o confirmar una reproducción sin comprobarla. " +
+                "Algunas acciones exigen desbloqueo, autorización o un paso tuyo."
+        )
     }
 
     private fun alarm(command: SkyDailyCommandParser.Command.Alarm) {
