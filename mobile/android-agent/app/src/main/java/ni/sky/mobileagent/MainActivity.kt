@@ -789,6 +789,14 @@ class MainActivity : Activity() {
             showMusicControlDisclosure(SkyMusicCommand.Request(
                 "november rain", musicLauncher.preferred()))
         })
+        content.addView(actionButton("Desactivar control musical asistido") {
+            getSharedPreferences("sky_music_access", MODE_PRIVATE)
+                .edit().putBoolean("consent", false).apply()
+            requestedMusicAfterPermission = null
+            SkyMusicControlService.cancelPending()
+            home.showMessage("Control musical asistido desactivado. " +
+                "Podés apagar el servicio desde Accesibilidad de Android.")
+        })
         content.addView(actionButton("MÚSICA · Spotify / YouTube Music / YouTube") {
             val choices = SkyMusicCommand.Service.entries.toTypedArray()
             AlertDialog.Builder(this)
