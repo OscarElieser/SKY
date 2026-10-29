@@ -2093,6 +2093,13 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             installedApps.showCatalog()
         })
+        content.addView(actionButton("SEGURIDAD · FIRMA Y PROTECCIONES") {
+            AlertDialog.Builder(this)
+                .setTitle("SKY IA · Seguridad de esta instalación")
+                .setMessage(SkyAndroidSecurityReport.status(this))
+                .setPositiveButton("Cerrar", null)
+                .show()
+        })
         content.addView(actionButton("Autodiagnóstico Android") {
             showDeviceDiagnostics()
         })
