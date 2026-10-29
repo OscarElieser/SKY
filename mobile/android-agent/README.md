@@ -1,3 +1,14 @@
+# SKY Android — versión de código 0.8.19 · búsqueda del historial y clima
+
+**Implementación en main; APK 0.8.19 pendiente de compilación y pruebas.**
+
+- Historial: búsqueda por título, pregunta y respuesta; páginas de 25 consultas sin límite de 150; exportación JSON voluntaria mediante el selector de Android. El archivo exportado no está cifrado: protegerlo al compartir.
+- Memoria: importar USER.md de SKY Windows con vista previa; elegir fusionar o reemplazar, revisar y eliminar elementos del perfil local. La orden «recuerda que...» admite reconocimiento por voz sin clave de un proveedor IA.
+- Clima: «clima en Managua, Nicaragua» usa Open-Meteo (geocodificación y condiciones actuales), con fecha/hora del dato y enlace de fuente. No usa GPS ni pide permisos de ubicación. Si hay homónimos, solicita país; para pronósticos futuros conserva el proveedor de búsqueda web cuando está configurado.
+- Windows no se modifica ni se copia información privada automáticamente. Se conservan todas las funciones anteriores.
+
+---
+
 # SKY Android — versión de código 0.8.18 · memoria, historial y adjuntos
 
 **Novedades en la rama `main` (pendientes de validar en un teléfono real):**

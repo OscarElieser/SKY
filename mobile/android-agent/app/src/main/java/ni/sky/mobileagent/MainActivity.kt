@@ -129,7 +129,8 @@ class MainActivity : Activity() {
                 if (!tokens.cloudEnabled() && !tokens.groqEnabled() &&
                     tokens.chatToken().isEmpty() &&
                     SkyLocalConversation.reply(transcript) == null &&
-                    !transcript.startsWith("recuerda que ", ignoreCase = true)) {
+                    !transcript.startsWith("recuerda que ", ignoreCase = true) &&
+                    !SkyWeatherNow.isWeatherQuery(transcript)) {
                     voiceReplyOnFace = false
                     voicePanel.showError("Activá el chat seguro en Ajustes.")
                     home.showMessage("Activá el chat desde Ajustes para conversar.")
@@ -1737,6 +1738,30 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun requestLiveWeather(question: String, city: String) {
+        if (chatPending) return
+        chatPending = true
+        home.beginSending(question)
+        voicePanel.showThinking()
+        chatExecutor.execute {
+            try {
+                val live = SkyWeatherNow.current(city)
+                runOnUiThread {
+                    home.addExchange(question, live.text, "Open-Meteo · clima actual",
+                        sources = listOf(SkyPhoneCloud.Source("Open-Meteo · datos actuales", live.sourceUrl)))
+                    voicePanel.speakReply(live.text)
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    home.failSending(error.message ?: "El clima no está disponible.", question)
+                    voicePanel.showError("No pude verificar el clima en internet.")
+                }
+            } finally {
+                chatPending = false
+            }
+        }
+    }
+
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
         if (message.startsWith("recuerda que ", ignoreCase = true)) {
@@ -1748,6 +1773,19 @@ class MainActivity : Activity() {
                         "SKY · memoria local")
                 }
                 .onFailure { home.showMessage(it.message ?: "No pude guardar ese recuerdo.") }
+            return
+        }
+        // El clima se consulta con una fuente real sin consumir cuota de IA.
+        if (SkyWeatherNow.isWeatherQuery(message) && !SkyWeatherNow.requestsFuture(message)) {
+            val city = SkyWeatherNow.requestedCity(message)
+            if (city.isNullOrBlank()) {
+                val ask = "¿De qué ciudad querés consultar el clima? Decime «clima en Managua, Nicaragua»."
+                chatInput.setText("")
+                home.addExchange(message, ask, "SKY · clima")
+                voicePanel.speakReply(ask)
+            } else {
+                requestLiveWeather(message, city)
+            }
             return
         }
         // Animate explicit emotional language in both typed and spoken turns.
