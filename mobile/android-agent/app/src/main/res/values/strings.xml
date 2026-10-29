@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="sky_text_assist_description">SKY puede escribir un texto solicitado en un campo vacío de WhatsApp o Gmail, únicamente después de tu autorización y cuando enfoqués ese campo. No lee conversaciones, no escribe contraseñas ni envía mensajes.</string>
+    <string name="sky_music_control_description">Con tu autorización, SKY puede buscar y seleccionar una canción en YouTube Music, YouTube o Spotify tras una orden de voz o texto. Solo actúa temporalmente dentro de estas aplicaciones y no lee chats ni envía información personal.</string>
 </resources>
