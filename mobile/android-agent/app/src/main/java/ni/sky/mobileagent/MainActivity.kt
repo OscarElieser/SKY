@@ -54,6 +54,8 @@ class MainActivity : Activity() {
     private lateinit var cloudConsent: CheckBox
     private lateinit var privateConsent: CheckBox
     private lateinit var archive: SkyConversationArchive
+    private val cognitionPrefs by lazy { getSharedPreferences("sky_android_cognition", MODE_PRIVATE) }
+    private fun cognitionEnabled(): Boolean = cognitionPrefs.getBoolean("enabled", true)
     private val attachmentRequest = 1666
     private val profileImportRequest = 1667
     private val historyExportRequest = 1668
@@ -133,7 +135,9 @@ class MainActivity : Activity() {
                     tokens.chatToken().isEmpty() &&
                     SkyLocalConversation.reply(transcript) == null &&
                     !transcript.startsWith("recuerda que ", ignoreCase = true) &&
-                    !SkyWeatherNow.isWeatherQuery(transcript)) {
+                    !SkyWeatherNow.isWeatherQuery(transcript) &&
+                    !(cognitionEnabled() && (SkyAndroidCognition.memoryQuestion(transcript) ||
+                        SkyAndroidCognition.historyQuestion(transcript)))) {
                     voiceReplyOnFace = false
                     voicePanel.showError("Activá el chat seguro en Ajustes.")
                     home.showMessage("Activá el chat desde Ajustes para conversar.")
@@ -1372,6 +1376,20 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             socialStudio.showCreatorMenu { request -> createSocialContent(request) }
         })
+        content.addView(CheckBox(this).apply {
+            text = "NÚCLEO COGNITIVO ANDROID · respuestas guiadas y recuerdos locales"
+            isChecked = cognitionEnabled()
+            setOnCheckedChangeListener { _, enabled ->
+                cognitionPrefs.edit().putBoolean("enabled", enabled).apply()
+                home.showMessage(if (enabled) "Núcleo cognitivo activado en este teléfono."
+                    else "Núcleo cognitivo desactivado. El chat y los controles siguen disponibles.")
+            }
+        })
+        content.addView(actionButton("NÚCLEO COGNITIVO · FUNCIONES Y PRIVACIDAD") {
+            AlertDialog.Builder(this).setTitle("SKY Android · Núcleo cognitivo")
+                .setMessage(SkyAndroidCognition.description())
+                .setPositiveButton("Entendido", null).show()
+        })
         content.addView(actionButton("HABILIDADES IA · INVESTIGAR / PROGRAMAR / DISEÑAR / PRESENTAR") {
             settingsDialog?.dismiss()
             showSkillsCatalog()
@@ -1924,6 +1942,30 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun localCognitionRecall(message: String): Boolean {
+        if (!cognitionEnabled()) return false
+        val answer = when {
+            SkyAndroidCognition.memoryQuestion(message) -> {
+                SkyAndroidCognition.localMemoryAnswer(message, SkyOwnerContext.memoryLines(this))
+            }
+            SkyAndroidCognition.historyQuestion(message) -> {
+                val terms = SkyAndroidCognition.searchTerms(message)
+                val found = if (terms.isEmpty()) emptyList() else archive.page(terms.first(), limit = 4)
+                SkyAndroidCognition.localHistoryAnswer(found.map {
+                    it.localTime() + " · " + it.title + " · " + it.answer.take(85)
+                }, terms.isNotEmpty())
+            }
+            else -> return false
+        }
+        chatInput.setText("")
+        val keepFace = voiceReplyOnFace
+        voiceReplyOnFace = false
+        home.addExchange(message, answer, "SKY · memoria privada local",
+            revealPanel = !keepFace)
+        voicePanel.speakReply(answer)
+        return true
+    }
+
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
         if (message.startsWith("recuerda que ", ignoreCase = true)) {
@@ -1937,6 +1979,8 @@ class MainActivity : Activity() {
                 .onFailure { home.showMessage(it.message ?: "No pude guardar ese recuerdo.") }
             return
         }
+        // Las preguntas explícitas sobre recuerdos e historial no salen a la nube.
+        if (localCognitionRecall(message)) return
         // El clima se consulta con una fuente real sin consumir cuota de IA.
         if (SkyWeatherNow.isWeatherQuery(message) && !SkyWeatherNow.requestsFuture(message)) {
             val city = SkyWeatherNow.requestedCity(message)
@@ -1989,8 +2033,13 @@ class MainActivity : Activity() {
         val privateData = privateConsent.isChecked
         // Nunca incluir el perfil personal en una solicitud remota sin permiso explícito.
         val skillsPrompt = SkySkillsCatalog.instructionFor(message)
-        val personalizedMessage = ((if (privateData) SkyOwnerContext.forPrompt(this) else "") +
-            skillsPrompt + message).take(4000)
+        val cognitionGuide = if (cognitionEnabled()) SkyAndroidCognition.guide(message) else ""
+        // Nunca truncar la consulta original para añadir instrucciones auxiliares.
+        // El perfil solo sale del teléfono si se marcó el permiso de datos privados.
+        val prefix = (if (privateData) SkyOwnerContext.forPrompt(this) else "") +
+            cognitionGuide + skillsPrompt
+        val personalizedMessage = prefix.take((4000 - message.length).coerceAtLeast(0)) +
+            message.takeLast(4000)
         cloudConsent.isChecked = false
         privateConsent.isChecked = false
         chatPending = true
@@ -2008,7 +2057,8 @@ class MainActivity : Activity() {
                 val provider: String
                 val sources: List<SkyPhoneCloud.Source>
                 val searchSuggestions: String
-                val needsLiveSources = SkyPhoneCloud.requiresLiveVerification(message)
+                val needsLiveSources = SkyPhoneCloud.requiresLiveVerification(message) ||
+                    (cognitionEnabled() && SkyAndroidCognition.classify(message).verifyWithSources)
                 when {
                     // For up-to-date information, Groq is NOT substituted for a
                     // verified web search: it has no search tool in this client.
