@@ -52,6 +52,41 @@ def render(manifest_path, output_path):
                         "-pix_fmt", "yuv420p", str(clip)]
             subprocess.run(command, check=True)
             clips.append(clip)
+        transition = spec.get("transition", "cut")
+        if transition not in {"cut", "fade"}:
+            raise ValueError("transition must be cut or fade")
+        if transition == "fade" and len(clips) > 1:
+            fade_seconds = float(spec.get("transition_duration", 0.4))
+            if not 0.1 <= fade_seconds <= 1.5:
+                raise ValueError("transition_duration must be between 0.1 and 1.5")
+            durations = [float(scene.get("duration", 4)) for scene in scenes]
+            if any(d <= fade_seconds for d in durations):
+                raise ValueError("Every scene must be longer than the transition")
+            # A single xfade chain preserves full-frame output at the requested FPS.
+            inputs = []
+            for clip in clips:
+                inputs += ["-i", str(clip)]
+            filters = []
+            current = "[0:v]"
+            elapsed = durations[0]
+            for index in range(1, len(clips)):
+                target = f"[v{index}]"
+                offset = round(elapsed - fade_seconds, 3)
+                filters.append(
+                    f"{current}[{index}:v]xfade=transition=fade:"
+                    f"duration={fade_seconds}:offset={offset}{target}"
+                )
+                current = target
+                elapsed += durations[index] - fade_seconds
+            faded = temp / "faded.mp4"
+            subprocess.run(
+                ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *inputs,
+                 "-filter_complex", ";".join(filters), "-map", current,
+                 "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "19",
+                 "-pix_fmt", "yuv420p", str(faded)],
+                check=True,
+            )
+            clips = [faded]
         concat = temp / "clips.txt"
         concat.write_text("".join(f"file '{clip.as_posix()}'\n" for clip in clips), encoding="utf-8")
         silent = temp / "silent.mp4"
