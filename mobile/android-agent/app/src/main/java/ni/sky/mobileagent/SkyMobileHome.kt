@@ -554,7 +554,7 @@ class SkyMobileHome(
 
     fun setAttachmentLabel(filename: String?) {
         attachmentLabel.text = if (filename.isNullOrBlank()) "" else
-            "Adjunto: " + filename.take(95) + " · TOCÁ PARA QUITAR"
+            "Adjuntos: " + filename.take(135) + " · TOCÁ PARA GESTIONAR"
         attachmentLabel.visibility = if (filename.isNullOrBlank()) View.GONE else View.VISIBLE
     }
 

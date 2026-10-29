@@ -476,6 +476,24 @@ class MainActivity : Activity() {
             .setNegativeButton("Cancelar", null).show()
     }
 
+    private fun showSkillsCatalog() {
+        val labels = SkySkillsCatalog.skills.map {
+            it.name + "\n" + it.capability
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Habilidades de SKY IA · funciones verificables")
+            .setItems(labels) { _, index ->
+                val selected = SkySkillsCatalog.skills[index]
+                home.openChat()
+                chatInput.setText(selected.example)
+                chatInput.setSelection(chatInput.text.length)
+                home.showMessage("Podés editar esta solicitud y enviarla. " +
+                    "SKY no abre por sí misma Canva, Gamma, Claude ni Copilot.")
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
     private fun chooseChatAttachment() {
         val picker = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(android.content.Intent.CATEGORY_OPENABLE)
@@ -1295,6 +1313,10 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             socialStudio.showCreatorMenu { request -> createSocialContent(request) }
         })
+        content.addView(actionButton("HABILIDADES IA · INVESTIGAR / PROGRAMAR / DISEÑAR / PRESENTAR") {
+            settingsDialog?.dismiss()
+            showSkillsCatalog()
+        })
         content.addView(actionButton("MI PERFIL PERSONAL · EDITAR / IMPORTAR DE WINDOWS") {
             settingsDialog?.dismiss()
             showOwnerProfile()
@@ -1887,8 +1909,9 @@ class MainActivity : Activity() {
         val cloud = cloudConsent.isChecked
         val privateData = privateConsent.isChecked
         // Nunca incluir el perfil personal en una solicitud remota sin permiso explícito.
-        val personalizedMessage = if (privateData)
-            (SkyOwnerContext.forPrompt(this) + message).take(4000) else message
+        val skillsPrompt = SkySkillsCatalog.instructionFor(message)
+        val personalizedMessage = ((if (privateData) SkyOwnerContext.forPrompt(this) else "") +
+            skillsPrompt + message).take(4000)
         cloudConsent.isChecked = false
         privateConsent.isChecked = false
         chatPending = true

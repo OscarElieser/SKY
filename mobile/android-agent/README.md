@@ -1,3 +1,19 @@
+# SKY Android 0.8.20 — archivos grandes, selección múltiple y habilidades
+
+**Implementación en la rama main; no instalar hasta comprobar compilación y APK firmada 0.8.20.**
+
+- **Adjuntar varios:** Android ACTION_OPEN_DOCUMENT con selección múltiple y posibilidad de añadir archivos en varias selecciones. Hasta **5 archivos**, **100 MB por archivo**, **300 MB entre todos**. El usuario puede retirar uno o todos antes de enviar. No requiere acceso general al almacenamiento ni copia los originales al almacenamiento de SKY.
+- **PDF: límite real de Gemini de 50 MB** por archivo, aunque el selector permite hasta 100 MB para tipos compatibles como imagen, texto, audio y video. No afirmar que una API acepta formatos no documentados ni que la cuota es ilimitada.
+- **Cargas por streaming:** Gemini Files API, fragmentos de 4 MiB y una sola respuesta de análisis conjunto, sin acumular el contenido de 100 MB en RAM. Requiere Gemini válido e internet; el proveedor puede rechazar archivos, cuotas, duración de video/audio o formatos según el modelo.
+- **Word, Excel y PowerPoint:** extracción local por flujo de texto/valores de DOCX/XLSX/PPTX de hasta 100 MB, con límite de descompresión y 14.000 caracteres de vista parcial por documento. **No analiza completamente gráficos, formato, fórmulas ni contenido más allá del extracto.**
+- **Privacidad:** confirmación explícita antes de cada envío. Los archivos subidos pueden permanecer en Gemini hasta 48 horas; SKY solicita borrarlos al terminar, pero no puede garantizar borrado inmediato ante desconexión, cierre forzoso o fallos de servidor. Evitar archivos secretos y revisar la política del proveedor.
+- **Habilidades reales:** menú en Ajustes para investigación, programación, docencia, redacción, preparación de presentaciones, diseño conceptual, análisis de archivos, planificación y multimedia. La IA produce texto y análisis; **no está conectada directamente a Canva, Gamma, Claude, ChatGPT ni Copilot**, no edita allí, no genera PPTX editable desde ese menú ni representa una suscripción a esos servicios.
+- **Intacto:** chat escrito, ojos animados, voz con y sin manos libres, historial con fecha/hora, memoria local, búsqueda web verificada cuando se dispone de herramienta y acciones Android ya existentes. SKY Windows no se modifica.
+
+**Verificación imprescindible:** pruebas automáticas, compilación release firmada y pruebas de dispositivo con archivos de ejemplo: TXT 1 MB, PDF 20 MB, audio 50 MB, video 90 MB y tres archivos juntos; comprobar consumo de RAM, permiso SAF, cancelación, errores, tiempos, cuotas y borrado remoto.
+
+---
+
 # SKY Android — versión de código 0.8.19 · búsqueda del historial y clima
 
 **Implementación en main; APK 0.8.19 pendiente de compilación y pruebas.**
