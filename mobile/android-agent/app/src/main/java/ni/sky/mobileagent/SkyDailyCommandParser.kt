@@ -13,6 +13,7 @@ object SkyDailyCommandParser {
         data class Timer(val seconds: Int) : Command()
         data class OpenApp(val app: String) : Command()
         object ShowApps : Command()
+        object Capabilities : Command()
         data class Note(val value: String) : Command()
         data class WebSearch(val query: String) : Command()
         object ShowNotes : Command()
@@ -30,6 +31,16 @@ object SkyDailyCommandParser {
         val clean = canonical(raw).replace(Regex("\\s+"), " ")
             .replace(Regex("^sky[ ,.:!]+"), "").trim()
         if (clean.isEmpty()) return null
+        // Answer real device capabilities locally, based on installed apps,
+        // rather than allowing the LLM to invent a categorical refusal.
+        val capabilityWords = Regex("""\b(?:funciones|funcionalidades|capacidades|habilidades|puedes hacer|puede hacer|podes hacer|que haces|que sabes hacer|que controlas|que aplicaciones puedes|que apps puedes|en que me ayudas)\b""")
+        if (capabilityWords.containsMatchIn(clean) &&
+            (clean.startsWith("que ") || clean.startsWith("dime ") ||
+                clean.startsWith("decime ") || clean.startsWith("cuales ") ||
+                clean.startsWith("cual ") || clean.startsWith("sky ") ||
+                clean.startsWith("muestra ") || clean.startsWith("explica "))) {
+            return Command.Capabilities
+        }
         // Evitar tomar frases explicativas largas como órdenes autorizadas.
         val action = clean.substringBefore("\n").trim()
         if (action.length > 350) return null
@@ -101,7 +112,7 @@ object SkyDailyCommandParser {
             "youtube" to "youtube", "chrome" to "chrome",
             "whatsapp" to "whatsapp", "gmail" to "gmail"
         )
-        val open = Regex("^(?:abre|abrir|abri|abreme|inicia|iniciar|lanza|lanzar) (?:la |el |aplicacion |app )?(youtube|chrome|whatsapp|gmail)(?: en (?:mi )?(?:telefono|celular|android))?\\.?$")
+        val open = Regex("^(?:abre|abrir|abri|abrime|abreme|inicia|iniciar|lanza|lanzar) (?:la |el |aplicacion |app )?(youtube|chrome|whatsapp|gmail)(?: en (?:mi )?(?:telefono|celular|android))?\\.?$")
             .matchEntire(action)
         if (open != null) return Command.OpenApp(appWords.getValue(open.groupValues[1]))
         // Descubrimiento dinámico: nuevas apps sin actualizar esta lista.
@@ -112,10 +123,12 @@ object SkyDailyCommandParser {
         if (notes.matches(action)) return Command.ShowNotes
         // El nombre proviene del teléfono, NO de un catálogo fijo.
         val genericLaunch = Regex(
-            "^(?:abre|abrir|abri|abreme|inicia|iniciar|lanza|lanzar) " +
-            "(?:(?:la|el) )?(?:(?:aplicacion|app|juego) )?" +
-            "([a-z0-9][a-z0-9 ]{0,79}?)" +
-            "(?: en (?:mi )?(?:telefono|celular|android))?$"
+            "^(?:(?:abre|abrir|abri|abrime|abreme|inicia|iniciar|lanza|lanzar)" +
+            "|(?:(?:quiero que|necesito que|puedes|podrias|podes|por favor) )" +
+            "(?:me )?(?:abras|abres|abrir|abre)) " +
+            "(?:(?:la|el|mi|una|un) )?(?:(?:aplicacion|app|juego) (?:de )?)?" +
+            "([a-z0-9][a-z0-9 .+&-]{0,79}?)" +
+            "(?: en (?:mi )?(?:telefono|celular|android))?[.!?]*$"
         ).matchEntire(action)
         if (genericLaunch != null) {
             val name = genericLaunch.groupValues[1].trim()
