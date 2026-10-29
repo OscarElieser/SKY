@@ -93,12 +93,12 @@ class SkyEyeVoicePanel(
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(Color.rgb(247, 245, 255))
+        setBackgroundColor(Color.TRANSPARENT)
         setPadding(dp(16), dp(12), dp(16), dp(14))
         addView(TextView(host).apply {
             text = "SKY  •  ASISTENTE DE VOZ"
             textSize = 18f
-            setTextColor(Color.rgb(51, 59, 104))
+            setTextColor(SkyPremiumUi.white)
             gravity = android.view.Gravity.CENTER
         })
         addView(eye, LayoutParams(LayoutParams.MATCH_PARENT, dp(220)))
@@ -119,13 +119,13 @@ class SkyEyeVoicePanel(
         addView(TextView(host).apply {
             text = "Tocá los ojitos de SKY para descubrir sus gestos ✨"
             textSize = 12f
-            setTextColor(Color.rgb(103, 89, 164))
+            setTextColor(SkyPremiumUi.muted)
             gravity = android.view.Gravity.CENTER
         })
         addView(message.apply {
             text = "SKY lista. Tocá los ojos o activá manos libres."
             textSize = 15f
-            setTextColor(Color.rgb(74, 84, 139))
+            setTextColor(SkyPremiumUi.white)
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, dp(8))
         })
@@ -137,7 +137,7 @@ class SkyEyeVoicePanel(
         addView(TextView(host).apply {
             text = "El micrófono se activa al tocar los ojos o al autorizar manos libres en Ajustes. Una notificación indica la escucha."
             textSize = 12f
-            setTextColor(Color.rgb(110, 113, 150))
+            setTextColor(SkyPremiumUi.muted)
         })
 
         speechEngine = TextToSpeech(host) { state ->
