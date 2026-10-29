@@ -42,3 +42,7 @@ El manifiesto acepta `"transition": "cut"` (por defecto) o `"transition": "fade"
 ## Subtítulos incrustados (fase de validación)
 
 Añadir al manifiesto `"captions": [{"start": 0.1, "end": 2.0, "text": "Descubrí Nicaragua"}]`. Los tiempos están en segundos y deben ser crecientes, sin solaparse y dentro de la duración total. El texto se incrusta en el MP4 usando el filtro `subtitles` de FFmpeg (requiere una compilación con libass). Este bloque todavía no transcribe audio ni genera subtítulos automáticamente; acepta textos proporcionados. La prueba de CI determina si el renderizado es compatible con el entorno.
+
+## Narración y música mezcladas
+
+El manifiesto admite `"voiceover": "narracion.wav"` y `"audio": "musica.mp3"` simultáneamente. La música se repite hasta la duración del video y, si hay narración, su volumen predeterminado es 0.18. `"music_volume"` permite ajustar el nivel entre 0 y 1. Se mezclan con FFmpeg y se exportan como audio AAC. Es necesario aportar la narración y la música con autorización de uso; **este motor aún no sintetiza voces**. Las pruebas de CI incluyen la presencia de pistas de video y audio en el MP4 final.
