@@ -15,8 +15,7 @@ import java.net.URL
  * comprometido. No abre herramientas del PC ni ejecuta comandos del modelo.
  */
 object SkyPhoneCloud {
-    const val MODEL = "gemini-3.5-flash-lite"
-    private const val API = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
+    const val MODEL = SkyGeminiModes.ECONOMY_MODEL
 
     data class Source(val title: String, val url: String)
     data class VerifiedReply(
@@ -102,9 +101,13 @@ object SkyPhoneCloud {
     }
 
     fun makePayload(message: String, history: JSONArray, useGoogleSearch: Boolean = false): JSONObject {
-        require(message.isNotBlank() && message.length <= 4000) { "Escribí una consulta de hasta 4000 caracteres." }
+        val route = SkyGeminiModes.select(message)
+        val maximum = if (route.tier == SkyGeminiModes.Tier.DEEP) 16000 else 4000
+        require(route.prompt.isNotBlank() && route.prompt.length <= maximum) {
+            "Escribí una consulta de hasta $maximum caracteres."
+        }
         val contents = JSONArray()
-        val start = (history.length() - 8).coerceAtLeast(0)
+        val start = (history.length() - route.historyTurns).coerceAtLeast(0)
         for (i in start until history.length()) {
             val turn = history.optJSONObject(i) ?: continue
             val role = when (turn.optString("role")) {
@@ -112,7 +115,7 @@ object SkyPhoneCloud {
                 "assistant" -> "model"
                 else -> continue
             }
-            val text = turn.optString("content").take(2000).trim()
+            val text = turn.optString("content").take(route.historyCharsPerTurn).trim()
             if (text.isNotEmpty()) {
                 contents.put(JSONObject()
                     .put("role", role)
@@ -121,7 +124,7 @@ object SkyPhoneCloud {
         }
         contents.put(JSONObject()
             .put("role", "user")
-            .put("parts", JSONArray().put(JSONObject().put("text", message))))
+            .put("parts", JSONArray().put(JSONObject().put("text", route.prompt))))
         return JSONObject()
             .put("systemInstruction", JSONObject().put("parts",
                 JSONArray().put(JSONObject().put("text",
@@ -154,14 +157,16 @@ object SkyPhoneCloud {
                     JSONArray().put(JSONObject().put("google_search", JSONObject())))
             }
             .put("generationConfig", JSONObject()
-                .put("maxOutputTokens", responseTokenLimit(message))
+                .put("maxOutputTokens", if (route.tier == SkyGeminiModes.Tier.ECONOMY)
+                    responseTokenLimit(route.prompt) else route.maxResponseTokens)
                 .put("temperature", 0.45))
     }
 
     fun reply(personalKey: String, message: String, history: JSONArray): String {
         require(validPersonalKey(personalKey)) { "Configurá una clave de Gemini para probar con Google." }
+        val route = SkyGeminiModes.select(message)
         val payload = makePayload(message, history).toString()
-        return send(personalKey, payload)
+        return send(personalKey, payload, model = route.model, answerLimit = route.answerChars)
     }
 
     /** Uses grounded Google Search, retaining source and Search Suggestions metadata. */
