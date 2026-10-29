@@ -120,8 +120,7 @@ object SkyAndroidCognition {
             words.any { it in setOf("investiga", "investigacion", "estudio", "cientifico", "fuentes", "bibliografia") } -> "investigador"
             else -> "conversacion"
         }
-        val needsLive = liveMarkers.any { it in clean } ||
-            SkyPhoneCloud.requiresLiveVerification(query)
+        val needsLive = liveMarkers.any { it in clean }
         return Route(
             role = role,
             intent = if (action) "accion_solicitada" else "consulta",
