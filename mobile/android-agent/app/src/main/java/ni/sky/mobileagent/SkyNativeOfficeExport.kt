@@ -15,7 +15,8 @@ import java.util.zip.ZipOutputStream
 object SkyNativeOfficeExport {
     enum class Format(val label: String, val mime: String, val extension: String) {
         WORD("Word editable · DOCX", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
-        POWERPOINT("PowerPoint editable · PPTX", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx")
+        POWERPOINT("PowerPoint editable · PPTX", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx"),
+        EXCEL("Excel editable · XLSX", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx")
     }
 
     const val CONTENT = "http://schemas.openxmlformats.org/package/2006/content-types"
@@ -57,6 +58,7 @@ object SkyNativeOfficeExport {
             when (format) {
                 Format.WORD -> SkyNativeWord.write(zip, entry)
                 Format.POWERPOINT -> SkyNativePowerPoint.write(zip, entry)
+                Format.EXCEL -> SkyNativeExcel.write(zip, entry)
             }
         }
     }
