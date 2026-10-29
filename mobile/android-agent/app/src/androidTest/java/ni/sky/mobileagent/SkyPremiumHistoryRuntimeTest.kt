@@ -45,6 +45,29 @@ class SkyPremiumHistoryRuntimeTest {
         }
     }
 
+    @Test fun longDocumentIsStoredAndRecoveredWithoutCuttingAtFiveThousand() {
+        SkyConversationArchive(app).use { archive ->
+            val document = "Inicio del documento. " +
+                "Contenido académico completo. ".repeat(250) +
+                "FIN DEL DOCUMENTO."
+            assertTrue(document.length > 5_000)
+            val saved = archive.append("Crear documento Word temporal " + System.nanoTime(),
+                document, "Groq · prueba documental")
+            try {
+                val loaded = archive.page(saved.title, limit = 25)
+                    .firstOrNull { it.id == saved.id }
+                assertNotNull(loaded)
+                assertEquals(document, loaded!!.answer)
+                val exported = ByteArrayOutputStream()
+                SkyNativeOfficeExport.write(exported, loaded,
+                    SkyNativeOfficeExport.Format.WORD)
+                assertTrue("Debe generarse un DOCX ZIP", exported.toByteArray().size > 700)
+            } finally {
+                archive.delete(saved.id)
+            }
+        }
+    }
+
     @Test fun regularHistoryStillWorksAfterAdditiveMigration() {
         SkyConversationArchive(app).use { archive ->
             val original = archive.append("Consulta de compatibilidad SKY",
