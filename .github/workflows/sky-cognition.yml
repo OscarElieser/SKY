@@ -1,0 +1,35 @@
+name: SKY cognition bridge regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'neural_core/sky_cognition.py'
+      - 'metaverse/sky_cognition_api.py'
+      - 'metaverse/api.py'
+      - 'tests/test_sky_cognition.py'
+      - '.github/workflows/sky-cognition.yml'
+  pull_request:
+    paths:
+      - 'neural_core/sky_cognition.py'
+      - 'metaverse/sky_cognition_api.py'
+      - 'metaverse/api.py'
+      - 'tests/test_sky_cognition.py'
+      - '.github/workflows/sky-cognition.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cognitive-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing test dependencies
+        run: python -m pip install -r requirements_social.txt -r requirements_studio.txt pytest
+      - name: Compile additions without executing models
+        run: python -m py_compile neural_core/sky_cognition.py metaverse/sky_cognition_api.py metaverse/api.py
+      - name: Validate privacy, plans, voice and authorization
+        run: PYTHONPATH=. pytest -q tests/test_sky_cognition.py
