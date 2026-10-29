@@ -80,7 +80,8 @@ class SkyFriendlyEyesView(context: Context) : View(context) {
             "sorprend" in clean || "sorpresa" in clean || "asombr" in clean -> Emotion.SURPRISED
             "emocion" in clean || "entusiasm" in clean || "eufor" in clean -> Emotion.EXCITED
             "amor" in clean || "carino" in clean || "quiero" in clean -> Emotion.LOVING
-            "feliz" in clean || "alegre" in clean || "sonri" in clean || "risa" in clean -> Emotion.HAPPY
+            "feliz" in clean || "alegre" in clean || "sonri" in clean ||
+                "risa" in clean || "hola" in clean || "gracias" in clean -> Emotion.HAPPY
             "sueno" in clean || "dormi" in clean -> Emotion.SLEEPY
             else -> Emotion.CURIOUS
         }
