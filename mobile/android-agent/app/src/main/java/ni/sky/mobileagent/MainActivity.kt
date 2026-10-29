@@ -641,6 +641,73 @@ class MainActivity : Activity() {
             .show()
     }
 
+    /** Aprender solo de una respuesta que el dueño revisó: no de cualquier web o chat. */
+    private fun showLearningDialog() {
+        val entry = archive.recent(1).lastOrNull()
+        if (entry == null) {
+            home.showMessage("Primero conversá con SKY para corregir una respuesta.")
+            return
+        }
+        val restriction = SkyAdaptiveMemory.ineligibleReason(entry.question)
+        if (restriction != null) {
+            AlertDialog.Builder(this)
+                .setTitle("Esta respuesta no se puede memorizar automáticamente")
+                .setMessage(restriction + "\n\nSKY no guardará acciones ni datos que pueden quedar desactualizados.")
+                .setPositiveButton("Entendido", null).show()
+            return
+        }
+        val editor = EditText(this).apply {
+            setText(entry.answer)
+            setSelection(text.length)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            minLines = 3
+            maxLines = 10
+            filters = arrayOf(InputFilter.LengthFilter(8000))
+            setPadding(28, 20, 28, 20)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Enseñarle una respuesta correcta a SKY")
+            .setMessage("Consulta original: " + entry.question.take(240) +
+                "\n\nRevisá o corregí la respuesta. SKY la reutilizará LOCALMENTE " +
+                "solo cuando vuelvas a hacer esa misma pregunta. No entrena pesos ni " +
+                "envía correcciones sin permiso.")
+            .setView(editor)
+            .setPositiveButton("Guardar corrección") { _, _ ->
+                runCatching { adaptiveMemory.teach(entry.question, editor.text.toString()) }
+                    .onSuccess {
+                        home.showMessage("Corrección aprendida y comprobada en memoria local.")
+                        voicePanel.express("¡Qué bien! Gracias por enseñarme una respuesta.")
+                    }
+                    .onFailure { home.showMessage(it.message ?: "No se guardó la corrección.") }
+            }
+            .setNegativeButton("Cancelar", null).show()
+    }
+
+    private fun showLearnedResponses() {
+        val learned = adaptiveMemory.recent(80)
+        if (learned.isEmpty()) {
+            home.showMessage("Aún no hay respuestas corregidas. Abrí Conversación → Enseñar.")
+            return
+        }
+        val labels = learned.map { it.question.take(90) + " · usada " + it.used + " vez/veces" }
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Respuestas aprendidas localmente")
+            .setItems(labels.toTypedArray()) { _, index ->
+                val item = learned[index]
+                AlertDialog.Builder(this)
+                    .setTitle(item.question.take(100))
+                    .setMessage(item.answer.take(1500) +
+                        "\n\nSolo se reutiliza para la misma pregunta; " +
+                        "nunca como prueba de una acción en Android.")
+                    .setPositiveButton("Entendido", null)
+                    .setNeutralButton("Eliminar") { _, _ ->
+                        if (adaptiveMemory.delete(item.id))
+                            home.showMessage("Corrección eliminada del teléfono.")
+                    }.show()
+            }
+            .setNegativeButton("Cerrar", null).show()
+    }
+
     private fun reviewMemoryLines() {
         val saved = longTermMemory.recent(150)
         val profile = SkyOwnerContext.memoryLines(this)
@@ -1833,6 +1900,10 @@ class MainActivity : Activity() {
                     }
                     .setNegativeButton("Cerrar", null).show()
             }
+        })
+        content.addView(actionButton("APRENDIZAJE REAL · MIS RESPUESTAS CORREGIDAS") {
+            settingsDialog?.dismiss()
+            showLearnedResponses()
         })
         content.addView(actionButton("MI MEMORIA · REVISAR Y BORRAR UN DATO") {
             settingsDialog?.dismiss()
