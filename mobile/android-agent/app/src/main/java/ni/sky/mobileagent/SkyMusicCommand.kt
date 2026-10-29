@@ -46,6 +46,16 @@ object SkyMusicCommand {
             if (song.length !in 2..180 || song in setOf("musica", "cancion", "algo")) return null
             return Request(song, choose(launchAndPlay.groupValues[1]))
         }
+        // "Busca noticias de hoy" and "busca información sobre X" are not
+        // music orders. Only consume a search verb when music/video was stated.
+        if (clean.startsWith("busca ") || clean.startsWith("buscame ")) {
+            val explicitMedia = Regex(
+                """^(?:busca|buscame)\s+(?:(?:en|por|desde)\s+""" +
+                """(?:youtube music|youtube|spotify)\s+)?""" +
+                """(?:(?:la|una)\s+)?(?:cancion|musica|tema|video)\b"""
+            ).containsMatchIn(clean)
+            if (!explicitMedia) return null
+        }
         val result = play.matchEntire(clean) ?: return null
         var query = result.groupValues[1].trim()
         val tail = service.find(query)
