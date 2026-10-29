@@ -64,7 +64,10 @@ class SkyVerifiedLearning(context: Context) {
             val name = SkyAndroidCognition.normalize(action)
             return when {
                 "nota" in name -> "notas"
-                "musica" in name || "reprodu" in name -> "musica"
+                "musica" in name || "reprodu" in name ||
+                    name.startsWith("control android ") &&
+                        listOf("volume", "next", "previous", "restart", "pause", "play")
+                            .any { it in name } -> "musica"
                 "alarma" in name || "reloj" in name || "temporizador" in name -> "alarmas"
                 "whatsapp" in name || "mensaje" in name || "compart" in name -> "mensajeria"
                 "abrir" in name || "aplicacion" in name -> "aplicaciones"
