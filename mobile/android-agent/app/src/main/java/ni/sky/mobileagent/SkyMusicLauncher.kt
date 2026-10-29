@@ -18,6 +18,10 @@ class SkyMusicLauncher(
     private val tell: (String) -> Unit,
     private val onNeedMusicPermission: (SkyMusicCommand.Request) -> Unit
 ) {
+    var onReceipt: ((String, String, String) -> Unit)? = null
+    private fun receipt(song: String, status: String, detail: String) {
+        onReceipt?.invoke("Música: " + song.take(100), status, detail)
+    }
     companion object {
         private const val MUSIC_PREF = "preferred_music"
     }
@@ -55,9 +59,11 @@ class SkyMusicLauncher(
             val launch = host.packageManager.getLaunchIntentForPackage(pkg)
                 ?: throw ActivityNotFoundException("La aplicación no está instalada")
             host.startActivity(launch)
-            tell("Estoy buscando «${request.query}» en $title para reproducirla.")
+            receipt(request.query, "SENT", "Android abrió reproductor; reproducción pendiente de verificación")
+            tell("Estoy buscando «${request.query}» en $title, pero aún no he confirmado la reproducción.")
         } catch (_: Exception) {
             SkyMusicControlService.cancelPending()
+            receipt(request.query, "FAILED", "No pudo abrir reproductor")
             tell("No pude abrir $title. Verificá que esté instalado y disponible.")
         }
     }
@@ -83,6 +89,7 @@ class SkyMusicLauncher(
         } catch (_: SecurityException) { false
         } catch (_: IllegalArgumentException) { false }
         if (launched) {
+            receipt(request.query, "SENT", "Intent de reproducción aceptado; audio no verificado")
             tell("Solicité reproducir «${request.query}» en $title. " +
                 "La aplicación decidirá si puede iniciar esa canción. " +
                 "No he comprobado que esté sonando.")
@@ -99,9 +106,11 @@ class SkyMusicLauncher(
         }
         try {
             host.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+            receipt(request.query, "SENT", "Solo búsqueda abierta; reproducción no verificada")
             tell("Abrí la búsqueda de «${request.query}» en $title, " +
                 "pero esa app no aceptó la reproducción directa por Android.")
         } catch (_: Exception) {
+            receipt(request.query, "FAILED", "Android no abrió búsqueda musical")
             tell("No encontré una aplicación compatible para abrir música.")
         }
     }
