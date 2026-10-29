@@ -470,6 +470,10 @@ class SkyMobileHome(
             gravity = Gravity.CENTER_VERTICAL
         }
         header.addView(panelTitle, LinearLayout.LayoutParams(0, dp(50), 1f))
+        header.addView(pill("Enseñar", Color.rgb(54, 81, 133), onTeach).apply {
+            textSize = 12f
+            contentDescription = "Corregir y enseñarle una respuesta a SKY"
+        }, LinearLayout.LayoutParams(dp(80), dp(40)).apply { rightMargin = dp(7) })
         header.addView(pill("×", Color.rgb(60, 62, 119)) { closePanel() }.apply {
             textSize = 28f
             contentDescription = "Cerrar panel y volver a SKY"
