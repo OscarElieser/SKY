@@ -10,11 +10,11 @@ class SkyVoicePresenceTest {
         assertEquals(SkyVoicePresence.Request.SLEEP,
             SkyVoicePresence.request("SKY dormí"))
         assertFalse(SkyVoicePresence.permits(SkyVoicePresence.Mode.SLEEP_LOCKED,
-            SkyWakePhrase.decide("SKY abre YouTube", false)))
+            "SKY abre YouTube"))
         assertFalse(SkyVoicePresence.permits(SkyVoicePresence.Mode.SLEEP_LOCKED,
-            SkyWakePhrase.decide("SKY", false)))
+            "SKY"))
         assertTrue(SkyVoicePresence.permits(SkyVoicePresence.Mode.SLEEP_LOCKED,
-            SkyWakePhrase.decide("SKY despierta", false)))
+            "SKY despierta"))
     }
 
     @Test fun attentiveInstructionsRequireExplicitSkyAndDoNotAuthorizeIdentity() {
