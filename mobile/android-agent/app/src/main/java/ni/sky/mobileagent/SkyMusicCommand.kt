@@ -27,16 +27,16 @@ object SkyMusicCommand {
         // Natural request observed on Samsung: "Hola SKY quiero que reproduzca
         // Spotify y reproduzca la canción November Rain".  Route it locally
         // rather than allowing a cloud model to deny Android capabilities.
-        clean = clean.replace(Regex("""^(?:hola|hey|buenas)\\s*,?\\s*sky[ ,.:!]*\\s*"""), "")
+        clean = clean.replace(Regex("""^(?:hola|hey|buenas)\s*,?\s*sky[ ,.:!]*\s*"""), "")
         val conversational = Regex(
-            """^quiero\\s+(?:que\\s+)?(?:reproduzca|reproduzcas|reproducir|pongas|ponga|reproduce|pon)\\s+""" +
-            """(spotify|youtube music|youtube musica|yt music|youtube)\\s+""" +
-            """(?:y|para)\\s+(?:reproduzca|reproduzcas|reproduce|reproducir|pon|pongas|ponga)\\s+""" +
-            """(?:(?:la|una)\\s+)?(?:(?:cancion|musica|tema|video)\\s+)?(.+)$"""
+            """^quiero\s+(?:que\s+)?(?:reproduzca|reproduzcas|reproducir|pongas|ponga|reproduce|pon)\s+""" +
+            """(spotify|youtube music|youtube musica|yt music|youtube)\s+""" +
+            """(?:y|para)\s+(?:reproduzca|reproduzcas|reproduce|reproducir|pon|pongas|ponga)\s+""" +
+            """(?:(?:la|una)\s+)?(?:(?:cancion|musica|tema|video)\s+)?(.+)$"""
         ).matchEntire(clean)
         if (conversational != null) {
             val song = conversational.groupValues[2]
-                .replace(Regex("""^(?:de|del)\\s+"""), "")
+                .replace(Regex("""^(?:de|del)\s+"""), "")
                 .trim(' ', '.', '?', '¿', '!', '"')
             if (song.length in 2..180 && song !in setOf("musica", "cancion", "algo")) {
                 return Request(song, choose(conversational.groupValues[1]))
