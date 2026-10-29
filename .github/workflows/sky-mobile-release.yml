@@ -81,6 +81,12 @@ jobs:
           test -s signer-fingerprint.txt
           "$build_tools/aapt" dump badging "SKY-IA-Android-standard-release.apk" | sed -n "s/^package:.*versionName='\\([^']*\\)'.*/\\1/p" > version.txt
           test -s version.txt
+      - name: Audit signed APK permissions, network and distribution security
+        shell: bash
+        run: |
+          bash mobile/android-agent/scripts/release-security-audit.sh \
+            mobile/android-agent/app/build/outputs/apk/standard/release/app-standard-release.apk
+
       - name: Attach signed release candidate for device tests (not Play certified)
         uses: actions/upload-artifact@v4
         with:
