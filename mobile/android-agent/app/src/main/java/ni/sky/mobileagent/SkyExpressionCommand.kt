@@ -11,9 +11,13 @@ object SkyExpressionCommand {
             .replace(Regex("""[^a-z0-9 ]"""), " ")
             .replace(Regex("""\s+"""), " ").trim()
             .replace(Regex("""^sky\s+"""), "")
-        if (!Regex("""^(?:ponte|pon|muestra|mostra|mostrame|muestrame|haz|hace|actua|expresa|quiero que|puedes|podes|sonrie|llora|sonri|llor|duerme|descansa|enojate)\b""")
+        if (!Regex("""^(?:ponte|pon|muestra|mostra|mostrame|muestrame|haz|hace|actua|expresa|quiero que|puedes|podes|sonrie|llora|sonri|llor|duerme|descansa|enojate|baila|bailar|salta|saltar|corre|correr|gira|girar)\b""")
                 .containsMatchIn(text)) return null
         return when {
+            Regex("""\b(?:baila|bailar|bailando)\b""").containsMatchIn(text) -> "baila"
+            Regex("""\b(?:salta|saltar|saltando)\b""").containsMatchIn(text) -> "salta"
+            Regex("""\b(?:corre|correr|corriendo)\b""").containsMatchIn(text) -> "corre"
+            Regex("""\b(?:gira|girar|girando)\b""").containsMatchIn(text) -> "gira"
             Regex("""\b(?:llora|llorar|llorando|llanto|lagrimas)\b""").containsMatchIn(text) -> "llora"
             Regex("""\b(?:triste|tristeza|pena)\b""").containsMatchIn(text) -> "triste"
             Regex("""\b(?:enojada|enojado|enojo|furiosa)\b""").containsMatchIn(text) -> "enojada"
