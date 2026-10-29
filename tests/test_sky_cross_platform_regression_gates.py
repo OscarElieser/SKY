@@ -47,7 +47,12 @@ def test_missing_security_capabilities_are_not_claimed_as_ready():
     indexed = {entry["id"]: entry for entry in _inventory()["capabilities"]}
     for capability in ("speaker_verification", "shared_sync"):
         for platform in ("windows", "android"):
-            assert indexed[capability][platform]["state"] == "missing"
+            item = indexed[capability][platform]
+            # Do not freeze future implementations as permanently missing.
+            # A promotion must have source evidence; runtime validation is separate.
+            if item["state"] != "missing":
+                assert item["evidence"], (capability, platform)
+    assert _inventory()["runtime_verified"] is False
 
 
 def test_shared_security_contract_denies_unknown_and_untrusted_actions():
