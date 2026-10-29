@@ -17,7 +17,7 @@ SKIP = {".git", ".venv", "venv", "node_modules", "build", "dist", ".gradle",
 EXTS = {".py", ".kt", ".java", ".json", ".yml", ".yaml", ".md", ".sh", ".ps1", ".gradle"}
 MAX_BYTES = 2_000_000
 REFERENCE_EXTS = {".ps1", ".kt", ".kts", ".gradle", ".yml", ".yaml", ".sh", ".json"}
-REFERENCE_PATTERN = re.compile(r"[A-Za-z0-9_./-]+\\.(?:py|ps1|kt|kts|gradle|json|ya?ml|sh)")
+REFERENCE_PATTERN = re.compile(r"[A-Za-z0-9_./-]+\.(?:py|ps1|kt|kts|gradle|json|ya?ml|sh)")
 
 
 
