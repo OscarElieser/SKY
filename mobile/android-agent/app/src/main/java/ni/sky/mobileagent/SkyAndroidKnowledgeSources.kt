@@ -87,7 +87,7 @@ class SkyAndroidKnowledgeSources(context: Context) :
     companion object {
         /** No se contacta la URL: solo validación sintáctica para almacenarla. */
         fun publicSourceUrl(raw: String): Boolean {
-            if (raw.length !in 15..1500 || raw.any { it.isWhitespace() || it.isISOControl() }) {
+            if (raw.length !in 15..1500 || raw.any { it.isWhitespace() || Character.isISOControl(it) }) {
                 return false
             }
             return try {
