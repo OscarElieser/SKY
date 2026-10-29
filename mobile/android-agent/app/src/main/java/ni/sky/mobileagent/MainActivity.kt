@@ -1048,9 +1048,18 @@ class MainActivity : Activity() {
                 "La descripción se enviará a Google solamente si autorizás esta consulta. " +
                 "Puede consumir cuota o facturación del proyecto y no estar habilitado en tu clave. " +
                 "No crearé una plantilla como sustituto si el proveedor falla.")
-            .setSingleChoiceItems(ratios.toTypedArray(), 0) { dialog, choice ->
-                dialog.dismiss()
-                confirmRealImage(field.text.toString(), ratios[choice])
+            .setPositiveButton("Elegir proporción") { _, _ ->
+                val prompt = field.text.toString()
+                if (prompt.trim().length !in 12..1500) {
+                    home.showMessage("Describí la imagen con 12 a 1500 caracteres.")
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle("Proporción de imagen")
+                        .setItems(ratios.toTypedArray()) { _, choice ->
+                            confirmRealImage(prompt, ratios[choice])
+                        }
+                        .setNegativeButton("Cancelar", null).show()
+                }
             }
             .setNegativeButton("Cancelar", null).show()
     }
