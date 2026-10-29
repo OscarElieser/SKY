@@ -17,7 +17,7 @@ object SkyExpressionCommand {
             Regex("""\b(?:llora|llorar|llorando|llanto|lagrimas)\b""").containsMatchIn(text) -> "llora"
             Regex("""\b(?:triste|tristeza|pena)\b""").containsMatchIn(text) -> "triste"
             Regex("""\b(?:enojada|enojado|enojo|furiosa)\b""").containsMatchIn(text) -> "enojada"
-            Regex("""\b(?:sonrie|sonreir|feliz|alegre|alegria)\b""").containsMatchIn(text) -> "feliz"
+            Regex("""\b(?:sonri|sonrie|sonreir|feliz|alegre|alegria)\b""").containsMatchIn(text) -> "feliz"
             Regex("""\b(?:emocionada|emoción|entusiasmada)\b""").containsMatchIn(text) -> "emocionada"
             Regex("""\b(?:timida|verguenza)\b""").containsMatchIn(text) -> "timida"
             Regex("""\b(?:sorpresa|sorprendida)\b""").containsMatchIn(text) -> "sorpresa"
