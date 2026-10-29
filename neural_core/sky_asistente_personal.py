@@ -74,26 +74,40 @@ def interpretar(texto: str) -> dict | None:
     word = word_direct(texto)
     if word:
         return word
-    # Chat y voz comparten el mismo intérprete de solicitudes de YouTube.
-    # Sólo interpretamos órdenes explícitas de reproducción: no hay navegación
-    # automática ni se sobreescriben órdenes de Word, Spotify o Windows.
+    # Resolver primero controles EXPLÍCITOS del reproductor: «pon el video
+    # en pantalla completa» es una orden local y no una búsqueda de YouTube.
+    # Nunca usar el contenido devuelto por un modelo como permiso de ejecución.
+    try:
+        jarvis = _normalizar(_interpretar_basico(_limpiar_wake(str(texto or ''))[:2000]))
+    except Exception:
+        jarvis = None
+    if (jarvis and jarvis.get('action') == 'player_control' and
+            jarvis.get('params', {}).get('subaction') in {
+                'mode_mini', 'mode_expanded', 'mode_fullscreen', 'mode_normal',
+                'pause', 'play', 'next', 'previous', 'restart', 'close'
+            } and re.search(
+                r'\\b(?:el video|reproductor|ponelo|modo mini|modo normal|'
+                r'pantalla completa|ventana|siguiente video|anterior video)\\b',
+                norm(_limpiar_wake(str(texto or ''))))):
+        return jarvis
+
+    # El parser propio conserva tildes y mayúsculas de títulos musicales.
+    # Las opciones visuales avanzadas del HUD permanecen explícitas.
+    propio = _interpretar_propio(texto)
+    if propio and propio['action'] == 'list_path':
+        return propio
     from .sky_hud_window_requests import parse_window_request
     ventana = parse_window_request(texto)
     if ventana and ventana.get('kind') == 'youtube':
+        if (ventana.get('mode', 'normal') == 'normal' and propio and
+                propio.get('action') == 'play_media'):
+            return propio
         consulta = str(ventana.get('query') or '').strip()
         if consulta:
             return _p('play_media', {
                 'query': consulta, 'service': 'youtube',
                 'mode': ventana.get('mode', 'normal')
             }, f'Reproducir "{consulta}" dentro de SKY (YouTube oficial)')
-    propio = _interpretar_propio(texto)
-    if propio and propio['action'] == 'list_path':
-        return propio
-    try:
-        jarvis = _interpretar_basico(_limpiar_wake(str(texto or ''))[:2000])
-    except Exception:
-        jarvis = None
-    jarvis = _normalizar(jarvis)
     if jarvis and jarvis.get('action') in _PRIORIDAD_JARVIS:
         return jarvis
     return propio or jarvis
