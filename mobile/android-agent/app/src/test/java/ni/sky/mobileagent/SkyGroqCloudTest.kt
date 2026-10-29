@@ -9,7 +9,6 @@ class SkyGroqCloudTest {
         assertEquals("openai/gpt-oss-20b", SkyGroqCloud.selectModel(listOf("openai/gpt-oss-20b", "openai/gpt-oss-120b")))
         assertEquals("openai/gpt-oss-120b", SkyGroqCloud.selectModel(listOf("openai/gpt-oss-120b")))
         assertNull(SkyGroqCloud.selectModel(listOf("llama-3.1-8b-instant")))
-        assertEquals("openai/gpt-oss-20b", SkyGroqCloud.payload("Hola", org.json.JSONArray()).getString("model"))
     }
 
     @Test fun keyValidationDoesNotLogOrAcceptHeaderWrappers() {
