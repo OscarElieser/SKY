@@ -19,7 +19,7 @@ import java.util.concurrent.Executors
 
 /**
  * Android Agent: no hay automatización encubierta. Solo recibe solicitudes
- * cuando está visible y requiere permisos por app y confirmación por comando.
+ * cuando está visible. La confianza local de apertura es revocable y nunca\n * autoriza sin confirmación acciones destructivas o tareas remotas.
  */
 class MainActivity : Activity() {
     // La red de chat nunca debe esperar detrás de los sondeos del agente ni
@@ -1737,8 +1737,19 @@ class MainActivity : Activity() {
             "No permitás el envío si el contenido incluye secretos personales."))
 
         content.addView(SkyPremiumUi.section(this, "Acceso",
-            "Aplicaciones autorizadas y conexión opcional", "◉"))
-        content.addView(actionButton("Ver aplicaciones instaladas y permisos") {
+            "Control supervisado de aplicaciones y conexión opcional", "◉"))
+        content.addView(description(
+            "Una sola autorización local para abrir las aplicaciones actuales y futuras " +
+            "cuando vos lo pidás. No autoriza automáticamente editar, borrar ni " +
+            "ejecutar órdenes de SKY Windows."
+        ))
+        content.addView(actionButton(if (installedApps.supervisedControlEnabled())
+            "● CONTROL SUPERVISADO ACTIVO · REVISAR / REVOCAR"
+            else "ACEPTO · ACTIVAR CONTROL SUPERVISADO") {
+            settingsDialog?.dismiss()
+            installedApps.showControlAuthorization()
+        })
+        content.addView(actionButton("Ver mis aplicaciones instaladas") {
             settingsDialog?.dismiss()
             installedApps.showCatalog()
         })
@@ -1768,7 +1779,8 @@ class MainActivity : Activity() {
             } else {
                 content.addView(description("Chat autorizado. Renovalo cuando venza su sesión."))
             }
-            content.addView(description("Aplicaciones permitidas"))
+            content.addView(description("Aplicaciones permitidas para órdenes remotas de Windows. " +
+                "Requieren autorización individual adicional."))
             for ((id, item) in apps) {
                 content.addView(CheckBox(this).apply {
                     text = "Permitir " + item.first
@@ -1783,16 +1795,11 @@ class MainActivity : Activity() {
             content.addView(actionButton("Revocar acceso del teléfono") { revoke() })
         }
         if (!linked) {
-            content.addView(description("Aplicaciones locales autorizadas"))
-            for ((id, item) in apps) {
-                content.addView(CheckBox(this).apply {
-                    text = "Permitir " + item.first
-                    isChecked = permissions.getBoolean(id, false)
-                    setOnCheckedChangeListener { _, granted ->
-                        permissions.edit().putBoolean(id, granted).apply()
-                    }
-                })
-            }
+            content.addView(description(
+                "Para órdenes locales de apertura y preparación de mensajes, " +
+                "usá el control supervisado de arriba. Los envíos y las acciones " +
+                "delicadas siguen requiriendo confirmación."
+            ))
         }
         content.addView(actionButton("CONTROL MUSICAL · SIGUIENTE / ATRÁS / VOLUMEN") {
             val labels = arrayOf("Siguiente canción", "Canción anterior",
