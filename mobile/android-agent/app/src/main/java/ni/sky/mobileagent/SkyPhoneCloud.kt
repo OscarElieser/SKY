@@ -100,7 +100,7 @@ object SkyPhoneCloud {
         return 1000
     }
 
-    fun makePayload(message: String, history: JSONArray, useGoogleSearch: Boolean = false,
+    internal fun makePayload(message: String, history: JSONArray, useGoogleSearch: Boolean = false,
                     selectedMode: SkyGeminiModes.Selection? = null): JSONObject {
         val route = selectedMode ?: SkyGeminiModes.select(message)
         val actualPrompt = if (selectedMode != null) message else route.prompt
@@ -164,7 +164,7 @@ object SkyPhoneCloud {
                 .put("temperature", 0.45))
     }
 
-    fun reply(personalKey: String, message: String, history: JSONArray,
+    internal fun reply(personalKey: String, message: String, history: JSONArray,
               selectedMode: SkyGeminiModes.Selection? = null): String {
         require(validPersonalKey(personalKey)) { "Configurá una clave de Gemini para probar con Google." }
         val route = selectedMode ?: SkyGeminiModes.select(message)
@@ -173,7 +173,7 @@ object SkyPhoneCloud {
     }
 
     /** Uses grounded Google Search, retaining source and Search Suggestions metadata. */
-    fun replyWithSources(personalKey: String, message: String, history: JSONArray,
+    internal fun replyWithSources(personalKey: String, message: String, history: JSONArray,
                          selectedMode: SkyGeminiModes.Selection? = null): VerifiedReply {
         require(validPersonalKey(personalKey)) { "Configurá una clave de Gemini en Ajustes." }
         val route = selectedMode ?: SkyGeminiModes.select(message)
