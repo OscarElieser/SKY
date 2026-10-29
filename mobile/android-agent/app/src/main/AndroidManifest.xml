@@ -27,7 +27,7 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:networkSecurityConfig="@xml/sky_network_security"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@style/SkyPremiumTheme">
         <provider
             android:name=".SkyGeneratedVideoProvider"
             android:authorities="ni.sky.mobileagent.generated"
