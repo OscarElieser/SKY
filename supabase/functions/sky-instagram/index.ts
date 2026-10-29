@@ -382,6 +382,12 @@ Deno.serve(async (req: Request) => {
       if (!(await mobileAuthorized(req))) return json({ error: "unauthorized" }, 401);
       return await verifiedProfile();
     }
+    // Reauthorization is initiated by the paired phone, never by an anonymous caller.
+    // The Meta login URL has a one-time CSRF state; no Meta or owner tokens are returned.
+    if (path === "mobile-start" && req.method === "POST") {
+      if (!(await mobileAuthorized(req))) return json({ error: "unauthorized" }, 401);
+      return await start();
+    }
     if (path === "mobile-disconnect" && req.method === "POST") {
       if (!(await mobileAuthorized(req)))return json({error:"unauthorized"},401);
       return await mobileRevoke(req);
