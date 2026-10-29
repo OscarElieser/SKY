@@ -11,7 +11,7 @@ object SkyExpressionCommand {
             .replace(Regex("""[^a-z0-9 ]"""), " ")
             .replace(Regex("""\s+"""), " ").trim()
             .replace(Regex("""^sky\s+"""), "")
-        if (!Regex("""^(?:ponte|pon|muestra|haz|hace|actua|expresa|quiero que|puedes|podes|sonrie|llora|sonri|llor)\b""")
+        if (!Regex("""^(?:ponte|pon|muestra|mostra|mostrame|muestrame|haz|hace|actua|expresa|quiero que|puedes|podes|sonrie|llora|sonri|llor|duerme|descansa|enojate)\b""")
                 .containsMatchIn(text)) return null
         return when {
             Regex("""\b(?:llora|llorar|llorando|llanto|lagrimas)\b""").containsMatchIn(text) -> "llora"
@@ -21,7 +21,10 @@ object SkyExpressionCommand {
             Regex("""\b(?:emocionada|emoción|entusiasmada)\b""").containsMatchIn(text) -> "emocionada"
             Regex("""\b(?:timida|verguenza)\b""").containsMatchIn(text) -> "timida"
             Regex("""\b(?:sorpresa|sorprendida)\b""").containsMatchIn(text) -> "sorpresa"
-            Regex("""\b(?:dormida|dormir|sueno)\b""").containsMatchIn(text) -> "sueno"
+            Regex("""\b(?:dormida|dormir|duerme|descansa|sueno)\b""").containsMatchIn(text) -> "sueno"
+            Regex("""\b(?:amor|carino|enamorada|amorosa|abrazo)\b""").containsMatchIn(text) -> "amor"
+            Regex("""\b(?:curiosa|curiosidad|pensativa|pensando)\b""").containsMatchIn(text) -> "curiosa"
+            Regex("""\b(?:calma|tranquila|serena)\b""").containsMatchIn(text) -> "calma"
             else -> null
         }
     }
