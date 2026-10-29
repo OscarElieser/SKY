@@ -378,13 +378,29 @@ class MainActivity : Activity() {
         return true
     }
 
+    /** Private text tasks use Groq first; Gemini is a consented fallback. */
+    private fun generateMobileText(prompt: String): String {
+        val history = JSONArray()
+        if (tokens.groqEnabled()) {
+            try {
+                return SkyGroqCloud.reply(tokens.groqKey(), prompt, history)
+            } catch (error: Exception) {
+                if (!tokens.cloudEnabled()) throw error
+            }
+        }
+        if (tokens.cloudEnabled()) {
+            return SkyPhoneCloud.reply(tokens.personalCloudKey(), prompt, history)
+        }
+        throw IllegalStateException("Configurá Groq o Gemini en Ajustes.")
+    }
+
     private fun createReplyDraft(request: SkyContextReply.Request) {
         if (!replyStudio.isApproved(request.contact)) {
             home.showMessage("Ese contacto no está autorizado en SKY.")
             return
         }
-        if (!tokens.cloudEnabled()) {
-            home.showMessage("Activá Gemini en Ajustes para proponer respuestas naturales.")
+        if (!tokens.groqEnabled() && !tokens.cloudEnabled()) {
+            home.showMessage("Activá Groq gratis o Gemini en Ajustes para preparar respuestas.")
             return
         }
         if (replyPending) {
@@ -395,8 +411,8 @@ class MainActivity : Activity() {
         voicePanel.showThinking()
         execute {
             try {
-                val draft = SkyPhoneCloud.reply(tokens.personalCloudKey(),
-                    SkyContextReply.prompt(request.contact, request.incoming), JSONArray())
+                val draft = generateMobileText(
+                    SkyContextReply.prompt(request.contact, request.incoming))
                 runOnUiThread {
                     if (!isFinishing) {
                         voicePanel.speakReply("Tengo una respuesta para " +
@@ -406,7 +422,7 @@ class MainActivity : Activity() {
                 }
             } catch (_: Exception) {
                 runOnUiThread {
-                    home.showMessage("No pude preparar esa respuesta. Revisá tu conexión con Gemini.")
+                    home.showMessage("No pude preparar esa respuesta. Revisá Groq/Gemini y tu conexión.")
                     voicePanel.showError("Error al preparar la respuesta.")
                 }
             } finally { replyPending = false }
@@ -563,8 +579,8 @@ class MainActivity : Activity() {
             home.showMessage("SKY ya está preparando un borrador creativo.")
             return
         }
-        if (!tokens.cloudEnabled()) {
-            home.showMessage("Activá Gemini en Ajustes para generar contenido original.")
+        if (!tokens.cloudEnabled() && !tokens.groqEnabled()) {
+            home.showMessage("Configurá Groq gratis o Gemini para crear contenido.")
             showSettings()
             return
         }
@@ -572,8 +588,7 @@ class MainActivity : Activity() {
         voicePanel.showThinking()
         execute {
             try {
-                val text = SkyPhoneCloud.reply(tokens.personalCloudKey(),
-                    SkySocialCommand.prompt(request), JSONArray())
+                val text = generateMobileText(SkySocialCommand.prompt(request))
                 runOnUiThread {
                     if (!isFinishing) {
                         voicePanel.speakReply("Tengo una propuesta para " + request.platform +
@@ -583,8 +598,8 @@ class MainActivity : Activity() {
                 }
             } catch (_: Exception) {
                 runOnUiThread {
-                    home.showMessage("No pude generar el borrador. Revisá internet, Gemini " +
-                        "y volvé a intentarlo.")
+                    home.showMessage("No pude generar el borrador. Revisá Groq/Gemini, " +
+                        "tu conexión y volvé a intentarlo.")
                     voicePanel.showError("No pude preparar el contenido.")
                 }
             } finally {
