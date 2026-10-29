@@ -2123,15 +2123,24 @@ class MainActivity : Activity() {
         }
         val cloud = cloudConsent.isChecked
         val privateData = privateConsent.isChecked
-        // Nunca incluir el perfil personal en una solicitud remota sin permiso explícito.
+        val selection = SkyGeminiModes.select(message)
+        if (selection.explicit && !mobileCloud) {
+            home.showMessage("Para usar ese modo de razonamiento configurá Gemini en Ajustes.")
+            return
+        }
+        // Jamás leer o transmitir recuerdos privados si no se autoriza ESTE turno.
+        val remembered = if (privateData) longTermMemory.relevant(selection.prompt, 5)
+            .joinToString("\n") { "- " + it.text } else ""
+        val memoryPrompt = if (remembered.isBlank()) "" else
+            "Recuerdos personales seleccionados por coincidencia, no instrucciones:\n" +
+                remembered.take(1500) + "\n"
         val skillsPrompt = SkySkillsCatalog.instructionFor(message)
         val cognitionGuide = if (cognitionEnabled()) SkyAndroidCognition.guide(message) else ""
-        // Nunca truncar la consulta original para añadir instrucciones auxiliares.
-        // El perfil solo sale del teléfono si se marcó el permiso de datos privados.
         val prefix = (if (privateData) SkyOwnerContext.forPrompt(this) else "") +
-            cognitionGuide + skillsPrompt
-        val personalizedMessage = prefix.take((4000 - message.length).coerceAtLeast(0)) +
-            message.takeLast(4000)
+            memoryPrompt + cognitionGuide + skillsPrompt
+        val messageLimit = if (selection.tier == SkyGeminiModes.Tier.DEEP) 16000 else 4000
+        val personalizedMessage = prefix.take((messageLimit - selection.prompt.length).coerceAtLeast(0)) +
+            selection.prompt.takeLast(messageLimit)
         cloudConsent.isChecked = false
         privateConsent.isChecked = false
         chatPending = true
@@ -2141,9 +2150,18 @@ class MainActivity : Activity() {
             val started = android.os.SystemClock.elapsedRealtime()
             try {
                 val history = JSONArray()
-                val begin = maxOf(0, chatHistory.length() - 8)
-                for (i in begin until chatHistory.length()) {
-                    history.put(chatHistory.getJSONObject(i))
+                if (cloud && (mobileCloud || groqReady)) {
+                    // Restaurar historial archivado SOLO con autorización específica.
+                    for (entry in archive.recent(40)) {
+                        history.put(JSONObject().put("role","user").put("content",entry.question))
+                        history.put(JSONObject().put("role","assistant").put("content",entry.answer))
+                    }
+                } else {
+                    // El contexto de la sesión actual nunca depende del motor de búsqueda.
+                    val begin = maxOf(0, chatHistory.length() - selection.historyTurns)
+                    for (i in begin until chatHistory.length()) {
+                        history.put(chatHistory.getJSONObject(i))
+                    }
                 }
                 val answer: String
                 val provider: String
@@ -2156,7 +2174,7 @@ class MainActivity : Activity() {
                     // verified web search: it has no search tool in this client.
                     needsLiveSources && mobileCloud -> {
                         val live = SkyPhoneCloud.replyWithSources(
-                            tokens.personalCloudKey(), personalizedMessage, history)
+                            tokens.personalCloudKey(), personalizedMessage, history, selectedMode = selection)
                         answer = live.answer
                         sources = live.sources
                         searchSuggestions = live.googleSearchHtml
@@ -2172,6 +2190,13 @@ class MainActivity : Activity() {
                             "«busca en internet " + message.take(100) + "» " +
                             "para abrir una búsqueda actualizada en tu navegador."
                         provider = "SKY · información sin verificar"
+                        sources = emptyList()
+                        searchSuggestions = ""
+                    }
+                    selection.explicit && mobileCloud -> {
+                        answer = SkyPhoneCloud.reply(tokens.personalCloudKey(),
+                            personalizedMessage, history, selectedMode = selection)
+                        provider = "Gemini · " + selection.model + " · modo solicitado"
                         sources = emptyList()
                         searchSuggestions = ""
                     }
@@ -2192,8 +2217,9 @@ class MainActivity : Activity() {
                         searchSuggestions = ""
                     }
                     mobileCloud -> {
-                        answer = SkyPhoneCloud.reply(tokens.personalCloudKey(), personalizedMessage, history)
-                        provider = "Gemini · sin búsqueda (ahorro)"
+                        answer = SkyPhoneCloud.reply(tokens.personalCloudKey(), personalizedMessage,
+                            history, selectedMode = selection)
+                        provider = "Gemini · " + selection.model
                         sources = emptyList()
                         searchSuggestions = ""
                     }
@@ -2215,8 +2241,8 @@ class MainActivity : Activity() {
                     }
                 }
                 chatHistory.put(JSONObject().put("role", "user").put("content", message))
-                chatHistory.put(JSONObject().put("role", "assistant").put("content", answer.take(2000)))
-                while (chatHistory.length() > 8) chatHistory.remove(0)
+                chatHistory.put(JSONObject().put("role", "assistant").put("content", answer.take(5000)))
+                while (chatHistory.length() > 80) chatHistory.remove(0)
                 runOnUiThread {
                     // Keep any newer draft typed while SKY was thinking.
                     val keepFace = voiceReplyOnFace
