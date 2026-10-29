@@ -10,6 +10,7 @@ on:
     branches: [main]
     paths:
       - 'mobile/android-agent/**'
+      - 'shared/sky_core_contract_v1.json'
       - '.github/workflows/sky-mobile-release.yml'
 jobs:
   signed-release:
@@ -176,8 +177,8 @@ jobs:
           # Nunca publicar una APK compilada desde un commit anterior al actual main.
           newest="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')"
           if [[ "$newest" != "$GITHUB_SHA" ]]; then
-            echo "No publicar versión obsoleta: main avanzó desde el inicio de esta compilación."
-            exit 0
+            echo "::error::APK firmada desde un commit obsoleto; main avanzó. La publicación se ha bloqueado por seguridad. Volvé a ejecutar este flujo sobre el HEAD de main."
+            exit 1
           fi
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release $tag already exists. Bump app versionCode/versionName before publishing a new APK."
