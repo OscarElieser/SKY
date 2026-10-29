@@ -54,6 +54,19 @@ class SkyMusicCommandTest {
         assertEquals("november rain", explicit?.query)
     }
 
+    @Test fun spokenNaturalLanguageGoesToMusicControllerNotChat() {
+        val observed = SkyMusicCommand.parse(
+            "Hola Sky quiero que reproduzca Spotify y reproduzca la canción November Rain")
+        assertEquals(SkyMusicCommand.Service.SPOTIFY, observed?.service)
+        assertEquals("november rain", observed?.query)
+        val youtube = SkyMusicCommand.parse(
+            "SKY, quiero que reproduzcas YouTube y reproduzcas la canción November Rain")
+        assertEquals(SkyMusicCommand.Service.YOUTUBE, youtube?.service)
+        assertEquals("november rain", youtube?.query)
+        assertNull(SkyMusicCommand.parse("Hola SKY quiero que reproduzca Spotify"))
+        assertNull(SkyMusicCommand.parse("Hola Sky quiero que reproduzca Spotify y busque noticias"))
+    }
+
     @Test fun signedStandardVariantNeverEnablesMusicAccessibility() {
         assertFalse(BuildConfig.ENABLE_TEXT_ASSIST)
         assertFalse(SkyMusicControlService.enabled())
