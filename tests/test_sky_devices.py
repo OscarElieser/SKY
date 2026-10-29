@@ -110,13 +110,33 @@ def test_transcripcion_rechaza_formatos(monkeypatch):
     with pytest.raises(ValueError): voz.transcribir_audio(b'datos','audio/mpeg')
 
 
-def test_resolve_youtube_queen_embeddable():
-    from neural_core.multimedia import resolve_youtube_video, KNOWN_EMBEDDING_BLOCKED
-    res = resolve_youtube_video("Queen")
-    assert res["video_id"] not in KNOWN_EMBEDDING_BLOCKED
-    assert res["embeddable"] is True
-    assert len(res["candidates"]) >= 2
-    assert "vbvyNnw8Qjg" in [c["id"] for c in res["candidates"]]
+def test_resolve_youtube_queen_embeddable(monkeypatch):
+    # Sin API no inventar videos incrustables ni reutilizar catálogos obsoletos.
+    from neural_core import multimedia
+    monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    empty = multimedia.resolve_youtube_video("Queen")
+    assert empty["embeddable"] is False and empty["video_id"] == ""
+    assert empty["candidates"] == [] and empty["source"] == "youtube_api_required"
+
+    # Con respuestas validadas de la API oficial sí devolver un resultado
+    # incrustable. Datos simulados únicamente dentro de esta prueba offline.
+    sample = [
+        {"id": "vbvyNnw8Qjg", "title": "Queen Live",
+         "url": "https://www.youtube.com/watch?v=vbvyNnw8Qjg",
+         "embeddable": True},
+        {"id": "HgzGwKwLmgM", "title": "Queen Concert",
+         "url": "https://www.youtube.com/watch?v=HgzGwKwLmgM",
+         "embeddable": True},
+    ]
+    monkeypatch.setenv("YOUTUBE_API_KEY", "fake-key-for-offline-unit-test")
+    monkeypatch.setattr(multimedia, "_search_youtube_api",
+                        lambda query, key: sample if query == "Queen" else [])
+    res = multimedia.resolve_youtube_video("Queen")
+    assert res["video_id"] not in multimedia.KNOWN_EMBEDDING_BLOCKED
+    assert res["source"] == "youtube_api_v3" and res["embeddable"] is True
+    assert len(res["candidates"]) == 2
+    assert res["video_id"] == "vbvyNnw8Qjg"
 
 
 def test_interpret_player_control_modes():
