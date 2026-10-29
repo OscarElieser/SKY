@@ -240,7 +240,7 @@ async function pairClaim(req: Request) {
     {claimed_at:new Date().toISOString()},"return=representation");
   if(!Array.isArray(rows)||rows.length!==1)return json({error:"invalid_or_expired_code"},403);
   const raw = b64(crypto.getRandomValues(new Uint8Array(32)))
-    .replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/g,"");
+    .replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"");
   await database("sky_instagram_mobile_devices","POST","",{
     token_hash:await digest(raw),device_label:"SKY Android",
     expires_at:new Date(Date.now()+30*24*60*60*1000).toISOString()
