@@ -30,6 +30,8 @@ object SkyDailyCommandParser {
         if (raw.length > 2000) return null
         val clean = canonical(raw).replace(Regex("\\s+"), " ")
             .replace(Regex("^sky[ ,.:!]+"), "").trim()
+            .trimStart('¿', '¡', ' ', ',', ':')
+            .trimEnd('?', '!', '.', ' ')
         if (clean.isEmpty()) return null
         // Answer real device capabilities locally, based on installed apps,
         // rather than allowing the LLM to invent a categorical refusal.
