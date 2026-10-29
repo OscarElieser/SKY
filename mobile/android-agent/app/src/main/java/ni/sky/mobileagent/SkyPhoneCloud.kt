@@ -90,14 +90,14 @@ object SkyPhoneCloud {
         val text = message.trim().lowercase(java.util.Locale.ROOT)
             .replace(Regex("""^sky[ ,.:!¿?]*"""), "")
             .trimStart('¿', '¡', ' ')
-        if (text.length > 200 || text.isBlank()) return 1000
+        if (text.length > 200 || text.isBlank()) return 2500
         if (Regex("""\b(?:mi|mis|nuestro|archivo|documento|investiga|busca|redacta|escribe|programa|código|codigo|crea|genera|analiza|resume|lista|plan|proyecto|pasos|explica paso a paso)\b""")
-                .containsMatchIn(text)) return 1000
+                .containsMatchIn(text)) return 3500
         if (Regex("""\b(?:en (?:una|dos|tres|1|2|3) oraciones|en una frase)\b""")
                 .containsMatchIn(text)) return 300
         if (Regex("""^(?:que|qué) es (?:la|el|un|una)?\s*[^?]{3,95}\??$""")
                 .matches(text)) return 400
-        return 1000
+        return 1200
     }
 
     internal fun makePayload(message: String, history: JSONArray, useGoogleSearch: Boolean = false,
@@ -185,7 +185,7 @@ object SkyPhoneCloud {
             (0 until parts.length()).mapNotNull { i ->
                 parts.optJSONObject(i)?.optString("text")?.trim()?.takeIf { it.isNotEmpty() }
             }.joinToString("\n")
-        }.orEmpty().take(route.answerChars)
+        }.orEmpty()
         if (answer.isBlank()) throw IllegalStateException("Gemini no devolvió una respuesta.")
         val metadata = candidate?.optJSONObject("groundingMetadata")
         val chunks = metadata?.optJSONArray("groundingChunks")
@@ -359,7 +359,8 @@ object SkyPhoneCloud {
                 if (text.isNotEmpty()) parts.add(text)
             }
         }
-        val answer = parts.joinToString("\n").take(answerLimit)
+        val answer = parts.joinToString("\n")
+        require(answer.length <= 100_000) { "La respuesta supera el límite de seguridad de SKY." }
         if (answer.isBlank()) {
             throw IllegalStateException("Gemini no devolvió texto. Revisá tu solicitud.")
         }
