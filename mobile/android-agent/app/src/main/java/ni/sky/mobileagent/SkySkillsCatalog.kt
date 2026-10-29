@@ -26,14 +26,14 @@ object SkySkillsCatalog {
             "docencia"),
         Skill("Redacción profesional",
             "Textos, cartas, correos, informes y propuestas revisables.",
-            "Redacta una carta profesional clara y lista para revisar.",
+            "Redacta una carta profesional con título y secciones. Luego exportala a Word desde Historial.",
             "redaccion"),
         Skill("Presentaciones tipo Gamma",
-            "Guiones de diapositivas, estructura y notas. Exportación PPTX editable pendiente.",
+            "Guiones de diapositivas y exportación PPTX editable desde Historial; sin edición en Gamma.",
             "Diseña un guion para una presentación de 12 diapositivas con objetivos y recursos.",
             "presentacion"),
         Skill("Diseño tipo Canva",
-            "Conceptos visuales, identidad, composiciones y especificaciones de diseño.",
+            "Conceptos visuales y exportación SVG vectorial editable de cuatro ideas; sin conexión con Canva.",
             "Propón una identidad visual profesional con paleta, tipografía y composiciones.",
             "diseno"),
         Skill("Análisis documental",
@@ -59,10 +59,10 @@ object SkySkillsCatalog {
                 .containsMatchIn(t) -> "Distingue diagnóstico, código propuesto y pruebas; no afirmes ejecutar nada."
             Regex("""\b(diapositiva|presentaci[oó]n|gamma)\b""")
                 .containsMatchIn(t) -> "Prepara un guion de diapositivas con títulos, contenido y notas; " +
-                    "no finjas haber generado una presentación editable."
+                    "indicá que el propietario puede exportar el resultado a PPTX editable desde Historial; no finjas editar Gamma."
             Regex("""\b(canva|empaque|packaging|dise[nñ]o gr[aá]fico|identidad visual)\b""")
                 .containsMatchIn(t) -> "Crea un brief de diseño profesional con jerarquía, " +
-                    "colores, tipografía y composición; no afirmes modificar Canva."
+                    "colores, tipografía y composición; ofrece exportar un SVG local editable con cuatro ideas, sin conexión con Canva."
             Regex("""\b(investiga|investigaci[oó]n|fuentes|bibliograf[ií]a)\b""")
                 .containsMatchIn(t) -> "Separa hechos verificables de hipótesis, cita fuentes " +
                     "solo si fueron realmente consultadas y señala la fecha."
