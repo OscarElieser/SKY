@@ -32,6 +32,17 @@
             android:authorities="ni.sky.mobileagent.generated"
             android:exported="false"
             android:grantUriPermissions="true" />
+        <!-- Explicit user opt-in in Android Accessibility settings. Limited to music apps. -->
+        <service android:name=".SkyMusicControlService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"
+            android:label="SKY · Control musical asistido">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice"
+                android:resource="@xml/sky_music_control_config" />
+        </service>
         <service android:name=".SkyHandsFreeService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
