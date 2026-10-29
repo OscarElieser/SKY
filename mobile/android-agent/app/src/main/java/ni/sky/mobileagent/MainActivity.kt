@@ -262,6 +262,12 @@ class MainActivity : Activity() {
             // Music commands must not talk over and interrupt the playing track.
             home.showMessage(message)
         }
+        quickActions.onReceipt = { action, state, detail ->
+            runCatching {
+                actionEvidence.record(action, state, detail)
+                verifiedLearning.observe(action, state)
+            }
+        }
         replyStudio = SkyReplyStudio(
             this, getSharedPreferences("sky_reply_contacts", MODE_PRIVATE)
         ) { message ->
