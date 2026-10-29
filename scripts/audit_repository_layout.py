@@ -7,6 +7,7 @@ import argparse
 import ast
 import hashlib
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -15,12 +16,16 @@ SKIP = {".git", ".venv", "venv", "node_modules", "build", "dist", ".gradle",
         ".dart_tool", "__pycache__", ".pytest_cache", ".idea", ".vscode"}
 EXTS = {".py", ".kt", ".java", ".json", ".yml", ".yaml", ".md", ".sh", ".ps1", ".gradle"}
 MAX_BYTES = 2_000_000
+REFERENCE_EXTS = {".ps1", ".kt", ".kts", ".gradle", ".yml", ".yaml", ".sh", ".json"}
+REFERENCE_PATTERN = re.compile(r"[A-Za-z0-9_./-]+\\.(?:py|ps1|kt|kts|gradle|json|ya?ml|sh)")
+
 
 
 def inventory(root=ROOT):
     by_hash = defaultdict(list)
     by_name = defaultdict(list)
     imports = []
+    file_references = []
     files = 0
     skipped = 0
     for path in sorted(root.rglob("*")):
@@ -40,6 +45,14 @@ def inventory(root=ROOT):
         files += 1
         by_hash[hashlib.sha256(raw).hexdigest()].append(relative)
         by_name[path.name.lower()].append(relative)
+        if path.suffix.lower() in REFERENCE_EXTS or path.name.endswith(".gradle.kts"):
+            try:
+                source = raw.decode("utf-8-sig")
+            except UnicodeError:
+                skipped += 1
+                continue
+            for match in REFERENCE_PATTERN.finditer(source):
+                file_references.append({"source": relative, "reference": match.group(0)})
         if path.suffix == ".py":
             try:
                 tree = ast.parse(raw.decode("utf-8-sig"), filename=relative)
@@ -65,7 +78,8 @@ def inventory(root=ROOT):
             for name, paths in sorted(by_name.items()) if len(paths) > 1
         ],
         "python_imports": sorted(imports, key=lambda x: (x["source"], x["module"])),
-        "caution": "Same names are not necessarily duplicates; imports do not prove runtime use. No files were moved.",
+        "cross_language_file_references": sorted(file_references, key=lambda x: (x["source"], x["reference"])),
+        "caution": "Reference strings are candidates, not a complete dependency graph. No files were moved.",
     }
 
 
