@@ -1,3 +1,18 @@
+# SKY Android 0.8.23 — creación nativa de Word, PowerPoint y SVG
+
+**Código integrado en main. Las funciones deben pasar CI y comprobarse en Samsung antes de considerarse verificadas en dispositivo.**
+
+- **Word real (.docx):** genera en Android un paquete Office Open XML ZIP con sus tipos de contenido, relaciones, estilos, párrafos, título, fecha, consulta y respuesta. El texto queda editable en Word y editores compatibles. Los encabezados Markdown se convierten en apartados y las listas en líneas con viñetas.
+- **PowerPoint real (.pptx):** presentación editable 16:9 con diapositivas, tema, diapositiva maestra, diseño, relaciones XML, cuadros de texto y formas nativas. Usa paleta azul/cian SKY; convierte encabezados y fragmentos de respuesta en diapositivas. Limitado a 25 diapositivas y cinco puntos por diapositiva; no incorpora imágenes generadas, animaciones ni gráficos complejos.
+- **SVG vectorial (.svg):** composición 1600 × 900 con formas y textos editables, cabecera SKY y un máximo de cuatro ideas tomadas de una respuesta. No genera ilustraciones por IA ni abre Canva.
+- **Desde historial:** abrir una consulta → «Guardar respuesta» → elegir entre Markdown, HTML, Word, PowerPoint o SVG. **Desde Ajustes:** «CREAR · WORD / POWERPOINT / SVG / MD / HTML» usa la última respuesta.
+- **Privacidad:** los archivos se generan localmente y se guardan donde el usuario elija con ACTION_CREATE_DOCUMENT, sin sincronización automática ni credenciales externas. Se escapan XML y caracteres no válidos; no se ejecutan instrucciones de documentos, macros ni scripts.
+- **Límites honestos:** no existe una integración directa con Canva, Gamma, Copilot, Claude, ChatGPT o Microsoft 365; exportar a un formato compatible es distinto de controlar esas aplicaciones. La respuesta persistida en historial puede estar recortada a 5.000 caracteres.
+- **Calidad:** pruebas de estructura de paquetes ZIP, presencia de piezas OOXML, XML válido, protección contra etiquetas y nombres seguros. Pendiente corroborar apertura/edición en Word y PowerPoint físicos y comprobar layout y compatibilidad.
+- SKY Windows no se modifica. Se conservan manos libres, chat, perfil, memoria, historial, control móvil permitido y adjuntos de hasta 100 MB (PDF 50 MB por límite de Gemini).
+
+---
+
 # SKY Android 0.8.23 — núcleo cognitivo y memoria local (sin SKY Windows)
 
 **Alcance:** cambios exclusivamente en `mobile/android-agent/` en la rama `main`.
