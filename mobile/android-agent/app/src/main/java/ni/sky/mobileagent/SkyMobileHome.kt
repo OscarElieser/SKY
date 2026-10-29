@@ -51,9 +51,8 @@ class SkyMobileHome(
     private val cyan = Color.rgb(132, 215, 245)
     private val violet = Color.rgb(125, 98, 245)
     private lateinit var mainSurface: LinearLayout
-    private lateinit var manualTalkButton: View
     private var handsFreeActive = false
-    private val faceCaption = text("SKY LISTA · TOCÁ PARA HABLAR", 12f, Color.rgb(207, 200, 252)).apply {
+    private val faceCaption = text("SKY LISTA · TOCÁ LOS OJOS O ACTIVÁ MANOS LIBRES", 12f, Color.rgb(207, 200, 252)).apply {
         gravity = Gravity.CENTER
         letterSpacing = 0.07f
         contentDescription = "Estado actual de SKY"
@@ -247,18 +246,12 @@ class SkyMobileHome(
             textSize = 23f
             contentDescription = "Abrir conversación por texto"
         }, LinearLayout.LayoutParams(dp(56), dp(56)).apply { rightMargin = dp(9) })
-        manualTalkButton = pill("🎙  HABLAR", violet) { voicePanel.listen() }.apply {
-            textSize = 16f
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-            contentDescription = "Activar micrófono para hablar con SKY"
-        }
-        actions.addView(manualTalkButton, LinearLayout.LayoutParams(0, dp(56), 1f))
         actions.addView(pill("■", Color.rgb(42, 43, 95)) {
             if (handsFreeActive) onStopHandsFree() else voicePanel.stop()
         }.apply {
             textSize = 18f
-            contentDescription = "Detener la escucha y la voz"
-        }, LinearLayout.LayoutParams(dp(56), dp(56)).apply { leftMargin = dp(9) })
+            contentDescription = "Detener escucha manos libres y voz"
+        }, LinearLayout.LayoutParams(dp(56), dp(56)))
         main.addView(actions)
         buildPanel()
     }
@@ -266,9 +259,8 @@ class SkyMobileHome(
     fun setHandsFreeActive(enabled: Boolean) {
         handsFreeActive = enabled
         voicePanel.setHandsFreeActive(enabled)
-        if (::manualTalkButton.isInitialized) manualTalkButton.visibility =
-            if (enabled) View.GONE else View.VISIBLE
-        faceCaption.text = if (enabled) "SKY DURMIENDO · DECÍ SKY" else "SKY LISTA · TOCÁ PARA HABLAR"
+        faceCaption.text = if (enabled) "SKY DURMIENDO · DECÍ SKY" else
+            "SKY LISTA · TOCÁ LOS OJOS O ACTIVÁ MANOS LIBRES"
     }
 
     /**
@@ -518,9 +510,6 @@ class SkyMobileHome(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        footerBar.addView(pill("🎙", Color.TRANSPARENT) { voicePanel.listen() }.apply {
-            contentDescription = "Dictar mensaje a SKY"
-        }, LinearLayout.LayoutParams(0, dp(44), 1f))
         footerBar.addView(pill("Privacidad", Color.TRANSPARENT) {
             privacy.visibility = if (privacy.visibility == View.GONE) View.VISIBLE else View.GONE
         }, LinearLayout.LayoutParams(0, dp(44), 1f))
