@@ -321,6 +321,8 @@ class MainActivity : Activity() {
             "Voz de SKY: " + if (voicePanel.isSpeechEngineReady()) "Lista" else "Pendiente",
             "Apps visibles para abrir: ${installedApps.discover().size}",
             "Notas privadas guardadas: $notes",
+            "Groq: " + if (tokens.groqEnabled()) "Configurado (conexión no comprobada)"
+                else "No configurado",
             "Gemini: " + if (tokens.cloudEnabled()) "Configurado (conexión no comprobada)"
                 else "No configurado",
             "Manos libres: " + if (handsFreePrefs.getBoolean("hands_free_opt_in", false))
