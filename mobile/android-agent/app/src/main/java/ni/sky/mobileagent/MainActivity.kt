@@ -799,52 +799,17 @@ class MainActivity : Activity() {
             .setNegativeButton("Cerrar", null).show()
     }
 
+    /** Historial premium local: los datos no salen del teléfono. */
     private fun showHistoryBrowser(query: String = "", beforeId: Long? = null) {
         historyBrowserDialog?.dismiss()
-        val page = archive.page(query, beforeId, 26)
-        val shown = page.take(25)
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(20, 12, 20, 12)
-        }
-        val filter = EditText(this).apply {
-            hint = "Buscar por título, pregunta o respuesta"
-            setSingleLine(true)
-            filters = arrayOf(InputFilter.LengthFilter(100))
-            setText(query)
-        }
-        container.addView(filter)
-        container.addView(actionButton("Buscar en todo mi historial") {
-            val term = filter.text.toString().trim()
-            showHistoryBrowser(term)
-        })
-        if (shown.isEmpty()) {
-            container.addView(description("No se encontraron consultas para este filtro."))
-        }
-        shown.forEach { item ->
-            container.addView(actionButton(item.title.take(80) +
-                "\n" + item.localTime() + " · " + item.engine.take(35)) {
-                AlertDialog.Builder(this)
-                    .setTitle(item.title)
-                    .setMessage(item.localTime() + "\n\nVOS:\n" + item.question +
-                        "\n\nSKY:\n" + item.answer)
-                    .setNeutralButton("Guardar respuesta") { _, _ -> chooseResponseExport(item) }
-                    .setPositiveButton("Cerrar", null).show()
-            })
-        }
-        if (page.size > 25) {
-            val cursor = shown.last().id
-            container.addView(actionButton("Ver consultas anteriores") {
-                showHistoryBrowser(query, cursor)
-            })
-        }
-        val list = ScrollView(this).apply { addView(container) }
-        historyBrowserDialog = AlertDialog.Builder(this)
-            .setTitle("Historial de SKY · " + if (beforeId == null) "más recientes" else "anteriores")
-            .setView(list)
-            .setPositiveButton("Exportar todo") { _, _ -> confirmHistoryExport() }
-            .setNegativeButton("Cerrar", null)
-            .show()
+        settingsDialog?.dismiss()
+        historyBrowserDialog = SkyPremiumHistory(
+            this, archive,
+            onOpenChat = { entry -> home.openSavedExchange(entry) },
+            onExportEntry = { entry -> chooseResponseExport(entry) },
+            onExportAll = { confirmHistoryExport() },
+            onHistoryChanged = { home.reloadHistory() }
+        ).show(query, beforeId)
     }
 
     private fun chooseResponseExport(entry: SkyConversationArchive.Entry) {
@@ -1549,6 +1514,7 @@ class MainActivity : Activity() {
             setPadding(30, 18, 30, 18)
         }
         val linked = tokens.token().isNotEmpty() && tokens.deviceId().isNotEmpty()
+        content.addView(SkyPremiumUi.section(this, "Motor", "Groq y Gemini · Conexiones verificables", "⚡"))
         content.addView(description("SKY Android · Ajustes y permisos"))
         content.addView(description("MODO INDEPENDIENTE · No necesitás Windows, Tailscale ni código de vinculación."))
         if (tokens.cloudEnabled()) {
@@ -1750,6 +1716,32 @@ class MainActivity : Activity() {
             }
             content.addView(groqButton)
         }
+        content.addView(SkyPremiumUi.section(this, "Privacidad",
+            "Permisos individuales · No compartas datos sin autorización", "◈"))
+        content.addView(CheckBox(this).apply {
+            text = "Autorizar nube para el próximo mensaje e historial"
+            isChecked = home.cloudConsent.isChecked
+            setOnCheckedChangeListener { _, enabled ->
+                home.cloudConsent.isChecked = enabled
+            }
+        })
+        content.addView(CheckBox(this).apply {
+            text = "Incluir mis datos privados solo en la próxima consulta"
+            isChecked = home.privateConsent.isChecked
+            setOnCheckedChangeListener { _, enabled ->
+                home.privateConsent.isChecked = enabled
+            }
+        })
+        content.addView(description("Los permisos anteriores son de un solo uso: " +
+            "SKY los desmarca después de cada consulta. " +
+            "No permitás el envío si el contenido incluye secretos personales."))
+
+        content.addView(SkyPremiumUi.section(this, "Acceso",
+            "Aplicaciones autorizadas y conexión opcional", "◉"))
+        content.addView(actionButton("Ver aplicaciones instaladas y permisos") {
+            settingsDialog?.dismiss()
+            installedApps.showCatalog()
+        })
         content.addView(actionButton(if (showOptionalWindowsLink || linked)
             "Ocultar conexión Windows (opcional)" else "Conexión Windows (opcional)") {
             showOptionalWindowsLink = !showOptionalWindowsLink
@@ -1852,6 +1844,8 @@ class MainActivity : Activity() {
                 }
                 .setNegativeButton("Cancelar", null).show()
         })
+        content.addView(SkyPremiumUi.section(this, "Creatividad",
+            "Documentos, multimedia y herramientas sociales", "✦"))
         content.addView(actionButton("RESPUESTAS NATURALES · CONTACTOS") {
             settingsDialog?.dismiss()
             replyStudio.showSettings { request -> createReplyDraft(request) }
@@ -1903,6 +1897,12 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             socialStudio.showCreatorMenu { request -> createSocialContent(request) }
         })
+        content.addView(SkyPremiumUi.section(this, "Memoria",
+            "Aprendizaje supervisado y recuerdos del teléfono", "◇"))
+        content.addView(actionButton("Enseñar a SKY una respuesta corregida") {
+            settingsDialog?.dismiss()
+            showLearningDialog()
+        })
         content.addView(CheckBox(this).apply {
             text = "NÚCLEO COGNITIVO ANDROID · respuestas guiadas y recuerdos locales"
             isChecked = cognitionEnabled()
@@ -1944,6 +1944,8 @@ class MainActivity : Activity() {
                 .setMessage(SkyAndroidCognition.description())
                 .setPositiveButton("Entendido", null).show()
         })
+        content.addView(SkyPremiumUi.section(this, "Herramientas",
+            "Modos avanzados y archivos editables", "▣"))
         content.addView(actionButton("MODELOS GEMINI · RÁPIDO / EQUILIBRADO / PROFUNDO") {
             val options = arrayOf(
                 "Económico · 3.5 Flash-Lite · consultas rápidas",
@@ -2009,6 +2011,8 @@ class MainActivity : Activity() {
                     .setNegativeButton("Cerrar", null).show()
             }
         })
+        content.addView(SkyPremiumUi.section(this, "Historial",
+            "Buscar, filtrar, renombrar, guardar y exportar", "◷"))
         content.addView(actionButton("HISTORIAL · BUSCAR Y EXPORTAR CONSULTAS") {
             settingsDialog?.dismiss()
             showHistoryBrowser()
@@ -2047,6 +2051,8 @@ class MainActivity : Activity() {
                     .setNegativeButton("Cerrar", null).show()
             }
         })
+        content.addView(SkyPremiumUi.section(this, "Diagnóstico",
+            "Comprobaciones reales, errores y aplicaciones disponibles", "◌"))
         content.addView(actionButton("DIAGNÓSTICO REAL · PROBAR GEMINI EN ESTE TELÉFONO") {
             settingsDialog?.dismiss()
             testGeminiModelsOnDevice()
@@ -2095,6 +2101,8 @@ class MainActivity : Activity() {
                     "También podés apagar el servicio desde Ajustes de Android.")
             })
         }
+        content.addView(SkyPremiumUi.section(this, "Voz",
+            "Manos libres, conversación fluida y lectura natural", "♫"))
         content.addView(CheckBox(this).apply {
             text = "Manos libres: decir SKY para despertar (micrófono local y notificación permanente)"
             isChecked = handsFreePrefs.getBoolean("hands_free_opt_in", false)
@@ -2123,12 +2131,13 @@ class MainActivity : Activity() {
             }
         })
         content.addView(description("Manos libres requiere Android 12 o posterior y reconocimiento de voz instalado en el dispositivo. Mientras está activa se muestra una notificación para apagarla. Puede consumir batería; si Android cierra el servicio, abrí SKY para reactivarlo. Con pantalla apagada puede ajustar volumen y enviar controles multimedia. Para abrir aplicaciones, Android puede exigir desbloquear el teléfono y tocar la notificación de SKY. Las acciones sensibles siguen exigiendo aprobación."))
-        val scroll = ScrollView(this).apply { addView(content) }
+        val premium = SkyPremiumUi.settingsShell(this, content) {
+            settingsDialog?.dismiss()
+        }
         settingsDialog = AlertDialog.Builder(this)
-            .setView(scroll)
-            .setNegativeButton("Cerrar", null)
+            .setView(premium)
             .create()
-        settingsDialog?.show()
+        settingsDialog?.let { SkyPremiumUi.showDialog(this, it, 0.92) }
     }
 
     private fun showMusicControlDisclosure(request: SkyMusicCommand.Request) {
