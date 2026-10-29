@@ -64,6 +64,8 @@ class SkyHandsFreeService : Service() {
     private var running = false
     private var listening = false
     private var awake = false
+    private var presence = SkyVoicePresence.Mode.WAKE_ONLY
+    private val voiceSettings by lazy { getSharedPreferences("sky_voice_settings", MODE_PRIVATE) }
     private var speechSuspended = false
     private var retryCount = 0
     private var lastCycle = 0L
@@ -73,7 +75,9 @@ class SkyHandsFreeService : Service() {
     private val fallAsleep = Runnable {
         awake = false
         onStatus?.invoke(true)
-        notifyState("SKY durmiendo · decí SKY")
+        notifyState(if (presence == SkyVoicePresence.Mode.SLEEP_LOCKED)
+            "SKY dormida por orden · decí SKY despierta"
+            else "SKY en espera · decí SKY")
     }
     private val safetyResume = Runnable { resumeFromSpeech() }
 
@@ -124,7 +128,18 @@ class SkyHandsFreeService : Service() {
             return START_NOT_STICKY
         }
         running = true
-        awake = false
+        presence = when (voiceSettings.getString("sky_presence_mode", "WAKE_ONLY")) {
+            "SLEEP_LOCKED" -> SkyVoicePresence.Mode.SLEEP_LOCKED
+            "ATTENTIVE" -> SkyVoicePresence.Mode.ATTENTIVE
+            else -> SkyVoicePresence.Mode.WAKE_ONLY
+        }
+        awake = presence == SkyVoicePresence.Mode.ATTENTIVE
+        notifyState(when (presence) {
+            SkyVoicePresence.Mode.SLEEP_LOCKED -> "SKY dormida · decí SKY despierta"
+            SkyVoicePresence.Mode.ATTENTIVE -> "SKY atenta · esperando órdenes"
+            else -> "SKY en espera · decí SKY"
+        })
+        onStatus?.invoke(!awake)
         arm()
         return START_NOT_STICKY  // No unauthorized microphone auto-restart at boot.
     }
@@ -237,7 +252,8 @@ class SkyHandsFreeService : Service() {
 
     private fun resetInactivity() {
         handler.removeCallbacks(fallAsleep)
-        if (awake) handler.postDelayed(fallAsleep, IDLE_MS)
+        if (awake && presence != SkyVoicePresence.Mode.ATTENTIVE)
+            handler.postDelayed(fallAsleep, IDLE_MS)
     }
 
     private fun suspendForSpeech() {
@@ -327,19 +343,63 @@ class SkyHandsFreeService : Service() {
         say("Te escuché. Abre SKY desde la notificación para continuar esa tarea.")
     }
 
+    private fun setPresence(mode: SkyVoicePresence.Mode) {
+        presence = mode
+        voiceSettings.edit().putString("sky_presence_mode", mode.name).apply()
+    }
+
     private fun process(heard: String) {
         if (!running) return
+        val request = SkyVoicePresence.request(heard)
+        if (request == SkyVoicePresence.Request.SLEEP) {
+            setPresence(SkyVoicePresence.Mode.SLEEP_LOCKED)
+            awake = false
+            handler.removeCallbacks(fallAsleep)
+            onStatus?.invoke(true)
+            notifyState("SKY dormida por tu orden · decí SKY despierta")
+            say("Entendido. Me quedo dormida hasta que me digás SKY despierta.")
+            return
+        }
+        if (presence == SkyVoicePresence.Mode.SLEEP_LOCKED &&
+            request != SkyVoicePresence.Request.WAKE) {
+            // Never treat unrelated sounds or a generic SKY as authorization.
+            schedule(750)
+            return
+        }
+        if (request == SkyVoicePresence.Request.ATTEND) {
+            setPresence(SkyVoicePresence.Mode.ATTENTIVE)
+            awake = true
+            resetInactivity()
+            onStatus?.invoke(false)
+            notifyState("SKY atenta · esperando tus órdenes")
+            say("Te escuché. Estoy atenta a tus orientaciones. Las acciones sensibles requieren tu confirmación.")
+            return
+        }
+        if (request == SkyVoicePresence.Request.WAKE) {
+            setPresence(SkyVoicePresence.Mode.WAKE_ONLY)
+            awake = true
+            resetInactivity()
+            onStatus?.invoke(false)
+            notifyState("SKY despierta · escuchando")
+            say("Aquí estoy. Te escucho.")
+            return
+        }
         val decision = SkyWakePhrase.decide(heard, awake)
         when (decision.kind) {
                 SkyWakePhrase.Kind.IGNORE -> schedule(650)
                 SkyWakePhrase.Kind.SLEEP -> {
+                    setPresence(SkyVoicePresence.Mode.SLEEP_LOCKED)
                     awake = false
                     handler.removeCallbacks(fallAsleep)
                     onStatus?.invoke(true)
-                    notifyState("SKY durmiendo · decí SKY")
-                    say("Listo. Aquí estaré cuando me ocupés.")
+                    notifyState("SKY dormida · decí SKY despierta")
+                    say("Entendido, quedo dormida hasta tu orden de despertar.")
                 }
                 SkyWakePhrase.Kind.WAKE -> {
+                    if (presence == SkyVoicePresence.Mode.SLEEP_LOCKED) {
+                        schedule(650)
+                        return
+                    }
                     awake = true
                     resetInactivity()
                     onStatus?.invoke(false)
