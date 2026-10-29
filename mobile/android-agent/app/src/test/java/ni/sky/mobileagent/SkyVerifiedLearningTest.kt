@@ -50,6 +50,15 @@ class SkyVerifiedLearningTest {
         assertEquals("mensajeria", SkyVerifiedLearning.category("Enviar mensaje"))
     }
 
+    @Test fun actualAudioControlIsClassifiedCorrectlyWithoutLearningFromDispatch() {
+        assertEquals("musica", SkyVerifiedLearning.category("Control Android VOLUME_UP"))
+        assertEquals("musica", SkyVerifiedLearning.category("Control Android PAUSE"))
+        assertEquals("musica", SkyVerifiedLearning.category("Control Android NEXT"))
+        assertNull(SkyVerifiedLearning.outcome("SENT"))
+        assertEquals(true, SkyVerifiedLearning.outcome("VERIFIED_LOCAL"))
+        assertEquals(false, SkyVerifiedLearning.outcome("FAILED"))
+    }
+
     @Test fun rejectsUnsafeLearningRates() {
         try {
             SkyVerifiedLearning.train(0.0, true, rate = 0.3)
