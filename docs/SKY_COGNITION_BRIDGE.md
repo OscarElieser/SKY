@@ -14,6 +14,7 @@ memoria existente, HUD, agente Windows ni SKY Android.
   selección de animación de emoción simulada y preprocesamiento de texto para TTS.
 - `metaverse/sky_cognition_api.py`: rutas autenticadas con X-SKY-KEY y MFA
   existente, sin acceso público abierto.
+- `metaverse/asistente_api.py` y `metaverse/static/hud.js`: el chat del HUD activa metadatos de personalidad simulada y texto preparado para voz; el núcleo cambia de color según un estado expresivo. No altera permisos ni las respuestas escritas.
 - `metaverse/api.py`: opción `cognitive` en `POST /api/chat` para incorporar
   contexto en el prompt **solo cuando el propietario lo active**. La opción
   `cognitive_private` requiere Ollama local. La ruta y sus respuestas anteriores
@@ -82,7 +83,8 @@ y aprobaciones existentes, comprobaciones del resultado y pruebas en dispositivo
 ## Verificación
 
 ```powershell
-python -m py_compile neural_core/sky_cognition.py metaverse/sky_cognition_api.py metaverse/api.py
+python -m py_compile neural_core/sky_cognition.py metaverse/sky_cognition_api.py metaverse/api.py metaverse/asistente_api.py
+node --check metaverse/static/hud.js
 python -m pytest -q tests/test_sky_cognition.py
 ```
 
