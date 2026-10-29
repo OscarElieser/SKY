@@ -2473,6 +2473,27 @@ class MainActivity : Activity() {
 
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
+        val corrected = SkyAdaptiveMemory.correctionFromCommand(message)
+        if (corrected != null) {
+            if (corrected.isBlank()) {
+                showLearningDialog()
+                return
+            }
+            val previous = archive.recent(1).lastOrNull()
+            if (previous == null) {
+                home.showMessage("Primero preguntame algo para corregir esa respuesta.")
+                return
+            }
+            runCatching { adaptiveMemory.teach(previous.question, corrected) }
+                .onSuccess {
+                    chatInput.setText("")
+                    home.showMessage("Aprendí tu corrección en el teléfono. " +
+                        "La reutilizaré cuando hagás la misma pregunta.")
+                    voicePanel.speakReply("Gracias por corregirme. Ya guardé la respuesta.")
+                }
+                .onFailure { home.showMessage(it.message ?: "No pude guardar esa corrección.") }
+            return
+        }
         val explicitFact = SkyAndroidCognition.explicitFact(message)
         if (explicitFact != null) {
             runCatching { longTermMemory.remember(explicitFact) }
@@ -2525,6 +2546,21 @@ class MainActivity : Activity() {
             home.addExchange(message, local, "SKY · local", revealPanel = !keepFace)
             voicePanel.speakReply(local)
             return
+        }
+        // El propietario puede enseñar respuestas estáticas. Recuperación local
+        // exacta, antes de gastar cuota y sin enviar estos datos a terceros.
+        if (!SkyGeminiModes.select(message).explicit) {
+            val approved = runCatching { adaptiveMemory.recall(message) }.getOrNull()
+            if (approved != null) {
+                chatInput.setText("")
+                val keepFace = voiceReplyOnFace
+                voiceReplyOnFace = false
+                home.addExchange(message, approved.answer,
+                    "SKY · respuesta corregida por vos · local", revealPanel = !keepFace)
+                voicePanel.express(approved.answer)
+                voicePanel.speakReply(approved.answer)
+                return
+            }
         }
         val mobileCloud = tokens.cloudEnabled()
         val groqReady = tokens.groqEnabled()
