@@ -1,3 +1,15 @@
+# SKY Android 0.8.22 — exportación de respuestas y cargas controlables
+
+**Código integrado en main; verificar una APK firmada antes de instalarla.**
+
+- En Ajustes → «DOCUMENTOS · GUARDAR RESPUESTA (MD / HTML)» exporta la última consulta; desde el historial, abre cualquier consulta y toca «Guardar respuesta». Formatos: **Markdown editable** o **HTML legible y editable**, guardados localmente mediante el selector de Android.
+- El HTML escapa el contenido de los adjuntos y las respuestas; no lo interpreta como etiquetas ejecutables. El contenido exportado puede contener datos personales: revisarlo antes de compartirlo.
+- Archivos: hasta cinco adjuntos, límite de 100 MB por archivo compatible y 300 MB combinados; PDF máximo 50 MB por límite del proveedor; selección reutilizable tras un fallo. Progreso por archivo y cancelación entre fragmentos o etapas (no instantánea durante una petición HTTP).
+- No implica integración oficial con ChatGPT, Gemini, Claude, Copilot, Gamma, Canva o Microsoft Office; **no genera DOCX/PPTX nativos**. Se conservan el chat, la voz, la memoria, el historial y las funciones existentes. SKY Windows no se modifica.
+- Pendiente: pruebas manuales de 100 MB y verificación de la carga/borrado remotos en Android real. La ejecución de CI no sustituye esas pruebas.
+
+---
+
 # SKY Android 0.8.21 — progreso y cancelación de archivos grandes
 
 **Código en main. La APK se considera lista solo tras la compilación firmada y las pruebas.**
