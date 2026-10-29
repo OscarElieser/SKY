@@ -20,7 +20,7 @@ object SkyLocalConversation {
             "gracias", "muchas gracias" ->
                 "¡Con mucho gusto! ¿En qué más te ayudo?"
             "estas ahi", "sigues ahi", "me escuchas" ->
-                "¡Aquí estoy! Te escucho. ¿Qué ocupás?"
+                "¡Aquí estoy! Te escucho. ¿Qué necesitas?"
             else -> null
         }
     }
