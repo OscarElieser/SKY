@@ -1,0 +1,445 @@
+{
+  "schema_version": 1,
+  "reviewed_at": "2026-10-29",
+  "repository": "OscarElieser/SKY",
+  "scope": "static_source_review",
+  "status_definition": {
+    "code": "Ruta de implementación localizada en el código; NO implica prueba funcional en dispositivo",
+    "limited": "Implementación parcial, condicionada o con prestaciones inferiores; prueba funcional pendiente",
+    "missing": "Sin implementación equivalente demostrada en esta revisión"
+  },
+  "runtime_verified": false,
+  "shared_contract": "Same user intent, equivalent observable outcome where supported, platform-native adapters, explicit permissions, traceable receipts",
+  "capabilities": [
+    {
+      "id": "chat",
+      "label": "Conversación contextual",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/providers.py"
+        ]
+      },
+      "android": {
+        "state": "code",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyPhoneCloud.kt"
+        ]
+      },
+      "note": "Proveedores y modelos distintos; conexión y cuota verificables por entorno"
+    },
+    {
+      "id": "local_llm",
+      "label": "LLM completamente local",
+      "windows": {
+        "state": "limited",
+        "evidence": [
+          "neural_core/sky_capability_inventory.py"
+        ]
+      },
+      "android": {
+        "state": "missing",
+        "evidence": []
+      },
+      "note": "Windows depende de un modelo local instalado; Android no incluye un LLM conversacional local equivalente"
+    },
+    {
+      "id": "memory",
+      "label": "Memoria privada a largo plazo",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_neural_memory.py"
+        ]
+      },
+      "android": {
+        "state": "code",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyLongTermMemory.kt"
+        ]
+      },
+      "note": "Almacenes independientes, sin sincronización de recuerdos"
+    },
+    {
+      "id": "voice",
+      "label": "Conversación, TTS y escucha",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/voice_coordinator.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyHandsFreeService.kt"
+        ]
+      },
+      "note": "Android 16 puede suspender la escucha, Windows depende de audio/permisos locales"
+    },
+    {
+      "id": "speaker_verification",
+      "label": "Verificación biométrica del hablante",
+      "windows": {
+        "state": "missing",
+        "evidence": []
+      },
+      "android": {
+        "state": "missing",
+        "evidence": []
+      },
+      "note": "STT no certifica la identidad del creador; requiere inscripción, pruebas antifraude y desbloqueo seguro"
+    },
+    {
+      "id": "app_launch",
+      "label": "Abrir aplicaciones instaladas",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_capacidades.py"
+        ]
+      },
+      "android": {
+        "state": "code",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyInstalledApps.kt"
+        ]
+      },
+      "note": "Nombres, permisos y paquetes difieren según el sistema"
+    },
+    {
+      "id": "app_interaction",
+      "label": "Operar interfaces de otras aplicaciones",
+      "windows": {
+        "state": "limited",
+        "evidence": [
+          "neural_core/windows_controller.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyAndroidActions.kt"
+        ]
+      },
+      "note": "No hay control universal de terceros; cada acción requiere API o permiso específico"
+    },
+    {
+      "id": "music",
+      "label": "Música y controles multimedia",
+      "windows": {
+        "state": "limited",
+        "evidence": [
+          "neural_core/sky_capacidades.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyMusicLauncher.kt"
+        ]
+      },
+      "note": "Abrir o enviar intent no acredita reproducción audible de un título concreto"
+    },
+    {
+      "id": "documents_docx",
+      "label": "Crear documentos DOCX",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_office.py"
+        ]
+      },
+      "android": {
+        "state": "code",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyNativeWord.kt"
+        ]
+      },
+      "note": "Plantillas y riqueza editorial distintas"
+    },
+    {
+      "id": "spreadsheets_xlsx",
+      "label": "Crear hojas XLSX",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_office.py"
+        ]
+      },
+      "android": {
+        "state": "code",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyNativeExcel.kt"
+        ]
+      },
+      "note": "Android tiene límites en filas y funciones; no hay editor general de Excel"
+    },
+    {
+      "id": "presentations_pptx",
+      "label": "Crear presentaciones PPTX",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_office.py"
+        ]
+      },
+      "android": {
+        "state": "code",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyNativePowerPoint.kt"
+        ]
+      },
+      "note": "Exportación no implica equivalencia visual ni efectos PowerPoint"
+    },
+    {
+      "id": "pdf",
+      "label": "Generar y procesar PDF",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_office.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyAttachmentReader.kt"
+        ]
+      },
+      "note": "Android lee adjuntos compatibles, pero no se comprobó exportación PDF equivalente"
+    },
+    {
+      "id": "multifile",
+      "label": "Analizar archivos múltiples",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_multimodal_reader.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyAttachmentBatch.kt"
+        ]
+      },
+      "note": "Tamaños, tipos y proveedores distintos; permisos por lote"
+    },
+    {
+      "id": "image_understanding",
+      "label": "Comprender imágenes",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_vision.py"
+        ]
+      },
+      "android": {
+        "state": "code",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyPhoneCloud.kt"
+        ]
+      },
+      "note": "Necesita proveedor visual y respuesta auténtica"
+    },
+    {
+      "id": "image_generation",
+      "label": "Generar imágenes",
+      "windows": {
+        "state": "limited",
+        "evidence": [
+          "neural_core/sky_design_ai.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyGeneratedImage.kt"
+        ]
+      },
+      "note": "Disponibilidad de modelos, claves, cuotas y formatos depende del entorno"
+    },
+    {
+      "id": "video_generation",
+      "label": "Crear videos",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_video_gen.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyAiVideo.kt"
+        ]
+      },
+      "note": "Ambos tienen rutas, pero resultados y costos no son equivalentes"
+    },
+    {
+      "id": "research",
+      "label": "Investigación y verificación web",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_scholarly.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyPhoneCloud.kt"
+        ]
+      },
+      "note": "Scholar/referencias académicas vs búsqueda Gemini; fuentes siempre comprobables"
+    },
+    {
+      "id": "education",
+      "label": "Docencia y actividades",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/academic_core.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkySkillsCatalog.kt"
+        ]
+      },
+      "note": "Android orienta respuestas; módulos didácticos de Windows son más amplios"
+    },
+    {
+      "id": "multiagents",
+      "label": "Supervisor y subagentes",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_supervisor.py"
+        ]
+      },
+      "android": {
+        "state": "missing",
+        "evidence": []
+      },
+      "note": "Android no posee supervisor equivalente de varios agentes; no ejecutar por promesa de la IA"
+    },
+    {
+      "id": "learning",
+      "label": "Aprendizaje y actualización supervisada",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_web_learning.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyVerifiedLearning.kt"
+        ]
+      },
+      "note": "No confundir indicadores de éxito con entrenamiento de pesos o acceso web autónomo"
+    },
+    {
+      "id": "social",
+      "label": "Redes sociales y contenido",
+      "windows": {
+        "state": "limited",
+        "evidence": [
+          "neural_core/sky_social_hub.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkySocialStudio.kt"
+        ]
+      },
+      "note": "Borradores y perfiles no acreditan publicación ni integración de cada plataforma"
+    },
+    {
+      "id": "three_d",
+      "label": "Modelado/exportación 3D",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_3d.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyFriendlyEyesView.kt"
+        ]
+      },
+      "note": "Android anima ojos con perspectiva, no genera modelos GLB equivalentes"
+    },
+    {
+      "id": "notifications",
+      "label": "Alarmas y recordatorios",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_rutinas.py"
+        ]
+      },
+      "android": {
+        "state": "limited",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyAndroidActions.kt"
+        ]
+      },
+      "note": "Dependen del programador Windows o intents y permisos de Android"
+    },
+    {
+      "id": "privacy_security",
+      "label": "Permisos, auditoría y control supervisado",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/sky_capacidades.py"
+        ]
+      },
+      "android": {
+        "state": "code",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyActionEvidence.kt"
+        ]
+      },
+      "note": "Las mismas clases de riesgo no significan idénticos permisos o confianza biométrica"
+    },
+    {
+      "id": "shared_sync",
+      "label": "Sincronización segura de tareas y memoria",
+      "windows": {
+        "state": "missing",
+        "evidence": []
+      },
+      "android": {
+        "state": "missing",
+        "evidence": []
+      },
+      "note": "No desplegada ni comprobada una sincronización cifrada con consentimiento y resolución de conflictos"
+    },
+    {
+      "id": "premium_ui",
+      "label": "Interfaz y expresiones SKY",
+      "windows": {
+        "state": "code",
+        "evidence": [
+          "neural_core/holographic_ui.py"
+        ]
+      },
+      "android": {
+        "state": "code",
+        "evidence": [
+          "mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyFriendlyEyesView.kt"
+        ]
+      },
+      "note": "Experiencias visuales nativas diferentes: HUD escritorio frente a ojos animados móvil"
+    }
+  ]
+}
