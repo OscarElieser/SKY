@@ -37,4 +37,12 @@ class SkyMobileIntentRouterTest {
         assertNull(SkyMobileIntentRouter.route("Investiga aplicaciones educativas"))
         assertNull(SkyMobileIntentRouter.route("abre una investigación sobre robótica"))
     }
+    @Test fun installedAppsAreNotHijackedBySkysInternalPanels() {
+        assertNull(SkyMobileIntentRouter.route("Abrí Word"))
+        assertNull(SkyMobileIntentRouter.route("Abre Office"))
+        assertNull(SkyMobileIntentRouter.route("Abrí Microsoft Word"))
+        assertEquals("documentos",
+            SkyMobileIntentRouter.route("Abrí el módulo de Word")?.module)
+    }
+
 }
