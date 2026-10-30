@@ -14,7 +14,41 @@ import java.util.Locale
  * A preview is not evidence that the complete remote analysis succeeded.
  */
 internal object SkyAttachmentPreview {
-    data class Result(val label: String, val details: String, val bitmap: Bitmap? = null)
+    data class Result(
+        val label: String,
+        val details: String,
+        val bitmap: Bitmap? = null,
+        val pageCount: Int = 0,
+        val pageIndex: Int = 0
+    )
+
+    /** Open just one PDF page on a worker; never decode all pages into memory. */
+    fun readPdfPage(resolver: ContentResolver, file: SkyAttachmentBatch.Item, index: Int): Result {
+        require(file.mime == "application/pdf") { "El adjunto no es un PDF." }
+        val descriptor = resolver.openFileDescriptor(file.uri, "r")
+            ?: throw IllegalArgumentException("Android no permitió abrir este PDF.")
+        return descriptor.use { fd ->
+            PdfRenderer(fd).use { pdf ->
+                require(pdf.pageCount > 0) { "El PDF no tiene páginas." }
+                require(index in 0 until pdf.pageCount) { "La página solicitada no existe." }
+                pdf.openPage(index).use { page ->
+                    val factor = minOf(960f / page.width, 1250f / page.height, 1f)
+                    val bitmap = Bitmap.createBitmap(
+                        (page.width * factor).toInt().coerceAtLeast(1),
+                        (page.height * factor).toInt().coerceAtLeast(1),
+                        Bitmap.Config.ARGB_8888)
+                    bitmap.eraseColor(Color.WHITE)
+                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    Result(
+                        "PDF · página " + (index + 1) + " de " + pdf.pageCount,
+                        file.name + "\n" + file.mime + " · " + file.sizeMb() + " MB" +
+                            "\nVista previa local: no verifica ni extrae el texto completo.",
+                        bitmap, pdf.pageCount, index
+                    )
+                }
+            }
+        }
+    }
 
     fun read(resolver: ContentResolver, file: SkyAttachmentBatch.Item): Result {
         val ext = file.name.substringAfterLast('.', "").lowercase(Locale.ROOT)
@@ -36,27 +70,7 @@ internal object SkyAttachmentPreview {
                 Result("Imagen · vista previa local", basic + "\nDimensiones: " +
                     bounds.outWidth + " × " + bounds.outHeight + " px", bitmap)
             }
-            file.mime == "application/pdf" -> {
-                val descriptor = resolver.openFileDescriptor(file.uri, "r")
-                    ?: throw IllegalArgumentException("Android no permitió abrir este PDF.")
-                descriptor.use { fd ->
-                    PdfRenderer(fd).use { pdf ->
-                        require(pdf.pageCount > 0) { "El PDF no tiene páginas." }
-                        pdf.openPage(0).use { page ->
-                            val factor = minOf(960f / page.width, 1250f / page.height, 1f)
-                            val bitmap = Bitmap.createBitmap(
-                                (page.width * factor).toInt().coerceAtLeast(1),
-                                (page.height * factor).toInt().coerceAtLeast(1),
-                                Bitmap.Config.ARGB_8888)
-                            bitmap.eraseColor(Color.WHITE)
-                            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                            Result("PDF · primera página", basic +
-                                "\nTotal de páginas: " + pdf.pageCount +
-                                "\nLa vista previa no extrae ni comprueba todas las páginas.", bitmap)
-                        }
-                    }
-                }
-            }
+            file.mime == "application/pdf" -> readPdfPage(resolver, file, 0)
             file.kind == SkyAttachmentBatch.Kind.OFFICE -> {
                 val preview = SkyOfficeStreaming.preview(resolver, file).take(5500)
                 Result("Office · texto y celdas recuperados", basic +
@@ -77,18 +91,38 @@ internal object SkyAttachmentPreview {
             }
             file.mime.startsWith("audio/") || file.mime.startsWith("video/") -> {
                 val retriever = MediaMetadataRetriever()
+                var thumbnail: Bitmap? = null
                 val detail = try {
                     resolver.openFileDescriptor(file.uri, "r")?.use { fd ->
                         retriever.setDataSource(fd.fileDescriptor)
                         val duration = retriever.extractMetadata(
                             MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                        if (file.mime.startsWith("video/") &&
+                            android.os.Build.VERSION.SDK_INT >= 27) {
+                            // Scaled frame, never a full-resolution 4K/8K bitmap.
+                            val width = retriever.extractMetadata(
+                                MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 960
+                            val height = retriever.extractMetadata(
+                                MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 540
+                            val ratio = minOf(960f / width.coerceAtLeast(1),
+                                960f / height.coerceAtLeast(1), 1f)
+                            thumbnail = runCatching {
+                                retriever.getScaledFrameAtTime(0L,
+                                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                                    (width * ratio).toInt().coerceAtLeast(1),
+                                    (height * ratio).toInt().coerceAtLeast(1))
+                            }.getOrNull()
+                        }
                         "Duración: " + if (duration != null) (duration / 1000).toString() +
                             " segundos" else "no disponible"
                     } ?: "Metadatos multimedia no disponibles."
                 } catch (_: Exception) { "Metadatos multimedia no disponibles." }
                 finally { runCatching { retriever.release() } }
-                Result("Multimedia · metadatos", basic + "\n" + detail +
-                    "\nLa transcripción o análisis requiere un motor compatible y autorización.")
+                Result(if (file.mime.startsWith("video/")) "Video · fotograma de muestra"
+                    else "Audio · información del archivo",
+                    basic + "\n" + detail +
+                        "\nLa vista previa no transcribe ni reproduce el contenido.",
+                    thumbnail)
             }
             else -> Result("Archivo seleccionado", basic +
                 "\nEste formato no dispone de una vista previa local completa.")
