@@ -256,6 +256,7 @@ class MainActivity : Activity() {
                 !processOwnerProfileImport(transcript) &&
                 !processScientificCalculation(transcript) &&
                 !processStatisticsCalculation(transcript) &&
+                !processQuadraticCalculation(transcript) &&
                 !processLocalPanelCommand(transcript, spoken = true) &&
                 !processCompanionCommand(transcript) &&
                 !processDailyCommand(transcript, spoken = true)) {
@@ -272,6 +273,7 @@ class MainActivity : Activity() {
                     !SkyWeatherNow.isWeatherQuery(transcript) &&
                     !SkyScientificCalculator.isRequest(transcript) &&
                     !SkyStatisticsCalculator.isRequest(transcript) &&
+                    !SkyQuadraticSolver.isRequest(transcript) &&
                     !SkyPublicResearch.explicit(transcript) &&
                     !SkyPublicResearch.encyclopedic(transcript) &&
                     !SkyAcademicResearch.explicit(transcript) &&
@@ -2945,6 +2947,17 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Exact algebraic roots, including complex roots; never inferred from an LLM. */
+    private fun processQuadraticCalculation(message: String): Boolean {
+        val result = SkyQuadraticSolver.solve(message) ?: return false
+        val keepFace = voiceReplyOnFace
+        voiceReplyOnFace = false
+        home.addExchange(message, result.answer,
+            "SKY · álgebra verificable", revealPanel = !keepFace)
+        if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(result.answer)
+        return true
+    }
+
     /** Deterministic statistics run locally on supplied numbers, without cloud access. */
     private fun processStatisticsCalculation(message: String): Boolean {
         val result = SkyStatisticsCalculator.solve(message) ?: return false
@@ -3077,6 +3090,10 @@ class MainActivity : Activity() {
             return
         }
         if (processStatisticsCalculation(message)) {
+            chatInput.setText("")
+            return
+        }
+        if (processQuadraticCalculation(message)) {
             chatInput.setText("")
             return
         }
