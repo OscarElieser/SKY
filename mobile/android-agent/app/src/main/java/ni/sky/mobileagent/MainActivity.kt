@@ -1118,13 +1118,72 @@ class MainActivity : Activity() {
                 })
                 preview.onSuccess { result ->
                     if (result.bitmap != null) {
-                        body.addView(android.widget.ImageView(this).apply {
+                        val image = android.widget.ImageView(this@MainActivity).apply {
                             setImageBitmap(result.bitmap)
                             adjustViewBounds = true
                             maxHeight = (resources.displayMetrics.density * 330).toInt()
                             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
                             contentDescription = result.label
-                        }, LinearLayout.LayoutParams(-1, -2))
+                        }
+                        body.addView(image, LinearLayout.LayoutParams(-1, -2))
+                        if (result.pageCount > 1) {
+                            val controls = LinearLayout(this@MainActivity).apply {
+                                orientation = LinearLayout.HORIZONTAL
+                                gravity = android.view.Gravity.CENTER_VERTICAL
+                            }
+                            var currentPage = result.pageIndex
+                            var loadingPage = false
+                            val counter = TextView(this@MainActivity).apply {
+                                text = "Página 1 de " + result.pageCount
+                                textSize = 13f
+                                setTextColor(android.graphics.Color.WHITE)
+                                gravity = android.view.Gravity.CENTER
+                            }
+                            val previous = Button(this@MainActivity).apply {
+                                text = "Anterior"
+                                isEnabled = false
+                            }
+                            val next = Button(this@MainActivity).apply {
+                                text = "Siguiente"
+                            }
+                            fun updateControls() {
+                                previous.isEnabled = !loadingPage && currentPage > 0
+                                next.isEnabled = !loadingPage && currentPage < result.pageCount - 1
+                            }
+                            fun navigate(delta: Int) {
+                                val requested = currentPage + delta
+                                if (loadingPage || requested !in 0 until result.pageCount) return
+                                loadingPage = true
+                                updateControls()
+                                executor.execute {
+                                    val page = runCatching {
+                                        SkyAttachmentPreview.readPdfPage(
+                                            contentResolver, item, requested)
+                                    }
+                                    runOnUiThread {
+                                        if (isFinishing) return@runOnUiThread
+                                        page.onSuccess { loaded ->
+                                            image.setImageBitmap(loaded.bitmap)
+                                            image.contentDescription = loaded.label
+                                            currentPage = requested
+                                            counter.text = "Página " + (currentPage + 1) +
+                                                " de " + result.pageCount
+                                        }.onFailure { error ->
+                                            counter.text = "No se pudo leer la página: " +
+                                                (error.message ?: "error de lectura")
+                                        }
+                                        loadingPage = false
+                                        updateControls()
+                                    }
+                                }
+                            }
+                            previous.setOnClickListener { navigate(-1) }
+                            next.setOnClickListener { navigate(1) }
+                            controls.addView(previous, LinearLayout.LayoutParams(0, -2, 1f))
+                            controls.addView(counter, LinearLayout.LayoutParams(0, -2, 1f))
+                            controls.addView(next, LinearLayout.LayoutParams(0, -2, 1f))
+                            body.addView(controls)
+                        }
                     }
                     body.addView(TextView(this).apply {
                         text = result.label + "\n\n" + result.details.take(5700)
