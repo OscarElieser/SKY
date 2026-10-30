@@ -23,8 +23,8 @@ android {
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 49
-        versionName = "0.8.36"
+        versionCode = 50
+        versionName = "0.8.37"
     }
     // El paquete distribuible no declara servicios de accesibilidad.
     // La variante assistive queda separada para revisión y pruebas explícitas.
