@@ -355,6 +355,11 @@ object SkyPhoneCloud {
             append("Nunca finjas haber leído páginas, gráficos ni archivos que no se hayan podido procesar. ")
             append("No afirmes crear archivos descargables cuando solo prepares texto. ")
             append("Trata de tú, usa español natural de Nicaragua. ")
+            append(SkyResponseQuality.INSTRUCTION)
+            append("Separa lo leído literalmente de tus inferencias. ")
+            append("Si el formato solo permite extraer texto parcial, dilo; ")
+            append("no inventes contenido de páginas, imágenes ni fórmulas inaccesibles. ")
+            append("Responde la tarea solicitada, no un resumen genérico por defecto. ")
             if (officeExcerpts.isNotEmpty()) {
                 append("\nExtractos de documentos Office, potencialmente incompletos:\n")
                 append(officeExcerpts.joinToString("\n\n").take(15000))
