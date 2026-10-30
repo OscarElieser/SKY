@@ -1,3 +1,18 @@
+## SKY Android — respuestas científicas y vistas previas locales (30/10/2026)
+
+**Cambio integrado en código de main; no equivale a compilación, APK publicada ni validación en teléfono. Solo se modifica Android; SKY Windows permanece intacta.**
+
+- **Respuestas premium:** las burbujas estructuradas de SKY muestran títulos, énfasis, listas, fragmentos de código, tablas Markdown y matemáticas mediante MathML Core sin ejecutar JavaScript ni descargar bibliotecas. El renderizado depende de Android System WebView y se comprobará en el Samsung real. Hay un subconjunto definido de LaTeX (fracciones, potencias, subíndices, raíces, símbolos y flechas): no es un motor TeX completo.
+- **Exactitud académica:** instrucciones comunes para Groq/Gemini y análisis de archivos que priorizan datos, unidades, hipótesis, fórmula, sustitución, resultado, análisis dimensional y aclaración de datos insuficientes. Estas instrucciones no certifican que un LLM haya realizado una verificación numérica independiente.
+- **Vista previa antes de enviar:** al seleccionar documentos por el explorador Android, SKY muestra la primera página de PDF, miniaturas acotadas de imágenes, muestras de texto y Office, o metadatos multimedia. Pregunta **«¿Qué querés que haga SKY con este archivo?»**; deja la instrucción en el cuadro de chat para edición y solo envía tras autorizar explícitamente la operación con Gemini. Permite reabrir la vista previa de cada adjunto desde el gestor.
+- **Límites honestos:** Office se extrae parcialmente sin garantizar gráficos/diseño; audio/video local muestra metadatos, no transcripción completa. No todo formato binario tiene decodificador; los formatos no compatibles deben identificarse como tales. Sigue vigente el máximo de 5 archivos y 100 MB por archivo compatible, hasta 300 MB combinados, y PDF de 50 MB según backend.
+- **Seguridad:** los adjuntos no ejecutan macros ni scripts; el marcado de respuestas se escapa y su visor bloquea JavaScript, acceso a archivos y red. Se mantiene el consentimiento por consulta, los controles de privacidad y el historial existente.
+- **Pruebas:** SkyScientificMarkupTest.kt cubre ecuaciones, subíndices, reacciones, títulos y escape de marcado. Pendientes: resultados de CI, validación visual de MathML en Android 16, prueba de vista previa real y lectura de adjuntos en el Samsung.
+
+[Ver compilaciones y pruebas](https://github.com/OscarElieser/SKY/actions/workflows/sky-mobile-release.yml).
+
+---
+
 ## SKY Android — comprobación local y opcional de reproducción (30/10/2026)
 
 **Solo Android. SKY Windows intacta.** Esta actualización agrega un verificador real de la sesión multimedia usando únicamente APIs locales de Android; no incorpora un modelo LLM entrenado en el teléfono ni garantiza que una app de terceros reproduzca automáticamente lo pedido.
