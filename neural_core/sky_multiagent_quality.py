@@ -25,10 +25,10 @@ _UNVERIFIED_ACTIONS = re.compile(
     r"descargu[eé]|abr[ií]|cre[eé]|consult[eé]|verifiqu[eé])\b"
 )
 _RECENT_ACTION = re.compile(
-    r"(?im)(?:^|[.!?]\\s+)(?:sky[\\s,:-]+)?"
-    r"(?:acabo|acabamos)\\s+de\\s+"
+    r"(?im)(?:^|[.!?]\s+)(?:sky[\s,:-]+)?"
+    r"(?:acabo|acabamos)\s+de\s+"
     r"(?:instalar|modificar|enviar|borrar|eliminar|publicar|ejecutar|"
-    r"desplegar|subir|descargar|abrir|crear|consultar|verificar)\\b"
+    r"desplegar|subir|descargar|abrir|crear|consultar|verificar)\b"
 )
 _FALSE_GROUNDING = re.compile(
     r"(?im)(?:^|[.!?]\s+)(?:ya\s+)?(?:investigu[eé]|navegu[eé]|"
