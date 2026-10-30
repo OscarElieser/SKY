@@ -331,5 +331,23 @@ class SafeFilesHTTPTests(unittest.TestCase):
         self.assertIn("/api/sky/safe-files/commit",hud)
         self.assertIn("Analizar y proponer",hud)
 
+
+    def test_local_ai_analysis_uses_no_cloud_and_never_writes(self):
+        from unittest.mock import patch as mocked
+        self.add("resumen.md","SKY enseña tecnología de forma profesional.")
+        target=Path(os.environ["SKY_SAFE_WORKSPACE_ROOT"])/"resumen.md"
+        sha=self.client.get("/api/sky/safe-files/analyze/resumen.md",headers=self.h).json()["sha256"]
+        request={"name":"resumen.md","expected_sha":sha,
+                 "instruction":"Analizá si este texto es claro"}
+        self.assertEqual(self.client.post("/api/sky/safe-files/ai-analyze",json=request).status_code,401)
+        with mocked("neural_core.providers.reply",return_value="Sugerencia local") as fake:
+            answer=self.client.post("/api/sky/safe-files/ai-analyze",headers=self.h,json=request)
+        self.assertEqual(answer.status_code,200,answer.text)
+        self.assertEqual(answer.json()["analysis"],"Sugerencia local")
+        self.assertFalse(answer.json()["cloud_called"])
+        self.assertFalse(answer.json()["file_modified"])
+        self.assertEqual(fake.call_args.kwargs["provider"],"ollama")
+        self.assertEqual(target.read_text(),"SKY enseña tecnología de forma profesional.")
+
 if __name__=="__main__":
     unittest.main()

@@ -71,5 +71,27 @@ class EditingTests(unittest.TestCase):
         v=edit.preview(p.name,"replace_once",ws._hash(p),"SKY","Centro")
         edit.prepare(p.name,"replace_once",ws._hash(p),"SKY","Centro",v["proposal_digest"])
         self.assertIn(secret,p.read_text(encoding="utf-8"))
+
+    def test_local_ai_is_explicit_only_and_advisory(self):
+        p=self.make(body="SKY desarrolla contenidos educativos con evidencia.")
+        with patch("neural_core.providers.reply",return_value="Revisá la coherencia.") as fake:
+            result=edit.analyze_with_local_ai(p.name,ws._hash(p),
+                                               "Identificá mejoras de redacción")
+        self.assertEqual(result["provider"],"ollama-localhost")
+        self.assertTrue(result["advisory_only"])
+        self.assertFalse(result["file_modified"])
+        self.assertFalse(result["facts_independently_verified"])
+        self.assertEqual(fake.call_args.kwargs["provider"],"ollama")
+        self.assertIn("contenidos educativos",fake.call_args.args[0][1]["content"])
+        self.assertEqual(p.read_text(),"SKY desarrolla contenidos educativos con evidencia.")
+
+    def test_local_ai_rejects_stale_hash_before_provider(self):
+        p=self.make(body="SKY redacta una guía real.")
+        sha=ws._hash(p)
+        p.write_text("Edición externa",encoding="utf-8")
+        with patch("neural_core.providers.reply",side_effect=AssertionError("Should not call")):
+            with self.assertRaises(ws.WorkspaceConflict):
+                edit.analyze_with_local_ai(p.name,sha,"Analizá la claridad del texto")
+
 if __name__=="__main__":
     unittest.main()

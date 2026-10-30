@@ -122,6 +122,26 @@ def prepare_edit(body: EditPrepare,request: Request):
     except (OSError, ValueError, RuntimeError) as exc:_failure(exc)
 
 
+class AIAnalysisInput(BaseModel):
+    name: str = Field(min_length=1,max_length=91)
+    expected_sha: str = Field(min_length=64,max_length=64)
+    instruction: str = Field(min_length=8,max_length=800)
+
+@router.post("/ai-analyze")
+def analyze_using_local_model(body: AIAnalysisInput):
+    """Petición EXPLÍCITA del propietario, texto únicamente a Ollama localhost."""
+    from neural_core import sky_safe_file_edits as editor
+    from neural_core.providers import ProviderError
+    try:
+        return editor.analyze_with_local_ai(body.name,body.expected_sha,body.instruction)
+    except ProviderError as exc:
+        raise HTTPException(503,"Ollama local no disponible; no se consultó la nube.") from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(404,"Archivo no encontrado.") from exc
+    except (OSError,ValueError,RuntimeError) as exc:
+        _failure(exc)
+
+
 @router.get("/text/{name}")
 def inspect_text(name: str):
     # Lectura de texto acotada y autenticada para edición en el HUD.

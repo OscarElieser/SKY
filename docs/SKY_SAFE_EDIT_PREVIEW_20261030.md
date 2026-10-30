@@ -20,3 +20,14 @@ Alcance: TXT, MD, CSV, JSON, PY y HTML; DOCX/PDF/PPTX/XLSX conservan
 solo lectura. No se promete conservar estructura de binarios complejos
 al editarlos. No hay autoedición por solicitudes libres ni permiso al token
 del chat Android para modificar archivos.
+
+
+## Análisis asistido voluntario (solo Ollama local)
+POST /api/sky/safe-files/ai-analyze: name, expected_sha, instruction.
+Envía un fragmento de hasta 9000 caracteres al Ollama configurado en localhost;
+si Ollama no está operativo, devuelve 503 sin fallback a nube. El fragmento se
+trata como contenido no confiable (defensa ante instrucciones incrustadas).
+Respuesta consultiva, no ejecutable, sin guardado, sin verificación factual
+independiente. La aplicación muestra claramente que las sugerencias NO se han
+aplicado. Para modificar sigue siendo indispensable comparar, preparar recibo y
+confirmar con PIN. El botón no envía nada hasta que el dueño lo pulsa.

@@ -3518,6 +3518,27 @@
       panel.appendChild(el('h3','','Contenido revisado (fragmento)'));
       panel.appendChild(excerpt);
       if(analysis.truncated_excerpt)panel.appendChild(el('p','muted','El fragmento fue recortado: no representa todo el archivo.'));
+      // El usuario debe solicitar expresamente el análisis al modelo LOCAL.
+      const aiQuestion=el('textarea','hab-in');aiQuestion.rows=2;aiQuestion.maxLength=800;
+      aiQuestion.placeholder='Ejemplo: Revisá claridad, coherencia y posibles errores.';
+      const aiLabel=el('label','sky-safe-field','Consulta voluntaria a Ollama local');
+      aiLabel.appendChild(aiQuestion);
+      const aiButton=el('button','btn','Analizar con IA local (opcional)');
+      aiButton.type='button';
+      const aiResult=el('pre','sky-safe-preview','La IA no ha sido consultada.');
+      aiResult.style.whiteSpace='pre-wrap';aiResult.style.wordBreak='break-word';
+      panel.append(aiLabel,aiButton,aiResult);
+      aiButton.addEventListener('click',async()=>{
+        aiButton.disabled=true;aiResult.textContent='Analizando con el motor local...';
+        try{
+          const answer=await api('/api/sky/safe-files/ai-analyze',{
+            method:'POST',body:JSON.stringify({name:analysis.name,
+              expected_sha:analysis.sha256,instruction:aiQuestion.value})});
+          aiResult.textContent='Sugerencia de '+answer.provider+
+            ' (orientativa, NO aplicada ni certificada):\n\n'+answer.analysis;
+        }catch(error){aiResult.textContent='No fue posible el análisis local: '+error.message;}
+        finally{aiButton.disabled=false;}
+      });
       if(!analysis.editable_via_proposal){
         panel.appendChild(el('p','muted',
           'Este formato o tamaño admite lectura, pero no edición literal desde esta ventana. El original está intacto.'));
