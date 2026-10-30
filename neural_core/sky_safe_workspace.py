@@ -54,8 +54,12 @@ def _name(value: str) -> str:
         raise WorkspaceError("Usá un nombre de archivo simple, sin carpetas ni rutas.")
     if Path(value).suffix.lower() not in EXTS:
         raise WorkspaceError("Extensión de archivo no admitida.")
-    if value.startswith("."):
-        raise WorkspaceError("No se admiten nombres ocultos.")
+    if value.startswith(".") or value.endswith((" ", ".")):
+        raise WorkspaceError("Nombre oculto o terminación inválida.")
+    first = value.split(".", 1)[0].rstrip(" ").upper()
+    reserved = {"CON", "PRN", "AUX", "NUL"} | {prefix + str(n) for prefix in ("COM", "LPT") for n in range(1, 10)}
+    if first in reserved:
+        raise WorkspaceError("Nombre reservado por Windows.")
     return value
 
 
