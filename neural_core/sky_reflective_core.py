@@ -134,9 +134,13 @@ def recall(request: str, *, limit: int = 2) -> list[dict]:
     """RAG local de etiquetas verificables, nunca fuente de instrucciones ejecutables."""
     if type(limit) is not int or not 1 <= limit <= 5:
         raise ValueError("Límite fuera de rango")
-    target = _vector(topic_for(request), "none")
+    topic = topic_for(request)
+    target = _vector(topic, "none")
+    # Ollama es opcional, exclusivamente local. Si falla, SKY sigue funcional.
+    from . import sky_reflective_embeddings as embeddings
+    semantic = embeddings.related_topics(topic)
     with _LOCK, closing(_connect()) as db:
-        rows = db.execute("""SELECT issue, outcome, vector_json, observed_at
+        rows = db.execute("""SELECT topic, issue, outcome, vector_json, observed_at
                              FROM reflective_experiences WHERE observed_at >= ?
                              ORDER BY id DESC LIMIT 300""", (int(time.time()) - _RETENTION_SECONDS,)).fetchall()
     candidates = []
@@ -147,10 +151,11 @@ def recall(request: str, *, limit: int = 2) -> list[dict]:
             vector = json.loads(row["vector_json"])
             if not isinstance(vector, list) or len(vector) != _DIMENSIONS:
                 continue
-            score = sum(float(a) * float(b) for a, b in zip(target, vector))
+            score = (semantic.get(row["topic"], -1.0) if semantic is not None
+                     else sum(float(a) * float(b) for a, b in zip(target, vector)))
         except (ValueError, TypeError):
             continue
-        if score >= 0.5:
+        if score >= (0.65 if semantic is not None else 0.5):
             candidates.append((score, row["observed_at"], row["issue"]))
     seen = set()
     results = []
@@ -171,8 +176,33 @@ def safe_feedback(report: dict) -> str:
     return _LESSONS.get(code, "")
 
 
+def report() -> dict:
+    """Métricas comprobables sobre pruebas de habilidades, no acciones físicas."""
+    with _LOCK, closing(_connect()) as db:
+        rows = db.execute("""SELECT topic, outcome, issue, COUNT(*) AS total
+                             FROM reflective_experiences
+                             WHERE observed_at >= ?
+                             GROUP BY topic, outcome, issue""",
+                          (int(time.time()) - _RETENTION_SECONDS,)).fetchall()
+    by_topic: dict[str, dict] = {}
+    for row in rows:
+        entry = by_topic.setdefault(row["topic"], {"passed_tests": 0, "failed_tests": 0, "failure_categories": {}})
+        count = int(row["total"])
+        entry[row["outcome"]] += count
+        if row["outcome"] == "failed_tests":
+            entry["failure_categories"][row["issue"]] = count
+    for entry in by_topic.values():
+        total = entry["passed_tests"] + entry["failed_tests"]
+        entry["pass_rate"] = round(entry["passed_tests"] / total, 3) if total else None
+    return {"total_observations": sum(v["passed_tests"] + v["failed_tests"] for v in by_topic.values()),
+            "by_topic": by_topic, "device_actions_verified": False,
+            "model_weights_updated": False, "records_are_tests_not_hardware_actions": True}
+
+
 def capabilities() -> dict:
+    from .sky_reflective_embeddings import capabilities as semantic_capabilities
     return {"storage": "local_sqlite", "vector": "fixed_feature_hashing_32d",
-            "semantic_llm_embeddings": False, "retention_days": 90,
-            "stores_raw_prompts_or_errors": False, "runs_generated_code": False,
-            "automatic_install": False, "model_weights_updated": False}
+            "semantic_llm_embeddings": semantic_capabilities(),
+            "retention_days": 90, "stores_raw_prompts_or_errors": False,
+            "runs_generated_code": False, "automatic_install": False,
+            "model_weights_updated": False}
