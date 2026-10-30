@@ -27,6 +27,9 @@ SKY IA es un proyecto de asistente inteligente que reúne **voz, texto, control 
 ---
 
 
+
+> **Instagram / Meta (29/10/2026):** webhook HTTPS verificado, función de Supabase v16 desplegada y bandeja privada de eventos añadida con RLS, deduplicación y acceso autenticado. Todavía faltan una entrega real a la v16, permisos/suscripciones en Meta y su interfaz Android; no se activan respuestas automáticas. [Evidencias y próximos ensayos](supabase/SKY_INSTAGRAM_DEPLOYMENT.md).
+
 ## 📱 SKY Android 0.8.27 — ejecución verificable y aprendizaje de resultados
 
 El módulo móvil integra controles Android con resultados observables: cambios de volumen comprobados antes/después, notas reabiertas tras guardar, evidencias persistentes diferenciadas de simples solicitudes, métricas locales por tipo de resultado y validación explícita del origen del propietario al ejecutar órdenes por voz. Las aperturas de apps y los eventos musicales **no** se consideran tareas terminadas si Android solo aceptó la solicitud. El trabajo conserva los límites de permisos y no modifica SKY Windows.
