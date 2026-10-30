@@ -98,6 +98,13 @@ def reflective_metrics():
     return {"metrics": report(), "capabilities": capabilities()}
 
 
+@router.get("/multiagent-quality")
+def multiagent_quality_status():
+    """Estado consultivo compartido por Windows y clientes Android autenticados."""
+    from neural_core.sky_unified_agents import capability_status
+    return capability_status()
+
+
 @router.get("/native-evolution")
 def native_evolution_status():
     """Lectura protegida de aprendizaje estadístico local, sin secretos."""

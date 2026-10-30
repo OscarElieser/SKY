@@ -28,6 +28,10 @@ _TOPICS = {
     "fechas": ("fecha", "calendario", "horario", "agenda", "dia", "mes"),
     "formato": ("formato", "tabla", "json", "csv", "lista"),
     "datos": ("datos", "estadistica", "contar", "promedio", "ordena"),
+    "programacion": ("program", "python", "flutter", "kotlin", "códig", "codigo", "software", "depurar"),
+    "educacion": ("educacion", "educación", "pedagog", "docencia", "curso", "rubrica", "rúbrica", "meidi"),
+    "investigacion": ("investig", "cientific", "científic", "tesis", "articulo", "artículo", "fuentes"),
+    "seguridad": ("seguridad", "auditor", "vulnerab", "ciberseguridad", "proteccion", "protección"),
 }
 _ISSUES = frozenset({"syntax", "prohibited_code", "invalid_contract", "test_mismatch",
                      "sandbox_failure", "timeout", "unclassified", "none"})
