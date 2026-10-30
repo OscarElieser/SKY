@@ -155,7 +155,7 @@ class MainActivity : Activity() {
                     instagramSay("El último mensaje dice: " +
                         SkyInstagramInboxRules.preview(msg.body, 220) +
                         ". Para preparar una respuesta, necesito compartir ese texto " +
-                        "con " + if (tokens.groqEnabled()) "Groq" else "Gemini" +
+                        "con " + (if (tokens.groqEnabled()) "Groq" else "Gemini") +
                         ". ¿Autorizás esa consulta? Decime sí autorizo o no.")
                 }.onFailure {
                     instagramSay("No pude recuperar un mensaje de Instagram válido: " +
