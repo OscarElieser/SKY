@@ -7,6 +7,8 @@ class SkyInstagramDraftFlowTest {
     @Test fun identifiesExplicitDraftRequestsWithoutInterferingOtherApps() {
         assertEquals(SkyInstagramDraftFlow.Command.PREPARE,
             SkyInstagramDraftFlow.command("SKY, redacta una respuesta al último mensaje de Instagram"))
+        assertEquals(SkyInstagramDraftFlow.Command.CHECK_SEND,
+            SkyInstagramDraftFlow.command("SKY, podemos responder mensajes de Instagram"))
         assertEquals(SkyInstagramDraftFlow.Command.COPY,
             SkyInstagramDraftFlow.command("copia la respuesta"))
         assertEquals(SkyInstagramDraftFlow.Command.SEND_REQUEST,
