@@ -1,0 +1,27 @@
+name: SKY Reflective Core
+on:
+  push:
+    paths:
+      - 'neural_core/sky_reflective_core.py'
+      - 'neural_core/sky_skill_builder.py'
+      - 'tests/test_sky_reflective_core.py'
+      - '.github/workflows/sky-reflective-core.yml'
+  pull_request:
+    paths:
+      - 'neural_core/sky_reflective_core.py'
+      - 'neural_core/sky_skill_builder.py'
+      - 'tests/test_sky_reflective_core.py'
+      - '.github/workflows/sky-reflective-core.yml'
+jobs:
+  reflection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pytest
+      - run: python -m pytest tests/test_sky_reflective_core.py -q
