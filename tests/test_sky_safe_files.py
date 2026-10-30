@@ -225,6 +225,13 @@ class SafeFilesHTTPTests(unittest.TestCase):
         self.assertFalse(response.json()["executed"])
         self.assertEqual(self.client.get("/api/sky/safe-files/text/lesson.txt").status_code,401)
 
+    def test_chat_approval_requires_explicit_user_action(self):
+        hud=Path("metaverse/static/hud.js").read_text(encoding="utf-8")
+        self.assertIn("presentarPropuestaArchivo",hud)
+        self.assertIn("data.tipo === 'safe_file_proposal'",hud)
+        self.assertIn("confirmar(card,names[spec.op]+' '+spec.name,execute,true)",hud)
+        self.assertIn("approval_token:prepared.approval_token",hud)
+
     def test_hud_has_visible_approval_workflow(self):
         hud=Path("metaverse/static/hud.js").read_text(encoding="utf-8")
         html=Path("metaverse/static/hud.html").read_text(encoding="utf-8")

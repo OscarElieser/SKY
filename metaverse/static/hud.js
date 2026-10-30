@@ -913,6 +913,7 @@
       if (data.aprendizaje && ventanas.has('kpi')) KPI.cargar();
       await decir(data.mensaje || '', undefined, data.sky_cognition?.speech_text || null); return;
     }
+    if (data.tipo === 'safe_file_proposal') { await presentarPropuestaArchivo(data, modo); return; }
     if (data.tipo === 'error') { setState('error', 'Revisá el motor de IA'); addMsg('sky', data.mensaje || 'Error.', 'err'); await speak('Tengo un problema: ' + (data.mensaje || '').split('.')[0]); return; }
     if (data.tipo === 'ciclo') { await cicloUI(data, modo); return; }
     if (data.tipo === 'accion') { await accion(data, modo); return; }
@@ -920,6 +921,82 @@
     if (data.tipo === 'correo') { await correoOrden(data, modo); return; }
     await decir(data.mensaje || 'Listo.');
   }
+  /* Borrador de archivos: sólo el usuario aprueba cambios después del preview. */
+  async function presentarPropuestaArchivo(data, modo) {
+    const spec=data && data.propuesta_archivo;
+    if (!spec || !['create','replace','append','rename','trash','restore'].includes(spec.op)
+        || typeof spec.name !== 'string') {
+      addMsg('sky','La propuesta de archivo es inválida. No se cambió nada.','err');
+      return;
+    }
+    const names={create:'Crear',replace:'Reemplazar',append:'Añadir texto',
+      rename:'Renombrar',trash:'Mover a papelera',restore:'Restaurar'};
+    const card=addCard('SKY · Archivo supervisado',data.mensaje||'Revisá la propuesta.');
+    const content=typeof spec.text==='string'?spec.text:
+      (spec.document?JSON.stringify(spec.document,null,2):'');
+    const summary=el('pre','sky-safe-chat-preview',
+      'Operación: '+names[spec.op]+'\nArchivo: '+spec.name+
+      (spec.new_name?'\nNombre nuevo: '+spec.new_name:'')+
+      (spec.trash_id?'\nID de papelera: '+spec.trash_id:'')+
+      (content?'\n\nContenido:\n'+content.slice(0,4000):'')+
+      '\n\nNo se modificó ningún archivo. Se necesita tu autorización personal.');
+    card.appendChild(summary);
+    setState('thinking','Preparando vista previa');
+    try {
+      const prepared=await api('/api/sky/safe-files/prepare',{
+        method:'POST',body:JSON.stringify({spec})});
+      if(!prepared || !prepared.preview || !prepared.approval_token)
+        throw Error('El servidor no entregó una vista previa válida.');
+      const p=prepared.preview;
+      card.appendChild(el('div','note',
+        'Vista previa: '+p.op+' · '+p.name+
+        '\nEstado previo: '+(p.expected_sha==='absent'?'No existe':String(p.expected_sha).slice(0,16)+'…')+
+        '\nBytes preparados: '+p.bytes_to_write+
+        '\nAutorización de un solo uso, hasta '+prepared.expires_in_seconds+' segundos.'));
+      const execute=async()=>{
+        setState('executing','Validando tu aprobación');
+        try{
+          const result=await api('/api/sky/safe-files/commit',{
+            method:'POST',body:JSON.stringify({spec,
+              approval_token:prepared.approval_token,
+              expected_sha:p.expected_sha,destination_state:p.destination_state})});
+          if(!result.ok || !result.verified_after_write)
+            throw Error('No se pudo acreditar el resultado.');
+          card.appendChild(el('div','res','Archivo verificado: '+result.operation+' · '+result.name));
+          if(result.result && result.result.download){
+            const link=el('a','btn','Descargar archivo');
+            link.href=result.result.download;
+            link.addEventListener('click',async(event)=>{
+              event.preventDefault();
+              try{
+                const r=await fetch(link.href,{headers:headers({},false)});
+                if(!r.ok)throw Error('Error de descarga '+r.status);
+                const blob=await r.blob(),u=URL.createObjectURL(blob);
+                const a=el('a');a.href=u;a.download=result.name;document.body.appendChild(a);
+                a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000);
+              }catch(err){card.appendChild(el('div','res bad',err.message));}
+            });
+            card.appendChild(link);
+          }
+          setState('idle','Cambio verificado');
+        }catch(err){
+          card.appendChild(el('div','res bad','No se pudo completar: '+err.message));
+          setState('error','No se completó la operación');
+        }
+        seguirConversacion();
+      };
+      confirmar(card,names[spec.op]+' '+spec.name,execute,true);
+      setState('idle','Revisá y confirmá personalmente');
+      if(modo==='voz'){
+        await speak('La vista previa está en pantalla. Tocá Ejecutar para autorizar.');
+        seguirConversacion();
+      }
+    }catch(err){
+      card.appendChild(el('div','res bad','No pude preparar el archivo: '+err.message));
+      setState('error','Vista previa no disponible');
+    }
+  }
+
   async function accion(data, modo) {
     const p = data.propuesta;
     if (data.interfaz) { await interfaz(p); return; }
