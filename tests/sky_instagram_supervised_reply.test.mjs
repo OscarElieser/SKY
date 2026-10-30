@@ -54,7 +54,7 @@ test("atomic one-time approval prevents duplicate send after errors", () => {
   assert.match(backend,/delivery_not_confirmed_no_retry/);
   assert.match(backend,/nextState === "sent"/);
   assert.match(backend,/returnedRecipient === row.recipient_id/);
-  assert.match(mobile,/No lo repetiré para evitar duplicados/);
+  assert.match(main,/No voy a repetirlo automáticamente|No voy a repetirlo automáticamente/);
 });
 
 test("Meta timestamp accepts seconds and milliseconds, without false history", () => {
