@@ -299,19 +299,27 @@ def commit(spec, expected_sha: str, destination_state: str | None):
                               "download": "/api/sky/safe-files/download/" + name}
                 elif op == "rename":
                     os.rename(target, folder / s["new_name"])
-                    result = {"name": s["new_name"], "sha256": _hash(folder / s["new_name"])}
+                    renamed_sha = _hash(folder / s["new_name"])
+                    if renamed_sha != expected_sha:
+                        raise WorkspaceConflict("La comprobación del archivo renombrado falló.")
+                    result = {"name": s["new_name"], "sha256": renamed_sha}
                 elif op == "trash":
                     dest = _trash_dir()
                     ident = secrets.token_hex(16)
                     os.rename(target, dest / ident)
+                    if _hash(dest / ident) != expected_sha:
+                        raise WorkspaceConflict("La comprobación del archivo en papelera falló.")
                     db.execute("INSERT INTO trash(id,original,sha,bytes,at) VALUES(?,?,?,?,?)",
                                (ident, name, expected_sha, (dest / ident).stat().st_size, int(time.time())))
                     result = {"trash_id": ident, "recoverable": True}
                 else:
                     origin = _trash_dir() / s["trash_id"]
                     os.rename(origin, target)
+                    restored_sha = _hash(target)
+                    if restored_sha != destination_state:
+                        raise WorkspaceConflict("La restauración no superó la comprobación.")
                     db.execute("UPDATE trash SET restored=1 WHERE id=? AND restored=0", (s["trash_id"],))
-                    result = {"sha256": _hash(target), "restored": True}
+                    result = {"sha256": restored_sha, "restored": True}
                 _audit(db, op, name, "verified", int(result.get("bytes", 0)))
         return {"ok": True, "operation": op, "name": name,
                 "result": result, "verified_after_write": True,
