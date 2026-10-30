@@ -190,6 +190,18 @@ class SafeFilesHTTPTests(unittest.TestCase):
                              json={"spec":{"op":"create","name":"x.txt","text":"secret"}})
         self.assertEqual(res.status_code,401)
 
+    def test_json_invalid_and_duplicate_keys_rejected_before_approval(self):
+        for text in ('{"x":1,"x":2}', '{"x":NaN}', '{"x": }'):
+            with self.subTest(text=text):
+                p=self.prepare({"op":"create","name":"wrong.json","text":text})
+                self.assertEqual(p.status_code,422,p.text)
+
+    def test_confirmations_reject_extra_fields(self):
+        p=self.prepare({"op":"create","name":"safe.txt","text":"Hello","private_data":"ignored"})
+        self.assertEqual(p.status_code,422)
+        p2=self.prepare({"op":"trash","name":"missing.txt","text":"unexpected"})
+        self.assertEqual(p2.status_code,422)
+
     def test_confirmation_prevents_overwriting_existing(self):
         self.add("existing.txt","Original")
         p=self.prepare({"op":"create","name":"existing.txt","text":"Overwrite"})

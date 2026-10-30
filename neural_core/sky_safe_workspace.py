@@ -132,8 +132,18 @@ def _validate(spec: dict) -> dict:
             if Path(name).suffix.lower() == ".json":
                 if op == "append":
                     raise WorkspaceError("No se añade texto libre a JSON.")
+                def unique_pairs(items):
+                    result = {}
+                    for key, value in items:
+                        if key in result:
+                            raise WorkspaceError("JSON con claves duplicadas.")
+                        result[key] = value
+                    return result
+                def reject_constant(value):
+                    raise WorkspaceError("Número especial JSON no permitido.")
                 try:
-                    json.loads(content, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+                    json.loads(content, object_pairs_hook=unique_pairs,
+                               parse_constant=reject_constant)
                 except (ValueError, RecursionError) as exc:
                     raise WorkspaceError("JSON inválido.") from exc
             normalized["text"] = content
