@@ -326,6 +326,48 @@ class SkyMobileHome(
             "SKY está procesando un mensaje" else "Enviar mensaje escrito a SKY"
     }
 
+    /**
+     * Long scientific answers can exceed Android's single-view height limit.
+     * Open them in their own scrollable, offline viewer instead of truncating.
+     */
+    private fun openFullResponse(answer: String) {
+        val viewer = WebView(host).apply {
+            settings.javaScriptEnabled = false
+            settings.domStorageEnabled = false
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            settings.blockNetworkLoads = true
+            setBackgroundColor(Color.rgb(20, 30, 57))
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(
+                    view: WebView?, request: WebResourceRequest?
+                ) = true
+            }
+            loadDataWithBaseURL(null, SkyScientificMarkup.toHtml(answer),
+                "text/html", "UTF-8", null)
+        }
+        val wrapper = FrameLayout(host).apply {
+            addView(viewer, FrameLayout.LayoutParams(-1,
+                (host.resources.displayMetrics.heightPixels * 0.67f).toInt()))
+        }
+        val dialog = android.app.AlertDialog.Builder(host)
+            .setTitle("SKY IA · Respuesta completa")
+            .setView(wrapper)
+            .setNeutralButton("Copiar texto") { _, _ ->
+                val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("SKY IA", answer))
+                Toast.makeText(host, "Respuesta copiada", Toast.LENGTH_SHORT).show()
+            }
+            .setPositiveButton("Cerrar", null)
+            .create()
+        dialog.setOnDismissListener {
+            wrapper.removeView(viewer)
+            viewer.stopLoading()
+            viewer.destroy()
+        }
+        dialog.show()
+    }
+
     private fun makeBubble(value: String, mine: Boolean): LinearLayout {
         val item = LinearLayout(host).apply {
             orientation = LinearLayout.VERTICAL
@@ -344,8 +386,12 @@ class SkyMobileHome(
         // A lightweight native bubble is enough for short plain messages.
         // WebView/MathML is reserved for structured answers to save memory.
         val rich = !mine && (value.contains('\n') || value.contains("\\[") ||
-            value.contains("\\(") || value.contains("**") ||
+            value.contains("\\(") || value.contains("**") || value.contains("$") ||
             value.trimStart().startsWith("#"))
+        val tooLong = !mine && value.length > 9000
+        val visibleValue = if (tooLong)
+            value.take(6800) + "\n\nVista previa de la respuesta. Tocá «Leer completa» para ver el resto."
+            else value
         val bubble: View = if (!rich) {
             text(value, 15f, white).apply {
                 gravity = Gravity.START
@@ -383,7 +429,7 @@ class SkyMobileHome(
                     }
                 }
                 loadDataWithBaseURL(
-                    null, SkyScientificMarkup.toHtml(value), "text/html", "UTF-8", null
+                    null, SkyScientificMarkup.toHtml(visibleValue), "text/html", "UTF-8", null
                 )
             }
         }
@@ -402,6 +448,16 @@ class SkyMobileHome(
             if (mine) LinearLayout.LayoutParams.WRAP_CONTENT else LinearLayout.LayoutParams.MATCH_PARENT,
             if (mine) LinearLayout.LayoutParams.WRAP_CONTENT else dp(56)
         ))
+        if (tooLong) {
+            item.addView(pill("Leer respuesta completa", Color.rgb(54, 81, 133)) {
+                openFullResponse(value)
+            }.apply {
+                textSize = 13f
+                contentDescription = "Leer toda la respuesta científica, sin recortes"
+            }, LinearLayout.LayoutParams(-1, dp(43)).apply {
+                topMargin = dp(8)
+            })
+        }
         return item
     }
 
