@@ -48,6 +48,7 @@ class SkyHandsFreeService : Service() {
         }
         @Volatile var onPhrase: ((String) -> Unit)? = null
         @Volatile var onWake: (() -> Unit)? = null
+        @Volatile var onInstagramNotice: ((Int) -> Unit)? = null
         @Volatile var onStatus: ((Boolean) -> Unit)? = null
         @Volatile var onStopped: (() -> Unit)? = null
         /** Explicit text/voice control from the visible Activity, never from third-party content. */
@@ -90,6 +91,41 @@ class SkyHandsFreeService : Service() {
             else "SKY en espera · decí SKY")
     }
     private val safetyResume = Runnable { resumeFromSpeech() }
+    private val instagramChecking = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val instagramPoll = object : Runnable {
+        override fun run() {
+            if (!running) return
+            if (SkyInstagramAlerts.enabled(this@SkyHandsFreeService) &&
+                SkyInstagramAlerts.paired(this@SkyHandsFreeService) &&
+                instagramChecking.compareAndSet(false, true)) {
+                Thread {
+                    val update = runCatching {
+                        SkyInstagramAlerts.observe(this@SkyHandsFreeService,
+                            SkyInstagramAlerts.fetch(this@SkyHandsFreeService))
+                    }.getOrNull()
+                    handler.post {
+                        instagramChecking.set(false)
+                        if (running && update != null && update.newCount > 0 &&
+                            SkyInstagramAlerts.enabled(this@SkyHandsFreeService)) {
+                            SkyInstagramAlerts.notifyNew(this@SkyHandsFreeService,
+                                update.newCount)
+                            val cb = onInstagramNotice
+                            if (cb != null) cb.invoke(update.newCount)
+                            else if (presence != SkyVoicePresence.Mode.SLEEP_LOCKED) {
+                                val notice = if (update.newCount == 1)
+                                    "Te llegó un mensaje nuevo de Instagram. Podés pedirme que lo lea."
+                                else "Te llegaron " + update.newCount +
+                                    " mensajes de Instagram. Pedime que los revise."
+                                say(notice)
+                            }
+                        }
+                    }
+                }.start()
+            }
+            handler.postDelayed(this, 60_000L)
+        }
+    }
+
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -151,6 +187,7 @@ class SkyHandsFreeService : Service() {
         })
         onStatus?.invoke(!awake)
         arm()
+        handler.post(instagramPoll)
         return START_NOT_STICKY  // No unauthorized microphone auto-restart at boot.
     }
 
@@ -297,6 +334,16 @@ class SkyHandsFreeService : Service() {
      * multimedia son acciones Android; abrir apps requiere UI desbloqueada.
      */
     private fun handleWithoutVisibleUi(command: String) {
+        if (SkyInstagramAlerts.command(command) == SkyInstagramAlerts.Command.READ) {
+            Thread {
+                val answer = runCatching {
+                    SkyInstagramAlerts.summary(SkyInstagramAlerts.fetch(this))
+                }.getOrElse { "No pude consultar Instagram de forma segura." }
+                handler.post { if (running && presence != SkyVoicePresence.Mode.SLEEP_LOCKED)
+                    say(answer) }
+            }.start()
+            return
+        }
         val quick = SkyQuickCommand.parse(command)
         if (quick != null) {
             if (quick == SkyQuickCommand.Action.REQUEST_UNLOCK) {

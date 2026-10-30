@@ -93,6 +93,93 @@ class MainActivity : Activity() {
         "gmail" to Pair("Gmail", "com.google.android.gm")
     )
     private val permissions by lazy { getSharedPreferences("sky_mobile_allowed_apps", MODE_PRIVATE) }
+    // The proactive Instagram check never sends messages or instructions to an LLM.
+    private val instagramChecking = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val instagramPoll = object : Runnable {
+        override fun run() {
+            if (!visible) return
+            if (!SkyHandsFreeService.health().active) checkInstagramAlerts()
+            handler.postDelayed(this, 45_000L)
+        }
+    }
+
+    private fun checkInstagramAlerts() {
+        if (!visible || !SkyInstagramAlerts.enabled(this) ||
+            !SkyInstagramAlerts.paired(this) ||
+            !instagramChecking.compareAndSet(false, true)) return
+        Thread {
+            val result = runCatching {
+                val snapshot = SkyInstagramAlerts.fetch(this)
+                SkyInstagramAlerts.observe(this, snapshot)
+            }
+            runOnUiThread {
+                instagramChecking.set(false)
+                if (!visible || isFinishing) return@runOnUiThread
+                result.getOrNull()?.let { update ->
+                    if (update.newCount > 0 && SkyInstagramAlerts.enabled(this)) {
+                        SkyInstagramAlerts.notifyNew(this, update.newCount)
+                        instagramNotice(update.newCount)
+                    }
+                }
+            }
+        }.start()
+    }
+
+    private fun instagramNotice(count: Int) {
+        if (count < 1 || !SkyInstagramAlerts.enabled(this)) return
+        val notice = if (count == 1)
+            "Te llegó un nuevo mensaje de Instagram. Decime SKY, leeme mis mensajes de Instagram."
+        else "Te llegaron " + count +
+            " mensajes de Instagram. Podés pedirme que te los lea."
+        if (::home.isInitialized) home.showMessage(notice)
+        if (::voicePanel.isInitialized && voicePanel.isVoiceEnabled()) voicePanel.speakReply(notice)
+    }
+
+    private fun readInstagramNow() {
+        if (!SkyInstagramAlerts.paired(this)) {
+            val message = "Necesito que vinculés Instagram una vez desde Conexión segura."
+            home.showMessage(message)
+            if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(message)
+            return
+        }
+        home.showMessage("SKY está revisando tus mensajes reales de Instagram.")
+        Thread {
+            val answer = runCatching { SkyInstagramAlerts.summary(SkyInstagramAlerts.fetch(this)) }
+                .getOrElse { "No pude consultar Instagram: " +
+                    (it.message ?: "error de conexión") }
+            runOnUiThread {
+                if (isFinishing || !visible) return@runOnUiThread
+                home.showMessage(answer)
+                if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(answer)
+            }
+        }.start()
+    }
+
+    private fun processInstagramCommand(message: String): Boolean {
+        return when (SkyInstagramAlerts.command(message)) {
+            SkyInstagramAlerts.Command.NONE -> false
+            SkyInstagramAlerts.Command.READ -> {
+                readInstagramNow()
+                true
+            }
+            SkyInstagramAlerts.Command.ENABLE -> {
+                SkyInstagramAlerts.setEnabled(this, true)
+                val answer = "Listo. Voy a avisarte cuando reciba nuevos mensajes " +
+                    "mientras SKY esté funcionando."
+                home.showMessage(answer)
+                if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(answer)
+                true
+            }
+            SkyInstagramAlerts.Command.DISABLE -> {
+                SkyInstagramAlerts.setEnabled(this, false)
+                val answer = "Desactivé los avisos automáticos de Instagram."
+                home.showMessage(answer)
+                if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(answer)
+                true
+            }
+        }
+    }
+
 
     private fun description(value: String) = TextView(this).apply {
         text = value
@@ -144,6 +231,7 @@ class MainActivity : Activity() {
                 !processReplyCommand(transcript) &&
                 !processCreatorCommand(transcript) &&
                 !processMessagingCommand(transcript) &&
+                !processInstagramCommand(transcript) &&
                 !processLocalPanelCommand(transcript, spoken = true) &&
                 !processCompanionCommand(transcript) &&
                 !processDailyCommand(transcript, spoken = true)) {
@@ -2389,6 +2477,10 @@ class MainActivity : Activity() {
     }
 
     private fun acceptPendingVoiceIntent(openIntent: android.content.Intent?) {
+        if (openIntent?.getBooleanExtra(SkyInstagramAlerts.EXTRA_READ, false) == true) {
+            openIntent.removeExtra(SkyInstagramAlerts.EXTRA_READ)
+            readInstagramNow()
+        }
         val pending = openIntent?.getStringExtra(SkyHandsFreeService.EXTRA_COMMAND)
         if (!pending.isNullOrBlank() && ::voicePanel.isInitialized) {
             openIntent?.removeExtra(SkyHandsFreeService.EXTRA_COMMAND)
@@ -2416,6 +2508,9 @@ class MainActivity : Activity() {
             voicePanel.setConversationMode(getSharedPreferences(
                 "sky_voice_settings", MODE_PRIVATE).getBoolean("fluid_opt_in", false))
         }
+        SkyHandsFreeService.onInstagramNotice = { count ->
+            if (visible) instagramNotice(count)
+        }
         SkyHandsFreeService.onPhrase = { phrase ->
             if (visible && ::voicePanel.isInitialized) voicePanel.acceptHandsFreeTranscript(phrase)
         }
@@ -2442,9 +2537,19 @@ class MainActivity : Activity() {
         handler.postDelayed({ showHandsFreeFirstRun() }, 1100L)
         companionController.onResume()
         handler.post(pollLoop)
+        handler.post(instagramPoll)
+        if (SkyInstagramAlerts.paired(this) && SkyInstagramAlerts.enabled(this) &&
+            android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED &&
+            !handsFreePrefs.getBoolean("instagram_notification_permission_asked", false)) {
+            handsFreePrefs.edit().putBoolean("instagram_notification_permission_asked", true).apply()
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1625)
+        }
     }
     override fun onPause() {
         SkyHandsFreeService.onPhrase = null
+        SkyHandsFreeService.onInstagramNotice = null
         SkyHandsFreeService.onWake = null
         SkyHandsFreeService.onStatus = null
         SkyHandsFreeService.onStopped = null
@@ -2452,9 +2557,11 @@ class MainActivity : Activity() {
         if (::companionController.isInitialized) companionController.onPause()
         if (::voicePanel.isInitialized) voicePanel.onPausePanel()
         handler.removeCallbacks(pollLoop)
+        handler.removeCallbacks(instagramPoll)
         super.onPause()
     }
     override fun onDestroy() {
+        handler.removeCallbacks(instagramPoll)
         handler.removeCallbacks(pollLoop)
         if (::voicePanel.isInitialized) voicePanel.close()
         if (::companionController.isInitialized) companionController.close()
@@ -2776,6 +2883,10 @@ class MainActivity : Activity() {
 
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
+        if (processInstagramCommand(message)) {
+            chatInput.setText("")
+            return
+        }
         if (processPresenceCommand(message)) {
             chatInput.setText("")
             return
@@ -2845,6 +2956,7 @@ class MainActivity : Activity() {
             processReplyCommand(message) ||
             processCreatorCommand(message) ||
             processMessagingCommand(message) ||
+            processInstagramCommand(message) ||
             processLocalPanelCommand(message, spoken = false) ||
             processCompanionCommand(message) || processDailyCommand(message, spoken = voiceReplyOnFace)) {
             chatInput.setText("")

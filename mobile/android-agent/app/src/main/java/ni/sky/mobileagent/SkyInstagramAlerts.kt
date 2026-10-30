@@ -67,7 +67,8 @@ internal object SkyInstagramAlerts {
             as NotificationManager).cancel(NOTIFICATION)
     }
 
-    private fun credential(ctx: Context): String = try {
+    private fun credential(ctx: Context): String {
+        return try {
         val prefs = ctx.getSharedPreferences("sky_instagram_mobile_v1", Context.MODE_PRIVATE)
         val iv = prefs.getString("iv", null) ?: return ""
         val value = prefs.getString("credential", null) ?: return ""
@@ -78,7 +79,8 @@ internal object SkyInstagramAlerts {
         cipher.init(Cipher.DECRYPT_MODE, key,
             GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)))
         String(cipher.doFinal(Base64.decode(value, Base64.NO_WRAP)), Charsets.UTF_8)
-    } catch (_: Exception) { "" }
+        } catch (_: Exception) { "" }
+    }
 
     private fun get(path: String, token: String): JSONObject {
         require(path == "/mobile-profile" || path == "/mobile-events")
