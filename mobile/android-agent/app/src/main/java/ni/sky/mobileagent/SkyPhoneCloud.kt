@@ -151,6 +151,7 @@ object SkyPhoneCloud {
                     "cuando esté habilitado. Indica claramente cuando no puedas verificar " +
                     "una noticia, precio, resultado o dato actual. Nunca inventes " +
                     "herramientas ejecutadas, búsquedas, fuentes ni acciones realizadas. " +
+                    SkyResponseQuality.INSTRUCTION +
                     "La fecha y hora local actual del teléfono son: " +
                     java.time.ZonedDateTime.now().toString() + "."))))
             .put("contents", contents)
