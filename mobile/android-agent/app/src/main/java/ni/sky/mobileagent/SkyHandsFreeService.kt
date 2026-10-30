@@ -82,11 +82,21 @@ class SkyHandsFreeService : Service() {
     private var speechSuspended = false
     private var retryCount = 0
     private var lastCycle = 0L
+    private var listeningStartedAt = 0L
     private var lastPhraseAtMs = 0L
     private var lastErrorCode = 0
     private var pendingBackgroundCommand: String? = null
     private var pendingExpiresAt = 0L
     private val nextListen = Runnable { arm() }
+    private val listenWatchdog = Runnable {
+        if (SkyListenWatchdog.needsRecovery(running, listening, speechSuspended,
+                SystemClock.elapsedRealtime() - listeningStartedAt)) {
+            lastErrorCode = SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+            stopRecognizer() // invalidates callbacks of the stuck recognizer.
+            retryCount = (retryCount + 1).coerceAtMost(5)
+            schedule(1000L)
+        }
+    }
     private val fallAsleep = Runnable {
         awake = false
         onStatus?.invoke(true)
@@ -234,6 +244,7 @@ class SkyHandsFreeService : Service() {
     }
 
     private fun stopRecognizer() {
+        handler.removeCallbacks(listenWatchdog)
         // Invalidate before cancel/destroy: those calls can produce late callbacks.
         recognitionEpoch.invalidate()
         listening = false
@@ -304,7 +315,9 @@ class SkyHandsFreeService : Service() {
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
             }
             listening = true
+            listeningStartedAt = SystemClock.elapsedRealtime()
             engine.startListening(options)
+            handler.postDelayed(listenWatchdog, SkyListenWatchdog.MAX_CYCLE_MS)
         } catch (_: Exception) {
             stopRecognizer()
             retryCount = (retryCount + 1).coerceAtMost(5)
