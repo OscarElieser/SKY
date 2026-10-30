@@ -8,6 +8,12 @@ Las llamadas `SpeechRecognizer.cancel()` y `destroy()` no garantizan que Android
 
 `SkyRecognitionEpoch` invalida la generación anterior **antes** de cancelar el reconocedor. Cada listener conserva su identificador; únicamente el actual y activo puede modificar los estados y entregar resultados.
 
+Si el reconocedor no entrega ningún resultado ni error durante 90 segundos mientras el
+servicio y el micrófono siguen activos, `SkyListenWatchdog` invalida esa sesión
+y solicita otro ciclo local. No intenta reiniciar cuando SKY está hablando,
+desactivada o sin permiso. El mecanismo no puede sortear restricciones de
+batería, bloqueo de pantalla ni terminación del proceso por Android.
+
 La voz sintetizada tiene un problema equivalente: un `TextToSpeech.onDone` de una respuesta ya reemplazada podía reactivar el micrófono mientras SKY seguía pronunciando otra frase. `SkySpeechTurnGuard` solo acepta el identificador vigente **una vez**. Las pausas externas anulan identificadores anteriores y el mecanismo de recuperación de 20 segundos sigue existiendo.
 
 ## Sueño y privacidad
