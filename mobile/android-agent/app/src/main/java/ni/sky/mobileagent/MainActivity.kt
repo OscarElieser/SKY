@@ -96,6 +96,7 @@ class MainActivity : Activity() {
     // The proactive Instagram check never sends messages or instructions to an LLM.
     private val instagramChecking = java.util.concurrent.atomic.AtomicBoolean(false)
     private var instagramReviewOfferUntil = 0L
+    private var instagramDraftOfferUntil = 0L
     private data class InstagramDraftConsent(
         val incoming: String, val eventKey: String,
         val senderId: String, val expiresAt: Long
@@ -280,6 +281,21 @@ class MainActivity : Activity() {
                 ". Sigue sin enviarse. Si querés copiarlo, decime «copia la respuesta».")
             return true
         }
+        if (instagramDraftOfferUntil > now) {
+            when (SkyInstagramDraftFlow.approval(message)) {
+                SkyInstagramDraftFlow.Approval.YES -> {
+                    instagramDraftOfferUntil = 0L
+                    proposeInstagramReply()
+                    return true
+                }
+                SkyInstagramDraftFlow.Approval.NO -> {
+                    instagramDraftOfferUntil = 0L
+                    instagramSay("Está bien, no prepararé ninguna respuesta ahora.")
+                    return true
+                }
+                SkyInstagramDraftFlow.Approval.NONE -> Unit
+            }
+        }
         return when (SkyInstagramDraftFlow.command(message)) {
             SkyInstagramDraftFlow.Command.PREPARE -> {
                 proposeInstagramReply()
@@ -361,6 +377,10 @@ class MainActivity : Activity() {
     }
 
     private fun readInstagramNow() {
+        if (!instagramDeviceUnlocked()) {
+            instagramSay("Desbloqueá el teléfono para consultar mensajes privados.")
+            return
+        }
         if (!SkyInstagramAlerts.paired(this)) {
             val message = "Necesito que vinculés Instagram una vez desde Conexión segura."
             home.showMessage(message)
@@ -369,13 +389,25 @@ class MainActivity : Activity() {
         }
         home.showMessage("SKY está revisando tus mensajes reales de Instagram.")
         Thread {
-            val answer = runCatching { SkyInstagramAlerts.summary(SkyInstagramAlerts.fetch(this)) }
-                .getOrElse { "No pude consultar Instagram: " +
-                    (it.message ?: "error de conexión") }
+            val response = runCatching { SkyInstagramAlerts.fetch(this) }
             runOnUiThread {
                 if (isFinishing || !visible) return@runOnUiThread
-                home.showMessage(answer)
-                if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(answer)
+                if (!instagramDeviceUnlocked()) {
+                    instagramSay("Desbloqueá el teléfono para revisar tus mensajes.")
+                    return@runOnUiThread
+                }
+                response.onSuccess { snapshot ->
+                    val hasMessages = snapshot.messages.isNotEmpty()
+                    instagramDraftOfferUntil = if (hasMessages)
+                        android.os.SystemClock.elapsedRealtime() + 120_000L else 0L
+                    val summary = SkyInstagramAlerts.summary(snapshot) +
+                        if (hasMessages) " ¿Querés que prepare una respuesta al último mensaje?"
+                        else ""
+                    instagramSay(summary)
+                }.onFailure {
+                    instagramSay("No pude consultar Instagram: " +
+                        (it.message ?: "error de conexión"))
+                }
             }
         }.start()
     }
