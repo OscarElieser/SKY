@@ -2876,6 +2876,38 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Real scholarly source from Windows research parity; no fake bibliography. */
+    private fun requestAcademicResearch(question: String) {
+        if (chatPending) {
+            home.showMessage("Estoy terminando otra consulta. Volvé a pedírmelo después.")
+            return
+        }
+        chatPending = true
+        home.beginSending(question)
+        voicePanel.showThinking()
+        chatExecutor.execute {
+            try {
+                val papers = SkyAcademicResearch.search(question)
+                runOnUiThread {
+                    if (isFinishing) return@runOnUiThread
+                    home.addExchange(question, papers.summary,
+                        "Semantic Scholar · publicaciones verificables",
+                        sources = papers.sources)
+                    voicePanel.speakReply(papers.summary)
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    if (isFinishing) return@runOnUiThread
+                    home.failSending("Consulta académica: " +
+                        (error.message ?: "fuente académica no disponible") +
+                        ". No inventé bibliografía.", question)
+                }
+            } finally {
+                chatPending = false
+            }
+        }
+    }
+
     /** Single-turn owner identity from local data only; never GitHub or third parties. */
     private fun processOwnerQuestion(message: String): Boolean {
         if (!SkyOwnerIdentity.isQuestion(message)) return false
@@ -2965,6 +2997,11 @@ class MainActivity : Activity() {
         if (message.isEmpty()) return
         if (processOwnerQuestion(message)) {
             chatInput.setText("")
+            return
+        }
+        if (SkyAcademicResearch.explicit(message)) {
+            chatInput.setText("")
+            requestAcademicResearch(message)
             return
         }
         if (SkyPublicResearch.explicit(message) ||
