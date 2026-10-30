@@ -45,6 +45,7 @@ class SkyAndroidActions(
      */
     fun prepareWhatsApp(draft: SkyMessagingIntent.Draft) {
         if (!localAppAuthorized("whatsapp")) {
+            receipt("Preparar WhatsApp", "REJECTED", "Falta autorización local de control supervisado")
             feedback("Activá el control supervisado en Configuración de SKY para continuar.")
             return
         }
@@ -87,7 +88,10 @@ class SkyAndroidActions(
             is SkyDailyCommandParser.Command.WebSearch -> webSearch(action.query)
             is SkyDailyCommandParser.Command.Share -> share(action.app, action.value)
             SkyDailyCommandParser.Command.ShowNotes -> showNotes()
-            is SkyDailyCommandParser.Command.Unsupported -> feedback(action.reason)
+            is SkyDailyCommandParser.Command.Unsupported -> {
+                receipt("Comando Android", "REJECTED", "Orden no compatible; ninguna acción ejecutada")
+                feedback(action.reason)
+            }
         }
     }
 
@@ -123,7 +127,10 @@ class SkyAndroidActions(
                 launch(intent,
                     "Envié al Reloj la solicitud para las " + hh + ". Verificá que quede configurada.")
             }
-            .setNegativeButton("Cancelar") { _, _ -> feedback("No se creó ninguna alarma.") }
+            .setNegativeButton("Cancelar") { _, _ ->
+                receipt("Alarma Android", "REJECTED", "El propietario canceló la alarma")
+                feedback("No se solicitó ninguna alarma.")
+            }
             .show()
     }
 
@@ -243,6 +250,7 @@ class SkyAndroidActions(
             return
         }
         if (!localAppAuthorized(id)) {
+            receipt("Preparar texto para compartir", "REJECTED", "Falta autorización local de control supervisado")
             feedback("Activá el control supervisado de SKY en Configuración antes de compartir.")
             return
         }
