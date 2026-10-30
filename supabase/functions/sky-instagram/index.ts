@@ -307,8 +307,11 @@ function eventText(v: unknown): string | null {
 function eventTime(v: unknown): string | null {
   if (typeof v !== "string" && typeof v !== "number") return null;
   const n=Number(v);
-  return Number.isFinite(n) && n >= 946684800 && n <= 4102444800 ?
-    new Date(n*1000).toISOString() : null;
+  const seconds=n >= 946684800000 && n <= 4102444800000 ?
+    n/1000 : n;
+  return Number.isFinite(seconds) && seconds >= 946684800 &&
+    seconds <= 4102444800 ?
+    new Date(seconds*1000).toISOString() : null;
 }
 type InstagramInboxEvent = {
   event_key:string; event_type:"message"|"comment"|"mention";
