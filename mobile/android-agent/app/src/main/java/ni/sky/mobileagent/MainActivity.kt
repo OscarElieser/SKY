@@ -3680,13 +3680,37 @@ class MainActivity : Activity() {
                     "SKY · control supervisado")
             }
             .setPositiveButton("Aprobar propuesta") { _, _ ->
-                runCatching { evidence.record("archivo_" + proposal.operation,
-                    "AUTORIZADA", "Autorizó la propuesta; ejecución móvil no habilitada", operationId) }
-                home.addExchange(message,
-                    "Propuesta aprobada, pero NO ejecutada. El chat móvil no dispone de " +
-                        "credenciales para modificar el espacio seguro del servidor. " +
-                        "No se modificó ningún archivo. Operación: " + operationId,
-                    "SKY · autorización sin ejecución")
+                val supported = proposal.operation in setOf("crear", "agregar", "reemplazar") &&
+                    proposal.filename.substringAfterLast('.').lowercase() in
+                    setOf("txt", "md", "csv", "json", "py", "html")
+                if (!supported) {
+                    runCatching { evidence.record("archivo_" + proposal.operation,
+                        "RECHAZADA", "Operación no disponible para ejecución local", operationId) }
+                    home.addExchange(message, "No ejecutado: este formato u operación requiere " +
+                        "un servicio autorizado adicional. No se modificaron archivos.",
+                        "SKY · protegido")
+                } else {
+                    runCatching { evidence.record("archivo_" + proposal.operation, "AUTORIZADA",
+                        "Confirmación específica de archivo privado Android", operationId) }
+                    try {
+                        val result = SkyPrivateFileExecutor(this).execute(proposal)
+                        evidence.record("archivo_" + proposal.operation, "VERIFICADA_LOCAL",
+                            "SHA-256: " + result.sha256.take(32) + "; copia: " +
+                                (result.backupId ?: "creación inicial") +
+                                "; bytes: " + result.bytes, operationId)
+                        home.addExchange(message, "Archivo privado Android verificado: " +
+                            result.filename + ". SHA-256: " + result.sha256 +
+                            ". Respaldo: " + (result.backupId ?: "no aplica") +
+                            ". Operación: " + operationId,
+                            "SKY · ejecución verificada local")
+                    } catch (error: Exception) {
+                        runCatching { evidence.record("archivo_" + proposal.operation, "FALLIDA",
+                            (error.message ?: "Fallo al modificar el archivo"), operationId) }
+                        home.addExchange(message, "No se pudo confirmar la operación: " +
+                            (error.message ?: "error local") + ". Revisá evidencias y respaldo.",
+                            "SKY · ejecución fallida")
+                    }
+                }
             }
             .show()
         chatInput.setText("")
