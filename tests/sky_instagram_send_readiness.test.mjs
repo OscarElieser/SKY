@@ -13,7 +13,7 @@ test("readiness is a GET-only device-authenticated endpoint", () => {
 
 test("checks Meta Page token and MESSAGING task without exposing credential data", () => {
   const start = backend.indexOf("async function mobileSendReadiness()");
-  const end = backend.indexOf("async function mobileRevoke(", start);
+  const end = backend.indexOf("const outboundEnabled", start);
   assert.ok(start > 0 && end > start);
   const block = backend.slice(start, end);
   assert.match(block, /"instagram_manage_messages"/);
@@ -24,8 +24,8 @@ test("checks Meta Page token and MESSAGING task without exposing credential data
   assert.doesNotMatch(block, /\bmethod:\s*"POST"/);
 });
 
-test("no misleading send success or message transmission is exposed", () => {
-  assert.match(backend, /awaiting_supervised_send_implementation/);
+test("readiness is not mistaken for successful delivery", () => {
   assert.match(backend, /send_tested: false/);
-  assert.doesNotMatch(backend, /graph\.facebook\.com\/v26\.0\/.*messages/);
+  assert.match(backend, /outgoing_enabled: false/);
+  assert.match(backend, /const outboundEnabled = \(\) => env\("SKY_INSTAGRAM_OUTGOING_ENABLED"\) === "true"/);
 });
