@@ -54,7 +54,7 @@ internal object SkyScientificCalculator {
 
         if (s.contains("segunda ley de newton") || s.contains("fuerza resultante")) {
             val m = number(s, """\bmasa\s*(?:de\s*)?([0-9]+(?:[.,][0-9]+)?)\s*(?:kg|kilogramos?)\b""")
-            val a = number(s, """\baceleracion\s*(?:de\s*)?(-?[0-9]+(?:[.,][0-9]+)?)\s*(?:m/s2|m/s\^2|m/s²|metros?\s+por\s+segundo\s+cuadrado)\b""")
+            val a = number(s, """\baceleracion\s*(?:de\s*)?(-?[0-9]+(?:[.,][0-9]+)?)\s*(?:m/s2|m/s\^2|m/s²|metros?\s+por\s+segundo\s+cuadrado)(?=\s|$|[,.;!?])""")
             if (m == null || a == null || m <= 0)
                 return Result("Segunda ley de Newton", "Indicame masa positiva en kg y aceleración " +
                     "en m/s². Ejemplo: SKY, calcula fuerza resultante masa 5 kg aceleración 2 m/s2.")
@@ -66,7 +66,7 @@ internal object SkyScientificCalculator {
                 " m/s². Fuerza neta: " + formatted(force) + " N.")
         }
 
-        val r = number(s, """\bresistencia\s*(?:de\s*)?([0-9]+(?:[.,][0-9]+)?)\s*(?:ohmios?|ohms?|Ω)\b""")
+        val r = number(s, """\bresistencia\s*(?:de\s*)?([0-9]+(?:[.,][0-9]+)?)\s*(?:ohmios?|ohms?|ω|Ω)(?=\s|$|[,.;!?])""")
         val i = number(s, """\bcorriente\s*(?:de\s*)?(-?[0-9]+(?:[.,][0-9]+)?)\s*(?:amperios?|amps?|a)\b""")
         if (r == null || i == null || r < 0)
             return Result("Ley de Ohm", "Indicame resistencia en ohmios y corriente en amperios. " +
