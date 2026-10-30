@@ -72,9 +72,8 @@ class SkyHandsFreeService : Service() {
     /** Only the latest Android SpeechRecognizer session may alter service state. */
     private val recognitionEpoch = SkyRecognitionEpoch()
     private var tts: TextToSpeech? = null
-    /** The completion of a previous utterance must not restart listening mid-reply. */
-    private var activeSpeechId: String? = null
-    private var speechSequence = 0L
+    /** A superseded spoken turn cannot resume microphone capture. */
+    private val speechTurns = SkySpeechTurnGuard()
     private var running = false
     private var listening = false
     private var awake = false
@@ -96,7 +95,7 @@ class SkyHandsFreeService : Service() {
             else "SKY en espera · decí SKY")
     }
     private val safetyResume = Runnable {
-        activeSpeechId = null
+        speechTurns.invalidate()
         resumeFromSpeech()
     }
     private val instagramChecking = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -321,7 +320,7 @@ class SkyHandsFreeService : Service() {
 
     private fun suspendForSpeech() {
         if (!running) return
-        activeSpeechId = null // Invalidate callbacks from a previous spoken turn.
+        speechTurns.invalidate() // Previous TTS callbacks are now stale.
         speechSuspended = true
         handler.removeCallbacks(nextListen)
         stopRecognizer()
@@ -338,15 +337,12 @@ class SkyHandsFreeService : Service() {
     }
 
     private fun finishSpeechIfCurrent(utteranceId: String?) {
-        if (utteranceId == null || utteranceId != activeSpeechId) return
-        activeSpeechId = null
-        resumeFromSpeech()
+        if (speechTurns.finish(utteranceId)) resumeFromSpeech()
     }
 
     private fun say(message: String) {
         suspendForSpeech()
-        val id = "sky-service-" + (++speechSequence)
-        activeSpeechId = id
+        val id = speechTurns.begin()
         val result = tts?.speak(SkySpokenText.prepare(message), TextToSpeech.QUEUE_FLUSH,
             Bundle(), id)
         if (result != TextToSpeech.SUCCESS) {
