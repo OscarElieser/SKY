@@ -244,13 +244,16 @@ def academic_research(query: str, *, provider: str = "openalex",
 
 
 def capabilities() -> dict[str, Any]:
+    from .sky_reflective_core import capabilities as reflective_capabilities
     return {
-        "version": "1.0.0", "integration": "additive",
+        "version": "1.1.0", "integration": "additive",
+        "reflective_learning": reflective_capabilities(),
         "features": {
             "planning": "consultative_no_execution",
             "neural_memory": "existing_owner_confirmed_encrypted",
             "public_research": "cached_metadata_only",
             "learning": "existing_verified_outcome_statistics",
+            "reflective_skill_learning": "local_bounded_test_feedback",
             "persona": "simulated_expression_es_NI",
             "tts": "text_preprocessing_only",
             "device_control": "requires_existing_authorized_device_agent",

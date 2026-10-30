@@ -569,3 +569,11 @@ Este repositorio público no contiene actualmente un archivo `LICENSE` en su ra�
 ---
 
 **SKY IA — Un solo núcleo, múltiples capacidades y resultados verificables.**
+
+## Núcleo reflexivo de SKY — recuperación, pruebas y corrección segura (2026-10-30)
+
+SKY utiliza `neural_core/sky_reflective_core.py` para registrar **resultados categorizados de las pruebas de habilidades** y recuperar recomendaciones antes de generar otras propuestas. El ciclo de `sky_skill_builder.proponer()` está limitado a tres intentos con detección de código repetido; las habilidades sólo pueden instalarse mediante la aprobación preexistente del propietario y después de superar nuevamente las pruebas.
+
+La opción `SKY_REFLECTIVE_SEMANTIC=1` activa recuperación por embeddings de categorías estáticas mediante un modelo Ollama **local** (`nomic-embed-text`), con fallback determinista cuando no esté disponible. La memoria local no guarda prompts, código generado ni stack traces. Las estadísticas son de pruebas, **no** pruebas de acciones reales sobre Android/Windows, ni entrenamiento automático del modelo.
+
+Detalles, requisitos y comandos de prueba: [docs/SKY_REFLECTIVE_CORE.md](docs/SKY_REFLECTIVE_CORE.md).
