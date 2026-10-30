@@ -1,3 +1,17 @@
+## SKY Android 0.8.40 — validación científica y previsualización paginada (30/10/2026)
+
+**Código enviado a main; publicación y funcionamiento físico pendientes de resultados reales de CI y del Samsung.** SKY Windows no se modifica.
+
+- **PDF con navegación real:** renderiza solo la página solicitada mediante Android PdfRenderer, con controles Anterior/Siguiente y contador. Un test instrumentado genera un PDF local de dos páginas y comprueba ambas páginas y la validación de índices en emuladores Android 15/16.
+- **Video:** miniatura real del fotograma mediante MediaMetadataRetriever.getScaledFrameAtTime en Android 8.1+; muestra la duración. Un video cifrado, dañado o sin fotograma decodificable seguirá mostrando únicamente sus metadatos, sin inventar una previsualización.
+- **Voz académica:** transforma fracciones, subíndices, exponentes, ecuaciones y flechas de reacción comunes a texto hablado antes de entregarlo al TTS; la respuesta escrita e historial permanecen sin cambios. No es un lector semántico completo de toda notación matemática.
+- **Calidad:** pruebas nuevas de Markdown seguro, tablas, ecuaciones multilínea y reproducción vocal natural; formato y contenido sin código remoto en el visor.
+- **Privacidad:** los archivos permanecen locales durante la previsualización; el análisis por Gemini sigue sujeto a consentimiento. La vista previa no prueba la lectura completa de audio, video, PDF ni gráficos Office.
+
+**Criterios de aceptación pendientes:** GitHub Actions debe aprobar tests unitarios + APK firmada + emuladores Android 15/16. En el Samsung hay que verificar la lectura visual de una ecuación de química, navegación por PDF, fotograma de video y que las instrucciones se envían exclusivamente tras autorización. La publicación de APK solo es válida cuando aparece en [GitHub Releases](https://github.com/OscarElieser/SKY/releases).
+
+---
+
 ## SKY Android — respuestas científicas y vistas previas locales (30/10/2026)
 
 **Cambio integrado en código de main; no equivale a compilación, APK publicada ni validación en teléfono. Solo se modifica Android; SKY Windows permanece intacta.**
