@@ -13,6 +13,8 @@ class SkyInstagramDraftFlowTest {
             SkyInstagramDraftFlow.command("copia la respuesta"))
         assertEquals(SkyInstagramDraftFlow.Command.SEND_REQUEST,
             SkyInstagramDraftFlow.command("sí, envíala"))
+        assertEquals(SkyInstagramDraftFlow.Command.STATUS,
+            SkyInstagramDraftFlow.command("SKY, verifica el envío de Instagram"))
         assertEquals(SkyInstagramDraftFlow.Command.NONE,
             SkyInstagramDraftFlow.command("reproduce una canción en YouTube"))
     }
