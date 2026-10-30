@@ -57,7 +57,7 @@ class SurgicalChatTests(unittest.TestCase):
 
     def test_missing_voice_turn_method_is_rejected(self):
         unsafe = local_voice_fixture().replace(
-            '                    coordinador_voz.record_turn(command, "registro")\\n', "")
+            '                    coordinador_voz.record_turn(command, "registro")\n', "")
         with self.assertRaises(RuntimeError):
             surgically_prepare_voice(unsafe.encode("utf-8"))
 
