@@ -35,6 +35,27 @@ class SkySpokenTextTest {
         assertFalse(spoken.contains("println"))
     }
 
+    @Test fun chemicalEquilibriumAndFractionSpeakWithoutLatexNoise() {
+        val spoken = SkySpokenText.prepare(
+            "Constante de equilibrio:\n\\[\nK_{\\text{eq}} = " +
+                "\\frac{k_{\\text{f}}}{k_{\\text{r}}}\n\\]"
+        )
+        assertTrue(spoken.contains("dividido entre"))
+        assertTrue(spoken.contains("es igual a"))
+        assertTrue(spoken.contains("subíndice"))
+        assertFalse(spoken.contains("frac"))
+        assertFalse(spoken.contains("\\"))
+    }
+
+    @Test fun reactionAndExponentSpeakNaturally() {
+        val spoken = SkySpokenText.prepare(
+            "\\(A+B\\rightleftharpoons C\\). La energía es \\(E=mc^{2}\\)."
+        )
+        assertTrue(spoken.contains("en equilibrio con"))
+        assertTrue(spoken.contains("elevado a 2"))
+        assertFalse(spoken.contains("rightleftharpoons"))
+    }
+
     @Test fun emptySpeechHasNoContent() {
         assertEquals("", SkySpokenText.prepare("  "))
     }
