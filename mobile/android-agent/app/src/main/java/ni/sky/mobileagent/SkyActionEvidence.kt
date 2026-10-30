@@ -112,6 +112,7 @@ class SkyActionEvidence(context: Context) :
 
     companion object {
         fun normalized(raw: String): String = when (raw.uppercase()) {
+            "PREPARED", "PREPARADA" -> "PREPARADA"
             "AUTHORIZED", "AUTORIZADA" -> "AUTORIZADA"
             "SENT", "LAUNCHED", "REQUESTED" -> "ENVIADA_SIN_VERIFICAR"
             "VERIFIED_LOCAL" -> "VERIFICADA_LOCAL"
