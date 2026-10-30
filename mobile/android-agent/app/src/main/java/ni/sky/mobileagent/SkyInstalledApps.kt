@@ -28,8 +28,9 @@ class SkyInstalledApps(
 ) {
     var onReceipt: ((String, String, String, String) -> Unit)? = null
     private var currentOperationId = java.util.UUID.randomUUID().toString()
-    private fun receipt(action: String, status: String, detail: String) {
-        onReceipt?.invoke(action, status, detail, currentOperationId)
+    private fun receipt(action: String, status: String, detail: String,
+                        operationId: String = currentOperationId) {
+        onReceipt?.invoke(action, status, detail, operationId)
     }
     private val trusted = activity.getSharedPreferences(
         "sky_trusted_launcher_apps", android.content.Context.MODE_PRIVATE
@@ -66,7 +67,7 @@ class SkyInstalledApps(
     }
 
     fun requestLaunch(query: String) {
-        currentOperationId = java.util.UUID.randomUUID().toString()
+        val operationId = java.util.UUID.randomUUID().toString()
         val choices = discover()
         val matched = SkyAppNameMatcher.matches(query, choices.map { it.asEntry() })
         val available = matched.mapNotNull { entry ->
@@ -74,14 +75,14 @@ class SkyInstalledApps(
         }
         when (available.size) {
             0 -> {
-                receipt("Abrir aplicación", "FAILED", "No se encontró aplicación visible coincidente")
+                receipt("Abrir aplicación", "FAILED", "No se encontró aplicación visible coincidente", operationId)
                 say("No encontré «" + query.take(65) +
                     "» entre las aplicaciones visibles. Podés revisar el catálogo en Ajustes.")
             }
             1 -> {
                 val app = available.first()
-                if (supervisedControlEnabled() || trusted.getBoolean(app.packageName, false)) launchDirect(app)
-                else confirm(app)
+                if (supervisedControlEnabled() || trusted.getBoolean(app.packageName, false)) launchDirect(app, operationId)
+                else confirm(app, operationId)
             }
             else -> {
                 AlertDialog.Builder(activity)
@@ -91,11 +92,11 @@ class SkyInstalledApps(
                         // Con autorización global solo se pregunta cuál app quiere abrir:
                         // no volver a solicitar confianza individual.
                         if (supervisedControlEnabled() ||
-                            trusted.getBoolean(selected.packageName, false)) launchDirect(selected)
-                        else confirm(selected)
+                            trusted.getBoolean(selected.packageName, false)) launchDirect(selected, operationId)
+                        else confirm(selected, operationId)
                     }
                     .setNegativeButton("Cancelar") { _, _ ->
-                        receipt("Abrir aplicación", "REJECTED", "Selección de aplicación cancelada")
+                        receipt("Abrir aplicación", "REJECTED", "Selección de aplicación cancelada", operationId)
                     }
                     .show()
             }
@@ -353,7 +354,7 @@ class SkyInstalledApps(
         SkyPremiumUi.showDialog(activity, dialog, 0.87)
     }
 
-    private fun confirm(app: Launchable) {
+    private fun confirm(app: Launchable, operationId: String = java.util.UUID.randomUUID().toString()) {
         val isTrusted = trusted.getBoolean(app.packageName, false)
         AlertDialog.Builder(activity)
             .setTitle("SKY · " + app.name)
@@ -361,26 +362,25 @@ class SkyInstalledApps(
                 "Podés confiar en ella para que SKY la abra directamente " +
                 "cuando VOS lo ordenés por voz o chat. " +
                 "Confiar no autoriza leer contenido, escribir ni publicar.")
-            .setPositiveButton("Abrir esta vez") { _, _ -> launchDirect(app) }
+            .setPositiveButton("Abrir esta vez") { _, _ -> launchDirect(app, operationId) }
             .setNeutralButton(if (isTrusted) "Quitar confianza" else "Confiar y abrir") { _, _ ->
                 if (isTrusted) {
                     trusted.edit().remove(app.packageName).apply()
                     say("SKY pedirá confirmación nuevamente para " + app.name + ".")
                 } else {
                     trusted.edit().putBoolean(app.packageName, true).apply()
-                    launchDirect(app)
+                    launchDirect(app, operationId)
                 }
             }
             .setNegativeButton("Cancelar") { _, _ ->
-                receipt("Abrir " + app.name, "REJECTED", "El propietario canceló la apertura")
+                receipt("Abrir " + app.name, "REJECTED", "El propietario canceló la apertura", operationId)
             }
             .show()
     }
 
-    private fun launchDirect(app: Launchable) {
+    private fun launchDirect(app: Launchable, operationId: String = java.util.UUID.randomUUID().toString()) {
         if (!launchLimiter.allow("launch:" + app.packageName)) {
-            receipt("Abrir " + app.name, "REJECTED",
-                "Límite local por órdenes duplicadas o demasiado frecuentes")
+            receipt("Abrir " + app.name, "REJECTED", "Límite local por órdenes duplicadas o demasiado frecuentes", operationId)
             say("Recibí varias órdenes seguidas. Esperá un momento para evitar aperturas duplicadas.")
             return
         }
@@ -392,7 +392,7 @@ class SkyInstalledApps(
             if (current == null) {
                 trusted.edit().remove(app.packageName).apply()
                 say("Esta aplicación ya no aparece instalada o visible.")
-                receipt("Abrir " + app.name, "FAILED", "App no encontrada al verificar Android")
+                receipt("Abrir " + app.name, "FAILED", "App no encontrada al verificar Android", operationId)
                 return
             }
             val launchIntent = Intent(Intent.ACTION_MAIN)
@@ -400,12 +400,11 @@ class SkyInstalledApps(
                 .setComponent(ComponentName(current.packageName, current.className))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             activity.startActivity(launchIntent)
-            receipt("Abrir " + current.name, "SENT",
-                "Android aceptó startActivity; apertura completa no comprobada")
+            receipt("Abrir " + current.name, "SENT", "Android aceptó startActivity; apertura completa no comprobada", operationId)
             say("Android recibió la orden para abrir " + current.name +
                 ". No puedo confirmar que terminó de cargar.")
         } catch (_: Exception) {
-            receipt("Abrir " + app.name, "FAILED", "Android rechazó la apertura")
+            receipt("Abrir " + app.name, "FAILED", "Android rechazó la apertura", operationId)
             say("Android no permitió abrir " + app.name + ".")
         }
     }
