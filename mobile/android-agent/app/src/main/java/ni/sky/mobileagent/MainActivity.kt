@@ -274,6 +274,9 @@ class MainActivity : Activity() {
                     "El borrador sigue disponible, pero el envío real todavía no está " +
                     "habilitado. Podés copiarlo desde SKY. No envié nada."
                 else {
+                    // Keep only opaque approval ID; no private DM text stored on device.
+                    getSharedPreferences("sky_instagram_receipts_v1", MODE_PRIVATE).edit()
+                        .putString("last_approval_id", prepared.approvalId).commit()
                     // Burn local approval before the one-and-only Meta send attempt.
                     consumed = true
                     val receipt = SkyInstagramAlerts.confirmReply(this, prepared, message)
@@ -302,6 +305,38 @@ class MainActivity : Activity() {
                 }
                 instagramDraftBusy.set(false)
                 if (!isFinishing && visible) instagramSay(result)
+            }
+        }.start()
+    }
+
+
+    /** Ask for evidence of the last attempt; never sends a second message. */
+    private fun checkInstagramReplyReceipt() {
+        if (!instagramDeviceUnlocked()) {
+            instagramSay("Desbloqueá el teléfono para consultar el comprobante de Instagram.")
+            return
+        }
+        val id = getSharedPreferences("sky_instagram_receipts_v1", MODE_PRIVATE)
+            .getString("last_approval_id", "").orEmpty()
+        if (id.isBlank()) {
+            instagramSay("SKY no registra ningún intento de envío autorizado en este teléfono.")
+            return
+        }
+        if (!instagramDraftBusy.compareAndSet(false, true)) return
+        instagramSay("Estoy verificando el último envío. No repetiré el mensaje.")
+        Thread {
+            val response = runCatching {
+                val receipt = SkyInstagramAlerts.replyStatus(this, id)
+                if (receipt.sent)
+                    "Meta confirmó el último envío. Comprobante: " + receipt.messageId
+                else "El último intento figura como «" + receipt.status +
+                    "». No significa que se haya enviado; no lo repetiré."
+            }.getOrElse {
+                "No pude consultar el comprobante. No enviaré nada de nuevo."
+            }
+            runOnUiThread {
+                instagramDraftBusy.set(false)
+                if (!isFinishing && visible) instagramSay(response)
             }
         }.start()
     }
@@ -406,6 +441,10 @@ class MainActivity : Activity() {
             }
             SkyInstagramDraftFlow.Command.SEND_REQUEST -> {
                 sendApprovedInstagramReply()
+                true
+            }
+            SkyInstagramDraftFlow.Command.STATUS -> {
+                checkInstagramReplyReceipt()
                 true
             }
             SkyInstagramDraftFlow.Command.NONE -> false
