@@ -42,6 +42,7 @@ class InstallerTests(unittest.TestCase):
                                + installer.AGENT_LOG_ORIGINAL
                                + "\ndef _validar(action, params, politica):\n"
                                + installer.AGENT_VALID_ORIGINAL
+                               + "\n        raise ValueError('bloqueado')"
                                + "\ndef _ejecutar(action, params, politica):\n"
                                + installer.AGENT_EXEC_ORIGINAL)
                 dst.write_text(content + "\n", encoding="utf-8")
