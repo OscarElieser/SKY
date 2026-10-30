@@ -255,6 +255,7 @@ class MainActivity : Activity() {
                 !processOwnerQuestion(transcript) &&
                 !processOwnerProfileImport(transcript) &&
                 !processScientificCalculation(transcript) &&
+                !processStatisticsCalculation(transcript) &&
                 !processLocalPanelCommand(transcript, spoken = true) &&
                 !processCompanionCommand(transcript) &&
                 !processDailyCommand(transcript, spoken = true)) {
@@ -269,6 +270,8 @@ class MainActivity : Activity() {
                         adaptiveMemory.find(transcript) == null) &&
                     SkyAndroidCognition.explicitFact(transcript) == null &&
                     !SkyWeatherNow.isWeatherQuery(transcript) &&
+                    !SkyScientificCalculator.isRequest(transcript) &&
+                    !SkyStatisticsCalculator.isRequest(transcript) &&
                     !SkyPublicResearch.explicit(transcript) &&
                     !SkyPublicResearch.encyclopedic(transcript) &&
                     !SkyAcademicResearch.explicit(transcript) &&
@@ -2942,6 +2945,17 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Deterministic statistics run locally on supplied numbers, without cloud access. */
+    private fun processStatisticsCalculation(message: String): Boolean {
+        val result = SkyStatisticsCalculator.solve(message) ?: return false
+        val keepFace = voiceReplyOnFace
+        voiceReplyOnFace = false
+        home.addExchange(message, result.answer,
+            "SKY · estadística local · " + result.title, revealPanel = !keepFace)
+        if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(result.answer)
+        return true
+    }
+
     /** Verified local calculations never ask an LLM to invent numeric output. */
     private fun processScientificCalculation(message: String): Boolean {
         val result = SkyScientificCalculator.solve(message) ?: return false
@@ -3059,6 +3073,10 @@ class MainActivity : Activity() {
             return
         }
         if (processScientificCalculation(message)) {
+            chatInput.setText("")
+            return
+        }
+        if (processStatisticsCalculation(message)) {
             chatInput.setText("")
             return
         }
