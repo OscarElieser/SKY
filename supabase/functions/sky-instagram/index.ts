@@ -292,25 +292,101 @@ async function signatureOk(body: Uint8Array, signature: string) {
     s => parseInt(s, 16));
   return equalBytes(expected, provided);
 }
-async function webhook(req: Request) {
+
+/** Minimal private ingestion: never save raw webhooks, secrets, or Meta test samples. */
+function eventObject(v: unknown): Json {
+  return v && typeof v === "object" && !Array.isArray(v) ? v as Json : {};
+}
+function bounded(v: unknown, limit=80): string | null {
+  if (typeof v !== "string" && typeof v !== "number") return null;
+  const s=String(v); return s.length > 0 && s.length <= limit ? s : null;
+}
+function eventText(v: unknown): string | null {
+  return typeof v === "string" ? v.slice(0,4000) : null;
+}
+function eventTime(v: unknown): string | null {
+  if (typeof v !== "string" && typeof v !== "number") return null;
+  const n=Number(v);
+  return Number.isFinite(n) && n >= 946684800 && n <= 4102444800 ?
+    new Date(n*1000).toISOString() : null;
+}
+type InstagramInboxEvent = {
+  event_key:string; event_type:"message"|"comment"|"mention";
+  ig_account_id:string; actor_id:string|null; target_id:string|null;
+  external_event_id:string|null; message_text:string|null; event_at:string|null;
+};
+async function normalizeInstagramWebhook(input: Json):Promise<InstagramInboxEvent[]> {
+  if (input.object !== "instagram" || !Array.isArray(input.entry)) return [];
+  const events:InstagramInboxEvent[]=[];
+  for (const entryValue of input.entry) {
+    const entry=eventObject(entryValue), account=bounded(entry.id);
+    if (!account) continue;
+    if (Array.isArray(entry.messaging)) for (const raw of entry.messaging) {
+      const m=eventObject(raw), msg=eventObject(m.message);
+      const id=bounded(msg.mid,180);
+      // Do not mistake delivery receipts or other messaging events for a DM.
+      if (!id && typeof msg.text !== "string") continue;
+      events.push({
+        event_key:await digest(JSON.stringify(["instagram",account,"message",id || JSON.stringify(m)])),
+        event_type:"message",ig_account_id:account,
+        actor_id:bounded(eventObject(m.sender).id),
+        target_id:bounded(eventObject(m.recipient).id),
+        external_event_id:id, message_text:eventText(msg.text),
+        event_at:eventTime(m.timestamp)
+      });
+    }
+    if (Array.isArray(entry.changes)) for (const raw of entry.changes) {
+      const change=eventObject(raw);
+      if (change.field !== "comments" && change.field !== "mentions") continue;
+      const v=eventObject(change.value);
+      const kind=change.field === "comments" ? "comment" : "mention";
+      const id=bounded(v.id,180);
+      events.push({
+        event_key:await digest(JSON.stringify(["instagram",account,kind,id || JSON.stringify(v)])),
+        event_type:kind, ig_account_id:account,
+        actor_id:bounded(eventObject(v.from).id),
+        target_id:bounded(v.media_id) || bounded(eventObject(v.media).id),
+        external_event_id:id,message_text:eventText(v.text),
+        event_at:eventTime(entry.time)
+      });
+    }
+  }
+  return [...new Map(events.map(e=>[e.event_key,e])).values()];
+}
+async function privateInstagramInbox() {
+  const select="?select=event_key,event_type,ig_account_id,actor_id,target_id,external_event_id,message_text,event_at,received_at,processing_status&order=received_at.desc&limit=50";
+  const rows=await database("sky_instagram_webhook_events","GET",select);
+  return json({ events:Array.isArray(rows) ? rows : [],limit:50 });
+}
+async function webhook(req:Request) {
   if (req.method === "GET") {
-    const p = new URL(req.url).searchParams;
-    const challenge = p.get("hub.challenge") || "";
-    const token = p.get("hub.verify_token") || "";
-    const expected = env("SKY_INSTAGRAM_WEBHOOK_VERIFY_TOKEN");
+    const p=new URL(req.url).searchParams;
+    const challenge=p.get("hub.challenge") || "";
+    const token=p.get("hub.verify_token") || "";
+    const expected=env("SKY_INSTAGRAM_WEBHOOK_VERIFY_TOKEN");
     if (expected.length < 24 || p.get("hub.mode") !== "subscribe" ||
         !challenge || token.length !== expected.length ||
-        !equalBytes(encoder(token), encoder(expected))) return json({ error: "forbidden" }, 403);
-    return new Response(challenge, { headers: { "content-type": "text/plain", "cache-control": "no-store" } });
+        !equalBytes(encoder(token),encoder(expected))) return json({error:"forbidden"},403);
+    return new Response(challenge,{headers:{"content-type":"text/plain","cache-control":"no-store"}});
   }
-  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-  const body = new Uint8Array(await req.arrayBuffer());
-  if (body.byteLength > 1024 * 1024) return json({ error: "too_large" }, 413);
-  if (!(await signatureOk(body, req.headers.get("x-hub-signature-256") || ""))) {
-    return json({ error: "invalid_signature" }, 403);
-  }
-  // Verified delivery only. No logging personal message bodies, no automated replies.
-  return json({ received: true });
+  if (req.method !== "POST") return json({error:"method_not_allowed"},405);
+  const body=new Uint8Array(await req.arrayBuffer());
+  if (body.byteLength > 1024*1024) return json({error:"too_large"},413);
+  if (!(await signatureOk(body,req.headers.get("x-hub-signature-256") || "")))
+    return json({error:"invalid_signature"},403);
+  let parsed:Json;
+  try { parsed=eventObject(JSON.parse(new TextDecoder().decode(body))); }
+  catch { return json({error:"invalid_json"},400); }
+  // Meta sends {"sample":...} test envelopes; do not store a fake customer message.
+  if ("sample" in parsed) return json({received:true,sample:true,stored:0});
+  const events=await normalizeInstagramWebhook(parsed);
+  if (events.length>1000) return json({error:"too_many_events"},413);
+  if (!events.length) return json({received:true,stored:0});
+  // Atomic, idempotent batch. Failure yields 503 so Meta can retry.
+  await database("sky_instagram_webhook_events","POST",
+    "?on_conflict=event_key",events,"resolution=ignore-duplicates,return=minimal");
+  // No automatic replies and no personal-content logs.
+  return json({received:true,accepted:events.length});
 }
 
 /** Temporary pairing via owner-authorized CLI; mobile receives only revocable credential. */
@@ -378,6 +454,10 @@ Deno.serve(async (req: Request) => {
       if (!(await mobileAuthorized(req)))return json({error:"unauthorized"},401);
       return await mobileStatus();
     }
+    if (path === "mobile-events" && req.method === "GET") {
+      if (!(await mobileAuthorized(req))) return json({error:"unauthorized"},401);
+      return await privateInstagramInbox();
+    }
     if (path === "mobile-profile" && req.method === "GET") {
       if (!(await mobileAuthorized(req))) return json({ error: "unauthorized" }, 401);
       return await verifiedProfile();
@@ -398,6 +478,7 @@ Deno.serve(async (req: Request) => {
     if (path === "start" && req.method === "POST") return await start();
     if (path === "status" && req.method === "GET") return await status();
     if (path === "profile" && req.method === "GET") return await verifiedProfile();
+    if (path === "events" && req.method === "GET") return await privateInstagramInbox();
     if (path === "disconnect" && req.method === "POST") return await disconnect();
     return json({ error: "not_found" }, 404);
   } catch {
