@@ -17,6 +17,8 @@ class ExistingSKYProcessSafetyTests(unittest.TestCase):
              patch.object(supervisor, '_iniciar') as spawn:
             self.assertIs(supervisor.start_all(), False)
             self.assertFalse(supervisor.running)
+            self.assertIsNone(supervisor._candado)
+            self.assertFalse(supervisor.servicios)
             killer.assert_not_called()
             spawn.assert_not_called()
 
@@ -27,6 +29,7 @@ class ExistingSKYProcessSafetyTests(unittest.TestCase):
              patch.object(launcher, 'kill_process_by_pid') as killer, \
              patch.object(supervisor, '_iniciar') as spawn:
             self.assertIs(supervisor.start_all(), False)
+            self.assertIsNone(supervisor._candado)
             killer.assert_not_called()
             spawn.assert_not_called()
 
