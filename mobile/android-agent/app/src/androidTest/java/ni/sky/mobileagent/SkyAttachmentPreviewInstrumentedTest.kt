@@ -41,7 +41,7 @@ class SkyAttachmentPreviewInstrumentedTest {
             assertEquals(0, first.pageIndex)
             assertNotNull(first.bitmap)
             assertTrue(first.bitmap!!.width in 1..960)
-            assertTrue(first.bitmap.height in 1..1250)
+            assertTrue(first.bitmap!!.height in 1..1250)
 
             val second = SkyAttachmentPreview.readPdfPage(context.contentResolver, item, 1)
             assertEquals(2, second.pageCount)
@@ -55,7 +55,7 @@ class SkyAttachmentPreviewInstrumentedTest {
             } catch (_: IllegalArgumentException) {
                 // Verified rejection.
             }
-            first.bitmap.recycle()
+            first.bitmap!!.recycle()
             second.bitmap?.recycle()
         } finally {
             local.delete()
