@@ -142,7 +142,8 @@ class SafeFilesHTTPTests(unittest.TestCase):
         self.assertEqual(self.prepare(restore).status_code,409)
 
     def test_escape_and_symlink_are_rejected(self):
-        for name in ("../outside.txt","/tmp/outside.txt","my/folder.txt",".env","archivo.exe"):
+        for name in ("../outside.txt","/tmp/outside.txt","my/folder.txt",".env","archivo.exe",
+                     "CON.txt","NUL.md","LPT1.pdf","AUX.xlsx"):
             with self.subTest(name=name):
                 self.assertEqual(self.prepare({"op":"create","name":name,"text":"data"}).status_code,422)
         folder=Path(os.environ["SKY_SAFE_WORKSPACE_ROOT"])
@@ -162,6 +163,10 @@ class SafeFilesHTTPTests(unittest.TestCase):
             {"name":"notas.xlsx","document":{"kind":"xlsx","title":"Notas SKY",
                 "content":"Resultados","headers":["Estudiante","Nota"],
                 "rows":[["A",80],["B",95]]}},
+            {"name":"diapositivas.pptx","document":{"kind":"pptx","title":"Clases SKY",
+                "content":"# Objetivos\nFormación profesional"}},
+            {"name":"informe.pdf","document":{"kind":"pdf","title":"SKY",
+                "content":"# Informe\nResultados locales"}},
         ]
         for item in samples:
             with self.subTest(name=item["name"]):
@@ -171,7 +176,10 @@ class SafeFilesHTTPTests(unittest.TestCase):
                 r=self.commit(spec,p)
                 self.assertEqual(r.status_code,200,r.text)
                 data=self.client.get("/api/sky/safe-files/download/"+item["name"],headers=self.h).content
-                self.assertTrue(zipfile.is_zipfile(BytesIO(data)))
+                if item["name"].endswith(".pdf"):
+                    self.assertTrue(data.startswith(b"%PDF-"))
+                else:
+                    self.assertTrue(zipfile.is_zipfile(BytesIO(data)))
                 self.assertEqual(r.json()["result"]["bytes"],len(data))
                 self.assertTrue(r.json()["verified_after_write"])
 
