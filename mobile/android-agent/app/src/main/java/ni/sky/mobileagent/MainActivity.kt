@@ -692,9 +692,9 @@ class MainActivity : Activity() {
             home.showMessage(feedback)
             if (!isFinishing && voicePanel.isVoiceEnabled()) voicePanel.speakReply(feedback)
         }
-        installedApps.onReceipt = { action, state, detail ->
+        installedApps.onReceipt = { action, state, detail, operationId ->
             runCatching {
-                actionEvidence.record(action, state, detail)
+                actionEvidence.record(action, state, detail, operationId)
                 verifiedLearning.observe(action, state)
             }
         }
@@ -745,9 +745,9 @@ class MainActivity : Activity() {
             },
             onNeedMusicPermission = { request -> showMusicControlDisclosure(request) }
         )
-        musicLauncher.onReceipt = { action, state, detail ->
+        musicLauncher.onReceipt = { action, state, detail, operationId ->
             runCatching {
-                actionEvidence.record(action, state, detail)
+                actionEvidence.record(action, state, detail, operationId)
                 verifiedLearning.observe(action, state)
             }
         }
