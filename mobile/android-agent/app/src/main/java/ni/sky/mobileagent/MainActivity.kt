@@ -3750,8 +3750,59 @@ class MainActivity : Activity() {
         return true
     }
 
+    private fun showSafeFileBackups(message: String): Boolean {
+        val normalized = SkyDailyCommandParser.canonical(message)
+            .replace(Regex("^sky[, :.!]*"), "").trim()
+        if (normalized !in setOf("muestra respaldos", "mostrar respaldos",
+                "mis respaldos", "historial de respaldos", "ver respaldos")) return false
+        val worker = SkyPrivateFileExecutor(this)
+        val entries = worker.listBackups()
+        if (entries.isEmpty()) {
+            home.addExchange(message, "No hay respaldos privados verificados disponibles.",
+                "SKY · respaldos locales")
+            chatInput.setText("")
+            return true
+        }
+        val descriptions = entries.take(30).map {
+            it.filename + " · " + java.text.DateFormat.getDateTimeInstance()
+                .format(java.util.Date(it.createdAt)) + " · " + it.id.take(8)
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("SKY · Historial de respaldos")
+            .setItems(descriptions.toTypedArray()) { _, index ->
+                val entry = entries[index]
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("Restaurar " + entry.filename)
+                    .setMessage("Se reemplazará el archivo privado actual por la versión " +
+                        "guardada. SHA-256 del respaldo: " + entry.sha256)
+                    .setNegativeButton("Cancelar", null)
+                    .setPositiveButton("Autorizar restauración") { _, _ ->
+                        val operationId = java.util.UUID.randomUUID().toString()
+                        try {
+                            actionEvidence.record("archivo_restaurar", "AUTORIZADA",
+                                "Respaldo " + entry.id, operationId)
+                            val hash = worker.restoreBackup(entry.filename, entry.id)
+                            actionEvidence.record("archivo_restaurar", "VERIFICADA_LOCAL",
+                                "SHA-256: " + hash, operationId)
+                            home.addExchange(message, "Restauración verificada de " +
+                                entry.filename + ". SHA-256: " + hash +
+                                ". Operación: " + operationId, "SKY · recuperación local")
+                        } catch (error: Exception) {
+                            runCatching { actionEvidence.record("archivo_restaurar", "FALLIDA",
+                                error.message ?: "No verificada", operationId) }
+                            home.addExchange(message, "Restauración no verificada: " +
+                                (error.message ?: "Error local"), "SKY · recuperación fallida")
+                        }
+                    }.show()
+            }
+            .setNegativeButton("Cerrar", null).show()
+        chatInput.setText("")
+        return true
+    }
+
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
+        if (showSafeFileBackups(message)) return
         if (previewSafeFileProposal(message)) return
         if (processOwnerProfileImport(message)) {
             chatInput.setText("")
