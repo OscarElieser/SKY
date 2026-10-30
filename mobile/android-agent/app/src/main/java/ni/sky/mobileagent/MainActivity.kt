@@ -2887,6 +2887,7 @@ class MainActivity : Activity() {
         super.onPause()
     }
     override fun onDestroy() {
+        if (::musicLauncher.isInitialized) musicLauncher.close()
         handler.removeCallbacks(instagramPoll)
         handler.removeCallbacks(pollLoop)
         if (::voicePanel.isInitialized) voicePanel.close()
