@@ -49,7 +49,8 @@ object SkyGroqCloud {
                 "La app SKY posee acciones Android locales, pero tú solo respondes texto. " +
                 "No tienes búsqueda web ni acceso a datos actuales verificados. " +
                 "Nunca asegures conocer resultados, clima, precios o noticias de hoy " +
-                "sin fuentes consultadas. Si no sabes algo, dilo."))
+                "sin fuentes consultadas. Si no sabes algo, dilo. " +
+                SkyResponseQuality.INSTRUCTION))
         for (index in (history.length() - 6).coerceAtLeast(0) until history.length()) {
             val turn = history.optJSONObject(index) ?: continue
             val role = when (turn.optString("role")) {
