@@ -83,7 +83,8 @@ internal object SkyInstagramAlerts {
     }
 
     private fun get(path: String, token: String): JSONObject {
-        require(path == "/mobile-profile" || path == "/mobile-events")
+        require(path == "/mobile-profile" || path == "/mobile-events" ||
+            path == "/mobile-send-readiness")
         val conn = URL(BASE + path).openConnection() as HttpURLConnection
         try {
             conn.requestMethod = "GET"
@@ -128,6 +129,39 @@ internal object SkyInstagramAlerts {
                 SkyInstagramInboxRules.preview(v.optString("message_text"), 500), at)
         }.sortedWith(compareByDescending<Message> { it.at }.thenBy { it.key })
         return Snapshot(id, messages)
+    }
+
+    /** Owner-readable Meta send preflight; never sends a message. */
+    fun sendReadiness(ctx: Context): String {
+        val token = credential(ctx)
+        require(token.isNotBlank()) { "Vinculá primero Instagram con SKY." }
+        val report = get("/mobile-send-readiness", token)
+        if (report.optBoolean("preflight_ok")) {
+            return "Meta reconoce una página vinculada y una credencial con tarea " +
+                "de mensajería. Todavía no se ha probado ni habilitado el envío " +
+                "supervisado desde SKY."
+        }
+        return when (report.optString("reason")) {
+            "missing_permissions" ->
+                "Meta informa permisos faltantes para mensajería. Revisaremos " +
+                "los permisos oficiales antes de activar el envío."
+            "page_token_or_messaging_task_missing" ->
+                "La página vinculada aún no confirma la credencial y la tarea " +
+                "MESSAGING necesarias. La recepción de mensajes sigue disponible."
+            "missing_linked_instagram_page" ->
+                "No encontré una única página vinculada con Instagram profesional."
+            "multiple_linked_pages" ->
+                "Hay varias páginas vinculadas y es necesario seleccionar " +
+                "la cuenta correcta antes de permitir envíos."
+            "page_lookup_unavailable" ->
+                "Meta no pudo verificar ahora la página. No significa que " +
+                "Instagram esté desconectado."
+            "instagram_login_send_not_configured" ->
+                "El acceso de Instagram funciona, pero falta preparar el " +
+                "mecanismo de envío correspondiente a ese tipo de autorización."
+            else -> "Todavía no está verificada la capacidad de envío de Instagram: " +
+                report.optString("reason").take(90)
+        }
     }
 
     /** Shared high-water mark prevents duplicate announcements after restarts. */
