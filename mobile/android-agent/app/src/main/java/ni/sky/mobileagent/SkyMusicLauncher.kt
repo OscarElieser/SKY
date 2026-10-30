@@ -24,6 +24,12 @@ class SkyMusicLauncher(
     private val verificationHandler = Handler(Looper.getMainLooper())
     private var playbackRequestId = 0
 
+    /** Prevent stale Activity callbacks from reporting a result after closing SKY. */
+    fun close() {
+        playbackRequestId++
+        verificationHandler.removeCallbacksAndMessages(null)
+    }
+
     /** Check actual player metadata only after explicit Android notification access. */
     private fun checkPlayback(request: SkyMusicCommand.Request,
                               playerPackage: String, label: String,
