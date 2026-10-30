@@ -8,6 +8,18 @@ SKY es un solo producto con dos ejecutores nativos independientes. El [contrato 
 
 ---
 
+## Estado verificable — 30 de octubre de 2026
+
+**SKY Android:** el código de `main` declara la versión **0.8.41** (`versionCode 54`). Esto **no equivale a una APK publicada ni probada**. Consultá [GitHub Releases](https://github.com/OscarElieser/SKY/releases) para obtener exclusivamente versiones firmadas, con su huella y SHA-256. La última APK publicada al momento de esta revisión era **0.8.38**; confirmar de nuevo antes de instalar.
+
+**Operaciones locales de archivos Android (en validación):** interpretar instrucciones, mostrar propuesta, aprobar o cancelar, crear/modificar archivos de texto en almacenamiento privado, guardar respaldos con metadatos persistentes, listar copias verificadas y restaurarlas con aprobación individual. Registro local de estados y huellas SHA-256. **No** implica editar archivos de terceros, ejecutar cambios remotos con tokens del chat móvil, ni certificar ejecución sobre un Samsung real. Pruebas instrumentadas, compilación firmada y Android 15/16 deben aprobarse para declarar disponibilidad. No desactivar Play Protect.
+
+**Seguridad y regresión:** el flujo `security-v103.yml` falló en el commit `43c2a7a` con **526 pruebas superadas y 1 fallida**. La prueba antigua exigía adoptar un servicio SKY activo sin comprobar propiedad, contradiciendo el control actual que evita duplicar o tomar procesos existentes. Se ajustó **solo la prueba de regresión**, sin cambiar el ejecutor de Windows; la corrección requiere una nueva ejecución verde para considerarse verificada. [Consultar resultados](https://github.com/OscarElieser/SKY/actions/workflows/security-v103.yml).
+
+**Principio:** ninguna compilación, acción, envío, restauración o protección se anuncia como funcional solo por existir su código. La ejecución real y la evidencia deben confirmarse por separado.
+
+---
+
 # 🌌 SKY IA — Asistente personal, docente y plataforma modular
 
 **Versión base:** `12.6.0` · **Rama oficial:** [`main`](https://github.com/OscarElieser/SKY/tree/main) · **Estado:** desarrollo activo, con pruebas automatizadas y validaciones de hardware e integraciones aún pendientes.
