@@ -41,7 +41,8 @@ internal object SkyInstagramDraftFlow {
             "si preparala", "preparala", "si redactala", "adelante",
             "de acuerdo", "claro", "dale" -> Approval.YES
             "no", "cancelar", "cancela", "ahora no", "no autorizo",
-            "mejor no", "deten" -> Approval.NO
+            "mejor no", "deten", "no hacelo local", "no compartas el mensaje",
+            "prefiero local", "sin internet", "sin compartir" -> Approval.NO
             else -> Approval.NONE
         }
     }
