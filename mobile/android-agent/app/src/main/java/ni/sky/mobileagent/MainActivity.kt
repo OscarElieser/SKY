@@ -3660,8 +3660,42 @@ class MainActivity : Activity() {
         return true
     }
 
+    private fun previewSafeFileProposal(message: String): Boolean {
+        val proposal = SkySafeFileConversation.prepare(message) ?: return false
+        val operationId = java.util.UUID.randomUUID().toString()
+        val description = "Operación: " + proposal.operation + "\\nArchivo: " +
+            proposal.filename + "\\n\\nDetalle propuesto:\\n" +
+            proposal.detail.take(1100) +
+            "\\n\\nSolo se preparó una vista previa. No se ha modificado ningún archivo."
+        val evidence = SkyActionEvidence(this)
+        runCatching { evidence.record("archivo_" + proposal.operation, "PREPARADA",
+            "Vista previa local; sin ejecución", operationId) }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("SKY · Vista previa segura")
+            .setMessage(description.replace("\\n", "\n"))
+            .setNegativeButton("Cancelar") { _, _ ->
+                runCatching { evidence.record("archivo_" + proposal.operation,
+                    "RECHAZADA", "Cancelada por el usuario; sin cambios", operationId) }
+                home.addExchange(message, "Operación cancelada. No se modificó ningún archivo.",
+                    "SKY · control supervisado")
+            }
+            .setPositiveButton("Aprobar propuesta") { _, _ ->
+                runCatching { evidence.record("archivo_" + proposal.operation,
+                    "AUTORIZADA", "Autorizó la propuesta; ejecución móvil no habilitada", operationId) }
+                home.addExchange(message,
+                    "Propuesta aprobada, pero NO ejecutada. El chat móvil no dispone de " +
+                        "credenciales para modificar el espacio seguro del servidor. " +
+                        "No se modificó ningún archivo. Operación: " + operationId,
+                    "SKY · autorización sin ejecución")
+            }
+            .show()
+        chatInput.setText("")
+        return true
+    }
+
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
+        if (previewSafeFileProposal(message)) return
         if (processOwnerProfileImport(message)) {
             chatInput.setText("")
             return
