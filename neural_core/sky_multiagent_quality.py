@@ -23,6 +23,12 @@ _UNVERIFIED_ACTIONS = re.compile(
     r"ejecut[eé]|desplegu[eé]|sub[ií]|modifiqu[eé]|"
     r"descargu[eé]|abr[ií]|cre[eé]|consult[eé]|verifiqu[eé])\b"
 )
+_RECENT_ACTION = re.compile(
+    r"(?im)(?:^|[.!?]\\s+)(?:sky[\\s,:-]+)?"
+    r"(?:acabo|acabamos)\\s+de\\s+"
+    r"(?:instalar|modificar|enviar|borrar|eliminar|publicar|ejecutar|"
+    r"desplegar|subir|descargar|abrir|crear|consultar|verificar)\\b"
+)
 _FALSE_GROUNDING = re.compile(
     r"(?im)(?:^|[.!?]\s+)(?:ya\s+)?(?:investigu[eé]|navegu[eé]|"
     r"busqu[eé]\s+en\s+internet|revis[eé]\s+(?:en\s+)?(?:la\s+)?web)\b"
@@ -59,7 +65,8 @@ def assess(answer: str) -> dict:
     """Gate de afirmaciones de ejecución ficticia; no es fact-check académico."""
     if not isinstance(answer, str) or not answer.strip():
         return {"accepted": False, "reason": "empty", "verified_facts": False}
-    if _UNVERIFIED_ACTIONS.search(answer) or _FALSE_GROUNDING.search(answer):
+    if (_UNVERIFIED_ACTIONS.search(answer) or _RECENT_ACTION.search(answer)
+            or _FALSE_GROUNDING.search(answer)):
         return {"accepted": False, "reason": "unverified_execution_claim", "verified_facts": False}
     return {"accepted": True, "reason": "no_unverified_execution_claim_detected",
             "verified_facts": False}
