@@ -379,6 +379,8 @@ class SkyInstalledApps(
     }
 
     private fun launchDirect(app: Launchable, operationId: String = java.util.UUID.randomUUID().toString()) {
+        receipt("Abrir " + app.name, "AUTORIZADA",
+            "Autorización local de apertura comprobada; no autoriza otras acciones", operationId)
         if (!launchLimiter.allow("launch:" + app.packageName)) {
             receipt("Abrir " + app.name, "REJECTED", "Límite local por órdenes duplicadas o demasiado frecuentes", operationId)
             say("Recibí varias órdenes seguidas. Esperá un momento para evitar aperturas duplicadas.")
