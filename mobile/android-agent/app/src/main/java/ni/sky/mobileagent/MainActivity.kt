@@ -252,6 +252,7 @@ class MainActivity : Activity() {
                 !processCreatorCommand(transcript) &&
                 !processMessagingCommand(transcript) &&
                 !processInstagramCommand(transcript) &&
+                !processOwnerQuestion(transcript) &&
                 !processLocalPanelCommand(transcript, spoken = true) &&
                 !processCompanionCommand(transcript) &&
                 !processDailyCommand(transcript, spoken = true)) {
@@ -2875,6 +2876,65 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Single-turn owner identity from local data only; never GitHub or third parties. */
+    private fun processOwnerQuestion(message: String): Boolean {
+        if (!SkyOwnerIdentity.isQuestion(message)) return false
+        val reply = SkyOwnerIdentity.summarize(SkyOwnerContext.read(this))
+        if (::home.isInitialized) {
+            val face = voiceReplyOnFace
+            voiceReplyOnFace = false
+            home.addExchange(message, reply, "SKY · identidad privada del teléfono",
+                revealPanel = !face)
+        }
+        if (::voicePanel.isInitialized && voicePanel.isVoiceEnabled())
+            voicePanel.speakReply(reply)
+        return true
+    }
+
+    /** Real public source inside SKY, not an invented search or browser redirect. */
+    private fun requestPublicResearch(question: String) {
+        if (chatPending) {
+            home.showMessage("Termino la consulta anterior antes de investigar otra.")
+            return
+        }
+        chatPending = true
+        home.beginSending(question)
+        voicePanel.showThinking()
+        chatExecutor.execute {
+            try {
+                val result = SkyPublicResearch.find(question)
+                runOnUiThread {
+                    if (isFinishing) return@runOnUiThread
+                    home.addExchange(question, result.answer, "Wikipedia · fuente consultada",
+                        sources = listOf(SkyPhoneCloud.Source(result.sourceTitle,
+                            result.sourceUrl)))
+                    voicePanel.speakReply(result.answer)
+                }
+            } catch (error: Exception) {
+                val fallback = if (tokens.groqEnabled() &&
+                    !SkyPhoneCloud.requiresLiveVerification(question)) {
+                    runCatching { SkyGroqCloud.reply(tokens.groqKey(),
+                        question, JSONArray()) }.getOrNull()
+                } else null
+                runOnUiThread {
+                    if (isFinishing) return@runOnUiThread
+                    if (!fallback.isNullOrBlank()) {
+                        val reply = fallback + "\n\nRespuesta general de Groq, sin verificación web."
+                        home.addExchange(question, reply, "Groq · respuesta de respaldo")
+                        voicePanel.speakReply(reply)
+                    } else {
+                        val reason = error.message ?: "La fuente no respondió."
+                        home.failSending("Wikipedia: " + reason +
+                            " Podés probar con un tema más específico o activar Gemini " +
+                            "para búsquedas actuales con fuentes.", question)
+                    }
+                }
+            } finally {
+                chatPending = false
+            }
+        }
+    }
+
     private fun localCognitionRecall(message: String): Boolean {
         if (!cognitionEnabled()) return false
         val answer = when {
@@ -2903,6 +2963,16 @@ class MainActivity : Activity() {
 
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
+        if (processOwnerQuestion(message)) {
+            chatInput.setText("")
+            return
+        }
+        if (SkyPublicResearch.explicit(message) ||
+            (!tokens.cloudEnabled() && SkyPublicResearch.encyclopedic(message))) {
+            chatInput.setText("")
+            requestPublicResearch(message)
+            return
+        }
         if (processInstagramCommand(message)) {
             chatInput.setText("")
             return
@@ -2942,14 +3012,20 @@ class MainActivity : Activity() {
         }
         val explicitFact = SkyAndroidCognition.explicitFact(message)
         if (explicitFact != null) {
-            runCatching { longTermMemory.remember(explicitFact) }
-                .onSuccess {
-                    chatInput.setText("")
-                    home.addExchange(message,
-                        "Guardé este dato en la memoria privada de largo plazo del teléfono.",
-                        "SKY · memoria larga local")
-                }
-                .onFailure { home.showMessage(it.message ?: "No pude guardar ese recuerdo.") }
+            val saved = runCatching {
+                if (SkyOwnerIdentity.isExplicitPersonalFact(explicitFact))
+                    SkyOwnerContext.remember(this, explicitFact)
+                longTermMemory.remember(explicitFact)
+            }
+            saved.onSuccess {
+                chatInput.setText("")
+                val selfFact = SkyOwnerIdentity.isExplicitPersonalFact(explicitFact)
+                val notice = if (selfFact)
+                    "Ya guardé ese dato en tu perfil privado del teléfono. Podés preguntarme quién sos."
+                else "Guardé ese dato en la memoria privada del teléfono."
+                home.addExchange(message, notice, "SKY · memoria confirmada local")
+                if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(notice)
+            }.onFailure { home.showMessage(it.message ?: "No pude guardar ese recuerdo.") }
             return
         }
         // Las preguntas explícitas sobre recuerdos e historial no salen a la nube.
