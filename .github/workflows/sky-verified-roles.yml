@@ -14,6 +14,9 @@ on:
       - 'neural_core/sky_verified_science.py'
       - 'metaverse/sky_verified_roles_api.py'
       - 'metaverse/api.py'
+      - 'neural_core/sky_safe_file_inspector.py'
+      - 'metaverse/sky_safe_files_api.py'
+      - 'tests/test_sky_safe_file_inspector.py'
       - 'tests/test_sky_verified_roles.py'
       - 'tests/test_sky_role_lessons.py'
       - 'tests/test_sky_role_router.py'
@@ -48,6 +51,7 @@ jobs:
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_role_router.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_conversation_tools.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_verified_json.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_safe_file_inspector.py' -v
           node --check metaverse/static/hud.js
 
   http-integration:

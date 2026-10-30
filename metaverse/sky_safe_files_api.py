@@ -68,6 +68,19 @@ def audit_items():
         _failure(exc)
 
 
+@router.get("/inspect/{name}")
+def inspect_document(name: str):
+    try:
+        from neural_core.sky_safe_file_inspector import inspect
+        return inspect(name)
+    except FileNotFoundError as exc:
+        raise HTTPException(404,"Archivo no encontrado.") from exc
+    except (workspace.WorkspaceError, ValueError) as exc:
+        raise HTTPException(422,str(exc)[:180]) from exc
+    except (OSError, ImportError) as exc:
+        raise HTTPException(503,"Lector no disponible.") from exc
+
+
 @router.get("/text/{name}")
 def inspect_text(name: str):
     # Lectura de texto acotada y autenticada para edición en el HUD.
