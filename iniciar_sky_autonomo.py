@@ -610,6 +610,13 @@ class SkySupervisor:
             self._candado = None
             return False
 
+        if is_port_in_use(PORTS["agent"]) and not es_servicio_sky(PORTS["agent"]):
+            _decir("[SKY] El puerto del agente ya está ocupado por otro servicio. "
+                   "No se inicia SKY sobre un puerto ajeno ni se finaliza ese proceso.")
+            self._candado.liberar()
+            self._candado = None
+            return False
+
         try:
             _ruta_parar().unlink()
         except OSError:
