@@ -3459,6 +3459,22 @@
             });
             row.appendChild(edit);
           }
+          const inspect=el('button','btn','Leer documento');inspect.type='button';
+          inspect.addEventListener('click',async()=>{
+            inspect.disabled=true;
+            try{
+              const result=await api('/api/sky/safe-files/inspect/'+encodeURIComponent(item.name));
+              const surface=el('div','sky-safe-preview');
+              surface.appendChild(el('p','muted','Vista parcial y privada · solo lectura · '+result.format));
+              const preview=el('pre','',result.text||'No se encontró texto extraíble en este documento.');
+              preview.style.whiteSpace='pre-wrap';
+              preview.style.wordBreak='break-word';
+              surface.appendChild(preview);
+              abrirVentana('safe-inspect','SKY · '+item.name,surface,{w:650,h:550});
+            }catch(error){info.textContent='No pude leer el archivo: '+error.message;}
+            finally{inspect.disabled=false;}
+          });
+          row.appendChild(inspect);
           row.append(use,download);stored.appendChild(row);
         }
         if(!(files.files||[]).length)stored.appendChild(el('p','muted','Todavía no hay archivos.'));
