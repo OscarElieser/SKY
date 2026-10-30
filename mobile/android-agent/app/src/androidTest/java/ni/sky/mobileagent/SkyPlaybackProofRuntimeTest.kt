@@ -21,6 +21,7 @@ class SkyPlaybackProofRuntimeTest {
         }
         assertNotNull("La verificación requiere un servicio declarado explícitamente", service)
         assertEquals(Manifest.permission.BIND_NOTIFICATION_LISTENER_SERVICE, service?.permission)
+        assertFalse("El servicio solo debe ser accesible al sistema", service?.exported ?: true)
         assertFalse("Una instalación de prueba limpia no debe activar permisos por sí sola",
             SkyPlaybackProof.available(context))
     }
