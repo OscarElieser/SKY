@@ -22,6 +22,16 @@ class Plan(BaseModel):
 def catalog():
     return sky_verified_roles.catalogue()
 
+@router.get("/learning")
+def learned_tool_failures():
+    """Estado de aprendizaje basado en resultados reales, sin entradas privadas."""
+    from neural_core.sky_role_lessons import report
+    try:
+        return report()
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(503, detail="Memoria operativa no disponible") from exc
+
+
 @router.get("/metrics")
 def metrics():
     try:

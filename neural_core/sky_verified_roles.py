@@ -16,6 +16,7 @@ import time
 import uuid
 from pathlib import Path
 from . import sky_verified_science as _science
+from . import sky_role_lessons as _lessons
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = {
@@ -210,6 +211,11 @@ def run_plan(steps, *, allow_network=False):
         start = time.monotonic()
         attempts = 0
         verification = None
+        failure_kind = "none"
+        try:
+            prior_lesson = _lessons.lesson(role, tool)
+        except (OSError, sqlite3.Error, ValueError):
+            prior_lesson = None
         try:
             if role == "investigacion":
                 attempts = 1
@@ -231,6 +237,16 @@ def run_plan(steps, *, allow_network=False):
             item = {"id": s["id"], "role": role, "tool": tool, "status": status, "result": data}
         except (RoleError, PermissionError, RuntimeError, ArithmeticError,
                 ImportError, OSError, ValueError) as exc:
+            if verification is not None and not verification.get("passed", False):
+                failure_kind = "verification_mismatch"
+            elif isinstance(exc, PermissionError):
+                failure_kind = "permission_required"
+            elif isinstance(exc, (ImportError, OSError)):
+                failure_kind = "dependency_unavailable"
+            elif isinstance(exc, (RoleError, ValueError, ArithmeticError)):
+                failure_kind = "invalid_input"
+            else:
+                failure_kind = "execution_failed"
             item = {"id": s["id"], "role": role, "tool": tool, "status": "FAILED",
                     "error": str(exc)[:200]}
         item["attempts"] = attempts
@@ -238,7 +254,15 @@ def run_plan(steps, *, allow_network=False):
             item["review"] = verification
             item["correction"] = "repeated_after_mismatch" if attempts == 2 else "not_needed"
         item["duration_ms"] = max(0, round((time.monotonic() - start)*1000))
+        item["prior_lesson"] = prior_lesson
+        item["issue_category"] = failure_kind
         item["memory_recorded"] = _remember(role, tool, item["status"], item["duration_ms"])
+        try:
+            item["lesson_recorded"] = _lessons.record(
+                role, tool, item["status"], issue=failure_kind,
+                attempts=attempts, duration_ms=min(item["duration_ms"], 3_600_000))
+        except (OSError, sqlite3.Error, ValueError):
+            item["lesson_recorded"] = False
         results.append(item)
         if item["status"] == "FAILED":
             break
