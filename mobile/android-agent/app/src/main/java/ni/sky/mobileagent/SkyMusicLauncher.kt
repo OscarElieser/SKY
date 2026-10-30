@@ -34,29 +34,30 @@ class SkyMusicLauncher(
     /** Check actual player metadata only after explicit Android notification access. */
     private fun checkPlayback(request: SkyMusicCommand.Request,
                               playerPackage: String, label: String,
-                              requestId: Int, step: Int = 0) {
+                              requestId: Int, operation: String, step: Int = 0) {
         if (requestId != playbackRequestId) return
         if (SkyPlaybackProof.playing(host, playerPackage, request.query)) {
             receipt(request.query, "VERIFIED_LOCAL",
-                "Android MediaSession confirmó PLAYING y metadatos de canción coincidentes en $label; audio audible no medido")
+                "Android MediaSession confirmó PLAYING y metadatos de canción coincidentes en $label; audio audible no medido", operation)
             tell("Android confirmó que $label está reproduciendo «${request.query}».")
             return
         }
         if (step < 12) {
             verificationHandler.postDelayed({
-                checkPlayback(request, playerPackage, label, requestId, step + 1)
+                checkPlayback(request, playerPackage, label, requestId, operation, step + 1)
             }, 1000L)
         } else {
             receipt(request.query, "ESTADO_DESCONOCIDO",
                 "No se detectó una MediaSession PLAYING con el título exacto en $label " +
-                    "tras 12 comprobaciones; no se confirma reproducción ni audio audible")
+                    "tras 12 comprobaciones; no se confirma reproducción ni audio audible", operation)
             tell("Android recibió la orden para «${request.query}» en $label, " +
                 "pero no pude confirmar la canción en reproducción. Revisá el reproductor.")
         }
     }
 
-    private fun receipt(song: String, status: String, detail: String) {
-        onReceipt?.invoke("Música: " + song.take(100), status, detail, operationId)
+    private fun receipt(song: String, status: String, detail: String,
+                        operation: String = operationId) {
+        onReceipt?.invoke("Música: " + song.take(100), status, detail, operation)
     }
     companion object {
         private const val MUSIC_PREF = "preferred_music"
@@ -134,7 +135,7 @@ class SkyMusicLauncher(
                 "La aplicación decidirá si puede iniciar esa canción. " +
                 "Todavía no he comprobado que esté sonando.")
             if (SkyPlaybackProof.available(host)) {
-                checkPlayback(request, pkg, title, requestId)
+                checkPlayback(request, pkg, title, requestId, operationId)
             }
             return
         }
