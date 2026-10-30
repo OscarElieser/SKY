@@ -196,6 +196,15 @@ class SafeFilesHTTPTests(unittest.TestCase):
         self.assertEqual(p.status_code,409)
         self.assertEqual((Path(os.environ["SKY_SAFE_WORKSPACE_ROOT"])/"existing.txt").read_text(),"Original")
 
+    def test_readonly_text_preview_for_editing(self):
+        self.add("lesson.txt","Texto editable")
+        response=self.client.get("/api/sky/safe-files/text/lesson.txt",headers=self.h)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()["text"],"Texto editable")
+        self.assertTrue(response.json()["read_only_preview"])
+        self.assertFalse(response.json()["executed"])
+        self.assertEqual(self.client.get("/api/sky/safe-files/text/lesson.txt").status_code,401)
+
     def test_hud_has_visible_approval_workflow(self):
         hud=Path("metaverse/static/hud.js").read_text(encoding="utf-8")
         html=Path("metaverse/static/hud.html").read_text(encoding="utf-8")

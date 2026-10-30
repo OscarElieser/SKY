@@ -68,6 +68,26 @@ def audit_items():
         _failure(exc)
 
 
+@router.get("/text/{name}")
+def inspect_text(name: str):
+    # Lectura de texto acotada y autenticada para edición en el HUD.
+    try:
+        from pathlib import Path
+        if Path(name).suffix.lower() not in workspace.TEXT_EXT:
+            raise workspace.WorkspaceError("Este formato se edita regenerando el documento.")
+        data = workspace.file_bytes(name)
+        if len(data) > workspace.MAX_TEXT:
+            raise workspace.WorkspaceError("Archivo demasiado extenso para editar en el HUD.")
+        text = data.decode("utf-8")
+        import hashlib
+        return {"name":name,"text":text,"sha256":hashlib.sha256(data).hexdigest(),
+                "read_only_preview":True,"executed":False}
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "Archivo no encontrado.") from exc
+    except (UnicodeDecodeError, OSError, ValueError) as exc:
+        _failure(workspace.WorkspaceError("No se puede editar como texto UTF-8.") if isinstance(exc,UnicodeDecodeError) else exc)
+
+
 @router.get("/download/{name}")
 def download(name: str):
     try:

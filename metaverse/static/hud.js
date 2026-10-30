@@ -3446,6 +3446,19 @@
             }catch(error){info.textContent='Descarga no disponible: '+error.message;}
             finally{download.disabled=false;}
           });
+          const ext=(item.name.split('.').pop()||'').toLowerCase();
+          if(['txt','md','csv','json','py','html'].includes(ext)){
+            const edit=el('button','btn','Editar texto');edit.type='button';
+            edit.addEventListener('click',async()=>{
+              try{
+                const data=await api('/api/sky/safe-files/text/'+encodeURIComponent(item.name));
+                operation.value='replace';updateFields();name.value=item.name;
+                content.value=data.text;invalidate();
+                info.textContent='Texto cargado. Revisá los cambios y prepará una nueva vista previa.';
+              }catch(error){info.textContent='No se pudo abrir el texto: '+error.message;}
+            });
+            row.appendChild(edit);
+          }
           row.append(use,download);stored.appendChild(row);
         }
         if(!(files.files||[]).length)stored.appendChild(el('p','muted','Todavía no hay archivos.'));
