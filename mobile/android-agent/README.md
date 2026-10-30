@@ -1,5 +1,9 @@
 ## SKY Android 0.8.40 — validación científica y previsualización paginada (30/10/2026)
 
+> **Corrección académica de 30/10/2026:** \`SkyScientificCalculator\` ahora reconoce aceleración con superíndice \`m/s²\` y resistencia con \`Ω\`, conserva aceleraciones negativas, evita que resultados pequeños no nulos se redondeen a cero y presenta cálculos de energía cinética, fuerza y ley de Ohm como datos → fórmula → sustitución → resultado → verificación dimensional. Pruebas de regresión ampliadas en \`SkyScientificCalculatorTest.kt\`. Se comprobó localmente el comportamiento de expresiones y formato usando el compilador Kotlin, pero **no** se certifica la APK 0.8.40 sin los jobs de GitHub Actions y el Samsung real.
+
+
+
 > **Continuación de calidad y estabilidad:** las respuestas largas disponen de vista completa y copia íntegra. Los adjuntos requieren una instrucción explícita antes del consentimiento para enviar. Los PDF liberan las imágenes al cambiar de página/cerrar la ventana; una lectura tardía no debe actualizar ventanas cerradas. El módulo TTS se compiló y probó localmente con ejemplos de fracciones/subíndices/reacciones, pero el APK completo sigue sin validación confirmada. [Protocolo de aceptación y evidencias](docs/SKY_SCIENTIFIC_FILES_ACCEPTANCE_0.8.40.md).
 
 
