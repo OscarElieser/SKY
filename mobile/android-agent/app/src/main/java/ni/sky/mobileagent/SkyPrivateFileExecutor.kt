@@ -13,6 +13,7 @@ import java.util.UUID
 class SkyPrivateFileExecutor(context: Context) {
     private val root = File(context.filesDir, "sky_safe_documents")
     private val backups = File(root, ".backups")
+    data class BackupEntry(val id: String, val filename: String, val createdAt: Long, val sha256: String)
     data class Result(val filename: String, val operation: String, val sha256: String,
                       val backupId: String?, val bytes: Int)
 
@@ -63,6 +64,11 @@ class SkyPrivateFileExecutor(context: Context) {
                     stream.fdSyncIfPossible()
                 }
                 require(sha(backup.readBytes()) == sha(original)) { "Respaldo no verificable" }
+                val record = org.json.JSONObject().put("id", id)
+                    .put("filename", proposal.filename)
+                    .put("createdAt", System.currentTimeMillis())
+                    .put("sha256", sha(original))
+                File(backups, id + ".json").writeText(record.toString())
                 backupId = id
             } catch (error: Exception) {
                 backup.delete()
@@ -85,6 +91,27 @@ class SkyPrivateFileExecutor(context: Context) {
         }
     }
 
+    /** Historial persistente que valida cada copia antes de ofrecerla. */
+    @Synchronized fun listBackups(): List<BackupEntry> {
+        if (!backups.isDirectory || backups.isSymbolicLink()) return emptyList()
+        return (backups.listFiles() ?: emptyArray()).asSequence()
+            .filter { it.isFile && !it.isSymbolicLink() && it.name.endsWith(".json") }
+            .mapNotNull { meta ->
+                runCatching {
+                    val record = org.json.JSONObject(meta.readText())
+                    val id = record.getString("id")
+                    val name = record.getString("filename")
+                    target(name)
+                    require(UUID.fromString(id).toString() == id && meta.name == id + ".json")
+                    val file = File(backups, id + ".bak")
+                    require(file.isFile && !file.isSymbolicLink())
+                    val digest = record.getString("sha256")
+                    require(digest == sha(file.readBytes()))
+                    BackupEntry(id, name, record.getLong("createdAt"), digest)
+                }.getOrNull()
+            }.sortedByDescending { it.createdAt }.take(100).toList()
+    }
+
     /** Restauración explícita desde un respaldo verificado; no se invoca automáticamente. */
     @Synchronized fun restoreBackup(name: String, backupId: String): String {
         require(Regex("[0-9a-fA-F-]{36}").matches(backupId) &&
@@ -96,6 +123,9 @@ class SkyPrivateFileExecutor(context: Context) {
         require(file.isFile && !file.isSymbolicLink()) { "Archivo original no disponible" }
         val backup = File(backups, backupId + ".bak")
         require(backup.isFile && !backup.isSymbolicLink()) { "Respaldo no disponible" }
+        require(listBackups().any { it.id == backupId && it.filename == name }) {
+            "Respaldo sin registro verificable"
+        }
         val bytes = backup.readBytes()
         require(bytes.size <= 12 * 1024 * 1024) { "Respaldo excesivo" }
         val temporary = File.createTempFile(".sky-restore-", ".tmp", root)
