@@ -135,7 +135,7 @@ def _snippet(text: str):
          "programacion", "validar_json", ("json",)),
     )
     for heading, role, tool, languages in rules:
-        prefix = re.match(r"^(?:" + heading + r")\s*:\s*", text, re.I)
+        prefix = re.match(r"^(?:" + heading + r")\s*:\s*", _fold(text), re.I)
         if not prefix:
             continue
         payload = text[prefix.end():].strip()
