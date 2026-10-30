@@ -164,7 +164,7 @@ object SkyAndroidCognition {
             "No inventés acciones realizadas, búsquedas, datos actuales ni referencias. " +
             "Si necesitás información reciente, usa solo fuentes verificables disponibles " +
             "y diferenciá claramente lo que no se pudo comprobar.\n" +
-            specific + "\n"
+            specific + "\n" + SkyExpertRoles.guidance(query)
     }
 
     fun description(): String =
