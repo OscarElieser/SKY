@@ -1,3 +1,30 @@
+## Respuestas Instagram supervisadas · servidor v18 (30/10/2026)
+
+**Hecho:** Supabase Edge Function `sky-instagram` versión **18**, con lectura, comprobación de permisos y nuevas rutas `POST /mobile-reply-prepare`, `POST /mobile-reply-confirm`, `GET /mobile-reply-status`. También se creó `public.sky_instagram_outbound_approvals` con RLS habilitado, sin políticas públicas y permisos solo para `service_role`. La tabla conserva hashes de texto y referencias, **nunca el cuerpo de la respuesta ni tokens Meta**.
+
+**Estado de producción:** el envío de mensajes está **DESACTIVADO por defecto** y la variable `SKY_INSTAGRAM_OUTGOING_ENABLED` no se habilita durante estas pruebas. El código de envío existe y se puede probar de forma controlada, pero **ningún mensaje se ha enviado desde SKY**; no debe presentarse como función de envío validada hasta la prueba real autorizada. En el primer despliegue, `sky_instagram_outbound_approvals` tenía **0 registros y 0 envíos**.
+
+**Flujo de consentimiento en SKY Android (sin botones nuevos):**
+1. «SKY, prepara respuesta al último mensaje de Instagram»: consulta un evento real y, para compartirlo con Groq/Gemini, pide permiso explícito; si el propietario no lo autoriza, genera borrador local.
+2. SKY lee y muestra el borrador. «Cambia la respuesta por...» permite corrección; «copia la respuesta» conserva opción manual.
+3. «Sí, envíala» autoriza **únicamente el texto vigente** y el evento original. La app envía una solicitud `prepare` usando su credencial revocable, cifrada en Android Keystore. No acepta un ID de destinatario escrito por el usuario.
+4. El servidor verifica el evento Meta autenticado, identidad profesional y Page con tarea `MESSAGING`, token no vencido, ventana conservadora de 23 h y longitud máxima de 950 caracteres/1000 bytes; devuelve un `approval_id` de 2 minutos. Si la función sigue desactivada, **no consume aprobación ni envía nada**.
+5. Solo la confirmación autorizada y coincidente con el SHA-256 del borrador provoca un intento de `POST https://graph.facebook.com/v26.0/{page-id}/messages` con Page token mantenido en Supabase. La transición atómica `prepared -> sending` impide repeticiones concurrentes. Meta debe devolver ID de mensaje y destinatario exactos para reconocer `sent`. Ante un error o timeout el estado es `failed`/`unknown`: **sin reintentos automáticos**.
+6. `/mobile-reply-status` permite recuperar el último estado con la credencial del dispositivo y sin revelar mensajes. La integración de consulta de estado en la UI y el manejo de cierre inesperado deben probarse antes de activar producción.
+
+**Corrección importante de fecha de webhook:** Meta puede enviar `timestamp` en **milisegundos**; el receptor ya convierte tanto segundos como milisegundos. Los dos primeros mensajes se almacenaron sin `event_at` y por seguridad **no autorizan un envío**; se necesitará una nueva prueba de DM desde la otra cuenta cuando la APK esté lista, sin modificar la conexión ni los webhooks existentes.
+
+**Activación posterior, solo con aprobación del propietario y evidencia:**
+- [ ] CI: pasar `deno check` y pruebas Node de seguridad para el gateway, unit tests Kotlin, build firmada y emuladores Android 15/16.
+- [ ] Verificar Meta App Review/roles, ventana de 24 h, Page token y tarea `MESSAGING` sin revelar secretos.
+- [ ] Probar en Samsung con un **mensaje de prueba nuevo**, borrador, corrección, aprobación y respuesta. No enviar test DM sin autorización concreta del usuario para el texto y cuenta.
+- [ ] Revisar el comprobante de Meta y que un segundo «envíala» **no** provoque duplicado, además de denegación, expiración y corte de red.
+- [ ] Solo después habilitar el secreto de producción `SKY_INSTAGRAM_OUTGOING_ENABLED=true` en el proyecto autorizado y validar nuevamente. Si algo falla, restablecerlo a `false`.
+- [ ] Auditar límites por dispositivo, RLS, métricas sin contenido personal y controles de revocación.
+
+La app seguirá pudiendo **leer, avisar y preparar borradores** aun cuando el envío esté deshabilitado. No se modifica SKY Windows ni BAQUEANO.
+
+
 ## SKY Android 0.8.32 · bandeja real de Instagram (30/10/2026)
 
 - **Prueba Meta → Supabase confirmada:** el webhook verificado registró **2 mensajes reales** para la cuenta profesional autorizada, con identificadores de evento válidos, estado `received` y recepción alrededor de las 07:58 (Nicaragua). Se comprobó en `sky_instagram_webhook_events`, sin guardar el contenido de conversaciones en este documento.
