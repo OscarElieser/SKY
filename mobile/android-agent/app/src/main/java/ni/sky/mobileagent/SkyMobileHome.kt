@@ -393,7 +393,7 @@ class SkyMobileHome(
             value.take(6800) + "\n\nVista previa de la respuesta. Tocá «Leer completa» para ver el resto."
             else value
         val bubble: View = if (!rich) {
-            text(value, 15f, white).apply {
+            text(visibleValue, 15f, white).apply {
                 gravity = Gravity.START
                 setLineSpacing(dp(3).toFloat(), 1f)
                 setTextIsSelectable(true)
@@ -419,7 +419,8 @@ class SkyMobileHome(
                         listOf(60L, 240L, 600L).forEach { delay ->
                             web.postDelayed({
                                 val desired = (web.contentHeight * web.scale).toInt()
-                                if (desired > dp(25) && web.layoutParams != null &&
+                                if (web.parent != null && web.isAttachedToWindow &&
+                                    desired > dp(25) && web.layoutParams != null &&
                                     web.layoutParams.height != desired) {
                                     web.layoutParams.height = desired.coerceAtMost(dp(30000))
                                     web.requestLayout()
