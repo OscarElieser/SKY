@@ -96,6 +96,167 @@ class MainActivity : Activity() {
     // The proactive Instagram check never sends messages or instructions to an LLM.
     private val instagramChecking = java.util.concurrent.atomic.AtomicBoolean(false)
     private var instagramReviewOfferUntil = 0L
+    private data class InstagramDraftConsent(
+        val incoming: String, val eventKey: String, val expiresAt: Long
+    )
+    private var instagramDraftConsent: InstagramDraftConsent? = null
+    private var instagramLastDraft: String? = null
+    private var instagramLastDraftUntil = 0L
+    private val instagramDraftBusy = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    private fun instagramDeviceUnlocked(): Boolean =
+        !(getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager).isDeviceLocked
+
+    private fun instagramSay(message: String) {
+        if (::home.isInitialized) home.showMessage(message)
+        if (::voicePanel.isInitialized && voicePanel.isVoiceEnabled() &&
+            instagramDeviceUnlocked()) voicePanel.speakReply(message)
+    }
+
+    /** Read-only source event. This stage never sends a DM. */
+    private fun proposeInstagramReply() {
+        if (!instagramDeviceUnlocked()) {
+            instagramSay("Desbloqueá el teléfono antes de revisar mensajes privados.")
+            return
+        }
+        if (!SkyInstagramAlerts.paired(this)) {
+            instagramSay("Primero vinculá tu cuenta de Instagram con SKY.")
+            return
+        }
+        if (!tokens.groqEnabled() && !tokens.cloudEnabled()) {
+            instagramSay("Para redactar respuestas con IA configurá Groq o Gemini.")
+            return
+        }
+        if (!instagramDraftBusy.compareAndSet(false, true)) {
+            instagramSay("Estoy revisando el mensaje anterior.")
+            return
+        }
+        instagramSay("Voy a consultar tu último mensaje real de Instagram.")
+        Thread {
+            val incoming = runCatching {
+                val snapshot = SkyInstagramAlerts.fetch(this)
+                snapshot.messages.firstOrNull {
+                    it.body.isNotBlank() &&
+                        it.body != "Mensaje sin texto o contenido multimedia"
+                } ?: error("No hay mensajes recientes con texto para responder.")
+            }
+            runOnUiThread {
+                instagramDraftBusy.set(false)
+                if (isFinishing || !visible) return@runOnUiThread
+                incoming.onSuccess { msg ->
+                    if (!instagramDeviceUnlocked()) {
+                        instagramSay("Desbloqueá el teléfono para revisar el mensaje.")
+                        return@onSuccess
+                    }
+                    instagramLastDraft = null
+                    instagramDraftConsent = InstagramDraftConsent(
+                        msg.body, msg.key,
+                        android.os.SystemClock.elapsedRealtime() + 120_000L)
+                    instagramSay("El último mensaje dice: " +
+                        SkyInstagramInboxRules.preview(msg.body, 220) +
+                        ". Para preparar una respuesta, necesito compartir ese texto " +
+                        "con " + if (tokens.groqEnabled()) "Groq" else "Gemini" +
+                        ". ¿Autorizás esa consulta? Decime sí autorizo o no.")
+                }.onFailure {
+                    instagramSay("No pude recuperar un mensaje de Instagram válido: " +
+                        (it.message ?: "fallo de conexión") + ".")
+                }
+            }
+        }.start()
+    }
+
+    private fun generateInstagramDraft(approval: InstagramDraftConsent) {
+        instagramDraftConsent = null
+        if (!instagramDeviceUnlocked()) {
+            instagramSay("Desbloqueá el teléfono para generar la respuesta.")
+            return
+        }
+        if (!instagramDraftBusy.compareAndSet(false, true)) return
+        instagramSay("Estoy preparando un borrador. No enviaré ningún mensaje.")
+        Thread {
+            val candidate = runCatching {
+                SkyInstagramDraftFlow.cleanDraft(
+                    generateMobileText(SkyInstagramDraftFlow.prompt(approval.incoming)))
+            }
+            runOnUiThread {
+                instagramDraftBusy.set(false)
+                if (isFinishing || !visible) return@runOnUiThread
+                candidate.onSuccess { proposed ->
+                    if (!instagramDeviceUnlocked()) {
+                        instagramSay("Desbloqueá el teléfono para revisar la respuesta.")
+                        return@onSuccess
+                    }
+                    instagramLastDraft = proposed
+                    instagramLastDraftUntil =
+                        android.os.SystemClock.elapsedRealtime() + 300_000L
+                    instagramSay("Te propongo esta respuesta, todavía sin enviar: " +
+                        proposed + ". Podés decirme copia la respuesta. " +
+                        "El envío directo se habilitará tras verificar la API de Meta.")
+                }.onFailure {
+                    instagramSay("La IA no produjo un borrador seguro: " +
+                        (it.message ?: "error del proveedor") + ".")
+                }
+            }
+        }.start()
+    }
+
+    /** Handles only explicit owner intents and a one-time, short-lived approval. */
+    private fun processInstagramDraft(message: String): Boolean {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val waiting = instagramDraftConsent
+        if (waiting != null) {
+            if (now >= waiting.expiresAt) {
+                instagramDraftConsent = null
+            } else {
+                when (SkyInstagramDraftFlow.approval(message)) {
+                    SkyInstagramDraftFlow.Approval.YES -> {
+                        generateInstagramDraft(waiting)
+                        return true
+                    }
+                    SkyInstagramDraftFlow.Approval.NO -> {
+                        instagramDraftConsent = null
+                        instagramSay("De acuerdo. No compartiré el mensaje con ninguna IA.")
+                        return true
+                    }
+                    SkyInstagramDraftFlow.Approval.NONE -> Unit
+                }
+            }
+        }
+        return when (SkyInstagramDraftFlow.command(message)) {
+            SkyInstagramDraftFlow.Command.PREPARE -> {
+                proposeInstagramReply()
+                true
+            }
+            SkyInstagramDraftFlow.Command.COPY -> {
+                val draft = instagramLastDraft?.takeIf {
+                    instagramDeviceUnlocked() && now < instagramLastDraftUntil
+                }
+                if (draft == null) instagramSay(
+                    "Todavía no hay un borrador vigente para copiar.")
+                else {
+                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    val clip = android.content.ClipData.newPlainText(
+                        "Borrador SKY Instagram", draft)
+                    if (android.os.Build.VERSION.SDK_INT >= 33) {
+                        clip.description.extras = android.os.PersistableBundle().apply {
+                            putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                        }
+                    }
+                    clipboard.setPrimaryClip(clip)
+                    instagramSay("Copié la respuesta al portapapeles. " +
+                        "Podés pegarla en Instagram y enviarla cuando la revisés.")
+                }
+                true
+            }
+            SkyInstagramDraftFlow.Command.SEND_REQUEST -> {
+                instagramSay("No he enviado nada. Todavía falta verificar el envío " +
+                    "autorizado con Meta. Si querés hacerlo ahora, decime copia la respuesta.")
+                true
+            }
+            SkyInstagramDraftFlow.Command.NONE -> false
+        }
+    }
+
 
     private val instagramPoll = object : Runnable {
         override fun run() {
@@ -158,6 +319,7 @@ class MainActivity : Activity() {
     }
 
     private fun processInstagramCommand(message: String): Boolean {
+        if (processInstagramDraft(message)) return true
         val now = android.os.SystemClock.elapsedRealtime()
         if (instagramReviewOfferUntil > now) {
             when (SkyInstagramDialogue.answer(message)) {
