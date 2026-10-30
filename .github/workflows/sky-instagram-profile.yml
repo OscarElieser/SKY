@@ -5,12 +5,14 @@ on:
     paths:
       - 'supabase/functions/sky-instagram/**'
       - 'tests/sky_instagram_profile_contract.test.mjs'
+      - 'tests/sky_instagram_send_readiness.test.mjs'
       - 'mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyInstagramMobileLink.kt'
       - '.github/workflows/sky-instagram-profile.yml'
   pull_request:
     paths:
       - 'supabase/functions/sky-instagram/**'
       - 'tests/sky_instagram_profile_contract.test.mjs'
+      - 'tests/sky_instagram_send_readiness.test.mjs'
       - 'mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyInstagramMobileLink.kt'
       - '.github/workflows/sky-instagram-profile.yml'
   workflow_dispatch:
@@ -31,4 +33,4 @@ jobs:
       - name: Static checks for the Instagram profile gateway
         run: deno check supabase/functions/sky-instagram/index.ts
       - name: Regression checks without exposing tokens or contacting Meta
-        run: node --test tests/sky_instagram_profile_contract.test.mjs tests/sky_instagram_credential.test.mjs
+        run: node --test tests/sky_instagram_profile_contract.test.mjs tests/sky_instagram_credential.test.mjs tests/sky_instagram_send_readiness.test.mjs
