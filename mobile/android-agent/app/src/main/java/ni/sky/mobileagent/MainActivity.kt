@@ -200,6 +200,30 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    private fun checkInstagramSendReadiness() {
+        if (!SkyInstagramAlerts.paired(this)) {
+            instagramSay("Primero vinculá Instagram con SKY.")
+            return
+        }
+        if (!instagramDraftBusy.compareAndSet(false, true)) {
+            instagramSay("Estoy terminando una consulta anterior de Instagram.")
+            return
+        }
+        instagramSay("Voy a comprobar los permisos reales de respuesta en Meta.")
+        Thread {
+            val result = runCatching { SkyInstagramAlerts.sendReadiness(this) }
+            runOnUiThread {
+                instagramDraftBusy.set(false)
+                if (isFinishing || !visible) return@runOnUiThread
+                instagramSay(result.getOrElse {
+                    "No se pudo comprobar el envío en Meta: " +
+                        (it.message ?: "error de conexión") +
+                        ". La lectura de mensajes sigue separada."
+                })
+            }
+        }.start()
+    }
+
     /** Handles only explicit owner intents and a one-time, short-lived approval. */
     private fun processInstagramDraft(message: String): Boolean {
         val now = android.os.SystemClock.elapsedRealtime()
@@ -225,6 +249,10 @@ class MainActivity : Activity() {
         return when (SkyInstagramDraftFlow.command(message)) {
             SkyInstagramDraftFlow.Command.PREPARE -> {
                 proposeInstagramReply()
+                true
+            }
+            SkyInstagramDraftFlow.Command.CHECK_SEND -> {
+                checkInstagramSendReadiness()
                 true
             }
             SkyInstagramDraftFlow.Command.COPY -> {
