@@ -114,11 +114,13 @@ def _validate(spec: dict) -> dict:
     if not isinstance(spec, dict) or set(spec) - _ALLOWED:
         raise WorkspaceError("Especificación no autorizada.")
     op = spec.get("op")
-    if op not in OPS:
+    if not isinstance(op, str) or op not in OPS:
         raise WorkspaceError("Operación fuera del catálogo.")
     name = _name(spec.get("name"))
     normalized = {"op": op, "name": name}
+    accepted = {"op", "name"}
     if op in {"create", "replace", "append"}:
+        accepted |= {"text", "document"}
         if op == "append" or Path(name).suffix.lower() in TEXT_EXT:
             if spec.get("document") is not None:
                 raise WorkspaceError("Especificación incompatible con archivo de texto.")
@@ -139,8 +141,14 @@ def _validate(spec: dict) -> dict:
             if op == "append":
                 raise WorkspaceError("Solo se puede añadir texto a archivos de texto.")
             doc = spec.get("document")
-            if not isinstance(doc, dict) or len(json.dumps(doc, ensure_ascii=False)) > 145_000:
+            if not isinstance(doc, dict) or set(doc) - {"kind","title","content","headers","rows","csv","template","ai_provider"}:
                 raise WorkspaceError("Documento estructurado inválido.")
+            try:
+                length = len(json.dumps(doc, ensure_ascii=False, allow_nan=False))
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise WorkspaceError("Datos de documento inválidos.") from exc
+            if length > 145_000:
+                raise WorkspaceError("Documento estructurado demasiado extenso.")
             if str(doc.get("kind", "")).lower() != Path(name).suffix[1:].lower():
                 raise WorkspaceError("Tipo de documento diferente de su extensión.")
             if not isinstance(doc.get("content", ""), str) or not doc.get("content", "").strip():
@@ -151,6 +159,7 @@ def _validate(spec: dict) -> dict:
                 raise WorkspaceError("No se permite envío implícito a una IA externa.")
             normalized["document"] = doc
     elif op == "rename":
+        accepted.add("new_name")
         if spec.get("new_name") is None:
             raise WorkspaceError("Falta el nuevo nombre.")
         normalized["new_name"] = _name(spec["new_name"])
@@ -159,11 +168,18 @@ def _validate(spec: dict) -> dict:
         if Path(normalized["new_name"]).suffix.lower() != Path(name).suffix.lower():
             raise WorkspaceError("No se cambia el tipo de archivo al renombrarlo.")
     elif op == "restore":
+        accepted.add("trash_id")
         ident = spec.get("trash_id")
         if not isinstance(ident, str) or not ID.fullmatch(ident):
             raise WorkspaceError("Identificador de papelera inválido.")
         normalized["trash_id"] = ident
-    if len(json.dumps(normalized, ensure_ascii=False, allow_nan=False)) > 160_000:
+    if set(spec) - accepted:
+        raise WorkspaceError("No se permiten campos inesperados para la operación.")
+    try:
+        raw = json.dumps(normalized, ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise WorkspaceError("Los datos del documento deben ser JSON válido.") from exc
+    if len(raw) > 160_000:
         raise WorkspaceError("Solicitud excesiva.")
     return normalized
 
@@ -241,8 +257,15 @@ def _write(path: Path, data: bytes, overwrite: bool):
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
-        if not overwrite and _hash(path) != _EMPTY:
-            raise WorkspaceConflict("El nombre ya está ocupado.")
+        if not overwrite:
+            # hard-link con semántica exclusiva: jamás sobreescribe si otro
+            # proceso crea el archivo después del preview.
+            try:
+                os.link(tmp, path)
+            except FileExistsError as exc:
+                raise WorkspaceConflict("El nombre ya está ocupado.") from exc
+            tmp.unlink()
+            return _hash(path)
         os.replace(tmp, path)
         return _hash(path)
     finally:

@@ -220,6 +220,10 @@ app.include_router(sky_modules_router, dependencies=[Depends(require_key)])
 from .sky_verified_roles_api import router as sky_verified_roles_router
 app.include_router(sky_verified_roles_router)
 
+# File changes live in an isolated workspace. Owner-only, preview + token + PIN.
+from .sky_safe_files_api import router as sky_safe_files_router
+app.include_router(sky_safe_files_router)
+
 # Installable SKY client for Windows browsers and Android; same SKY API and HUD.
 from .mobile_pwa_api import router as mobile_pwa_router
 app.include_router(mobile_pwa_router)
