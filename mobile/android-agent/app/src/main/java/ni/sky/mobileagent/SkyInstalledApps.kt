@@ -71,8 +71,11 @@ class SkyInstalledApps(
             choices.firstOrNull { it.packageName == entry.packageName && it.name == entry.label }
         }
         when (available.size) {
-            0 -> say("No encontré «" + query.take(65) +
-                "» entre las aplicaciones visibles. Podés revisar el catálogo en Ajustes.")
+            0 -> {
+                receipt("Abrir aplicación", "FAILED", "No se encontró aplicación visible coincidente")
+                say("No encontré «" + query.take(65) +
+                    "» entre las aplicaciones visibles. Podés revisar el catálogo en Ajustes.")
+            }
             1 -> {
                 val app = available.first()
                 if (supervisedControlEnabled() || trusted.getBoolean(app.packageName, false)) launchDirect(app)
@@ -89,7 +92,9 @@ class SkyInstalledApps(
                             trusted.getBoolean(selected.packageName, false)) launchDirect(selected)
                         else confirm(selected)
                     }
-                    .setNegativeButton("Cancelar", null)
+                    .setNegativeButton("Cancelar") { _, _ ->
+                        receipt("Abrir aplicación", "REJECTED", "Selección de aplicación cancelada")
+                    }
                     .show()
             }
         }
@@ -363,7 +368,9 @@ class SkyInstalledApps(
                     launchDirect(app)
                 }
             }
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton("Cancelar") { _, _ ->
+                receipt("Abrir " + app.name, "REJECTED", "El propietario canceló la apertura")
+            }
             .show()
     }
 
