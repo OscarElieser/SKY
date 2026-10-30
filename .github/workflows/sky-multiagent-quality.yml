@@ -1,0 +1,41 @@
+name: SKY Multiagent Quality Gate
+on:
+  push:
+    paths:
+      - 'neural_core/sky_multiagent_quality.py'
+      - 'neural_core/sky_unified_agents.py'
+      - 'neural_core/sky_reflective_core.py'
+      - 'neural_core/sky_reflective_embeddings.py'
+      - 'metaverse/sky_cognition_api.py'
+      - 'tests/test_sky_multiagent_quality.py'
+      - 'tests/test_sky_unified_agents.py'
+      - 'tests/test_sky_cognition.py'
+      - '.github/workflows/sky-multiagent-quality.yml'
+  pull_request:
+    paths:
+      - 'neural_core/sky_multiagent_quality.py'
+      - 'neural_core/sky_unified_agents.py'
+      - 'neural_core/sky_reflective_core.py'
+      - 'neural_core/sky_reflective_embeddings.py'
+      - 'metaverse/sky_cognition_api.py'
+      - 'tests/test_sky_multiagent_quality.py'
+      - 'tests/test_sky_unified_agents.py'
+      - 'tests/test_sky_cognition.py'
+      - '.github/workflows/sky-multiagent-quality.yml'
+permissions:
+  contents: read
+jobs:
+  safe-multiagent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Dependencies
+        run: python -m pip install -r requirements_studio.txt pytest
+      - name: Verify Python syntax
+        run: python -m compileall -q neural_core/sky_multiagent_quality.py neural_core/sky_unified_agents.py neural_core/sky_reflective_core.py neural_core/sky_reflective_embeddings.py metaverse/sky_cognition_api.py
+      - name: Integrated security and behavioral tests
+        run: python -m pytest -q tests/test_sky_multiagent_quality.py tests/test_sky_unified_agents.py tests/test_sky_reflective_core.py tests/test_sky_cognition.py
