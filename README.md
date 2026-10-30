@@ -8,6 +8,27 @@ SKY es un solo producto con dos ejecutores nativos independientes. El [contrato 
 
 ---
 
+## Auditoría de consolidación en `main` — 30/10/2026
+
+**Fuente de verdad:** `main` es la rama de integración, pero tener otras ramas o etiquetas no significa que sus cambios estén incorporados ni que deban eliminarse. No hacer merges forzados ni reescribir historial sin comparación de archivos, conflictos y pruebas satisfactorias.
+
+- **Issues:** 7 abiertos (a la hora de revisión), dedicados a voz y pruebas Android, agentes y herramientas, autonomía supervisada, Instagram y memoria multimodal. Un issue es seguimiento de trabajo; no demuestra por sí solo un bug.
+- **Pull requests:** [#96, sesiones de voz y sueño persistente Android](https://github.com/OscarElieser/SKY/pull/96), permanece abierto. GitHub reportó `mergeable=false`, `mergeable_state=dirty`: requiere resolver conflictos y volver a comprobar las pruebas antes de fusionarlo. **No se ha fusionado.**
+- **Ramas:** aproximadamente 99 visibles, incluyendo respaldos, ramas históricas, versiones y desarrollos. Las ramas `fix/sky-android-voice-session-isolation-20261030`, `feature/sky-multiagent-quality-20261030`, `feature/sky-reflective-core-20261030` y `feature/sky-android-local-playback-proof-20261030` mostraron commits divergentes con respecto a `main`. La rama `feature/sky-mobile-agent-android-20261026` se encontró completamente detrás de `main` y sin commits exclusivos. Estas comparaciones **no certifican que todo su código funcional falte o sobre**: requieren revisión por archivo.
+- **Etiquetas:** se mostraron 36 tags; son referencias de versiones y **no deben fusionarse como ramas** ni borrarse por limpieza.
+- **Seguridad:** la corrección del test obsoleto de adopción de servicios se publicó en `main`; su aceptación depende de un GitHub Actions verde. Conservar el control que impide adoptar procesos de origen no acreditado.
+- **APK:** el código Android declara `0.8.41`; una versión declarada no equivale a una APK firmada publicada. Verificar [Releases](https://github.com/OscarElieser/SKY/releases), huella de firma, SHA-256 y pruebas reales antes de instalar.
+
+### Criterios de integración sin pérdida
+
+1. Comparar `main...rama` para conocer commits exclusivos y archivos afectados.
+2. Resolver conflictos mediante revisión; no usar `force push`, no reescribir `main`, no borrar respaldos ni ramas con trabajo exclusivo.
+3. Ejecutar pruebas Android y de seguridad aplicables antes de fusionar, y comprobar nuevamente el estado de `main`.
+4. Registrar en PR o issue la evidencia de integración, pruebas y pendientes; cerrar únicamente aquello que esté demostrado.
+5. Mantener separadas la validación en CI, la instalación de APK y las pruebas físicas en Samsung.
+
+---
+
 ## Estado verificable — 30 de octubre de 2026
 
 **SKY Android:** el código de `main` declara la versión **0.8.41** (`versionCode 54`). Esto **no equivale a una APK publicada ni probada**. Consultá [GitHub Releases](https://github.com/OscarElieser/SKY/releases) para obtener exclusivamente versiones firmadas, con su huella y SHA-256. La última APK publicada al momento de esta revisión era **0.8.38**; confirmar de nuevo antes de instalar.
