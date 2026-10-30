@@ -3703,6 +3703,39 @@ class MainActivity : Activity() {
                             ". Respaldo: " + (result.backupId ?: "no aplica") +
                             ". Operación: " + operationId,
                             "SKY · ejecución verificada local")
+                        result.backupId?.let { backupId ->
+                            android.app.AlertDialog.Builder(this)
+                                .setTitle("SKY · Recuperar versión anterior")
+                                .setMessage("Se conservó una copia de " + result.filename +
+                                    ". ¿Querés restaurar la versión anterior? " +
+                                    "Se reemplazará la versión actual de este archivo privado.")
+                                .setNegativeButton("Conservar versión actual", null)
+                                .setPositiveButton("Restaurar respaldo") { _, _ ->
+                                    val restoreId = java.util.UUID.randomUUID().toString()
+                                    try {
+                                        evidence.record("archivo_restaurar", "AUTORIZADA",
+                                            "Restauración explícita del respaldo " + backupId,
+                                            restoreId)
+                                        val hash = SkyPrivateFileExecutor(this).restoreBackup(
+                                            result.filename, backupId)
+                                        evidence.record("archivo_restaurar", "VERIFICADA_LOCAL",
+                                            "Restauración SHA-256: " + hash, restoreId)
+                                        home.addExchange("Restaurar " + result.filename,
+                                            "Versión anterior restaurada y verificada. " +
+                                                "SHA-256: " + hash + ". Operación: " + restoreId,
+                                            "SKY · recuperación local")
+                                    } catch (error: Exception) {
+                                        runCatching {
+                                            evidence.record("archivo_restaurar", "FALLIDA",
+                                                error.message ?: "Error de restauración", restoreId)
+                                        }
+                                        home.addExchange("Restaurar " + result.filename,
+                                            "La restauración no fue verificada: " +
+                                                (error.message ?: "Error desconocido"),
+                                            "SKY · recuperación fallida")
+                                    }
+                                }.show()
+                        }
                     } catch (error: Exception) {
                         runCatching { evidence.record("archivo_" + proposal.operation, "FALLIDA",
                             (error.message ?: "Fallo al modificar el archivo"), operationId) }
