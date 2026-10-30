@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from contextlib import closing
 
 MAX_ADVICE = 2
 
@@ -44,7 +45,7 @@ def advice(request: str) -> list[dict]:
         topic = reflex.topic_for(request)
         if topic == "general":
             return []
-        with reflex._LOCK, reflex._connect() as db:
+        with reflex._LOCK, closing(reflex._connect()) as db:
             rows = db.execute(
                 """SELECT issue, COUNT(*) AS n FROM reflective_experiences
                    WHERE topic = ? AND outcome = 'failed_tests'
