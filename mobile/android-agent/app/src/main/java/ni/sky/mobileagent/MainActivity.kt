@@ -268,6 +268,10 @@ class MainActivity : Activity() {
                         adaptiveMemory.find(transcript) == null) &&
                     SkyAndroidCognition.explicitFact(transcript) == null &&
                     !SkyWeatherNow.isWeatherQuery(transcript) &&
+                    !SkyPublicResearch.explicit(transcript) &&
+                    !SkyPublicResearch.encyclopedic(transcript) &&
+                    !SkyAcademicResearch.explicit(transcript) &&
+                    !SkyPublicNews.explicit(transcript) &&
                     !(cognitionEnabled() && (SkyAndroidCognition.memoryQuestion(transcript) ||
                         SkyAndroidCognition.historyQuestion(transcript)))) {
                     voiceReplyOnFace = false
