@@ -3190,8 +3190,10 @@ class MainActivity : Activity() {
             SkyKnowledgeRecall.select(selection.prompt, knowledgeSources.recent(40))
         }.getOrDefault(emptyList()) else emptyList()
         val evidenceRecall = SkyKnowledgeRecall.guidance(priorSources)
+        val factCheckGuide = SkyEvidencePolicy.guidance(message)
         val prefix = (if (privateData) SkyOwnerContext.forPrompt(this) else "") +
-            memoryPrompt + documentGuide + cognitionGuide + evidenceRecall + skillsPrompt
+            memoryPrompt + documentGuide + cognitionGuide + factCheckGuide +
+            evidenceRecall + skillsPrompt
         val messageLimit = if (selection.tier == SkyGeminiModes.Tier.DEEP) 16000 else 4000
         val personalizedMessage = prefix.take((messageLimit - selection.prompt.length).coerceAtLeast(0)) +
             selection.prompt.takeLast(messageLimit)
