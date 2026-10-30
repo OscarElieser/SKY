@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOLS = {
     "matematicas": ("calcular",),
     "datos": ("resumen",),
-    "programacion": ("sintaxis_python",),
+    "programacion": ("sintaxis_python", "validar_json"),
     "ciberseguridad": ("auditoria_python",),
     "investigacion": ("semantic_scholar",),
     "fisica": ("mecanica_si",),
@@ -104,6 +104,33 @@ def _syntax(args, prev):
         n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
     ][:50], "scope": "sintaxis_sin_ejecucion"}
 
+def _json_validation(args, prev):
+    """Parse JSON de solo lectura: no devuelve contenido privado."""
+    source = args.get("source")
+    if not isinstance(source, str) or not 1 <= len(source) <= 10000 or "\x00" in source:
+        raise RoleError("JSON inválido o excesivo.")
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise RoleError("JSON con claves duplicadas.")
+            result[key] = value
+        return result
+    def bad_constant(value):
+        raise RoleError("Constante JSON no permitida.")
+    try:
+        parsed = json.loads(source, object_pairs_hook=pairs, parse_constant=bad_constant)
+    except (json.JSONDecodeError, RecursionError) as exc:
+        raise RoleError("Sintaxis JSON inválida.") from exc
+    kind = ("object" if isinstance(parsed, dict) else
+            "array" if isinstance(parsed, list) else
+            "null" if parsed is None else type(parsed).__name__)
+    return {"syntax_valid": True, "top_level": kind,
+            "object_keys": len(parsed) if isinstance(parsed, dict) else None,
+            "code_executed": False, "schema_validated": False,
+            "scope": "json_sintaxis_sin_ejecucion"}
+
+
 def _audit(args, prev):
     tree = _parse_source(args)
     findings = []
@@ -143,6 +170,7 @@ EXECUTORS = {
     ("matematicas", "calcular"): _calculate,
     ("datos", "resumen"): _summary,
     ("programacion", "sintaxis_python"): _syntax,
+    ("programacion", "validar_json"): _json_validation,
     ("ciberseguridad", "auditoria_python"): _audit,
     ("fisica", "mecanica_si"): _science.mecanica_si,
     ("quimica", "masa_molar"): _science.masa_molar,

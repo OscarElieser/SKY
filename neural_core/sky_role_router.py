@@ -12,6 +12,7 @@ DOMAINS=(
  ("educacion","evaluar_rubrica",("rubrica","evaluacion por criterios")),
  ("datos","resumen",("promedio","mediana","estadistica")),
  ("programacion","sintaxis_python",("sintaxis python","sintaxis de python")),
+ ("programacion","validar_json",("validar json","sintaxis json")),
  ("ciberseguridad","auditoria_python",("audita el codigo","auditar codigo")),
  ("investigacion","semantic_scholar",("semantic scholar","publicaciones academicas")),
 )
