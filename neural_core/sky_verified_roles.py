@@ -15,6 +15,7 @@ import statistics
 import time
 import uuid
 from pathlib import Path
+from . import sky_verified_science as _science
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = {
@@ -23,6 +24,9 @@ TOOLS = {
     "programacion": ("sintaxis_python",),
     "ciberseguridad": ("auditoria_python",),
     "investigacion": ("semantic_scholar",),
+    "fisica": ("mecanica_si",),
+    "quimica": ("masa_molar",),
+    "educacion": ("evaluar_rubrica",),
 }
 OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
        ast.Div: operator.truediv, ast.FloorDiv: operator.floordiv,
@@ -139,6 +143,9 @@ EXECUTORS = {
     ("datos", "resumen"): _summary,
     ("programacion", "sintaxis_python"): _syntax,
     ("ciberseguridad", "auditoria_python"): _audit,
+    ("fisica", "mecanica_si"): _science.mecanica_si,
+    ("quimica", "masa_molar"): _science.masa_molar,
+    ("educacion", "evaluar_rubrica"): _science.evaluar_rubrica,
 }
 
 def catalogue():
@@ -201,12 +208,24 @@ def run_plan(steps, *, allow_network=False):
     for s in steps:
         role, tool = s["role"], s["tool"]
         start = time.monotonic()
+        attempts = 0
+        verification = None
         try:
             if role == "investigacion":
+                attempts = 1
                 data = _research(s["args"], allow_network)
                 status = "RETRIEVED_UNVERIFIED"
             else:
-                data = EXECUTORS[(role, tool)](s["args"], states.get(s.get("depends_on")))
+                # Auto-reparación restringida: una sola repetición de operación
+                # pura cuando un revisor encuentra resultados inconsistentes.
+                # Nunca modifica código, archivos ni dispositivos.
+                for attempts in (1, 2):
+                    data = EXECUTORS[(role, tool)](s["args"], states.get(s.get("depends_on")))
+                    verification = _science.review(role, tool, s["args"], data)
+                    if verification["passed"]:
+                        break
+                else:
+                    raise RoleError("El resultado no pasó el control tras dos intentos.")
                 status = "VERIFIED_LIMITED_SCOPE"
             states[s["id"]] = data if status == "VERIFIED_LIMITED_SCOPE" else {}
             item = {"id": s["id"], "role": role, "tool": tool, "status": status, "result": data}
@@ -214,6 +233,10 @@ def run_plan(steps, *, allow_network=False):
                 ImportError, OSError, ValueError) as exc:
             item = {"id": s["id"], "role": role, "tool": tool, "status": "FAILED",
                     "error": str(exc)[:200]}
+        item["attempts"] = attempts
+        if verification is not None:
+            item["review"] = verification
+            item["correction"] = "repeated_after_mismatch" if attempts == 2 else "not_needed"
         item["duration_ms"] = max(0, round((time.monotonic() - start)*1000))
         item["memory_recorded"] = _remember(role, tool, item["status"], item["duration_ms"])
         results.append(item)

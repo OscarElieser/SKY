@@ -4,9 +4,12 @@ on:
     branches: [main]
     paths:
       - 'neural_core/sky_verified_roles.py'
+      - 'neural_core/sky_verified_science.py'
       - 'metaverse/sky_verified_roles_api.py'
       - 'metaverse/api.py'
       - 'tests/test_sky_verified_roles.py'
+      - 'tests/test_sky_verified_science.py'
+      - 'tests/test_sky_verified_runtime_v2.py'
       - '.github/workflows/sky-verified-roles.yml'
   workflow_dispatch:
 permissions:
@@ -22,5 +25,5 @@ jobs:
           python-version: '3.11'
       - name: Verify SKY roles (offline)
         run: |
-          python -m py_compile neural_core/sky_verified_roles.py metaverse/sky_verified_roles_api.py
-          PYTHONPATH=. python -m unittest discover -s tests -p test_sky_verified_roles.py -v
+          python -m py_compile neural_core/sky_verified_roles.py neural_core/sky_verified_science.py metaverse/sky_verified_roles_api.py
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_verified_*.py' -v

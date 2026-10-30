@@ -60,7 +60,7 @@ class RealRolesTests(unittest.TestCase):
     def test_unimplemented_role_is_not_executable(self):
         with self.assertRaises(roles.RoleError):
             roles.run_plan([{"id": "x", "role": "educacion", "tool": "fingir_clase", "args": {}}])
-        self.assertTrue(any(x["id"] == "educacion" and x["execution"] == "catalogue_only"
+        self.assertTrue(any(x["id"] == "viajes" and x["execution"] == "catalogue_only"
                             for x in roles.catalogue()["roles"]))
 
     def test_forward_dependency_rejected(self):
