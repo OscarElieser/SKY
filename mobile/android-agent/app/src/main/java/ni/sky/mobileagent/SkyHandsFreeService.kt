@@ -69,6 +69,8 @@ class SkyHandsFreeService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
+    /** Only the latest Android SpeechRecognizer session may alter service state. */
+    private val recognitionEpoch = SkyRecognitionEpoch()
     private var tts: TextToSpeech? = null
     private var running = false
     private var listening = false
@@ -223,6 +225,8 @@ class SkyHandsFreeService : Service() {
     }
 
     private fun stopRecognizer() {
+        // Invalidate before cancel/destroy: those calls can produce late callbacks.
+        recognitionEpoch.invalidate()
         listening = false
         val old = recognizer
         recognizer = null
@@ -237,6 +241,7 @@ class SkyHandsFreeService : Service() {
             return
         }
         stopRecognizer()
+        val epoch = recognitionEpoch.begin()
         try {
             val engine = SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
             recognizer = engine
@@ -250,8 +255,8 @@ class SkyHandsFreeService : Service() {
                 override fun onEvent(eventType: Int, params: Bundle?) {}
 
                 override fun onError(error: Int) {
+                    if (!recognitionEpoch.accepts(epoch, listening)) return
                     lastErrorCode = error
-                    if (!listening) return
                     stopRecognizer()
                     if (!running) return
                     if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ||
@@ -271,7 +276,7 @@ class SkyHandsFreeService : Service() {
                 }
 
                 override fun onResults(results: Bundle?) {
-                    if (!listening) return
+                    if (!recognitionEpoch.accepts(epoch, listening)) return
                     val heard = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         ?.firstOrNull().orEmpty()
                     stopRecognizer()
