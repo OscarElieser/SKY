@@ -46,6 +46,9 @@ class SkyMusicLauncher(
                 checkPlayback(request, playerPackage, label, requestId, step + 1)
             }, 1000L)
         } else {
+            receipt(request.query, "ESTADO_DESCONOCIDO",
+                "No se detectó una MediaSession PLAYING con el título exacto en $label " +
+                    "tras 12 comprobaciones; no se confirma reproducción ni audio audible")
             tell("Android recibió la orden para «${request.query}» en $label, " +
                 "pero no pude confirmar la canción en reproducción. Revisá el reproductor.")
         }
