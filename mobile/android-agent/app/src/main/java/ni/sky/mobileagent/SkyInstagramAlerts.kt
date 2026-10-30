@@ -164,6 +164,73 @@ internal object SkyInstagramAlerts {
         }
     }
 
+
+    data class ReplyPrepared(val approvalId: String, val recipientLabel: String,
+                             val expiresAt: String, val canConfirm: Boolean)
+    data class ReplyReceipt(val sent: Boolean, val status: String,
+                            val messageId: String?)
+
+    /** HTTPS requests use only the phone's Keystore-protected revocable credential. */
+    private fun replyRequest(ctx: Context, route: String, payload: JSONObject): Pair<Int, JSONObject> {
+        require(route == "/mobile-reply-prepare" || route == "/mobile-reply-confirm")
+        val token = credential(ctx)
+        require(token.isNotBlank()) { "La cuenta de Instagram no está vinculada." }
+        val conn = URL(BASE + route).openConnection() as HttpURLConnection
+        try {
+            conn.requestMethod = "POST"
+            conn.connectTimeout = 8_000
+            conn.readTimeout = 15_000
+            conn.instanceFollowRedirects = false
+            conn.doOutput = true
+            conn.setRequestProperty("Authorization", "Bearer " + token)
+            conn.setRequestProperty("Accept", "application/json")
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            conn.setRequestProperty("Cache-Control", "no-store")
+            conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+            val status = conn.responseCode
+            val body = (if (status in 200..299) conn.inputStream else conn.errorStream)
+                ?.bufferedReader(Charsets.UTF_8)?.use { it.readText().take(4001) } ?: "{}"
+            require(body.length <= 4000) { "La respuesta del servidor excedió el límite." }
+            val response = runCatching { JSONObject(body) }.getOrDefault(JSONObject())
+            if (status == 401 || status == 403) error("Autorización de Instagram vencida.")
+            return status to response
+        } finally { conn.disconnect() }
+    }
+
+    /** No Meta call happens in the preparation phase. */
+    fun prepareReply(ctx: Context, eventKey: String, text: String): ReplyPrepared {
+        require(eventKey.matches(Regex("[0-9a-f]{64}")))
+        require(text.isNotBlank() && text.length <= 950)
+        val payload = JSONObject().put("event_key", eventKey).put("text", text)
+        val (code, result) = replyRequest(ctx, "/mobile-reply-prepare", payload)
+        if (code !in 200..299 || !result.optBoolean("prepared"))
+            error("No se pudo preparar el envío: " + result.optString("error", "HTTP $code"))
+        val approvalId = result.optString("approval_id")
+        require(approvalId.matches(Regex("[a-fA-F0-9-]{36}")))
+        return ReplyPrepared(approvalId,
+            result.optString("recipient_label", "Cuenta verificada").take(60),
+            result.optString("expires_at"), result.optBoolean("can_confirm"))
+    }
+
+    /**
+     * Must be called only after an explicit owner confirmation of the exact text.
+     * A timeout is ambiguous: caller must NOT retry automatically.
+     */
+    fun confirmReply(ctx: Context, approval: ReplyPrepared, text: String): ReplyReceipt {
+        require(approval.canConfirm) { "El envío no está habilitado en el servidor." }
+        val payload = JSONObject().put("approval_id", approval.approvalId)
+            .put("text", text).put("owner_confirmed", true)
+        val (code, result) = replyRequest(ctx, "/mobile-reply-confirm", payload)
+        return if (code in 200..299 && result.optBoolean("sent")) {
+            val receipt = result.optString("message_id")
+            require(receipt.length > 5) { "Meta no entregó un comprobante de envío." }
+            ReplyReceipt(true, "sent", receipt)
+        } else {
+            ReplyReceipt(false, result.optString("status",
+                result.optString("error", "HTTP $code")), null)
+        }
+    }
+
     /** Shared high-water mark prevents duplicate announcements after restarts. */
     @Synchronized fun observe(ctx: Context, snapshot: Snapshot): Update {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
