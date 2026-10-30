@@ -14,8 +14,8 @@ def _parse(text):
     # Cortesía conversacional: no concede autorización adicional.
     t=re.sub(r"^(?:(?:por favor|podrias|podrías|puedes|podes|necesito que|quiero que)\\s+)+", "", t, flags=re.I).strip()
     rules=(
-        ("create",rf"(?:crea|crear|genera|generar|prepara|preparar)\s+(?:un\s+|una\s+)?(?:archivo|documento|informe)\s+({FILE})\s+con\s+contenido\s*:\s*([\s\S]+)"),
-        ("replace",rf"(?:reemplaza|reemplazar|sustituye|sustituir|actualiza|actualizar)\s+(?:el\s+)?(?:contenido\s+(?:de|del)\s+)?(?:archivo\s+)?({FILE})\s+(?:por|con)\s*:\s*([\s\S]+)"),
+        ("create",rf"(?:crea|crear|genera|generar|prepara|preparar|prepares)\s+(?:un\s+|una\s+)?(?:archivo|documento|informe)\s+({FILE})\s+con\s+contenido\s*:\s*([\s\S]+)"),
+        ("replace",rf"(?:reemplaza|reemplazar|sustituye|sustituir|actualiza|actualizar|actualices)\s+(?:el\s+)?(?:contenido\s+(?:de|del)\s+)?(?:archivo\s+)?({FILE})\s+(?:por|con)\s*:\s*([\s\S]+)"),
         ("append",rf"(?:anade|añade|agrega|agregar|anadir|incorpora|incorporar)\s+(?:texto\s+)?(?:al\s+|a\s+)?(?:archivo\s+)?({FILE})\s*:\s*([\s\S]+)"),
         ("rename",rf"(?:renombra|renombrar|cambia\s+el\s+nombre\s+de)\s+(?:el\s+)?(?:archivo\s+)?({FILE})\s+(?:a|por)\s+({FILE})"),
         ("trash",rf"(?:mueve|mover|envia|envía|enviar)\s+(?:el\s+)?(?:archivo\s+)?({FILE})\s+a\s+(?:la\s+)?papelera"),
