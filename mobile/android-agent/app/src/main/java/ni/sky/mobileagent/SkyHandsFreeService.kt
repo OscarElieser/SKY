@@ -72,6 +72,9 @@ class SkyHandsFreeService : Service() {
     /** Only the latest Android SpeechRecognizer session may alter service state. */
     private val recognitionEpoch = SkyRecognitionEpoch()
     private var tts: TextToSpeech? = null
+    /** The completion of a previous utterance must not restart listening mid-reply. */
+    private var activeSpeechId: String? = null
+    private var speechSequence = 0L
     private var running = false
     private var listening = false
     private var awake = false
@@ -92,7 +95,10 @@ class SkyHandsFreeService : Service() {
             "SKY dormida por orden · decí SKY despierta"
             else "SKY en espera · decí SKY")
     }
-    private val safetyResume = Runnable { resumeFromSpeech() }
+    private val safetyResume = Runnable {
+        activeSpeechId = null
+        resumeFromSpeech()
+    }
     private val instagramChecking = java.util.concurrent.atomic.AtomicBoolean(false)
     private val instagramPoll = object : Runnable {
         override fun run() {
@@ -145,8 +151,12 @@ class SkyHandsFreeService : Service() {
         }
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {}
-            override fun onDone(utteranceId: String?) { handler.post { resumeFromSpeech() } }
-            override fun onError(utteranceId: String?) { handler.post { resumeFromSpeech() } }
+            override fun onDone(utteranceId: String?) {
+                handler.post { finishSpeechIfCurrent(utteranceId) }
+            }
+            override fun onError(utteranceId: String?) {
+                handler.post { finishSpeechIfCurrent(utteranceId) }
+            }
         })
     }
 
@@ -311,6 +321,7 @@ class SkyHandsFreeService : Service() {
 
     private fun suspendForSpeech() {
         if (!running) return
+        activeSpeechId = null // Invalidate callbacks from a previous spoken turn.
         speechSuspended = true
         handler.removeCallbacks(nextListen)
         stopRecognizer()
@@ -326,12 +337,20 @@ class SkyHandsFreeService : Service() {
         schedule(850)
     }
 
+    private fun finishSpeechIfCurrent(utteranceId: String?) {
+        if (utteranceId == null || utteranceId != activeSpeechId) return
+        activeSpeechId = null
+        resumeFromSpeech()
+    }
+
     private fun say(message: String) {
         suspendForSpeech()
-        val result = tts?.speak(SkySpokenText.prepare(message), TextToSpeech.QUEUE_FLUSH, Bundle(),
-            "sky-service-" + SystemClock.uptimeMillis())
+        val id = "sky-service-" + (++speechSequence)
+        activeSpeechId = id
+        val result = tts?.speak(SkySpokenText.prepare(message), TextToSpeech.QUEUE_FLUSH,
+            Bundle(), id)
         if (result != TextToSpeech.SUCCESS) {
-            handler.postDelayed({ resumeFromSpeech() }, 1500)
+            handler.postDelayed({ finishSpeechIfCurrent(id) }, 1500)
         }
     }
 
