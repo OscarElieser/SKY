@@ -69,7 +69,8 @@ class SkyActionEvidence(context: Context) :
         val failed: Int,
         val rejected: Int,
         val remoteResponse: Int,
-        val unknown: Int
+        val unknown: Int,
+        val authorized: Int
     )
 
     /** Agrega estados reales de SQLite, sin leer contenido de notas ni mensajes. */
@@ -89,7 +90,8 @@ class SkyActionEvidence(context: Context) :
             failed = counts["FALLIDA"] ?: 0,
             rejected = counts["RECHAZADA"] ?: 0,
             remoteResponse = counts["RESPUESTA_REMOTA_RECIBIDA"] ?: 0,
-            unknown = counts["ESTADO_DESCONOCIDO"] ?: 0
+            unknown = counts["ESTADO_DESCONOCIDO"] ?: 0,
+            authorized = counts["AUTORIZADA"] ?: 0
         )
     }
 
@@ -110,6 +112,7 @@ class SkyActionEvidence(context: Context) :
 
     companion object {
         fun normalized(raw: String): String = when (raw.uppercase()) {
+            "AUTHORIZED", "AUTORIZADA" -> "AUTORIZADA"
             "SENT", "LAUNCHED", "REQUESTED" -> "ENVIADA_SIN_VERIFICAR"
             "VERIFIED_LOCAL" -> "VERIFICADA_LOCAL"
             "RECEIVED_RESPONSE" -> "RESPUESTA_REMOTA_RECIBIDA"
