@@ -71,6 +71,14 @@ class SkyScientificCalculatorTest {
         assertTrue(ohm.contains("**Resultado: 12.000 V**"))
     }
 
+    @Test fun smallNonzeroEnergyNeverAppearsAsZero() {
+        val answer = SkyScientificCalculator.solve(
+            "calcula energía cinética masa 0,001 kg velocidad 0,01 m/s"
+        )!!.answer
+        assertFalse(answer.contains("**Resultado: 0.000 J**"))
+        assertTrue(answer.contains("5.00000e-08 J"))
+    }
+
     @Test fun neverFabricatesMissingValues() {
         assertTrue(SkyScientificCalculator.solve(
             "calcula energía cinética masa 2 kg")!!.answer.contains("indicame"))
