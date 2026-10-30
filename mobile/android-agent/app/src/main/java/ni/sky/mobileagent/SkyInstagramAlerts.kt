@@ -231,6 +231,34 @@ internal object SkyInstagramAlerts {
         }
     }
 
+
+    /** Read the single-use approval receipt after a network interruption. Never resend. */
+    fun replyStatus(ctx: Context, approvalId: String): ReplyReceipt {
+        require(approvalId.matches(Regex("[a-fA-F0-9-]{36}")))
+        val token = credential(ctx)
+        require(token.isNotBlank()) { "Volvé a vincular tu teléfono con Instagram." }
+        val url = URL(BASE + "/mobile-reply-status?approval_id=" +
+            java.net.URLEncoder.encode(approvalId, "UTF-8"))
+        val conn = url.openConnection() as HttpURLConnection
+        try {
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 8_000
+            conn.readTimeout = 10_000
+            conn.instanceFollowRedirects = false
+            conn.setRequestProperty("Authorization", "Bearer " + token)
+            conn.setRequestProperty("Accept", "application/json")
+            val status = conn.responseCode
+            if (status !in 200..299)
+                error("Meta no dispone del comprobante en este momento (HTTP $status).")
+            val response = JSONObject(conn.inputStream.bufferedReader(Charsets.UTF_8).use {
+                it.readText().take(4001)
+            })
+            val state = response.optString("state")
+            val messageId = response.optString("message_id").takeIf { it.length > 5 }
+            return ReplyReceipt(state == "sent" && messageId != null, state, messageId)
+        } finally { conn.disconnect() }
+    }
+
     /** Shared high-water mark prevents duplicate announcements after restarts. */
     @Synchronized fun observe(ctx: Context, snapshot: Snapshot): Update {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
