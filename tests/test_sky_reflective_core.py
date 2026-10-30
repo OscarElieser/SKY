@@ -32,7 +32,7 @@ def test_recall_is_advisory_and_semantically_honest():
     items = reflection.recall("calcula otro porcentaje")
     assert items and items[0]["issue"] == "syntax"
     assert "token privado" not in str(items)
-    assert reflection.capabilities()["semantic_llm_embeddings"] is False
+    assert reflection.capabilities()["semantic_llm_embeddings"]["enabled"] is False
     assert reflection.capabilities()["automatic_install"] is False
 
 
@@ -89,3 +89,73 @@ def test_repeated_candidate_stops_without_installation(monkeypatch):
     builder.proponer("redacta resumen", intentos=3)
     assert len(calls) == 1
     assert len(prompts) == 2
+
+
+def test_optional_semantic_topic_retrieval_is_owner_opt_in(monkeypatch):
+    from neural_core import sky_reflective_embeddings as sem
+    assert sem.related_topics("texto") is None
+    monkeypatch.setenv("SKY_REFLECTIVE_SEMANTIC", "1")
+    monkeypatch.setattr(sem, "_vectors", lambda endpoint, model: {
+        name: ([1.0, 0.0] if name == "texto" else [0.0, 1.0])
+        for name in sem.TOPIC_DESCRIPTIONS
+    })
+    similarities = sem.related_topics("texto")
+    assert similarities["texto"] == 1.0
+    assert similarities["calculo"] == 0.0
+    assert sem.capabilities()["raw_user_text_sent"] is False
+
+
+def test_semantic_failure_returns_to_deterministic_retrieval(monkeypatch):
+    from neural_core import sky_reflective_embeddings as sem
+    reflection.record("calcula porcentaje", {"aprobada": False,
+                      "estatica": ["Error de sintaxis"]})
+    monkeypatch.setenv("SKY_REFLECTIVE_SEMANTIC", "1")
+    monkeypatch.setattr(sem, "_vectors", lambda endpoint, model: (_ for _ in ()).throw(OSError("down")))
+    items = reflection.recall("calcula promedio")
+    assert items and items[0]["issue"] == "syntax"
+
+
+def test_ollama_endpoint_fails_closed(monkeypatch):
+    from neural_core import sky_reflective_embeddings as sem
+    monkeypatch.setenv("SKY_REFLECTIVE_OLLAMA_URL", "https://api.example.org")
+    with pytest.raises(ValueError):
+        sem._endpoint()
+    monkeypatch.setenv("SKY_REFLECTIVE_OLLAMA_URL", "http://127.0.0.1:11434/other")
+    with pytest.raises(ValueError):
+        sem._endpoint()
+    monkeypatch.setenv("SKY_REFLECTIVE_OLLAMA_URL", "http://127.0.0.1:11434")
+    assert sem._endpoint() == "http://127.0.0.1:11434"
+
+
+def test_only_fixed_descriptions_are_submitted_for_embeddings(monkeypatch):
+    from neural_core import sky_reflective_embeddings as sem
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self, count):
+            raw = {"embeddings": [[float(i == j) for j in range(8)]
+                                  for i in range(len(sem.TOPIC_DESCRIPTIONS))]}
+            return json.dumps(raw).encode()
+    requests = []
+    class Opener:
+        def open(self, request, timeout):
+            requests.append(json.loads(request.data.decode()))
+            assert timeout <= 2.5
+            assert request.full_url == "http://127.0.0.1:11434/api/embed"
+            return Response()
+    monkeypatch.setattr(sem.urllib.request, "build_opener", lambda *handlers: Opener())
+    sem._vectors.cache_clear()
+    sem._vectors("http://127.0.0.1:11434", "nomic-embed-text")
+    assert requests[0]["input"] == list(sem.TOPIC_DESCRIPTIONS.values())
+    assert "secret" not in json.dumps(requests).lower()
+    sem._vectors.cache_clear()
+
+
+def test_reflection_quality_report_counts_only_tests():
+    reflection.record("calcula suma", {"aprobada": True})
+    reflection.record("calcula porcentajes", {"aprobada": False, "estatica": ["Error de sintaxis"]})
+    data = reflection.report()
+    assert data["total_observations"] == 2
+    assert data["by_topic"]["calculo"]["pass_rate"] == 0.5
+    assert data["by_topic"]["calculo"]["failure_categories"]["syntax"] == 1
+    assert data["records_are_tests_not_hardware_actions"]
