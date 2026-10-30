@@ -1,3 +1,13 @@
+## SKY Android 0.8.32 · bandeja real de Instagram (30/10/2026)
+
+- **Prueba Meta → Supabase confirmada:** el webhook verificado registró **2 mensajes reales** para la cuenta profesional autorizada, con identificadores de evento válidos, estado `received` y recepción alrededor de las 07:58 (Nicaragua). Se comprobó en `sky_instagram_webhook_events`, sin guardar el contenido de conversaciones en este documento.
+- **Implementación Android en `main`:** nueva opción «Bandeja de mensajes de Instagram» dentro de «Conexión segura»; lectura privada de `GET /mobile-profile` y `GET /mobile-events` con credencial revocable del dispositivo, guardada en Android Keystore. El teléfono **no recibe** secretos de Meta o de propietario. Se valida el ID numérico de la cuenta ante cada lectura.
+- **Interfaz real:** diseño nocturno/cian con conversaciones agrupadas por identificador de remitente abreviado, contenido real de eventos, hora local de recepción y botón Actualizar. Refresco cada 30 segundos solo con la ventana abierta. No se fingen nombres, estado «no leído» ni un historial completo: el servidor entrega hasta 50 eventos recientes.
+- **Política de seguridad:** bandeja de solo lectura. No responde automáticamente, no modifica publicaciones ni realiza acciones fuera de los permisos autorizados. Permisos y datos de BAQUEANO y SKY Windows permanecen intactos.
+- **Pruebas Android:** `SkyInstagramInboxRulesTest` cubre aislamiento por cuenta, exclusión de eco propio y representación segura de mensajes sin texto. **Compilar y pasar CI no equivale a validación física en el Samsung**; antes de distribuir se requieren prueba de instalación firmada, conexión con la cuenta real, actualización de bandeja y revocación.
+- **Siguiente fase (no implementada):** nombres reales de remitentes mediante API oficial cuando estén disponibles; lectura confirmada/no leídos, paginación, redacción supervisada y envío real de respuestas requieren endpoints, permisos y pruebas adicionales.
+
+
 
 ### Estado técnico Meta → SKY (29/10/2026)
 
