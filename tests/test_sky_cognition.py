@@ -140,8 +140,9 @@ def test_hud_additive_integration_keeps_existing_controls():
     assert "confirmar(card, titulo" in src
 
 
-def test_authenticated_endpoints(monkeypatch):
+def test_authenticated_endpoints(monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
+    monkeypatch.setenv("SKY_REFLECTIVE_DB", str(tmp_path / "reflection.sqlite3"))
     monkeypatch.setenv("SKY_API_KEY", "sky-owner-cognition-tests-key-2026")
     monkeypatch.setenv("SKY_WORKFLOWS_ENABLED", "0")
     monkeypatch.setenv("SKY_WEB_LEARNING", "0")
@@ -153,6 +154,13 @@ def test_authenticated_endpoints(monkeypatch):
         response = client.get("/api/sky/cognition/capabilities", headers=headers)
         assert response.status_code == 200
         assert response.json()["integration"] == "additive"
+        assert response.json()["reflective_learning"]["automatic_install"] is False
+        reflection_denied = client.get("/api/sky/cognition/reflective-metrics")
+        assert reflection_denied.status_code in (401, 403)
+        reflection_ok = client.get("/api/sky/cognition/reflective-metrics", headers=headers)
+        assert reflection_ok.status_code == 200
+        assert reflection_ok.json()["metrics"]["total_observations"] == 0
+        assert reflection_ok.json()["capabilities"]["automatic_install"] is False
         plan = client.post("/api/sky/cognition/plan",
                            headers=headers,
                            json={"query": "Abrí YouTube", "device": "android"})
