@@ -126,6 +126,23 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      # Android SDK downloads occasionally fail with a truncated/corrupt zip.
+      # Retry the official package installer before the emulator action, without
+      # skipping any runtime tests or changing their security requirements.
+      - name: Instalar emulador Android con reintentos verificables
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if sdkmanager --install "emulator" --channel=0; then
+              echo "Emulator SDK package installed."
+              exit 0
+            fi
+            echo "::warning::Android emulator SDK download failed (attempt $attempt/3)"
+            if [[ "$attempt" -lt 3 ]]; then sleep "$((attempt * 10))"; fi
+          done
+          echo "::error::The emulator SDK could not be installed after 3 attempts"
+          exit 1
       - name: Probar aplicación en Android real virtualizado (no hardware Samsung)
         uses: reactivecircus/android-emulator-runner@v2
         with:
