@@ -15,7 +15,7 @@ internal object SkyStatisticsCalculator {
         """^(?:(?:sky|esky|sky ia)\s*[,:]?\s*)?""" +
         """(?:calcula|calculame|calcular|saca|obten|dame|resuelve)\s+""" +
         """(?:la\s+|el\s+)?""" +
-        """(estadistica|estadisticas|resumen estadistico|promedio|media|mediana|""" +
+        """(estadisticas|estadistica|resumen estadistico|promedio|mediana|media|""" +
         """varianza|desviacion estandar)\s*(?:de|para|sobre)?\s*(.*)$"""
     )
 
