@@ -173,6 +173,7 @@ def maybe_answer(task: str, history: list[dict] | None = None,
     start = time.monotonic()
     done = False
     count = 0
+    repair_attempts = 0
     try:
         from . import sky_multiagent_quality as quality
         provider, model = _backend(preferred)
@@ -269,6 +270,6 @@ def maybe_answer(task: str, history: list[dict] | None = None,
             from .sky_metricas import registrar
             registrar("modelo", "sky-subagentes", done,
                       ms=(time.monotonic() - start) * 1000, origen="subagentes",
-                      detalle="expertos=" + str(count))
+                      detalle="expertos=" + str(count) + ",revisiones=" + str(repair_attempts))
         except Exception:
             pass
