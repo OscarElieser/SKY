@@ -11,10 +11,12 @@ def _parse(text):
     if not isinstance(text,str) or not 3<=len(text)<=MAX_REQUEST:
         return None
     t=re.sub(r"^\s*(?:(?:oye|hey|ok)\s+)?sky[\s,.:;!¡-]*","",text,flags=re.I).strip()
+    # Cortesía conversacional: no concede autorización adicional.
+    t=re.sub(r"^(?:(?:por favor|podrias|podrías|puedes|podes|necesito que|quiero que)\\s+)+", "", t, flags=re.I).strip()
     rules=(
-        ("create",rf"(?:crea|crear|genera|generar)\s+(?:un\s+|una\s+)?(?:archivo|documento|informe)\s+({FILE})\s+con\s+contenido\s*:\s*([\s\S]+)"),
-        ("replace",rf"(?:reemplaza|reemplazar|sustituye|sustituir)\s+(?:el\s+)?(?:contenido\s+(?:de|del)\s+)?(?:archivo\s+)?({FILE})\s+(?:por|con)\s*:\s*([\s\S]+)"),
-        ("append",rf"(?:anade|añade|agrega|agregar|anadir)\s+(?:texto\s+)?(?:al\s+|a\s+)?(?:archivo\s+)?({FILE})\s*:\s*([\s\S]+)"),
+        ("create",rf"(?:crea|crear|genera|generar|prepara|preparar)\s+(?:un\s+|una\s+)?(?:archivo|documento|informe)\s+({FILE})\s+con\s+contenido\s*:\s*([\s\S]+)"),
+        ("replace",rf"(?:reemplaza|reemplazar|sustituye|sustituir|actualiza|actualizar)\s+(?:el\s+)?(?:contenido\s+(?:de|del)\s+)?(?:archivo\s+)?({FILE})\s+(?:por|con)\s*:\s*([\s\S]+)"),
+        ("append",rf"(?:anade|añade|agrega|agregar|anadir|incorpora|incorporar)\s+(?:texto\s+)?(?:al\s+|a\s+)?(?:archivo\s+)?({FILE})\s*:\s*([\s\S]+)"),
         ("rename",rf"(?:renombra|renombrar|cambia\s+el\s+nombre\s+de)\s+(?:el\s+)?(?:archivo\s+)?({FILE})\s+(?:a|por)\s+({FILE})"),
         ("trash",rf"(?:mueve|mover|envia|envía|enviar)\s+(?:el\s+)?(?:archivo\s+)?({FILE})\s+a\s+(?:la\s+)?papelera"),
         ("restore",rf"(?:restaura|restaurar|recupera|recuperar)\s+(?:el\s+)?(?:archivo\s+)?({FILE})\s+(?:de\s+la\s+papelera\s+)?(?:con\s+)?(?:id|identificador)\s+([a-fA-F0-9]{{32}})"),
