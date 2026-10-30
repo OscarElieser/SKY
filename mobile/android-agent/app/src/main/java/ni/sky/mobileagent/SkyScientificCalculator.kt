@@ -30,8 +30,13 @@ internal object SkyScientificCalculator {
         return value.takeIf { it.isFinite() && kotlin.math.abs(it) <= 1e9 }
     }
 
-    private fun formatted(value: Double): String =
-        String.format(Locale.US, "%.3f", value)
+    private fun formatted(value: Double): String {
+        // Never display a nonzero scientific value as 0.000 or hide
+        // fractional precision behind three forced decimal places.
+        val standard = String.format(Locale.US, "%.3f", value)
+        return if (standard.toDoubleOrNull() == value) standard
+        else String.format(Locale.US, "%.6g", value)
+    }
 
     fun solve(raw: String): Result? {
         if (!isRequest(raw)) return null
