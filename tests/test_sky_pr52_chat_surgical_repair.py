@@ -25,6 +25,7 @@ def voice_loop():
                 intent=interpret_command(command)
                 if intent:
                     say("otra tarea")
+                    coordinador_voz.record_turn(command, "registro")
                 else:
                     say("charlar")
 """)
@@ -53,6 +54,12 @@ class SurgicalChatTests(unittest.TestCase):
             "                if intent:\n", "                if intent and other_condition:\n")
         with self.assertRaises(RuntimeError):
             surgically_prepare_voice(local.encode("utf-8"))
+
+    def test_missing_voice_turn_method_is_rejected(self):
+        unsafe = local_voice_fixture().replace(
+            '                    coordinador_voz.record_turn(command, "registro")\n', "")
+        with self.assertRaises(RuntimeError):
+            surgically_prepare_voice(unsafe.encode("utf-8"))
 
     def test_crlf_retained_on_windows(self):
         data = local_voice_fixture().replace("\n", "\r\n").encode("utf-8")

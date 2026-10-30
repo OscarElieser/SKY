@@ -599,6 +599,24 @@ class SkySupervisor:
             if self.open_browser:
                 self._abrir_interfaz()
             return False
+        # Si la API de SKY ya está activa, no iniciamos un segundo supervisor
+        # ni adoptamos servicios ajenos. El usuario puede consultar --status.
+        # Se libera el candado adquirido antes de salir: nunca bloquear futuros inicios.
+        if is_port_in_use(PORTS["api"]) and es_servicio_sky(PORTS["api"]):
+            _decir("[SKY] La API de SKY ya responde. Evito crear otro supervisor "
+                   "o duplicar agentes/escuchas. No se detiene ningún proceso.")
+            _decir("[SKY] Usá --status para revisar los servicios existentes.")
+            self._candado.liberar()
+            self._candado = None
+            return False
+
+        if is_port_in_use(PORTS["agent"]) and not es_servicio_sky(PORTS["agent"]):
+            _decir("[SKY] El puerto del agente ya está ocupado por otro servicio. "
+                   "No se inicia SKY sobre un puerto ajeno ni se finaliza ese proceso.")
+            self._candado.liberar()
+            self._candado = None
+            return False
+
         try:
             _ruta_parar().unlink()
         except OSError:

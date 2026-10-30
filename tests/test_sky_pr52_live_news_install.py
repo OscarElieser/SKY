@@ -34,6 +34,30 @@ class InstallerTests(unittest.TestCase):
             for name in updater.CHANGES:
                 self.assertIn(b"# conservar personalizado", plan[name])
 
+    def test_crlf_inputs_preserve_newlines_and_second_run_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for name, (before, _) in updater.CHANGES.items():
+                dst = root / name
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                data = ("# conservar propietario\n" + "def test():\n" + before + "\n")
+                dst.write_bytes(data.replace("\n", "\r\n").encode("utf-8"))
+            with patch.object(updater, "download",
+                              side_effect=lambda p: ("# nueva utilidad: " + p + "\n").encode("utf-8")):
+                plan, _, errors = updater.prepare(root)
+                self.assertFalse(errors)
+                self.assertEqual(len(plan), 4)
+                for name in updater.CHANGES:
+                    self.assertIn(b"\r\n", plan[name])
+                    self.assertNotIn(b"\n", plan[name].replace(b"\r\n", b""))
+                for name, contents in plan.items():
+                    file = root / name
+                    file.parent.mkdir(parents=True, exist_ok=True)
+                    file.write_bytes(contents)
+                again, _, second_errors = updater.prepare(root)
+                self.assertFalse(second_errors)
+                self.assertEqual(again, {})
+
     def test_unrecognized_chat_version_blocks_every_change(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
