@@ -95,6 +95,8 @@ class MainActivity : Activity() {
     private val permissions by lazy { getSharedPreferences("sky_mobile_allowed_apps", MODE_PRIVATE) }
     // The proactive Instagram check never sends messages or instructions to an LLM.
     private val instagramChecking = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var instagramReviewOfferUntil = 0L
+
     private val instagramPoll = object : Runnable {
         override fun run() {
             if (!visible) return
@@ -127,10 +129,10 @@ class MainActivity : Activity() {
 
     private fun instagramNotice(count: Int) {
         if (count < 1 || !SkyInstagramAlerts.enabled(this)) return
+        instagramReviewOfferUntil = android.os.SystemClock.elapsedRealtime() + 120_000L
         val notice = if (count == 1)
-            "Te llegó un nuevo mensaje de Instagram. Decime SKY, leeme mis mensajes de Instagram."
-        else "Te llegaron " + count +
-            " mensajes de Instagram. Podés pedirme que te los lea."
+            "Te llegó un mensaje nuevo de Instagram. ¿Lo revisamos?"
+        else "Te llegaron " + count + " mensajes de Instagram. ¿Los revisamos?"
         if (::home.isInitialized) home.showMessage(notice)
         if (::voicePanel.isInitialized && voicePanel.isVoiceEnabled()) voicePanel.speakReply(notice)
     }
@@ -156,6 +158,24 @@ class MainActivity : Activity() {
     }
 
     private fun processInstagramCommand(message: String): Boolean {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (instagramReviewOfferUntil > now) {
+            when (SkyInstagramDialogue.answer(message)) {
+                SkyInstagramDialogue.Answer.YES -> {
+                    instagramReviewOfferUntil = 0L
+                    readInstagramNow()
+                    return true
+                }
+                SkyInstagramDialogue.Answer.NO -> {
+                    instagramReviewOfferUntil = 0L
+                    val answer = "Está bien, no los revisaré ahora. Me avisás cuando querás."
+                    home.showMessage(answer)
+                    if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(answer)
+                    return true
+                }
+                SkyInstagramDialogue.Answer.NONE -> Unit
+            }
+        }
         return when (SkyInstagramAlerts.command(message)) {
             SkyInstagramAlerts.Command.NONE -> false
             SkyInstagramAlerts.Command.READ -> {
