@@ -3184,8 +3184,14 @@ class MainActivity : Activity() {
                 "ni digas que no puedes crear un DOCX: SKY lo guardará localmente.\\n" else ""
         val skillsPrompt = SkySkillsCatalog.instructionFor(message)
         val cognitionGuide = if (cognitionEnabled()) SkyAndroidCognition.guide(message) else ""
+        // Public reference metadata only, retained from genuine sourced research.
+        // Older links are NOT treated as facts and never change model weights.
+        val priorSources = if (cognitionEnabled() && cloud) runCatching {
+            SkyKnowledgeRecall.select(selection.prompt, knowledgeSources.recent(40))
+        }.getOrDefault(emptyList()) else emptyList()
+        val evidenceRecall = SkyKnowledgeRecall.guidance(priorSources)
         val prefix = (if (privateData) SkyOwnerContext.forPrompt(this) else "") +
-            memoryPrompt + documentGuide + cognitionGuide + skillsPrompt
+            memoryPrompt + documentGuide + cognitionGuide + evidenceRecall + skillsPrompt
         val messageLimit = if (selection.tier == SkyGeminiModes.Tier.DEEP) 16000 else 4000
         val personalizedMessage = prefix.take((messageLimit - selection.prompt.length).coerceAtLeast(0)) +
             selection.prompt.takeLast(messageLimit)
