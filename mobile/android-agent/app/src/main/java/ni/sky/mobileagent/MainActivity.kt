@@ -1078,19 +1078,107 @@ class MainActivity : Activity() {
 
     private fun manageSelectedAttachments() {
         if (selectedAttachments.isEmpty()) return
-        val titles = selectedAttachments.map {
-            "Quitar: " + it.name.take(70) + " · " + it.sizeMb() + " MB"
-        }.toMutableList()
-        titles.add("Quitar todos los adjuntos")
+        val files = selectedAttachments.toList()
+        val titles = files.map { "Ver vista previa: " + it.name.take(60) } +
+            files.map { "Quitar: " + it.name.take(60) } +
+            "Quitar todos los adjuntos"
         AlertDialog.Builder(this)
-            .setTitle("Archivos para la consulta")
+            .setTitle("Archivos · gestionar y visualizar")
             .setItems(titles.toTypedArray()) { _, position ->
-                if (position == selectedAttachments.size) selectedAttachments.clear()
-                else selectedAttachments.removeAt(position)
-                refreshSelectedAttachments()
+                when {
+                    position < files.size -> showSelectedAttachmentPreview(files[position])
+                    position < files.size * 2 -> {
+                        selectedAttachments.removeAll { it.uri == files[position - files.size].uri }
+                        refreshSelectedAttachments()
+                    }
+                    else -> { selectedAttachments.clear(); refreshSelectedAttachments() }
+                }
             }
             .setNegativeButton("Cerrar", null)
             .show()
+    }
+
+    /** Preview local first; no upload, consent, microphone or external app. */
+    private fun showSelectedAttachmentPreview(item: SkyAttachmentBatch.Item) {
+        home.showMessage("Preparando una vista previa privada de " + item.name.take(45) + "...")
+        execute {
+            val preview = runCatching { SkyAttachmentPreview.read(contentResolver, item) }
+            runOnUiThread {
+                if (isFinishing || selectedAttachments.none { it.uri == item.uri }) return@runOnUiThread
+                val body = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(28, 14, 28, 14)
+                }
+                val total = selectedAttachments.size
+                body.addView(TextView(this).apply {
+                    text = "ARCHIVOS SELECCIONADOS (" + total + ")\n" +
+                        selectedAttachments.joinToString("\n") { "• " + it.name.take(65) }
+                    textSize = 13f
+                    setTextColor(android.graphics.Color.rgb(164, 219, 255))
+                })
+                preview.onSuccess { result ->
+                    if (result.bitmap != null) {
+                        body.addView(android.widget.ImageView(this).apply {
+                            setImageBitmap(result.bitmap)
+                            adjustViewBounds = true
+                            maxHeight = (resources.displayMetrics.density * 330).toInt()
+                            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                            contentDescription = result.label
+                        }, LinearLayout.LayoutParams(-1, -2))
+                    }
+                    body.addView(TextView(this).apply {
+                        text = result.label + "\n\n" + result.details.take(5700)
+                        setTextColor(android.graphics.Color.WHITE)
+                        textSize = 14f
+                        setTextIsSelectable(true)
+                        setPadding(0, 14, 0, 14)
+                    })
+                }.onFailure { error ->
+                    body.addView(TextView(this).apply {
+                        text = "La vista previa local no está disponible: " +
+                            (error.message ?: "formato o permisos no compatibles") +
+                            "\nEl archivo sigue seleccionado; aún no se envió a la nube."
+                        setTextColor(android.graphics.Color.WHITE)
+                        textSize = 14f
+                    })
+                }
+                body.addView(TextView(this).apply {
+                    text = "\n¿Qué querés que haga SKY con este archivo? Podés pedir " +
+                        "resumir, explicar, resolver, extraer datos, comparar o revisar errores. " +
+                        "La vista previa es parcial; la lectura completa depende del formato y del proveedor."
+                    textSize = 14f
+                    setTextColor(android.graphics.Color.rgb(185, 228, 250))
+                })
+                val instruction = EditText(this).apply {
+                    hint = "Escribí tu instrucción para SKY..."
+                    setText(chatInput.text.toString())
+                    inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                    minLines = 2
+                    maxLines = 5
+                    setTextColor(android.graphics.Color.WHITE)
+                    setHintTextColor(android.graphics.Color.LTGRAY)
+                }
+                body.addView(instruction)
+                val scroller = ScrollView(this).apply { addView(body) }
+                AlertDialog.Builder(this)
+                    .setTitle("SKY · Vista previa privada")
+                    .setView(scroller)
+                    .setPositiveButton("Preparar consulta") { _, _ ->
+                        val task = instruction.text.toString().trim()
+                        if (task.isNotEmpty()) {
+                            chatInput.setText(task)
+                            chatInput.setSelection(chatInput.text.length)
+                        }
+                        home.openChat()
+                        home.showMessage("Tus archivos están listos. " +
+                            "Enviá la consulta cuando quieras; SKY pedirá autorización " +
+                            "antes de compartirlos con Gemini.")
+                    }
+                    .setNeutralButton("Otro archivo") { _, _ -> manageSelectedAttachments() }
+                    .setNegativeButton("Ahora no", null)
+                    .show()
+            }
+        }
     }
 
     private fun chooseOwnerProfileImport() {
@@ -1467,8 +1555,9 @@ class MainActivity : Activity() {
                         selectedAttachments.addAll(result)
                         refreshSelectedAttachments()
                         home.openChat()
-                        home.showMessage("Seleccionados " + result.size +
-                            " archivos. Se enviarán solo después de tu autorización.")
+                        // Primero visualizar el archivo y preguntar el objetivo.
+                        // El envío sigue separado y con autorización expresa.
+                        showSelectedAttachmentPreview(result.last())
                     } }.onFailure { error -> runOnUiThread {
                         home.showMessage(error.message ?: "No pude preparar la selección.")
                     } }
