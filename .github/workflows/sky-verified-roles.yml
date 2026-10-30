@@ -20,6 +20,9 @@ on:
       - 'tests/test_sky_conversation_tools.py'
       - 'tests/test_sky_verified_json.py'
       - 'tests/test_sky_role_http.py'
+      - 'neural_core/sky_safe_workspace.py'
+      - 'metaverse/sky_safe_files_api.py'
+      - 'tests/test_sky_safe_files.py'
       - 'metaverse/static/hud.html'
       - 'metaverse/static/hud.js'
       - 'tests/test_sky_verified_science.py'
@@ -39,7 +42,7 @@ jobs:
           python-version: '3.11'
       - name: Verify SKY roles (offline)
         run: |
-          python -m py_compile neural_core/sky_conversation_tools.py neural_core/sky_asistente_personal.py metaverse/asistente_api.py metaverse/sky_home_api.py neural_core/sky_role_router.py neural_core/sky_role_lessons.py neural_core/sky_verified_roles.py neural_core/sky_verified_science.py metaverse/sky_verified_roles_api.py
+          python -m py_compile neural_core/sky_safe_workspace.py metaverse/sky_safe_files_api.py neural_core/sky_conversation_tools.py neural_core/sky_asistente_personal.py metaverse/asistente_api.py metaverse/sky_home_api.py neural_core/sky_role_router.py neural_core/sky_role_lessons.py neural_core/sky_verified_roles.py neural_core/sky_verified_science.py metaverse/sky_verified_roles_api.py
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_verified_*.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_role_lessons.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_role_router.py' -v
@@ -59,3 +62,19 @@ jobs:
         run: python -m pip install --disable-pip-version-check 'fastapi>=0.115,<1' 'httpx>=0.27,<1'
       - name: Test HTTP routing and scoped Android credentials (isolated API)
         run: PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_role_http.py' -v
+
+
+  safe-files:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install minimal workspace and Office dependencies
+        run: python -m pip install --disable-pip-version-check 'fastapi>=0.115,<1' 'httpx>=0.27,<1' 'python-docx>=1.1,<2' 'XlsxWriter>=3.2,<4'
+      - name: Test real file operations, approvals, Office files and HTTP
+        run: |
+          python -m py_compile neural_core/sky_safe_workspace.py metaverse/sky_safe_files_api.py
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_safe_files.py' -v
