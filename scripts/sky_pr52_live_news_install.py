@@ -82,7 +82,9 @@ def prepare(root: Path):
             failures.append(rel + ": falta archivo original.")
             continue
         original = file.read_bytes()
-        src = original.decode("utf-8-sig")
+        # Windows often stores these files with CRLF. Match against normalized
+        # LF but preserve the original newline style in the proposed update.
+        src = original.decode("utf-8-sig").replace("\r\n", "\n")
         if after in src:
             report.append((rel, "YA INSTALADO"))
             continue
