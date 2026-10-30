@@ -1,3 +1,14 @@
+
+### Estado técnico Meta → SKY (29/10/2026)
+
+- **Comprobado:** Meta verificó el webhook HTTPS y entregó una solicitud de prueba que Supabase registró con HTTP 200 (la prueba fue anterior al despliegue v16).
+- **Desplegado:** Supabase Edge Function `sky-instagram` versión **16** y código en `main`. La función valida HMAC-SHA256 sobre el cuerpo original antes de guardar eventos.
+- **Implementado:** tabla privada `sky_instagram_webhook_events` (RLS y sin permisos públicos); normalización mínima de mensajes, comentarios y menciones, identificación de duplicados por hash, lectura autenticada por `GET /events` (propietario) y `GET /mobile-events` (dispositivo previamente vinculado). No se almacenan solicitudes de prueba con envoltura `sample`.
+- **Comprobado:** la tabla permite escritura y lectura por `service_role`, las cuentas `anon` y `authenticated` no tienen lectura, y el ensayo SQL en transacción se revirtió sin dejar mensajes ficticios.
+- **Aún no verificado:** un mensaje auténtico entregado a v16, suscripción activa de campos en Meta, suscripción de la cuenta profesional cuando Meta la requiera, revisión de aplicación, interfaz de bandeja Android, publicación/respuestas automáticas y pruebas completas en teléfono.
+- **Seguridad:** no modificar SKY Windows ni BAQUEANO; los tokens OAuth continúan cifrados en Supabase. Nadie debe copiar App Secret, verify token ni el token de propietario en repositorios, APK o capturas.
+- **Próximo ensayo:** activar en Meta únicamente los campos `messages` y `comments` cuando se habilite la cuenta, enviar un DM desde otra cuenta autorizada y comprobar que la tabla tenga un registro real. La plantilla de Meta prueba transporte, no persistencia de un mensaje real.
+
 # SKY Android — Supabase exclusivo para Instagram
 
 ## Proyecto objetivo
