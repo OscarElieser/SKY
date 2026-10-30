@@ -24,10 +24,12 @@ on:
       - 'tests/test_sky_verified_json.py'
       - 'tests/test_sky_role_http.py'
       - 'neural_core/sky_safe_workspace.py'
+      - 'neural_core/sky_safe_file_edits.py'
       - 'neural_core/sky_file_intents.py'
       - 'tests/test_sky_file_intents.py'
       - 'metaverse/sky_safe_files_api.py'
       - 'tests/test_sky_safe_files.py'
+      - 'tests/test_sky_safe_file_edits.py'
       - 'metaverse/static/hud.html'
       - 'metaverse/static/hud.js'
       - 'tests/test_sky_verified_science.py'
@@ -82,6 +84,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check 'fastapi>=0.115,<1' 'httpx>=0.27,<1' 'python-docx>=1.1,<2' 'XlsxWriter>=3.2,<4' 'python-pptx>=1.0,<2' 'reportlab>=4.4,<5'
       - name: Test real file operations, approvals, Office files and HTTP
         run: |
-          python -m py_compile neural_core/sky_safe_workspace.py metaverse/sky_safe_files_api.py
+          python -m py_compile neural_core/sky_safe_file_edits.py neural_core/sky_safe_workspace.py metaverse/sky_safe_files_api.py
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_safe_files.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_safe_file_edits.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_file_intents.py' -v

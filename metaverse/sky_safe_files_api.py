@@ -81,6 +81,47 @@ def inspect_document(name: str):
         raise HTTPException(503,"Lector no disponible.") from exc
 
 
+class EditRequest(BaseModel):
+    name: str = Field(min_length=1,max_length=91)
+    mode: str = Field(min_length=1,max_length=30)
+    expected_sha: str = Field(min_length=64,max_length=64)
+    find: str = Field(default="",max_length=2000)
+    replacement: str = Field(min_length=1,max_length=12000)
+
+class EditPrepare(EditRequest):
+    proposal_digest: str = Field(min_length=64,max_length=64)
+
+@router.get("/analyze/{name}")
+def analyze_document(name: str):
+    from neural_core import sky_safe_file_edits as editor
+    try:return editor.analyze(name)
+    except FileNotFoundError as exc:raise HTTPException(404,"Archivo no encontrado.") from exc
+    except (OSError, ValueError, RuntimeError) as exc:_failure(exc)
+
+@router.post("/edit/preview")
+def preview_edit(body: EditRequest):
+    from neural_core import sky_safe_file_edits as editor
+    try:return editor.preview(body.name,body.mode,body.expected_sha,body.find,body.replacement)
+    except FileNotFoundError as exc:raise HTTPException(404,"Archivo no encontrado.") from exc
+    except (OSError, ValueError, RuntimeError) as exc:_failure(exc)
+
+@router.post("/edit/prepare")
+def prepare_edit(body: EditPrepare,request: Request):
+    from neural_core import sky_safe_file_edits as editor
+    try:
+        with workspace._LOCK:
+            prepared=editor.prepare(body.name,body.mode,body.expected_sha,
+                                    body.find,body.replacement,body.proposal_digest)
+            p=prepared["preview"]
+            receipt={"spec":prepared["spec"],"expected_sha":p["expected_sha"],
+                     "destination_state":p["destination_state"]}
+            token=approvals.issue("sky_safe_files_v1",receipt,request)
+        return {"spec":prepared["spec"],"preview":p,"approval_token":token,
+                "expires_in_seconds":approvals.ttl,"committed":False}
+    except FileNotFoundError as exc:raise HTTPException(404,"Archivo no encontrado.") from exc
+    except (OSError, ValueError, RuntimeError) as exc:_failure(exc)
+
+
 @router.get("/text/{name}")
 def inspect_text(name: str):
     # Lectura de texto acotada y autenticada para edición en el HUD.
