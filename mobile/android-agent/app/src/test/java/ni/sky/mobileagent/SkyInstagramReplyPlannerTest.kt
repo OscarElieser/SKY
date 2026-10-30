@@ -22,11 +22,11 @@ class SkyInstagramReplyPlannerTest {
     }
     @Test fun recognizesNaturalDialogueWithoutSilentSending() {
         val p = SkyInstagramReplyPlanner
-        assertEquals(p.Intent.PREPARE, p.intent("SKY prepará respuesta de Instagram"))
-        assertEquals(p.Intent.PREPARE, p.intent("Dale, preparala", awaitingProposal=true))
-        assertEquals(p.Intent.SEND_QUERY, p.intent("Sí, enviala", hasDraft=true))
-        assertEquals(p.Intent.NONE, p.intent("Sí, enviala"))
-        assertEquals(p.Intent.CANCEL, p.intent("No la mandes", hasDraft=true))
+        assertEquals(SkyInstagramReplyPlanner.Intent.PREPARE, p.intent("SKY prepará respuesta de Instagram"))
+        assertEquals(SkyInstagramReplyPlanner.Intent.PREPARE, p.intent("Dale, preparala", awaitingProposal=true))
+        assertEquals(SkyInstagramReplyPlanner.Intent.SEND_QUERY, p.intent("Sí, enviala", hasDraft=true))
+        assertEquals(SkyInstagramReplyPlanner.Intent.NONE, p.intent("Sí, enviala"))
+        assertEquals(SkyInstagramReplyPlanner.Intent.CANCEL, p.intent("No la mandes", hasDraft=true))
         assertEquals("Gracias por escribirme",
             p.revisedText("SKY, cambia la respuesta por Gracias por escribirme"))
     }
