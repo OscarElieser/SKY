@@ -374,3 +374,17 @@ body.sky-cinematic{background:
 /* Identidad visual SKY IA · logotipo oficial · 2026-10-28 */
 .brand .sky-official-mark {display:block;width:39px;height:39px;object-fit:contain;flex:none;filter:drop-shadow(0 0 6px rgba(0,229,255,.25))}
 .brand .word {letter-spacing:.13em;white-space:nowrap}
+
+/* SKY Safe Files: mismos tonos de la interfaz oficial, sin estilos externos */
+.sky-safe-studio{display:flex;flex-direction:column;gap:11px;padding:8px;min-width:0}
+.sky-safe-field{display:flex;flex-direction:column;gap:5px;font-size:12px;color:#b2dcec}
+.sky-safe-field .hab-in{width:100%;box-sizing:border-box;resize:vertical}
+.sky-safe-buttons,.sky-safe-file{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sky-safe-preview{border:1px solid rgba(0,229,255,.4);border-radius:12px;
+ background:rgba(4,31,53,.8);color:#d9f5ff;padding:13px;white-space:pre-wrap;
+ font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.sky-safe-list{display:flex;flex-direction:column;gap:7px}
+.sky-safe-file{justify-content:space-between;padding:9px;border:1px solid rgba(0,229,255,.15);
+ border-radius:10px;background:rgba(3,26,45,.7);font-size:12px}
+.sky-safe-file span{min-width:0;overflow-wrap:anywhere}
+.sky-safe-field[hidden]{display:none}

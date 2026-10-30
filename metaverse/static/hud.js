@@ -3356,6 +3356,147 @@
     await load();
   }
 
+  /* SKY Safe Files · operaciones del dueño, sujetas a aprobación de un uso.
+     El HUD no almacena recibos, contenidos ni credenciales en localStorage. */
+  async function abrirArchivosSeguros() {
+    const page=el('div','sky-safe-studio');
+    const info=el('p','muted','Prepará una operación. Nada cambia hasta que confirmés.');
+    page.appendChild(info);
+    const operation=el('select','hab-in');
+    for(const [key,caption] of [
+      ['create','Crear'],['replace','Reemplazar'],['append','Añadir texto'],
+      ['rename','Renombrar'],['trash','Mover a papelera'],['restore','Restaurar']]){
+      const option=el('option','',caption);option.value=key;operation.appendChild(option);
+    }
+    const opLabel=el('label','sky-safe-field','Operación');opLabel.appendChild(operation);
+    const name=el('input','hab-in');name.placeholder='ejemplo: informe.docx';name.maxLength=91;
+    const nameLabel=el('label','sky-safe-field','Nombre del archivo');nameLabel.appendChild(name);
+    const renamed=el('input','hab-in');renamed.placeholder='nuevo-nombre.docx';renamed.maxLength=91;
+    const renameLabel=el('label','sky-safe-field','Nuevo nombre');renameLabel.appendChild(renamed);
+    const trash=el('input','hab-in');trash.placeholder='ID de papelera';
+    const trashLabel=el('label','sky-safe-field','Identificador para restaurar');trashLabel.appendChild(trash);
+    const content=el('textarea','hab-in');content.rows=7;
+    content.placeholder='Escribí aquí el contenido. Para Excel, ingresá JSON con kind, title, headers y rows.';
+    const contentLabel=el('label','sky-safe-field','Contenido / especificación de documento');contentLabel.appendChild(content);
+    const note=el('p','muted','Solo nombres simples. Extensiones: txt, md, csv, json, py, html, docx, xlsx, pptx y pdf.');
+    const buttonRow=el('div','sky-safe-buttons');
+    const prepareButton=el('button','btn primary','Preparar vista previa');prepareButton.type='button';
+    const commitButton=el('button','btn','Confirmar cambio');commitButton.type='button';commitButton.disabled=true;
+    buttonRow.append(prepareButton,commitButton);
+    const previewText=el('div','sky-safe-preview','Sin operación preparada.');
+    const stored=el('div','sky-safe-list'),recovered=el('div','sky-safe-list');
+    page.append(opLabel,nameLabel,renameLabel,trashLabel,contentLabel,note,buttonRow,previewText,
+                el('h3','','Archivos guardados'),stored,el('h3','','Papelera recuperable'),recovered);
+    abrirVentana('safe-files','SKY · Archivos protegidos',page,{w:770,h:700});
+    let pending=null;
+    function invalidate(){
+      pending=null;commitButton.disabled=true;previewText.textContent='Los cambios necesitan nueva vista previa.';
+    }
+    function updateFields(){
+      const action=operation.value;
+      renameLabel.hidden=action!=='rename';
+      trashLabel.hidden=action!=='restore';
+      contentLabel.hidden=!['create','replace','append'].includes(action);
+      commitButton.textContent=action==='trash'?'Confirmar movimiento a papelera':
+        action==='restore'?'Confirmar restauración':'Confirmar cambio';
+      invalidate();
+    }
+    operation.addEventListener('change',updateFields);
+    for(const control of [name,renamed,trash,content])control.addEventListener('input',invalidate);
+    updateFields();
+    function spec(){
+      const op=operation.value,filename=name.value.trim();
+      const data={op,name:filename};
+      if(op==='rename')data.new_name=renamed.value.trim();
+      if(op==='restore')data.trash_id=trash.value.trim();
+      if(['create','replace','append'].includes(op)){
+        const extension=(filename.split('.').pop()||'').toLowerCase();
+        if(['docx','xlsx','pptx','pdf'].includes(extension)){
+          if(op==='append')throw Error('No se puede añadir texto directamente a un documento binario.');
+          if(extension==='xlsx'){
+            try{data.document=JSON.parse(content.value);}
+            catch{throw Error('Para Excel escribí JSON válido con kind, title, headers y rows.');}
+          }else{
+            data.document={kind:extension,title:filename.slice(0,-extension.length-1),content:content.value};
+          }
+        }else data.text=content.value;
+      }
+      return data;
+    }
+    async function refresh(){
+      stored.textContent='';recovered.textContent='';
+      try{
+        const [files,trashData]=await Promise.all([
+          api('/api/sky/safe-files/list'),api('/api/sky/safe-files/trash')]);
+        for(const item of files.files||[]){
+          const row=el('div','sky-safe-file');
+          row.appendChild(el('span','',item.name+' · '+Math.ceil(item.bytes/1024)+' KB'));
+          const use=el('button','btn','Seleccionar');use.type='button';
+          use.addEventListener('click',()=>{name.value=item.name;invalidate();});
+          const download=el('button','btn','Descargar');download.type='button';
+          download.addEventListener('click',async()=>{
+            download.disabled=true;
+            try{
+              const response=await fetch('/api/sky/safe-files/download/'+encodeURIComponent(item.name),
+                {headers:headers({},false)});
+              if(!response.ok)throw Error('HTTP '+response.status);
+              const blob=await response.blob(),url=URL.createObjectURL(blob);
+              const link=el('a');link.href=url;link.download=item.name;document.body.appendChild(link);
+              link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2500);
+            }catch(error){info.textContent='Descarga no disponible: '+error.message;}
+            finally{download.disabled=false;}
+          });
+          row.append(use,download);stored.appendChild(row);
+        }
+        if(!(files.files||[]).length)stored.appendChild(el('p','muted','Todavía no hay archivos.'));
+        for(const item of trashData.items||[]){
+          const row=el('div','sky-safe-file');
+          row.appendChild(el('span','',item.original+' · recuperable'));
+          const restore=el('button','btn','Preparar restauración');restore.type='button';
+          restore.addEventListener('click',()=>{
+            operation.value='restore';updateFields();name.value=item.original;trash.value=item.id;invalidate();
+          });
+          row.appendChild(restore);recovered.appendChild(row);
+        }
+        if(!(trashData.items||[]).length)recovered.appendChild(el('p','muted','Papelera vacía.'));
+      }catch(error){info.textContent='No pude consultar los archivos: '+error.message;}
+    }
+    prepareButton.addEventListener('click',async()=>{
+      prepareButton.disabled=true;pending=null;commitButton.disabled=true;
+      try{
+        const current=spec();
+        const output=await api('/api/sky/safe-files/prepare',{
+          method:'POST',body:JSON.stringify({spec:current})});
+        pending={spec:current,receipt:output};
+        const p=output.preview;
+        previewText.textContent='Listo para autorizar: '+p.op+' · '+p.name+
+          '\nEstado anterior: '+(p.expected_sha==='absent'?'archivo inexistente':p.expected_sha.slice(0,14)+'…')+
+          '\nBytes preparados: '+p.bytes_to_write+
+          '\nLa aprobación caduca en '+output.expires_in_seconds+' segundos. No se han modificado archivos.';
+        commitButton.disabled=false;info.textContent='Confirmá solo si estás de acuerdo con este cambio.';
+      }catch(error){previewText.textContent='No se pudo preparar: '+error.message;}
+      finally{prepareButton.disabled=false;}
+    });
+    commitButton.addEventListener('click',async()=>{
+      if(!pending)return;
+      commitButton.disabled=true;
+      const work=pending;pending=null;
+      try{
+        const approval=work.receipt;
+        const result=await api('/api/sky/safe-files/commit',{
+          method:'POST',body:JSON.stringify({
+            spec:work.spec,approval_token:approval.approval_token,
+            expected_sha:approval.preview.expected_sha,
+            destination_state:approval.preview.destination_state})});
+        previewText.textContent='Cambio comprobado: '+result.operation+' · '+result.name+
+          '\nVerificación posterior: '+(result.verified_after_write?'correcta':'no disponible');
+        info.textContent='Resultado recibido del servidor; consultá el archivo actualizado.';
+        await refresh();
+      }catch(error){previewText.textContent='No se completó: '+error.message+'. Prepará otra vista previa.';}
+    });
+    await refresh();
+  }
+
   async function abrirDiagnostico() {
     const cont = el('div');
     cont.appendChild(el('p', 'muted', 'Revisando…'));
@@ -3406,6 +3547,7 @@
   $('btn-wake').addEventListener('click', () => { salidaAudio(); activarEscucha(!W.on); });
   $('btn-diag').addEventListener('click', abrirDiagnostico);
   $('btn-role-health').addEventListener('click', abrirPanelRoles);
+  $('btn-safe-files').addEventListener('click', abrirArchivosSeguros);
   document.addEventListener('pointerdown', () => { try { salidaAudio(); } catch { /* */ } }, { once: true });
   $('chat-form').addEventListener('submit', (e) => { e.preventDefault(); recibir($('chat-input').value, 'texto'); });
   document.addEventListener('keydown', (e) => {

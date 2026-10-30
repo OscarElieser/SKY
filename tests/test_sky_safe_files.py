@@ -196,5 +196,15 @@ class SafeFilesHTTPTests(unittest.TestCase):
         self.assertEqual(p.status_code,409)
         self.assertEqual((Path(os.environ["SKY_SAFE_WORKSPACE_ROOT"])/"existing.txt").read_text(),"Original")
 
+    def test_hud_has_visible_approval_workflow(self):
+        hud=Path("metaverse/static/hud.js").read_text(encoding="utf-8")
+        html=Path("metaverse/static/hud.html").read_text(encoding="utf-8")
+        api=Path("metaverse/api.py").read_text(encoding="utf-8")
+        self.assertIn("abrirArchivosSeguros",hud)
+        self.assertIn("btn-safe-files",html)
+        self.assertIn("sky_safe_files_router",api)
+        self.assertIn("/api/sky/safe-files/prepare",hud)
+        self.assertIn("/api/sky/safe-files/commit",hud)
+
 if __name__=="__main__":
     unittest.main()
