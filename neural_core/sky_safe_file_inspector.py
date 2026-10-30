@@ -12,7 +12,7 @@ def inspect(name):
     data=ws.file_bytes(name)
     ext=Path(name).suffix.lower()
     if ext in ws.TEXT_EXT:
-        try: text=data[:LIMIT].decode("utf-8",errors="ignore")
+        try: text=data.decode("utf-8")[:LIMIT]
         except UnicodeDecodeError as e: raise ws.WorkspaceError("Texto no UTF-8.") from e
     elif ext in (".docx",".pptx",".xlsx"):
         chunks=[]

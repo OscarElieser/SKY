@@ -37,4 +37,20 @@ class InspectorTests(unittest.TestCase):
         (ws._root()/"mal.docx").write_bytes(bad.getvalue())
         with self.assertRaises(ws.WorkspaceError):inspector.inspect("mal.docx")
 
+
+    def test_utf8_multibyte_limit_is_not_a_false_decode_error(self):
+        # Una tilde puede caer justo en el borde de la vista limitada.
+        p=ws._root()/"utf8.md"
+        p.write_bytes(b"x"*14999 + "ñ".encode("utf-8") + b"hola")
+        result=inspector.inspect("utf8.md")
+        self.assertTrue(result["read_only"])
+        self.assertEqual(len(result["text"]),15000)
+        self.assertTrue(result["text"].endswith("ñ"))
+
+    def test_non_utf8_text_is_not_silently_accepted(self):
+        p=ws._root()/"invalid.md"
+        p.write_bytes(b"abc\xff")
+        with self.assertRaises(ws.WorkspaceError):
+            inspector.inspect("invalid.md")
+
 if __name__=="__main__":unittest.main()
