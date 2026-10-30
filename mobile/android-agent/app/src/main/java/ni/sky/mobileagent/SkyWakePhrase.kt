@@ -24,7 +24,11 @@ object SkyWakePhrase {
             when {
                 text == wake -> ""
                 text.startsWith(wake + " ") -> text.removePrefix(wake).trim()
-                text.endsWith(" " + wake) -> text.removeSuffix(wake).trim()
+                // A sentence merely ending in "sky" is ambient speech,
+                // never permission to execute. Suffix is wake-only.
+                text.endsWith(" " + wake) &&
+                    text.removeSuffix(wake).trim() in wakeOnly ->
+                    text.removeSuffix(wake).trim()
                 else -> null
             }
         }
