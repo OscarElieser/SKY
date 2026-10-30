@@ -3500,6 +3500,126 @@
       }
       return data;
     }
+    // Analizar y proponer sin escribir. Preparar un recibo y guardar son clics separados.
+    async function abrirAnalisisSeguro(filename){
+      const panel=el('div','sky-safe-studio'),state=el('p','muted','Analizando archivo...');
+      panel.appendChild(state);
+      abrirVentana('safe-editor','SKY · Análisis y cambios propuestos',panel,{w:750,h:670});
+      let analysis;
+      try{
+        analysis=await api('/api/sky/safe-files/analyze/'+encodeURIComponent(filename));
+      }catch(err){state.textContent='No pude analizar: '+err.message;return;}
+      state.textContent=analysis.name+' · '+analysis.file_bytes+' bytes · '+
+        analysis.visible_words+' palabras visibles · '+analysis.visible_lines+
+        ' líneas. Análisis parcial, local y de solo lectura.';
+      const excerpt=el('pre','sky-safe-preview',analysis.excerpt||'No se encontró texto extraíble.');
+      excerpt.style.whiteSpace='pre-wrap';
+      excerpt.style.wordBreak='break-word';
+      panel.appendChild(el('h3','','Contenido revisado (fragmento)'));
+      panel.appendChild(excerpt);
+      if(analysis.truncated_excerpt)panel.appendChild(el('p','muted','El fragmento fue recortado: no representa todo el archivo.'));
+      if(!analysis.editable_via_proposal){
+        panel.appendChild(el('p','muted',
+          'Este formato o tamaño admite lectura, pero no edición literal desde esta ventana. El original está intacto.'));
+        return;
+      }
+      const operation=el('select','hab-in');
+      for(const [value,label] of [['replace_once','Sustituir una coincidencia exacta'],['append_text','Añadir texto al final']]){
+        const option=el('option','',label);option.value=value;operation.appendChild(option);
+      }
+      const modeLabel=el('label','sky-safe-field','Tipo de cambio');modeLabel.appendChild(operation);
+      const find=el('textarea','hab-in');find.rows=3;find.maxLength=2000;
+      find.placeholder='Escribí el fragmento exacto presente en el documento.';
+      const findLabel=el('label','sky-safe-field','Texto que deseás reemplazar');findLabel.appendChild(find);
+      const replacement=el('textarea','hab-in');replacement.rows=5;replacement.maxLength=12000;
+      replacement.placeholder='Nuevo contenido (se utiliza exactamente como está escrito).';
+      const replacementLabel=el('label','sky-safe-field','Texto nuevo');replacementLabel.appendChild(replacement);
+      const actions=el('div','sky-safe-buttons');
+      const previewButton=el('button','btn primary','1. Ver comparación');previewButton.type='button';
+      const approvalButton=el('button','btn','2. Preparar autorización');approvalButton.type='button';
+      const commitButton=el('button','btn','3. Confirmar y guardar');commitButton.type='button';
+      approvalButton.disabled=true;commitButton.disabled=true;
+      actions.append(previewButton,approvalButton,commitButton);
+      const note=el('p','muted','Los reemplazos exigen una sola coincidencia literal. Si el archivo cambia, SKY rechaza el guardado.');
+      const diff=el('pre','sky-safe-preview','Todavía no hay cambios propuestos.');
+      diff.style.whiteSpace='pre-wrap';diff.style.wordBreak='break-word';
+      const feedback=el('p','muted','Ningún cambio se guardará sin confirmar.');
+      panel.append(modeLabel,findLabel,replacementLabel,note,actions,feedback,
+                   el('h3','','Comparación antes de guardar'),diff);
+      let proposal=null,prepared=null;
+      function invalidate(){
+        proposal=null;prepared=null;
+        approvalButton.disabled=true;commitButton.disabled=true;
+        diff.textContent='Los cambios requieren nueva comparación.';
+      }
+      function update(){
+        findLabel.hidden=operation.value!=='replace_once';
+        if(operation.value!=='replace_once')find.value='';
+        invalidate();
+      }
+      operation.addEventListener('change',update);
+      for(const field of [find,replacement])field.addEventListener('input',invalidate);
+      update();
+      function payload(){
+        return {name:analysis.name,mode:operation.value,expected_sha:analysis.sha256,
+          find:operation.value==='replace_once'?find.value:'',
+          replacement:replacement.value};
+      }
+      previewButton.addEventListener('click',async()=>{
+        previewButton.disabled=true;invalidate();
+        try{
+          const input=payload();
+          const result=await api('/api/sky/safe-files/edit/preview',{
+            method:'POST',body:JSON.stringify(input)});
+          proposal={input,digest:result.proposal_digest};
+          diff.textContent=result.diff||'Diferencias sin líneas visibles';
+          if(result.diff_truncated)diff.textContent+='\n[VISTA PREVIA RECORTADA]';
+          feedback.textContent='Comparación preparada. Original intacto. Cambios: '+
+            result.before_chars+' → '+result.after_chars+' caracteres. Revisá antes de autorizar.';
+          approvalButton.disabled=false;
+        }catch(error){feedback.textContent='No se pudo preparar el cambio: '+error.message;}
+        finally{previewButton.disabled=false;}
+      });
+      approvalButton.addEventListener('click',async()=>{
+        if(!proposal)return;
+        approvalButton.disabled=true;
+        try{
+          const data=await api('/api/sky/safe-files/edit/prepare',{
+            method:'POST',body:JSON.stringify({
+              ...proposal.input,proposal_digest:proposal.digest})});
+          prepared=data;
+          commitButton.disabled=false;
+          feedback.textContent='Autorización preparada. Caduca en '+data.expires_in_seconds+
+            ' segundos. Todavía no se modificó ningún archivo.';
+        }catch(error){
+          proposal=null;prepared=null;
+          feedback.textContent='No se pudo autorizar: '+error.message;
+        }
+      });
+      commitButton.addEventListener('click',async()=>{
+        if(!prepared)return;
+        const resultToCommit=prepared;prepared=null;commitButton.disabled=true;
+        try{
+          const result=await api('/api/sky/safe-files/commit',{
+            method:'POST',body:JSON.stringify({
+              spec:resultToCommit.spec,
+              approval_token:resultToCommit.approval_token,
+              expected_sha:resultToCommit.preview.expected_sha,
+              destination_state:resultToCommit.preview.destination_state
+            })});
+          if(!result.verified_after_write)throw Error('No se confirmó la verificación posterior.');
+          feedback.textContent='Cambio guardado y comprobado con SHA-256. Revisá el archivo actualizado.';
+          diff.textContent='Operación confirmada: '+result.operation+' · '+result.name;
+          proposal=null;approvalButton.disabled=true;previewButton.disabled=true;
+          info.textContent='SKY confirmó la modificación segura de '+result.name;
+          await refresh();
+        }catch(error){
+          proposal=null;approvalButton.disabled=true;
+          feedback.textContent='No se completó el guardado: '+error.message+
+            '. Volvé a analizar el archivo antes de intentar de nuevo.';
+        }
+      });
+    }
     async function refresh(){
       stored.textContent='';recovered.textContent='';
       try{
@@ -3536,6 +3656,9 @@
             });
             row.appendChild(edit);
           }
+          const analyzeBtn=el('button','btn','Analizar y proponer');analyzeBtn.type='button';
+          analyzeBtn.addEventListener('click',()=>abrirAnalisisSeguro(item.name));
+          row.appendChild(analyzeBtn);
           const inspect=el('button','btn','Leer documento');inspect.type='button';
           inspect.addEventListener('click',async()=>{
             inspect.disabled=true;
