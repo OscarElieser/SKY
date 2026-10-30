@@ -26,9 +26,10 @@ class SkyInstalledApps(
     private val activity: Activity,
     private val say: (String) -> Unit
 ) {
-    var onReceipt: ((String, String, String) -> Unit)? = null
+    var onReceipt: ((String, String, String, String) -> Unit)? = null
+    private var currentOperationId = java.util.UUID.randomUUID().toString()
     private fun receipt(action: String, status: String, detail: String) {
-        onReceipt?.invoke(action, status, detail)
+        onReceipt?.invoke(action, status, detail, currentOperationId)
     }
     private val trusted = activity.getSharedPreferences(
         "sky_trusted_launcher_apps", android.content.Context.MODE_PRIVATE
@@ -65,6 +66,7 @@ class SkyInstalledApps(
     }
 
     fun requestLaunch(query: String) {
+        currentOperationId = java.util.UUID.randomUUID().toString()
         val choices = discover()
         val matched = SkyAppNameMatcher.matches(query, choices.map { it.asEntry() })
         val available = matched.mapNotNull { entry ->
@@ -105,6 +107,7 @@ class SkyInstalledApps(
      * decide posteriormente si publicarlo o enviarlo; SKY nunca pulsa Enviar.
      */
     fun requestShare(query: String, text: String) {
+        currentOperationId = java.util.UUID.randomUUID().toString()
         val available = discover()
         val matched = SkyAppNameMatcher.matches(query, available.map { it.asEntry() })
             .mapNotNull { entry ->
