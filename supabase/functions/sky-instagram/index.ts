@@ -432,6 +432,79 @@ async function mobileStatus() {
   const found=Array.isArray(record)&&record.length?record[0]:null;
   return json({authorized:!!found,profile_verified:false,connection:found});
 }
+/** Read-only preflight for Facebook Login/Page-based Instagram messaging.
+ * Never returns tokens or sends a DM. A positive result is NOT a send receipt.
+ */
+async function mobileSendReadiness(): Promise<Response> {
+  const found = await database("sky_instagram_connections", "GET",
+    "?id=eq.owner&select=token_ciphertext,token_iv,token_expires_at,verified_at");
+  const row = Array.isArray(found) && found.length === 1 ? found[0] as Json : null;
+  if (!row || typeof row.verified_at !== "string") return json({
+    connected: false, preflight_ok: false, send_tested: false,
+    outgoing_enabled: false, reason: "no_verified_instagram_connection"
+  });
+  if (typeof row.token_expires_at === "string" &&
+      Date.parse(row.token_expires_at) <= Date.now()) return json({
+    connected: true, preflight_ok: false, send_tested: false,
+    outgoing_enabled: false, reason: "expired_token"
+  });
+  let token: string, scopeInfo: { scopes:string[]; expires_at:string|null };
+  try {
+    token = await decryptToken(row);
+    scopeInfo = await inspectToken(token);
+  } catch {
+    return json({ connected: true, preflight_ok: false,
+      send_tested: false, outgoing_enabled: false, reason: "invalid_meta_token" });
+  }
+  if (scopeInfo.expires_at && Date.parse(scopeInfo.expires_at) <= Date.now())
+    return json({ connected: true, preflight_ok: false,
+      send_tested: false, outgoing_enabled: false, reason: "expired_meta_token" });
+
+  if (scopeInfo.scopes.includes("instagram_business_manage_messages")) {
+    return json({ connected: true, login_type: "instagram",
+      preflight_ok: false, send_tested: false, outgoing_enabled: false,
+      reason: "instagram_login_send_not_configured" });
+  }
+  const required = ["instagram_basic","instagram_manage_messages","pages_show_list"];
+  const missing = required.filter(scope => !scopeInfo.scopes.includes(scope));
+  if (missing.length > 0) {
+    return json({ connected: true, login_type: "facebook", preflight_ok: false,
+      send_tested: false, outgoing_enabled: false,
+      reason: "missing_permissions", missing_permissions: missing });
+  }
+  const result = await graphRead("graph.facebook.com", "me/accounts",
+    "id,tasks,access_token,instagram_business_account{id,username}", token);
+  if (!result || !Array.isArray(result.data)) {
+    return json({ connected: true, login_type: "facebook", preflight_ok: false,
+      send_tested: false, outgoing_enabled: false,
+      reason: "page_lookup_unavailable" });
+  }
+  const pages = result.data.map(item => {
+    const p = eventObject(item);
+    const ig = eventObject(p.instagram_business_account);
+    const tasks = Array.isArray(p.tasks) ? p.tasks : [];
+    return { pageId: String(p.id || ""), instagramId: String(ig.id || ""),
+      hasPageToken: typeof p.access_token === "string" && p.access_token.length >= 20,
+      messagingTask: tasks.includes("MESSAGING") };
+  }).filter(p => validId(p.pageId) && validId(p.instagramId));
+  if (pages.length !== 1) return json({
+    connected: true, login_type: "facebook", preflight_ok: false,
+    send_tested: false, outgoing_enabled: false,
+    reason: pages.length > 1 ? "multiple_linked_pages" : "missing_linked_instagram_page"
+  });
+  const page = pages[0];
+  // Never serialize page access tokens, user access tokens, or Meta secrets.
+  const ready = page.hasPageToken && page.messagingTask;
+  return json({ connected: true, login_type: "facebook",
+    profile_verified: true, page_token_available: page.hasPageToken,
+    page_messaging_task: page.messagingTask,
+    preflight_ok: ready, outgoing_enabled: false, send_tested: false,
+    reason: ready ? "awaiting_supervised_send_implementation" :
+      "page_token_or_messaging_task_missing",
+    extra_review: "Verify Meta App Review, permission scope, and messaging window before send."
+  });
+}
+
 async function mobileRevoke(req:Request) {
   const token=(req.headers.get("authorization")||"").slice(7);
   const query=new URLSearchParams({token_hash:"eq."+await digest(token)});
@@ -461,6 +534,10 @@ Deno.serve(async (req: Request) => {
     if (path === "mobile-profile" && req.method === "GET") {
       if (!(await mobileAuthorized(req))) return json({ error: "unauthorized" }, 401);
       return await verifiedProfile();
+    }
+    if (path === "mobile-send-readiness" && req.method === "GET") {
+      if (!(await mobileAuthorized(req))) return json({ error: "unauthorized" }, 401);
+      return await mobileSendReadiness();
     }
     // Reauthorization is initiated by the paired phone, never by an anonymous caller.
     // The Meta login URL has a one-time CSRF state; no Meta or owner tokens are returned.
