@@ -505,6 +505,257 @@ async function mobileSendReadiness(): Promise<Response> {
   });
 }
 
+
+/**
+ * Instagram owner-supervised reply transport. No automatic sending:
+ * - every candidate references a verified, recent incoming webhook
+ * - text is never persisted, only its digest
+ * - one short-lived approval per exact device/event/text
+ * - one atomic prepared->sending transition and no automatic retries
+ * - sending is explicitly gated by a production server-side feature flag
+ */
+const outboundEnabled = () => env("SKY_INSTAGRAM_OUTGOING_ENABLED") === "true";
+const approvalPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const eventPattern = /^[0-9a-f]{64}$/;
+const replyLimit = 950;
+const lastIncomingWindowMs = 23 * 60 * 60 * 1000; // conservative, within Meta's 24h window
+const approvalLifeMs = 2 * 60 * 1000;
+
+async function ownerDeviceHash(req: Request): Promise<string> {
+  const header = req.headers.get("authorization") || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw Error("invalid_device");
+  return digest(token);
+}
+async function replyInput(req: Request): Promise<Json> {
+  const size = Number(req.headers.get("content-length") || "0");
+  if (size > 5000) throw Error("payload_too_large");
+  const raw = await req.text();
+  if (raw.length > 5000) throw Error("payload_too_large");
+  const body = JSON.parse(raw) as unknown;
+  if (!body || typeof body !== "object" || Array.isArray(body))
+    throw Error("invalid_payload");
+  return body as Json;
+}
+function replyText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text || text.length > replyLimit ||
+      encoder(text).byteLength > 1000 ||
+      /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(text)) return null;
+  return text;
+}
+function freshIncoming(event: Json): boolean {
+  if (event.event_type !== "message" || !eventPattern.test(String(event.event_key || "")) ||
+      !validId(String(event.ig_account_id || "")) ||
+      !validId(String(event.actor_id || "")) ||
+      !validId(String(event.target_id || "")) ||
+      String(event.ig_account_id) !== String(event.target_id) ||
+      typeof event.event_at !== "string") return false;
+  const received = Date.parse(event.event_at);
+  const elapsed = Date.now() - received;
+  return Number.isFinite(received) && elapsed >= 0 && elapsed < lastIncomingWindowMs;
+}
+async function sourceIncoming(eventKey: string): Promise<Json | null> {
+  if (!eventPattern.test(eventKey)) return null;
+  const query = "?event_key=eq." + eventKey +
+    "&select=event_key,event_type,ig_account_id,actor_id,target_id,event_at";
+  const records = await database("sky_instagram_webhook_events", "GET", query);
+  const event = Array.isArray(records) && records.length === 1 ?
+    records[0] as Json : null;
+  return event && freshIncoming(event) ? event : null;
+}
+async function instagramPageFor(accountId: string): Promise<
+  { pageId: string; pageToken: string } | null
+> {
+  const connections = await database("sky_instagram_connections", "GET",
+    "?id=eq.owner&select=token_ciphertext,token_iv,token_expires_at,verified_at");
+  const record = Array.isArray(connections) && connections.length === 1 ?
+    connections[0] as Json : null;
+  if (!record || typeof record.verified_at !== "string" ||
+      (typeof record.token_expires_at === "string" &&
+       Date.parse(record.token_expires_at) <= Date.now())) return null;
+  try {
+    const userToken = await decryptToken(record);
+    const grants = await inspectToken(userToken);
+    if (!["instagram_basic","instagram_manage_messages","pages_show_list",
+           "pages_read_engagement"].every(x => grants.scopes.includes(x))) return null;
+    if (grants.expires_at && Date.parse(grants.expires_at) <= Date.now()) return null;
+    const response = await graphRead("graph.facebook.com", "me/accounts",
+      "id,tasks,access_token,instagram_business_account{id,username}", userToken);
+    const pages = Array.isArray(response?.data) ? response.data : [];
+    const matched = pages.map(p => {
+      const page = eventObject(p);
+      const ig = eventObject(page.instagram_business_account);
+      const tasks = Array.isArray(page.tasks) ? page.tasks : [];
+      return {
+        id: String(page.id || ""),
+        ig: String(ig.id || ""),
+        token: typeof page.access_token === "string" ? page.access_token : "",
+        permitted: tasks.includes("MESSAGING"),
+      };
+    }).filter(p => validId(p.id) && p.ig === accountId &&
+      p.token.length > 20 && p.permitted);
+    return matched.length === 1 ?
+      { pageId: matched[0].id, pageToken: matched[0].token } : null;
+  } catch { return null; }
+}
+async function mobileReplyPrepare(req: Request): Promise<Response> {
+  let body: Json;
+  try { body = await replyInput(req); }
+  catch { return json({ error: "invalid_payload" }, 400); }
+  const eventKey = String(body.event_key || "");
+  const message = replyText(body.text);
+  if (!eventPattern.test(eventKey) || !message)
+    return json({ error: "invalid_event_or_text" }, 400);
+  const incoming = await sourceIncoming(eventKey);
+  if (!incoming) return json({ error: "incoming_message_missing_or_outside_24h" }, 409);
+  // The recipient is ALWAYS from an authenticated webhook; never from the phone.
+  const page = await instagramPageFor(String(incoming.ig_account_id));
+  if (!page) return json({ error: "send_permissions_or_page_not_ready" }, 409);
+  const deviceHash = await ownerDeviceHash(req);
+  const textHash = await digest(message);
+  const check = new URLSearchParams({
+    event_key: "eq." + eventKey,
+    reply_digest: "eq." + textHash,
+    device_token_hash: "eq." + deviceHash,
+  });
+  const previous = await database("sky_instagram_outbound_approvals", "GET",
+    "?" + check.toString() + "&select=approval_id,state,expires_at");
+  if (Array.isArray(previous) && previous.length) {
+    return json({ error: "duplicate_or_previously_prepared",
+      status: (previous[0] as Json).state }, 409);
+  }
+  // Conservative per-device limit. The unique constraint prevents same-event
+  // duplicates even if two requests race the pre-check.
+  const recent = await database("sky_instagram_outbound_approvals", "GET",
+    "?device_token_hash=eq." + deviceHash +
+    "&created_at=gt." + encodeURIComponent(new Date(Date.now() - 3600000).toISOString()) +
+    "&select=approval_id&limit=12");
+  if (Array.isArray(recent) && recent.length >= 10)
+    return json({ error: "hourly_limit_reached" }, 429);
+  const approvalId = crypto.randomUUID();
+  const expires = new Date(Date.now() + approvalLifeMs).toISOString();
+  try {
+    await database("sky_instagram_outbound_approvals", "POST", "", {
+      approval_id: approvalId, device_token_hash: deviceHash,
+      event_key: eventKey, reply_digest: textHash,
+      recipient_id: incoming.actor_id, ig_account_id: incoming.ig_account_id,
+      expires_at: expires, state: "prepared"
+    }, "return=minimal");
+  } catch {
+    return json({ error: "duplicate_or_unavailable" }, 409);
+  }
+  return json({
+    prepared: true, approval_id: approvalId, expires_at: expires,
+    recipient_label: "Instagram ···" + String(incoming.actor_id).slice(-5),
+    outbound_enabled: outboundEnabled(),
+    // Do not falsely report sendability when the server-side feature gate is off.
+    can_confirm: outboundEnabled(),
+    send_tested: false,
+  });
+}
+async function mobileReplyStatus(req: Request): Promise<Response> {
+  const id = new URL(req.url).searchParams.get("approval_id") || "";
+  if (!approvalPattern.test(id)) return json({ error: "invalid_approval" }, 400);
+  const deviceHash = await ownerDeviceHash(req);
+  const q = new URLSearchParams({ approval_id: "eq." + id,
+    device_token_hash: "eq." + deviceHash });
+  const rows = await database("sky_instagram_outbound_approvals", "GET",
+    "?" + q.toString() + "&select=state,meta_message_id,expires_at,completed_at");
+  if (!Array.isArray(rows) || rows.length !== 1)
+    return json({ error: "approval_not_found" }, 404);
+  const r = rows[0] as Json;
+  return json({ state: r.state, message_id: r.state === "sent" ? r.meta_message_id : null,
+    expires_at: r.expires_at, completed_at: r.completed_at });
+}
+async function mobileReplyConfirm(req: Request): Promise<Response> {
+  // Cannot send unless deliberately enabled after real end-to-end tests.
+  if (!outboundEnabled())
+    return json({ error: "supervised_send_not_enabled" }, 423);
+  let body: Json;
+  try { body = await replyInput(req); }
+  catch { return json({ error: "invalid_payload" }, 400); }
+  const id = String(body.approval_id || "");
+  const message = replyText(body.text);
+  if (!approvalPattern.test(id) || !message || body.owner_confirmed !== true)
+    return json({ error: "explicit_approval_required" }, 400);
+  const deviceHash = await ownerDeviceHash(req);
+  const filter = new URLSearchParams({
+    approval_id: "eq." + id, device_token_hash: "eq." + deviceHash
+  });
+  const records = await database("sky_instagram_outbound_approvals", "GET",
+    "?" + filter.toString() + "&select=event_key,reply_digest,state,expires_at,ig_account_id,recipient_id");
+  if (!Array.isArray(records) || records.length !== 1)
+    return json({ error: "approval_missing" }, 404);
+  const row = records[0] as Json;
+  if (row.state !== "prepared") return json({ error: "already_consumed_or_in_progress",
+    status: row.state }, 409);
+  if (typeof row.expires_at !== "string" || Date.parse(row.expires_at) <= Date.now())
+    return json({ error: "approval_expired" }, 409);
+  if (await digest(message) !== row.reply_digest)
+    return json({ error: "reply_changed_reapproval_required" }, 409);
+  const incoming = await sourceIncoming(String(row.event_key || ""));
+  if (!incoming || incoming.ig_account_id !== row.ig_account_id ||
+      incoming.actor_id !== row.recipient_id)
+    return json({ error: "incoming_message_no_longer_eligible" }, 409);
+  const page = await instagramPageFor(String(row.ig_account_id));
+  if (!page) return json({ error: "meta_permissions_not_ready" }, 409);
+
+  // Atomic compare-and-swap: only one concurrent request can consume approval.
+  const cas = new URLSearchParams({
+    approval_id: "eq." + id, device_token_hash: "eq." + deviceHash,
+    state: "eq.prepared", expires_at: "gt." + new Date().toISOString()
+  });
+  const locked = await database("sky_instagram_outbound_approvals", "PATCH",
+    "?" + cas.toString(), { state: "sending" }, "return=representation");
+  if (!Array.isArray(locked) || locked.length !== 1)
+    return json({ error: "approval_already_consumed" }, 409);
+
+  let nextState = "unknown";
+  let receipt: string | null = null;
+  try {
+    const url = "https://graph.facebook.com/v26.0/" + page.pageId + "/messages";
+    const response = await fetch(url, {
+      method: "POST", redirect: "error",
+      headers: { authorization: "Bearer " + page.pageToken,
+        "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        recipient: { id: String(row.recipient_id) },
+        messaging_type: "RESPONSE",
+        message: { text: message },
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (response.ok) {
+      const data = await response.json() as Json;
+      const messageId = typeof data.message_id === "string" ?
+        data.message_id : "";
+      const returnedRecipient = typeof data.recipient_id === "string" ?
+        data.recipient_id : "";
+      if (messageId.length > 5 && messageId.length <= 250 &&
+          returnedRecipient === row.recipient_id) {
+        nextState = "sent";
+        receipt = messageId;
+      }
+    } else if (response.status >= 400 && response.status < 500) {
+      nextState = "failed";
+    }
+  } catch { /* timeout is unknown: NEVER retry automatically */ }
+  try {
+    await database("sky_instagram_outbound_approvals", "PATCH",
+      "?approval_id=eq." + id + "&state=eq.sending", {
+        state: nextState, completed_at: new Date().toISOString(),
+        ...(receipt ? { meta_message_id: receipt } : {})
+      }, "return=minimal");
+  } catch { /* state 'sending' still prevents duplicate sends */ }
+  return nextState === "sent" ?
+    json({ sent: true, message_id: receipt, status: "sent" }) :
+    json({ sent: false, status: nextState,
+      error: nextState === "unknown" ? "delivery_not_confirmed_no_retry" :
+        "meta_rejected_message" }, nextState === "failed" ? 422 : 503);
+}
+
 async function mobileRevoke(req:Request) {
   const token=(req.headers.get("authorization")||"").slice(7);
   const query=new URLSearchParams({token_hash:"eq."+await digest(token)});
@@ -538,6 +789,18 @@ Deno.serve(async (req: Request) => {
     if (path === "mobile-send-readiness" && req.method === "GET") {
       if (!(await mobileAuthorized(req))) return json({ error: "unauthorized" }, 401);
       return await mobileSendReadiness();
+    }
+    if (path === "mobile-reply-prepare" && req.method === "POST") {
+      if (!(await mobileAuthorized(req))) return json({ error: "unauthorized" }, 401);
+      return await mobileReplyPrepare(req);
+    }
+    if (path === "mobile-reply-confirm" && req.method === "POST") {
+      if (!(await mobileAuthorized(req))) return json({ error: "unauthorized" }, 401);
+      return await mobileReplyConfirm(req);
+    }
+    if (path === "mobile-reply-status" && req.method === "GET") {
+      if (!(await mobileAuthorized(req))) return json({ error: "unauthorized" }, 401);
+      return await mobileReplyStatus(req);
     }
     // Reauthorization is initiated by the paired phone, never by an anonymous caller.
     // The Meta login URL has a one-time CSRF state; no Meta or owner tokens are returned.
