@@ -2928,7 +2928,14 @@ class MainActivity : Activity() {
         }
         SkyHandsFreeService.onStatus = { asleep ->
             if (visible && ::voicePanel.isInitialized) {
-                voicePanel.showHandsFreeState(if (asleep) "SKY durmiendo · decí SKY" else "SKY escuchándote")
+                val locked = handsFreePrefs.getString("sky_presence_mode", "WAKE_ONLY") ==
+                    SkyVoicePresence.Mode.SLEEP_LOCKED.name
+                val state = when {
+                    locked -> "SKY dormida por tu orden · decí SKY despierta"
+                    asleep -> "SKY en espera · decí SKY"
+                    else -> "SKY escuchándote"
+                }
+                voicePanel.showHandsFreeState(state)
             }
         }
         if (handsFreePrefs.getBoolean("hands_free_opt_in", false) &&
