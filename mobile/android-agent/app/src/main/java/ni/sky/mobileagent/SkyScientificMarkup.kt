@@ -59,6 +59,14 @@ internal object SkyScientificMarkup {
             if (ch == '\\') {
                 val start = pos
                 while (pos < src.length && src[pos].isLetter()) pos++
+                // TeX spacing commands are backslash plus a punctuation character.
+                if (start == pos && pos < src.length) {
+                    val punctuation = src[pos++]
+                    if (punctuation in listOf(',', ';', ':', '!', ' ')) {
+                        return "<mspace width=\"0.25em\"/>"
+                    }
+                    return "<mo>" + escape(punctuation.toString()) + "</mo>"
+                }
                 val name = src.substring(start, pos)
                 return when (name) {
                     "frac", "dfrac", "tfrac" ->
@@ -187,6 +195,33 @@ internal object SkyScientificMarkup {
                 } else content.append("<p>").append(escape(open + expression)).append("</p>")
                 i++; continue
             }
+            // Markdown pipe tables: keep each cell as escaped data, never HTML.
+            if (line.startsWith("|") && line.count { it == '|' } >= 2) {
+                val rows = mutableListOf<List<String>>()
+                var headerRow = false
+                while (i < lines.size && lines[i].trim().startsWith("|")) {
+                    val cells = lines[i].trim().trim('|').split('|').map { it.trim() }
+                    val divider = cells.isNotEmpty() && cells.all {
+                        it.matches(Regex("^:?-{3,}:?$"))
+                    }
+                    if (divider) {
+                        if (rows.size == 1) headerRow = true
+                    } else rows.add(cells)
+                    i++
+                }
+                content.append("<div class=\"table-scroll\"><table>")
+                rows.forEachIndexed { row, cells ->
+                    content.append("<tr>")
+                    cells.forEach { cell ->
+                        val tag = if (headerRow && row == 0) "th" else "td"
+                        content.append("<").append(tag).append(">")
+                            .append(inline(cell)).append("</").append(tag).append(">")
+                    }
+                    content.append("</tr>")
+                }
+                content.append("</table></div>")
+                continue
+            }
             val heading = Regex("^(#{1,6})\\s+(.+)$").find(line)
             when {
                 line.isBlank() -> content.append("<div class=\"space\"></div>")
@@ -226,6 +261,10 @@ white-space:pre;overflow-x:auto}
 code{font:0.93em ui-monospace,monospace;color:#95e8ff}
 blockquote{border-left:3px solid #80cbff;padding:6px 10px;color:#dceaff;margin:8px 0}
 hr{border:0;border-top:1px solid #4b6080;margin:12px 0}
+.table-scroll{overflow-x:auto;margin:12px 0;border:1px solid #426080;border-radius:10px}
+table{border-collapse:collapse;min-width:100%;font-size:14px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #34516c}
+th{background:#203c59;color:#acecff;font-weight:700}
 </style></head><body>""" + content + "</body></html>"
     }
 }
