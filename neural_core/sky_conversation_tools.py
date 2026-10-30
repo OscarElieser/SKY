@@ -124,9 +124,45 @@ def _rubric(text: str):
     return "educacion", "evaluar_rubrica", {"criterios": rows}
 
 
+def _snippet(text: str):
+    """Codigos Python/JSON proporcionados directamente por el usuario."""
+    rules = (
+        (r"(?:revisa|verifica|valida|comprueba)\s+(?:la\s+)?sintaxis\s+(?:de\s+)?python",
+         "programacion", "sintaxis_python", ("python", "py")),
+        (r"(?:audita|auditar|revisa\s+seguridad\s+de)\s+(?:el\s+)?codigo\s+(?:de\s+)?python",
+         "ciberseguridad", "auditoria_python", ("python", "py")),
+        (r"(?:valida|validar|verifica|comprueba)\s+(?:el\s+)?json",
+         "programacion", "validar_json", ("json",)),
+    )
+    for heading, role, tool, languages in rules:
+        prefix = re.match(r"^(?:" + heading + r")\s*:\s*", text, re.I)
+        if not prefix:
+            continue
+        payload = text[prefix.end():].strip()
+        fence = chr(96) * 3
+        fenced = re.fullmatch(re.escape(fence) + r"([a-zA-Z]*)\s*\n([\s\S]+?)\n?" +
+                              re.escape(fence), payload)
+        if fenced:
+            lang = fenced.group(1).casefold()
+            if lang and lang not in languages:
+                return None
+            source = fenced.group(2)
+        else:
+            if fence in payload:
+                return None
+            source = payload
+        if not 1 <= len(source) <= 3500 or "\x00" in source:
+            return None
+        return role, tool, {"source": source}
+    return None
+
+
 def _choose(text: str):
     # Las rutas no compatibles (investigación, dispositivos, archivos) siguen
     # sus reglas y permisos habituales. Nunca adivinar datos ausentes.
+    inspection = _snippet(text)
+    if inspection is not None:
+        return inspection
     for candidate in (_rubric, _statistics, _chemistry, _physics, _arithmetic):
         found = candidate(text)
         if found:
@@ -146,7 +182,12 @@ def maybe_answer(raw: str, mode: str = "chat") -> dict | None:
         return None
     role, tool, args = selected
     try:
-        outcome = routing.dispatch(text, args, allow_network=False)
+        intent = {
+            ("programacion", "sintaxis_python"): "sintaxis de python",
+            ("programacion", "validar_json"): "validar json",
+            ("ciberseguridad", "auditoria_python"): "audita el codigo",
+        }.get((role, tool), text)
+        outcome = routing.dispatch(intent, args, allow_network=False)
     except (ValueError, OSError, ArithmeticError, TypeError, OverflowError):
         return {"tipo":"respuesta","mensaje":"No pude comprobar ese cálculo. Revisá los datos y las unidades.",
                 "proveedor":"sky-verified-local","verificacion":{"status":"FAILED","role":role,"tool":tool}}
@@ -154,7 +195,15 @@ def maybe_answer(raw: str, mode: str = "chat") -> dict | None:
         return {"tipo":"respuesta","mensaje":"Esta herramienta requiere revisión técnica por fallos repetidos. No ejecuté el cálculo.",
                 "proveedor":"sky-verified-local","verificacion":{"status":"REQUIRES_REVIEW","role":role,"tool":tool}}
     if outcome["status"] != "VERIFIED_LIMITED_SCOPE":
-        return {"tipo":"respuesta","mensaje":"No pude verificar el resultado con esos datos. Comprobá la expresión y los valores.",
+        message = "No pude verificar el resultado con esos datos. Comprobá la expresión y los valores."
+        if tool in ("sintaxis_python", "validar_json"):
+            message = "Encontré un problema de sintaxis. Revisá la estructura."
+            steps = outcome.get("execution", {}).get("steps", [])
+            if tool == "sintaxis_python" and steps:
+                match = re.search(r"línea (\d+)", str(steps[0].get("error", "")))
+                if match:
+                    message += " Revisá la línea " + match.group(1) + "."
+        return {"tipo":"respuesta","mensaje":message,
                 "proveedor":"sky-verified-local","verificacion":{"status":"FAILED","role":role,"tool":tool}}
     step=outcome["execution"]["steps"][0]
     result=step["result"]
@@ -173,6 +222,26 @@ def maybe_answer(raw: str, mode: str = "chat") -> dict | None:
                 answer="La fuerza es "+_decimal(result["fuerza_n"])+" newtons."
             else:
                 answer="La energía cinética es "+_decimal(result["energia_j"])+" julios."
+        elif tool == "sintaxis_python":
+            names = result.get("functions", [])
+            answer = ("La sintaxis Python es válida. No ejecuté el código. " +
+                      ("Funciones encontradas: " + ", ".join(names[:8]) + "." if names
+                       else "No se declararon funciones."))
+        elif tool == "auditoria_python":
+            findings = result.get("findings", [])
+            if findings:
+                evidence = "; ".join("línea " + str(x["line"]) + ": " + str(x["symbol"])
+                                     for x in findings[:8])
+                answer = ("Encontré " + str(len(findings)) +
+                          " llamadas potencialmente peligrosas: " + evidence +
+                          ". La auditoría es parcial y no certifica seguridad.")
+            else:
+                answer = ("No detecté los patrones que busca esta revisión. "
+                          "La auditoría es parcial y no garantiza seguridad.")
+        elif tool == "validar_json":
+            answer = ("El JSON tiene sintaxis válida. Tipo superior: " +
+                      str(result["top_level"]) +
+                      ". No se ejecutó ni validó contra un esquema.")
         elif role == "educacion":
             answer=("La rúbrica suma "+_decimal(result["total_obtenido"])+" de "+
                     _decimal(result["total_posible"])+" puntos ("+

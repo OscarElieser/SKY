@@ -84,5 +84,46 @@ class ConversationToolsTests(unittest.TestCase):
         self.assertIn("return home_chat(payload)",mobile)
         self.assertIn("asis.reglas(texto)",api)
 
+
+    def test_python_syntax_and_ast_never_runs(self):
+        fence=chr(96)*3
+        s="Revisa sintaxis de Python:\n"+fence+"python\ndef hola():\n    return 42\n"+fence
+        result=convo.maybe_answer(s)
+        self.assertEqual(result["verificacion"]["status"],"VERIFIED_LIMITED_SCOPE")
+        self.assertIn("Funciones encontradas: hola",result["mensaje"])
+
+    def test_static_audit_reports_real_patterns(self):
+        fence=chr(96)*3
+        s="Audita el código Python:\n"+fence+"python\nimport os\nos.system('echo NEVER')\neval('2+2')\n"+fence
+        result=convo.maybe_answer(s)
+        self.assertIn("2 llamadas",result["mensaje"])
+        self.assertIn("no certifica seguridad",result["mensaje"])
+
+    def test_json_valid_and_invalid(self):
+        r=convo.maybe_answer('Valida JSON: {"name":"SKY","count":2}')
+        self.assertEqual(r["verificacion"]["status"],"VERIFIED_LIMITED_SCOPE")
+        self.assertIn("Tipo superior: object",r["mensaje"])
+        for bad in ('{"x":1,"x":2}','{"x":}'):
+            with self.subTest(bad=bad):
+                self.assertEqual(convo.maybe_answer("Valida JSON: "+bad)["verificacion"]["status"],"FAILED")
+
+    def test_private_python_source_not_stored(self):
+        private="TOKEN_PRIVATE_827381"
+        r=convo.maybe_answer("Revisa sintaxis de Python:\nkey='"+private+"'")
+        self.assertEqual(r["verificacion"]["status"],"VERIFIED_LIMITED_SCOPE")
+        self.assertNotIn(private.encode(),(Path(self.temp.name)/"lesson.sqlite").read_bytes())
+
+    def test_large_snippet_uses_fixed_router_intent(self):
+        fence=chr(96)*3
+        text="Revisa sintaxis de Python:\n"+fence+"python\n"+("x = 1\n"*150)+fence
+        r=convo.maybe_answer(text)
+        self.assertEqual(r["verificacion"]["status"],"VERIFIED_LIMITED_SCOPE")
+
+    def test_snippet_missing_or_wrong_language_rejected(self):
+        fence=chr(96)*3
+        for text in ("Audita mi código","Revisa sintaxis de Python","Valida JSON:",
+                     "Audita el código Python: "+fence+"javascript\nalert(1)\n"+fence):
+            self.assertIsNone(convo.maybe_answer(text))
+
 if __name__=="__main__":
     unittest.main()
