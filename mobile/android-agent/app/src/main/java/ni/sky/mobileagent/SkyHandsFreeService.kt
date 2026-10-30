@@ -111,7 +111,8 @@ class SkyHandsFreeService : Service() {
                                 update.newCount)
                             val cb = onInstagramNotice
                             if (cb != null) cb.invoke(update.newCount)
-                            else if (presence != SkyVoicePresence.Mode.SLEEP_LOCKED) {
+                            else if (presence != SkyVoicePresence.Mode.SLEEP_LOCKED &&
+                                voiceSettings.getBoolean("read_aloud", true)) {
                                 val notice = if (update.newCount == 1)
                                     "Te llegó un mensaje nuevo de Instagram. Podés pedirme que lo lea."
                                 else "Te llegaron " + update.newCount +
@@ -335,6 +336,12 @@ class SkyHandsFreeService : Service() {
      */
     private fun handleWithoutVisibleUi(command: String) {
         if (SkyInstagramAlerts.command(command) == SkyInstagramAlerts.Command.READ) {
+            val guard = getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager
+            if (guard.isDeviceLocked) {
+                notifyState("Instagram · desbloqueá el teléfono para consultar", command)
+                say("Por tu privacidad, desbloqueá el teléfono antes de que lea tus mensajes.")
+                return
+            }
             Thread {
                 val answer = runCatching {
                     SkyInstagramAlerts.summary(SkyInstagramAlerts.fetch(this))
