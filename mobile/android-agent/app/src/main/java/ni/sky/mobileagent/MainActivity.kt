@@ -3302,9 +3302,15 @@ class MainActivity : Activity() {
             home.showMessage("Configurá Gemini en Ajustes para analizar varios archivos de hasta 100 MB.")
             return
         }
-        val instruction = query.ifBlank {
-            "Analiza los archivos seleccionados, compáralos y explicame su contenido."
+        // No adivinar la tarea: cada archivo debe procesarse para un objetivo indicado
+        // por el usuario. La vista previa sigue siendo local y no envía datos.
+        if (query.isBlank()) {
+            home.showMessage("¿Qué querés que haga con estos archivos? " +
+                "Escribí una instrucción antes de autorizar el análisis.")
+            showSelectedAttachmentPreview(selected.last())
+            return
         }
+        val instruction = query
         val names = selected.joinToString("\n") {
             "• " + it.name.take(65) + " (" + it.sizeMb() + " MB)"
         }
