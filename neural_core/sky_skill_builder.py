@@ -278,18 +278,51 @@ def guardar_propuesta(manifiesto_crudo: dict, codigo: str, pedido: str = '') -> 
 
 
 def proponer(pedido: str, proveedor: str = 'auto', intentos: int = 2) -> dict:
-    """La IA redacta la habilidad; si falla la revisión o las pruebas, se le devuelve el error una vez."""
+    """Bucle reflexivo acotado: propone, verifica, aprende y corrige SIN instalar.
+
+    La memoria es local y sólo contiene etiquetas de resultados; ni el texto
+    privado de las pruebas ni sus stack traces se envían en reintentos.
+    """
+    from . import sky_reflective_core as reflection
+    import hashlib
+    import sqlite3
+
     pedido = ' '.join(str(pedido).split())[:500]
     if len(pedido) < 6:
         raise ValueError('Contame qué tiene que hacer la habilidad.')
+    if isinstance(intentos, bool) or not isinstance(intentos, int):
+        raise ValueError('Cantidad de intentos inválida.')
+    max_intentos = min(3, max(1, intentos))
+    try:
+        consejos = reflection.recall(pedido, limit=2)
+    except (OSError, ValueError, sqlite3.Error):
+        consejos = []
+    consejo_inicial = ' '.join(c['lesson'] for c in consejos)[:350]
+
     ultimo = None
-    for intento in range(max(1, intentos)):
-        consigna = pedido if not ultimo else (pedido + '\nTu versión anterior falló: ' +
-                                              json.dumps(ultimo['reporte'], ensure_ascii=False)[:1500] + '. Corregila.')
+    resumen_fallo = ''
+    codigos_vistos = set()
+    for intento in range(max_intentos):
+        consigna = pedido
+        if intento == 0 and consejo_inicial:
+            consigna += '\nLecciones de pruebas locales anteriores: ' + consejo_inicial
+        if ultimo is not None:
+            consigna += '\nTu versión anterior falló en las pruebas. ' + resumen_fallo + ' Corregila.'
         datos = _redactar(consigna, proveedor)
-        ultimo = guardar_propuesta(datos.get('manifiesto') or {}, str(datos.get('codigo', '')), pedido)
+        codigo = str(datos.get('codigo', ''))
+        huella = hashlib.sha256(codigo.encode('utf-8')).hexdigest()
+        if huella in codigos_vistos:
+            break  # No repetir indefinidamente una propuesta idéntica.
+        codigos_vistos.add(huella)
+        ultimo = guardar_propuesta(datos.get('manifiesto') or {}, codigo, pedido)
+        try:
+            reflection.record(pedido, ultimo['reporte'])
+        except (OSError, ValueError, sqlite3.Error):
+            pass  # La memoria optativa nunca bloquea la revisión y las pruebas.
         if ultimo['reporte']['aprobada']:
             break
+        resumen_fallo = reflection.safe_feedback(ultimo['reporte'])
+
     try:
         with _LOCK:
             d = _estado()
