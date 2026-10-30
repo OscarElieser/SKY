@@ -217,6 +217,9 @@ app.mount('/static',StaticFiles(directory=STATIC),name='static')
 from .sky_modules_api import router as sky_modules_router
 app.include_router(sky_modules_router, dependencies=[Depends(require_key)])
 
+from .sky_verified_roles_api import router as sky_verified_roles_router
+app.include_router(sky_verified_roles_router)
+
 # Installable SKY client for Windows browsers and Android; same SKY API and HUD.
 from .mobile_pwa_api import router as mobile_pwa_router
 app.include_router(mobile_pwa_router)
