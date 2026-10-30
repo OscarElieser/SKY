@@ -46,10 +46,13 @@ internal object SkyScientificCalculator {
             val energy = 0.5 * m * v * v
             if (!energy.isFinite()) return Result("Energía cinética",
                 "Los valores son demasiado grandes para calcularlos con precisión.")
-            return Result("Energía cinética", "Usé E = ½ × m × v². Masa " +
-                formatted(m) + " kg, velocidad " + formatted(v) +
-                " m/s. Resultado: " + formatted(energy) +
-                " J. Cálculo determinista con unidades SI.")
+            return Result("Energía cinética", "### Energía cinética\n\n" +
+                "**Datos:** masa " + formatted(m) + " kg; velocidad " + formatted(v) +
+                " m/s.\n\n**Fórmula:**\n\\[\nE_c = \\frac{1}{2} m v^{2}\n\\]\n\n" +
+                "**Sustitución:**\n\\[\nE_c = 0.5(" + formatted(m) + ")(" +
+                formatted(v) + ")^{2}\n\\]\n\n" +
+                "**Resultado: " + formatted(energy) + " J**\n\n" +
+                "Verificación de unidades: kg × (m/s)² = J. Cálculo local determinista.")
         }
 
         if (s.contains("segunda ley de newton") || s.contains("fuerza resultante")) {
@@ -61,9 +64,14 @@ internal object SkyScientificCalculator {
             val force = m * a
             if (!force.isFinite()) return Result("Segunda ley de Newton",
                 "Los valores exceden la precisión del cálculo.")
-            return Result("Segunda ley de Newton", "Usé F = m × a. Masa " +
-                formatted(m) + " kg, aceleración " + formatted(a) +
-                " m/s². Fuerza neta: " + formatted(force) + " N.")
+            return Result("Segunda ley de Newton", "### Segunda ley de Newton\n\n" +
+                "**Datos:** masa " + formatted(m) + " kg; aceleración " +
+                formatted(a) + " m/s².\n\n**Fórmula:**\n\\[\nF = m \\cdot a\n\\]\n\n" +
+                "**Sustitución:**\n\\[\nF = (" + formatted(m) + ")(" +
+                formatted(a) + ")\n\\]\n\n" +
+                "**Resultado: " + formatted(force) + " N**\n\n" +
+                "Verificación dimensional: kg × m/s² = N. El signo expresa la " +
+                "dirección según el eje elegido. Cálculo local determinista.")
         }
 
         val r = number(s, """\bresistencia\s*(?:de\s*)?([0-9]+(?:[.,][0-9]+)?)\s*(?:ohmios?|ohms?|ω|Ω)(?=\s|$|[,.;!?])""")
@@ -74,8 +82,13 @@ internal object SkyScientificCalculator {
         val voltage = r * i
         if (!voltage.isFinite()) return Result("Ley de Ohm",
             "Los valores exceden la precisión del cálculo.")
-        return Result("Ley de Ohm", "Usé V = I × R. Corriente " +
-            formatted(i) + " A, resistencia " + formatted(r) +
-            " Ω. Tensión: " + formatted(voltage) + " V (circuito resistivo ideal).")
+        return Result("Ley de Ohm", "### Ley de Ohm\n\n" +
+            "**Datos:** corriente " + formatted(i) + " A; resistencia " +
+            formatted(r) + " Ω.\n\n**Fórmula:**\n\\[\nV = I \\cdot R\n\\]\n\n" +
+            "**Sustitución:**\n\\[\nV = (" + formatted(i) + ")(" +
+            formatted(r) + ")\n\\]\n\n" +
+            "**Resultado: " + formatted(voltage) + " V**\n\n" +
+            "Verificación dimensional: A × Ω = V. Circuito resistivo ideal. " +
+            "Cálculo local determinista.")
     }
 }
