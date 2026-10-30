@@ -1116,8 +1116,12 @@ class MainActivity : Activity() {
                     textSize = 13f
                     setTextColor(android.graphics.Color.rgb(164, 219, 255))
                 })
+                var previewOpen = true
+                var ownedPreviewBitmap: android.graphics.Bitmap? = null
+                var previewImage: android.widget.ImageView? = null
                 preview.onSuccess { result ->
                     if (result.bitmap != null) {
+                        ownedPreviewBitmap = result.bitmap
                         val image = android.widget.ImageView(this@MainActivity).apply {
                             setImageBitmap(result.bitmap)
                             adjustViewBounds = true
@@ -1125,6 +1129,7 @@ class MainActivity : Activity() {
                             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
                             contentDescription = result.label
                         }
+                        previewImage = image
                         body.addView(image, LinearLayout.LayoutParams(-1, -2))
                         if (result.pageCount > 1) {
                             val controls = LinearLayout(this@MainActivity).apply {
@@ -1161,9 +1166,17 @@ class MainActivity : Activity() {
                                             contentResolver, item, requested)
                                     }
                                     runOnUiThread {
-                                        if (isFinishing) return@runOnUiThread
+                                        if (isFinishing || !previewOpen) {
+                                            page.getOrNull()?.bitmap?.recycle()
+                                            return@runOnUiThread
+                                        }
                                         page.onSuccess { loaded ->
+                                            val previousBitmap = ownedPreviewBitmap
                                             image.setImageBitmap(loaded.bitmap)
+                                            ownedPreviewBitmap = loaded.bitmap
+                                            if (previousBitmap !== loaded.bitmap) {
+                                                previousBitmap?.recycle()
+                                            }
                                             image.contentDescription = loaded.label
                                             currentPage = requested
                                             counter.text = "Página " + (currentPage + 1) +
@@ -1219,7 +1232,7 @@ class MainActivity : Activity() {
                 }
                 body.addView(instruction)
                 val scroller = ScrollView(this).apply { addView(body) }
-                AlertDialog.Builder(this)
+                val previewDialog = AlertDialog.Builder(this)
                     .setTitle("SKY · Vista previa privada")
                     .setView(scroller)
                     .setPositiveButton("Preparar consulta") { _, _ ->
@@ -1235,7 +1248,14 @@ class MainActivity : Activity() {
                     }
                     .setNeutralButton("Otro archivo") { _, _ -> manageSelectedAttachments() }
                     .setNegativeButton("Ahora no", null)
-                    .show()
+                    .create()
+                previewDialog.setOnDismissListener {
+                    previewOpen = false
+                    previewImage?.setImageBitmap(null)
+                    ownedPreviewBitmap?.recycle()
+                    ownedPreviewBitmap = null
+                }
+                previewDialog.show()
             }
         }
     }
