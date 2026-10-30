@@ -1,3 +1,18 @@
+## SKY Android — comprobación local y opcional de reproducción (30/10/2026)
+
+**Solo Android. SKY Windows intacta.** Esta actualización agrega un verificador real de la sesión multimedia usando únicamente APIs locales de Android; no incorpora un modelo LLM entrenado en el teléfono ni garantiza que una app de terceros reproduzca automáticamente lo pedido.
+
+- **Orden primero:** SKY pide reproducir un título específico en Spotify, YouTube Music o YouTube por el Intent oficial de Android. Abrir la app o aceptar el Intent produce el estado `SENT`, no `VERIFIED_LOCAL`.
+- **Evidencia de reproducción:** si el dueño activó voluntariamente `SKY · Verificar reproducción musical` en los Ajustes de acceso a notificaciones de Android, SKY consulta hasta unos 12 segundos las sesiones activas de `MediaSessionManager`. Marca `VERIFIED_LOCAL` solo cuando **el paquete del reproductor coincide, el estado es PLAYING y el título de sus metadatos coincide exactamente con el solicitado** (se admite un sufijo de artista `de ...`). Esta evidencia no mide sonido audible en los altavoces.
+- **Privacidad real:** Android otorga un permiso amplio de notificaciones para permitir acceso a sesiones de terceros. El servicio `SkyPlaybackProofListener` no lee el contenido de ninguna notificación y solo consulta sesiones de los tres reproductores permitidos; no persiste ni sube metadatos de otras aplicaciones. El permiso es opcional y revocable; SKY indica claramente el alcance antes de abrir Ajustes.
+- **Sin permiso o sin metadatos:** la orden continúa disponible. No se inventa reproducción, no se activa Accesibilidad en la APK estándar y no se ejecutan acciones ajenas al reproductor. Si se cancela una orden y comienza otra, la verificación anterior se invalida.
+- **Pruebas:** `SkyPlaybackProofTest.kt` comprueba coincidencia de título, aplicación exacta y estado `PLAYING`. `Sky Mobile Android Agent` compila la APK y ejecuta pruebas unitarias. La escucha en segundo plano, los permisos reales y la confirmación del audio en el Samsung necesitan prueba física y una versión firmada publicada aparte.
+- **Dependencias inevitables:** utilizar la sesión de YouTube o Spotify exige esas aplicaciones, disponibilidad de su servicio y los permisos vigentes de Android. Funciones locales (cálculo, documentos nativos, notas, historial, clasificación de comandos) no necesitan iniciar SKY Windows ni consultar un LLM remoto.
+
+[Releases publicadas](https://github.com/OscarElieser/SKY/releases) · [Acciones Android](https://github.com/OscarElieser/SKY/actions).
+
+---
+
 ## SKY Android 0.8.29 — presencia supervisada y rostro premium (beta pendiente de CI)
 
 **Alcance: exclusivamente `mobile/android-agent/`; no se modifican los servicios SKY Windows.** La numeración de código no implica que exista una APK 0.8.29 publicada ni probada físicamente.
