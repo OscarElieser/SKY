@@ -1,5 +1,9 @@
 ## SKY Android 0.8.40 — validación científica y previsualización paginada (30/10/2026)
 
+> **Continuación de calidad y estabilidad:** las respuestas largas disponen de vista completa y copia íntegra. Los adjuntos requieren una instrucción explícita antes del consentimiento para enviar. Los PDF liberan las imágenes al cambiar de página/cerrar la ventana; una lectura tardía no debe actualizar ventanas cerradas. El módulo TTS se compiló y probó localmente con ejemplos de fracciones/subíndices/reacciones, pero el APK completo sigue sin validación confirmada. [Protocolo de aceptación y evidencias](docs/SKY_SCIENTIFIC_FILES_ACCEPTANCE_0.8.40.md).
+
+
+
 **Código enviado a main; publicación y funcionamiento físico pendientes de resultados reales de CI y del Samsung.** SKY Windows no se modifica.
 
 - **PDF con navegación real:** renderiza solo la página solicitada mediante Android PdfRenderer, con controles Anterior/Siguiente y contador. Un test instrumentado genera un PDF local de dos páginas y comprueba ambas páginas y la validación de índices en emuladores Android 15/16.
