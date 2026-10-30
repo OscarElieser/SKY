@@ -584,3 +584,6 @@ SKY añade revisión consultiva en `neural_core/sky_multiagent_quality.py`: inte
 
 Detalle: [docs/SKY_MULTIAGENT_QUALITY_GATE.md](docs/SKY_MULTIAGENT_QUALITY_GATE.md).
 
+### Windows: seguridad de arranque y reparación de regresiones PR52 (30/10/2026)
+
+La reparación conservadora impide un segundo supervisor cuando la API de SKY ya responde, rechaza puertos ajenos sin cerrar servicios, normaliza los puntos de inserción para archivos CRLF de Windows y conserva pruebas de rechazo de cambios no seguros. Los reparadores siguen exigiendo aprobación explícita para aplicar cambios. Evidencia, alcance y límites: [docs/SKY_WINDOWS_PR52_REGRESSION_REPAIR.md](docs/SKY_WINDOWS_PR52_REGRESSION_REPAIR.md).
