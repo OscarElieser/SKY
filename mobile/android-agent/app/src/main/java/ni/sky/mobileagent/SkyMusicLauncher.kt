@@ -20,7 +20,8 @@ class SkyMusicLauncher(
     private val tell: (String) -> Unit,
     private val onNeedMusicPermission: (SkyMusicCommand.Request) -> Unit
 ) {
-    var onReceipt: ((String, String, String) -> Unit)? = null
+    var onReceipt: ((String, String, String, String) -> Unit)? = null
+    private var operationId = java.util.UUID.randomUUID().toString()
     private val verificationHandler = Handler(Looper.getMainLooper())
     private var playbackRequestId = 0
 
@@ -55,7 +56,7 @@ class SkyMusicLauncher(
     }
 
     private fun receipt(song: String, status: String, detail: String) {
-        onReceipt?.invoke("Música: " + song.take(100), status, detail)
+        onReceipt?.invoke("Música: " + song.take(100), status, detail, operationId)
     }
     companion object {
         private const val MUSIC_PREF = "preferred_music"
@@ -73,6 +74,7 @@ class SkyMusicLauncher(
         prefs.edit().putString(MUSIC_PREF, value.name).apply()
     }
     fun play(request: SkyMusicCommand.Request) {
+        operationId = java.util.UUID.randomUUID().toString()
         playbackRequestId++
         // Distributable standard build never asks for accessibility privileges.
         // It requests playback via Android's documented music intent instead.
@@ -106,6 +108,7 @@ class SkyMusicLauncher(
 
     /** Official Android action retained as a user-selected fallback. */
     fun playViaAndroidIntent(request: SkyMusicCommand.Request) {
+        operationId = java.util.UUID.randomUUID().toString()
         val requestId = ++playbackRequestId
         val chosen = request.service ?: preferred()
         val title = SkyMusicCommand.label(chosen)
