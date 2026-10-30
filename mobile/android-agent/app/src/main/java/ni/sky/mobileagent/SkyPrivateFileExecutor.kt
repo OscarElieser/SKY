@@ -85,6 +85,35 @@ class SkyPrivateFileExecutor(context: Context) {
         }
     }
 
+    /** Restauración explícita desde un respaldo verificado; no se invoca automáticamente. */
+    @Synchronized fun restoreBackup(name: String, backupId: String): String {
+        require(Regex("[0-9a-fA-F-]{36}").matches(backupId) &&
+            runCatching { UUID.fromString(backupId) }.isSuccess) {
+            "Identificador de respaldo inválido"
+        }
+        val file = target(name)
+        require(root.isDirectory && !root.isSymbolicLink()) { "Espacio inseguro" }
+        require(file.isFile && !file.isSymbolicLink()) { "Archivo original no disponible" }
+        val backup = File(backups, backupId + ".bak")
+        require(backup.isFile && !backup.isSymbolicLink()) { "Respaldo no disponible" }
+        val bytes = backup.readBytes()
+        require(bytes.size <= 12 * 1024 * 1024) { "Respaldo excesivo" }
+        val temporary = File.createTempFile(".sky-restore-", ".tmp", root)
+        try {
+            temporary.outputStream().use { out ->
+                out.write(bytes)
+                out.fdSyncIfPossible()
+            }
+            require(sha(temporary.readBytes()) == sha(bytes)) { "Respaldo no verificable" }
+            require(temporary.renameTo(file)) { "No se pudo restaurar" }
+            val restored = sha(file.readBytes())
+            require(restored == sha(bytes)) { "Restauración no verificada" }
+            return restored
+        } finally {
+            temporary.delete()
+        }
+    }
+
     private fun java.io.FileOutputStream.fdSyncIfPossible() = fd.sync()
     private fun File.isSymbolicLink(): Boolean =
         java.nio.file.Files.isSymbolicLink(toPath())
