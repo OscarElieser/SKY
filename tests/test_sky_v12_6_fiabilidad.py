@@ -535,17 +535,22 @@ def test_arrancar_dos_veces_no_duplica_ni_interrumpe(monkeypatch, servicio_falso
     assert proc.poll() is not None                                # cierre limpio de lo propio
 
 
-def test_adopta_un_sky_sano_sin_reiniciarlo(monkeypatch, servicio_falso):
+def test_no_adopta_servicio_sin_propiedad_ni_lo_interrumpe(monkeypatch, servicio_falso):
     a = _supervisor(monkeypatch, servicio_falso.definir)
     assert a.start_all() is True
     proc = a.servicios['api'].proc
     a._candado.liberar()                                          # el supervisor anterior «murió»; la API sigue
     b = _supervisor(monkeypatch, servicio_falso.definir)
     try:
-        assert b.start_all() is True
-        assert b.servicios['api'].externo and b.servicios['api'].proc is None and proc.poll() is None
-        b.stop_all()
-        assert proc.poll() is None                                # lo adoptado no se cierra
+        # Política actual: no adoptar servicios en ejecución sin acreditar propiedad.
+        # El segundo supervisor rechaza duplicar o intervenir el servicio ajeno.
+        assert b.start_all() is False
+        assert b._candado is None
+        assert not b.running
+        assert proc.poll() is None
+        assert launcher.sonda_api(servicio_falso.puerto)[0]
+        assert not b.servicios
+        assert proc.poll() is None                                # no se interrumpe el original
     finally:
         proc.terminate(); proc.wait(5)
 
