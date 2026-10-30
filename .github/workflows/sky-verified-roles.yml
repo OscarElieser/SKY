@@ -5,11 +5,15 @@ on:
     paths:
       - 'neural_core/sky_verified_roles.py'
       - 'neural_core/sky_role_lessons.py'
+      - 'neural_core/sky_role_router.py'
       - 'neural_core/sky_verified_science.py'
       - 'metaverse/sky_verified_roles_api.py'
       - 'metaverse/api.py'
       - 'tests/test_sky_verified_roles.py'
       - 'tests/test_sky_role_lessons.py'
+      - 'tests/test_sky_role_router.py'
+      - 'metaverse/static/hud.html'
+      - 'metaverse/static/hud.js'
       - 'tests/test_sky_verified_science.py'
       - 'tests/test_sky_verified_runtime_v2.py'
       - '.github/workflows/sky-verified-roles.yml'
@@ -27,6 +31,8 @@ jobs:
           python-version: '3.11'
       - name: Verify SKY roles (offline)
         run: |
-          python -m py_compile neural_core/sky_role_lessons.py neural_core/sky_verified_roles.py neural_core/sky_verified_science.py metaverse/sky_verified_roles_api.py
+          python -m py_compile neural_core/sky_role_router.py neural_core/sky_role_lessons.py neural_core/sky_verified_roles.py neural_core/sky_verified_science.py metaverse/sky_verified_roles_api.py
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_verified_*.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_role_lessons.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_role_router.py' -v
+          node --check metaverse/static/hud.js

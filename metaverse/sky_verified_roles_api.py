@@ -32,6 +32,31 @@ def learned_tool_failures():
         raise HTTPException(503, detail="Memoria operativa no disponible") from exc
 
 
+class RouterInput(BaseModel):
+    task: str = Field(min_length=3, max_length=500)
+    allow_network: bool = False
+
+class DispatchInput(RouterInput):
+    args: dict = Field(default_factory=dict)
+
+@router.get("/dashboard")
+def dashboard():
+    from neural_core import sky_role_router
+    return sky_role_router.dashboard()
+
+@router.post("/recommend")
+def recommend(body: RouterInput):
+    from neural_core import sky_role_router
+    try:return sky_role_router.recommend(body.task,allow_network=body.allow_network)
+    except sky_role_router.RoutingError as exc:raise HTTPException(422,detail=str(exc)) from exc
+
+@router.post("/dispatch")
+def dispatch(body: DispatchInput):
+    from neural_core import sky_role_router
+    try:return sky_role_router.dispatch(body.task,body.args,allow_network=body.allow_network)
+    except (sky_role_router.RoutingError,sky_verified_roles.RoleError) as exc:
+        raise HTTPException(422,detail=str(exc)) from exc
+
 @router.get("/metrics")
 def metrics():
     try:

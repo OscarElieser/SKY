@@ -3328,6 +3328,34 @@
       });
     } catch { /* sin acceso */ }
   }
+  async function abrirPanelRoles() {
+    const panel=el('div'),msg=el('p','muted','Consultando...'),rows=el('ul','diag-list');
+    const refresh=el('button','btn primary','Actualizar métricas');refresh.type='button';
+    panel.append(msg,refresh,rows);
+    abrirVentana('role-reliability','SKY · Fiabilidad de agentes',panel,{w:650,h:570});
+    async function load(){
+      refresh.disabled=true;rows.textContent='';
+      try{
+        const r=await api('/api/sky/verified-roles/dashboard');
+        msg.textContent=r.registered_tools+' herramientas · '+r.observations+' observaciones locales. No certifica Android o Windows.';
+        $('role-summary').textContent=r.registered_tools+' herramientas, '+r.observations+' observaciones.';
+        for(const item of (r.tools||[])){
+          const q=item.quality||{},li=el('li',q.requires_review?'bad':'opt');
+          li.appendChild(el('b','',item.role+' · '+item.tool));
+          li.appendChild(el('small','',q.sample_count?
+            Math.round(100*q.local_pass_rate)+'% verificaciones locales de '+q.sample_count:
+            'Sin muestras locales'));
+          if(q.external_unverified)li.appendChild(el('small','',q.external_unverified+' fuentes externas no verificadas'));
+          if(q.requires_review)li.appendChild(el('div','fix','Requiere revisión técnica'));
+          rows.appendChild(li);
+        }
+      }catch(e){msg.textContent='Sin datos verificables: '+e.message;}
+      finally{refresh.disabled=false;}
+    }
+    refresh.addEventListener('click',load);
+    await load();
+  }
+
   async function abrirDiagnostico() {
     const cont = el('div');
     cont.appendChild(el('p', 'muted', 'Revisando…'));
@@ -3377,6 +3405,7 @@
   $('btn-tts').addEventListener('click', () => setVoz(!S.voz));
   $('btn-wake').addEventListener('click', () => { salidaAudio(); activarEscucha(!W.on); });
   $('btn-diag').addEventListener('click', abrirDiagnostico);
+  $('btn-role-health').addEventListener('click', abrirPanelRoles);
   document.addEventListener('pointerdown', () => { try { salidaAudio(); } catch { /* */ } }, { once: true });
   $('chat-form').addEventListener('submit', (e) => { e.preventDefault(); recibir($('chat-input').value, 'texto'); });
   document.addEventListener('keydown', (e) => {
