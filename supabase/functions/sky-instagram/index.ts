@@ -604,6 +604,8 @@ async function instagramPageFor(accountId: string): Promise<
   } catch { return null; }
 }
 async function mobileReplyPrepare(req: Request): Promise<Response> {
+  // Disabled rollouts must not consume one-time approvals or create stale drafts.
+  if (!outboundEnabled()) return json({ error: "supervised_send_not_enabled" }, 423);
   let body: Json;
   try { body = await replyInput(req); }
   catch { return json({ error: "invalid_payload" }, 400); }
