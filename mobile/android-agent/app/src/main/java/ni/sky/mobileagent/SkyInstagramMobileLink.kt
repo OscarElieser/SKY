@@ -77,7 +77,8 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
     fun show() {
         val choices=arrayOf("Vincular este teléfono con código temporal",
             "Consultar conexión verificada","Verificar identidad real con Meta",
-            "Renovar autorización oficial con Meta","Desvincular este teléfono")
+            "Renovar autorización oficial con Meta","Bandeja de mensajes de Instagram",
+            "Desvincular este teléfono")
         // setMessage + setItems oculta las opciones en AlertDialog.
         AlertDialog.Builder(host).setTitle("SKY · Instagram seguro")
             .setItems(choices){_,which->when(which){
@@ -85,7 +86,8 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
                 1->check()
                 2->verifyProfile()
                 3->renewAuthorization()
-                4->AlertDialog.Builder(host).setTitle("Desvincular Instagram")
+                4->openInbox()
+                5->AlertDialog.Builder(host).setTitle("Desvincular Instagram")
                     .setMessage("¿Revocar el acceso de este teléfono? No se revoca el permiso global de Meta.")
                     .setPositiveButton("Revocar"){_,_->disconnect()}
                     .setNegativeButton("Cancelar",null).show()
@@ -236,6 +238,16 @@ class SkyInstagramMobileLink(private val host: Activity, private val feedback: (
             }
             .setNegativeButton("Cancelar",null)
             .show()
+    }
+
+    /** Read-only owner inbox, protected by the phone's revocable Keystore credential. */
+    private fun openInbox() {
+        val credential = token()
+        if (credential.isBlank()) {
+            feedback("Vinculá primero este teléfono con Instagram.")
+            return
+        }
+        SkyInstagramInbox(host, credential).show()
     }
 
     private fun disconnect(){
