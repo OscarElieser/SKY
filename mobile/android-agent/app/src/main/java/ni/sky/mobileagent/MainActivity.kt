@@ -254,6 +254,7 @@ class MainActivity : Activity() {
                 !processInstagramCommand(transcript) &&
                 !processOwnerQuestion(transcript) &&
                 !processOwnerProfileImport(transcript) &&
+                !processScientificCalculation(transcript) &&
                 !processLocalPanelCommand(transcript, spoken = true) &&
                 !processCompanionCommand(transcript) &&
                 !processDailyCommand(transcript, spoken = true)) {
@@ -2941,6 +2942,18 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Verified local calculations never ask an LLM to invent numeric output. */
+    private fun processScientificCalculation(message: String): Boolean {
+        val result = SkyScientificCalculator.solve(message) ?: return false
+        val keepFace = voiceReplyOnFace
+        voiceReplyOnFace = false
+        home.addExchange(message, result.answer,
+            "SKY · calculadora científica · " + result.title,
+            revealPanel = !keepFace)
+        if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(result.answer)
+        return true
+    }
+
     /** Android file selector requires a user action and reveals no hidden files. */
     private fun processOwnerProfileImport(message: String): Boolean {
         if (!SkyOwnerProfileIntent.requestsImport(message)) return false
@@ -3042,6 +3055,10 @@ class MainActivity : Activity() {
             return
         }
         if (processOwnerQuestion(message)) {
+            chatInput.setText("")
+            return
+        }
+        if (processScientificCalculation(message)) {
             chatInput.setText("")
             return
         }
