@@ -577,3 +577,10 @@ SKY utiliza `neural_core/sky_reflective_core.py` para registrar **resultados cat
 La opción `SKY_REFLECTIVE_SEMANTIC=1` activa recuperación por embeddings de categorías estáticas mediante un modelo Ollama **local** (`nomic-embed-text`), con fallback determinista cuando no esté disponible. La memoria local no guarda prompts, código generado ni stack traces. Las estadísticas son de pruebas, **no** pruebas de acciones reales sobre Android/Windows, ni entrenamiento automático del modelo.
 
 Detalles, requisitos y comandos de prueba: [docs/SKY_REFLECTIVE_CORE.md](docs/SKY_REFLECTIVE_CORE.md).
+
+## Calidad multiagente y reparación de síntesis (2026-10-30)
+
+SKY añade revisión consultiva en `neural_core/sky_multiagent_quality.py`: integra lecciones categóricas y anónimas de pruebas anteriores en la planificación de especialistas; comprueba algunas afirmaciones falsas de acciones realizadas y permite **una** nueva síntesis antes de devolver el control al asistente original. No instala software, no concede permisos ni equivale a verificación factual. Se conserva el único núcleo `sky_unified_agents`, con métricas y ruta autenticada `/api/sky/cognition/multiagent-quality`.
+
+Detalle: [docs/SKY_MULTIAGENT_QUALITY_GATE.md](docs/SKY_MULTIAGENT_QUALITY_GATE.md).
+
