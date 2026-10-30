@@ -242,5 +242,94 @@ class SafeFilesHTTPTests(unittest.TestCase):
         self.assertIn("/api/sky/safe-files/prepare",hud)
         self.assertIn("/api/sky/safe-files/commit",hud)
 
+
+    def test_analysis_preview_prepare_and_commit_require_pin(self):
+        self.add("programa.md","SKY aprende con evidencia.\n")
+        folder=Path(os.environ["SKY_SAFE_WORKSPACE_ROOT"])
+        current=folder/"programa.md"
+        url="/api/sky/safe-files/analyze/programa.md"
+        self.assertEqual(self.client.get(url).status_code,401)
+        analysis=self.client.get(url,headers=self.h)
+        self.assertEqual(analysis.status_code,200,analysis.text)
+        report=analysis.json()
+        self.assertTrue(report["editable_via_proposal"])
+        self.assertFalse(report["file_changed"])
+        command={"name":"programa.md","mode":"replace_once",
+                 "expected_sha":report["sha256"],"find":"aprende","replacement":"enseña"}
+        preview=self.client.post("/api/sky/safe-files/edit/preview",headers=self.h,json=command)
+        self.assertEqual(preview.status_code,200,preview.text)
+        self.assertIn("enseña",preview.json()["diff"])
+        self.assertFalse(preview.json()["committed"])
+        self.assertEqual(current.read_text(encoding="utf-8"),"SKY aprende con evidencia.\n")
+        prepare=self.client.post("/api/sky/safe-files/edit/prepare",headers=self.h,
+                                 json={**command,"proposal_digest":preview.json()["proposal_digest"]})
+        self.assertEqual(prepare.status_code,200,prepare.text)
+        spec=prepare.json()["spec"]
+        self.assertEqual(spec["text"],"SKY enseña con evidencia.\n")
+        self.assertEqual(self.commit(spec,prepare).status_code,403)
+        self.assertEqual(current.read_text(encoding="utf-8"),"SKY aprende con evidencia.\n")
+        completed=self.commit(spec,prepare,{**self.h,"X-SKY-PIN":"123456"})
+        self.assertEqual(completed.status_code,200,completed.text)
+        self.assertTrue(completed.json()["verified_after_write"])
+        self.assertEqual(current.read_text(encoding="utf-8"),"SKY enseña con evidencia.\n")
+        self.assertEqual(self.commit(spec,prepare,{**self.h,"X-SKY-PIN":"123456"}).status_code,409)
+
+    def test_changed_file_between_preview_and_prepare_is_rejected(self):
+        self.add("informe.txt","Versión inicial")
+        target=Path(os.environ["SKY_SAFE_WORKSPACE_ROOT"])/"informe.txt"
+        sha=self.client.get("/api/sky/safe-files/analyze/informe.txt",headers=self.h).json()["sha256"]
+        cmd={"name":"informe.txt","mode":"replace_once",
+             "expected_sha":sha,"find":"inicial","replacement":"actualizada"}
+        preview=self.client.post("/api/sky/safe-files/edit/preview",headers=self.h,json=cmd)
+        self.assertEqual(preview.status_code,200,preview.text)
+        target.write_text("Otra actualización externa",encoding="utf-8")
+        response=self.client.post("/api/sky/safe-files/edit/prepare",headers=self.h,
+                   json={**cmd,"proposal_digest":preview.json()["proposal_digest"]})
+        self.assertEqual(response.status_code,409,response.text)
+        self.assertEqual(target.read_text(),"Otra actualización externa")
+
+    def test_change_of_requested_text_needs_a_new_preview(self):
+        self.add("clase.md","Aprendizaje digital")
+        sha=self.client.get("/api/sky/safe-files/analyze/clase.md",headers=self.h).json()["sha256"]
+        cmd={"name":"clase.md","mode":"replace_once",
+             "expected_sha":sha,"find":"digital","replacement":"seguro"}
+        preview=self.client.post("/api/sky/safe-files/edit/preview",headers=self.h,json=cmd)
+        denied=self.client.post("/api/sky/safe-files/edit/prepare",headers=self.h,
+                   json={**cmd,"replacement":"inseguro",
+                         "proposal_digest":preview.json()["proposal_digest"]})
+        self.assertEqual(denied.status_code,409,denied.text)
+        self.assertEqual((Path(os.environ["SKY_SAFE_WORKSPACE_ROOT"])/"clase.md").read_text(),
+                         "Aprendizaje digital")
+
+    def test_docx_is_readonly_and_json_validation_still_applies(self):
+        self.add("data.json",'{"enabled":true}')
+        sha=self.client.get("/api/sky/safe-files/analyze/data.json",headers=self.h).json()["sha256"]
+        bad={"name":"data.json","mode":"replace_once","expected_sha":sha,
+             "find":"true","replacement":"NaN"}
+        denied=self.client.post("/api/sky/safe-files/edit/preview",headers=self.h,json=bad)
+        self.assertEqual(denied.status_code,422,denied.text)
+        self.assertEqual(self.client.get("/api/sky/safe-files/text/data.json",
+                                         headers=self.h).json()["text"],'{"enabled":true}')
+        doc={"op":"create","name":"clase.docx",
+             "document":{"kind":"docx","title":"Clase","content":"# Contenido\nSKY IA"}}
+        prepared=self.prepare(doc)
+        self.assertEqual(prepared.status_code,200,prepared.text)
+        self.assertEqual(self.commit(doc,prepared).status_code,200)
+        analysis=self.client.get("/api/sky/safe-files/analyze/clase.docx",headers=self.h)
+        self.assertEqual(analysis.status_code,200,analysis.text)
+        self.assertFalse(analysis.json()["editable_via_proposal"])
+        denied=self.client.post("/api/sky/safe-files/edit/preview",headers=self.h,json={
+            "name":"clase.docx","mode":"replace_once",
+            "expected_sha":analysis.json()["sha256"],"find":"SKY","replacement":"IA"})
+        self.assertEqual(denied.status_code,422,denied.text)
+
+    def test_hud_has_real_three_stage_edit_flow(self):
+        hud=Path("metaverse/static/hud.js").read_text(encoding="utf-8")
+        self.assertIn("abrirAnalisisSeguro",hud)
+        self.assertIn("/api/sky/safe-files/edit/preview",hud)
+        self.assertIn("/api/sky/safe-files/edit/prepare",hud)
+        self.assertIn("/api/sky/safe-files/commit",hud)
+        self.assertIn("Analizar y proponer",hud)
+
 if __name__=="__main__":
     unittest.main()
