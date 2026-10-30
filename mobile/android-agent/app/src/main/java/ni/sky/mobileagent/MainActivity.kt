@@ -293,7 +293,7 @@ class MainActivity : Activity() {
             }
             runOnUiThread {
                 instagramDraftBusy.set(false)
-                if (!isFinishing || visible) instagramSay(result)
+                if (!isFinishing && visible) instagramSay(result)
             }
         }.start()
     }
