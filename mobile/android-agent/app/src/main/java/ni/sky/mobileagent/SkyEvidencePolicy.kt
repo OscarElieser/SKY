@@ -26,6 +26,25 @@ internal object SkyEvidencePolicy {
         return phrases.any { text.contains(it) }
     }
 
+    /**
+     * Grounding instruction for claim-level scrutiny, never a claim of
+     * automatic lie detection. This text cannot execute Android actions.
+     */
+    fun guidance(question: String): String {
+        if (!needsVerification(question) &&
+            !SkyPhoneCloud.requiresLiveVerification(question)) return ""
+        return "COMPROBACIÓN FACTUAL OBLIGATORIA: identifica cada afirmación concreta; " +
+            "intenta localizar fuente primaria oficial y fecha de publicación, " +
+            "y contrasta al menos otra fuente independiente cuando sea posible. " +
+            "Busca información que contradiga la hipótesis, distingue noticia, " +
+            "opinión, rumor, dato histórico y hecho medido. " +
+            "Clasifica las afirmaciones en: corroborado por fuentes, discutido, " +
+            "sin verificar o refutado con evidencia; nunca uses 'verdadero' " +
+            "únicamente porque muchos sitios repitan la misma nota. " +
+            "Explica qué dato faltó y da enlaces reales. Jamás inventes fecha, " +
+            "autor, número de estudios, veredicto o lectura de una web.\\n"
+    }
+
     fun assess(sources: List<SkyPhoneCloud.Source>): Assessment {
         val domains = sources.mapNotNull { item ->
             try {
