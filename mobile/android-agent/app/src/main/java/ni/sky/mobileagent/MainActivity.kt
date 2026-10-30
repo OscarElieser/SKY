@@ -253,6 +253,7 @@ class MainActivity : Activity() {
                 !processMessagingCommand(transcript) &&
                 !processInstagramCommand(transcript) &&
                 !processOwnerQuestion(transcript) &&
+                !processOwnerProfileImport(transcript) &&
                 !processLocalPanelCommand(transcript, spoken = true) &&
                 !processCompanionCommand(transcript) &&
                 !processDailyCommand(transcript, spoken = true)) {
@@ -2936,6 +2937,15 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Android file selector requires a user action and reveals no hidden files. */
+    private fun processOwnerProfileImport(message: String): Boolean {
+        if (!SkyOwnerProfileIntent.requestsImport(message)) return false
+        home.showMessage("Elegí tu archivo personal. Lo revisaré y solo lo guardaré " +
+            "si confirmás la importación; la copia interna quedará cifrada.")
+        chooseOwnerProfileImport()
+        return true
+    }
+
     /** Single-turn owner identity from local data only; never GitHub or third parties. */
     private fun processOwnerQuestion(message: String): Boolean {
         if (!SkyOwnerIdentity.isQuestion(message)) return false
@@ -3023,6 +3033,10 @@ class MainActivity : Activity() {
 
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
+        if (processOwnerProfileImport(message)) {
+            chatInput.setText("")
+            return
+        }
         if (processOwnerQuestion(message)) {
             chatInput.setText("")
             return
