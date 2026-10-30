@@ -133,7 +133,8 @@ def test_only_fixed_descriptions_are_submitted_for_embeddings(monkeypatch):
         def __enter__(self): return self
         def __exit__(self, *args): return False
         def read(self, count):
-            raw = {"embeddings": [[float(i == j) for j in range(8)]
+            dimension = max(8, len(sem.TOPIC_DESCRIPTIONS))
+            raw = {"embeddings": [[float(i == j) for j in range(dimension)]
                                   for i in range(len(sem.TOPIC_DESCRIPTIONS))]}
             return json.dumps(raw).encode()
     requests = []
