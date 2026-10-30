@@ -47,7 +47,7 @@ internal object SkyAttachmentPreview {
                             val bitmap = Bitmap.createBitmap(
                                 (page.width * factor).toInt().coerceAtLeast(1),
                                 (page.height * factor).toInt().coerceAtLeast(1),
-                                Bitmap.Config.RGB_565)
+                                Bitmap.Config.ARGB_8888)
                             bitmap.eraseColor(Color.WHITE)
                             page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                             Result("PDF · primera página", basic +
@@ -78,11 +78,13 @@ internal object SkyAttachmentPreview {
             file.mime.startsWith("audio/") || file.mime.startsWith("video/") -> {
                 val retriever = MediaMetadataRetriever()
                 val detail = try {
-                    retriever.setDataSource(resolver.openFileDescriptor(file.uri, "r")!!.fileDescriptor)
-                    val duration = retriever.extractMetadata(
-                        MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-                    "Duración: " + if (duration != null) (duration / 1000).toString() + " segundos"
-                        else "no disponible"
+                    resolver.openFileDescriptor(file.uri, "r")?.use { fd ->
+                        retriever.setDataSource(fd.fileDescriptor)
+                        val duration = retriever.extractMetadata(
+                            MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                        "Duración: " + if (duration != null) (duration / 1000).toString() +
+                            " segundos" else "no disponible"
+                    } ?: "Metadatos multimedia no disponibles."
                 } catch (_: Exception) { "Metadatos multimedia no disponibles." }
                 finally { runCatching { retriever.release() } }
                 Result("Multimedia · metadatos", basic + "\n" + detail +
