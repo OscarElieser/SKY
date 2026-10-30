@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.provider.MediaStore
+import android.os.Handler
+import android.os.Looper
 
 /**
  * Android media action with a truthful fallback.
@@ -19,6 +21,36 @@ class SkyMusicLauncher(
     private val onNeedMusicPermission: (SkyMusicCommand.Request) -> Unit
 ) {
     var onReceipt: ((String, String, String) -> Unit)? = null
+    private val verificationHandler = Handler(Looper.getMainLooper())
+    private var playbackRequestId = 0
+
+    /** Prevent stale Activity callbacks from reporting a result after closing SKY. */
+    fun close() {
+        playbackRequestId++
+        verificationHandler.removeCallbacksAndMessages(null)
+    }
+
+    /** Check actual player metadata only after explicit Android notification access. */
+    private fun checkPlayback(request: SkyMusicCommand.Request,
+                              playerPackage: String, label: String,
+                              requestId: Int, step: Int = 0) {
+        if (requestId != playbackRequestId) return
+        if (SkyPlaybackProof.playing(host, playerPackage, request.query)) {
+            receipt(request.query, "VERIFIED_LOCAL",
+                "Android MediaSession confirmó PLAYING y metadatos de canción coincidentes en $label; audio audible no medido")
+            tell("Android confirmó que $label está reproduciendo «${request.query}».")
+            return
+        }
+        if (step < 12) {
+            verificationHandler.postDelayed({
+                checkPlayback(request, playerPackage, label, requestId, step + 1)
+            }, 1000L)
+        } else {
+            tell("Android recibió la orden para «${request.query}» en $label, " +
+                "pero no pude confirmar la canción en reproducción. Revisá el reproductor.")
+        }
+    }
+
     private fun receipt(song: String, status: String, detail: String) {
         onReceipt?.invoke("Música: " + song.take(100), status, detail)
     }
@@ -38,6 +70,7 @@ class SkyMusicLauncher(
         prefs.edit().putString(MUSIC_PREF, value.name).apply()
     }
     fun play(request: SkyMusicCommand.Request) {
+        playbackRequestId++
         // Distributable standard build never asks for accessibility privileges.
         // It requests playback via Android's documented music intent instead.
         if (!BuildConfig.ENABLE_TEXT_ASSIST) {
@@ -70,6 +103,7 @@ class SkyMusicLauncher(
 
     /** Official Android action retained as a user-selected fallback. */
     fun playViaAndroidIntent(request: SkyMusicCommand.Request) {
+        val requestId = ++playbackRequestId
         val chosen = request.service ?: preferred()
         val title = SkyMusicCommand.label(chosen)
         val pkg = packageName(chosen)
@@ -92,7 +126,10 @@ class SkyMusicLauncher(
             receipt(request.query, "SENT", "Intent de reproducción aceptado; audio no verificado")
             tell("Solicité reproducir «${request.query}» en $title. " +
                 "La aplicación decidirá si puede iniciar esa canción. " +
-                "No he comprobado que esté sonando.")
+                "Todavía no he comprobado que esté sonando.")
+            if (SkyPlaybackProof.available(host)) {
+                checkPlayback(request, pkg, title, requestId)
+            }
             return
         }
         // Deep links are for SEARCH, not evidence of successful playback.

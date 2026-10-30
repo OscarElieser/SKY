@@ -36,6 +36,16 @@
         <service android:name=".SkyHandsFreeService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+        <!-- Optional, explicit OS opt-in for reading only matching playback sessions.
+             SKY ignores notification payloads; revocable in Android settings. -->
+        <service android:name=".SkyPlaybackProofListener"
+            android:label="SKY · Verificar reproducción musical"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
         <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

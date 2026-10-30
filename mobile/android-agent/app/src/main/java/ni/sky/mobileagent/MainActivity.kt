@@ -2348,6 +2348,44 @@ class MainActivity : Activity() {
                 "dentro de otras apps. Algunas canciones necesitarán una acción " +
                 "dentro del reproductor."))
         }
+        content.addView(actionButton("VERIFICAR REPRODUCCIÓN · ANDROID LOCAL") {
+            val enabled = SkyPlaybackProof.available(this)
+            if (enabled) {
+                AlertDialog.Builder(this)
+                    .setTitle("SKY · Verificación musical activa")
+                    .setMessage("Android permite comprobar solamente el título y el " +
+                        "estado de reproducción de YouTube, YouTube Music y Spotify. " +
+                        "SKY no guarda notificaciones ni mensajes. Podés revocar el " +
+                        "permiso desde Ajustes de Android.")
+                    .setPositiveButton("Abrir ajustes del permiso") { _, _ ->
+                        startActivity(android.content.Intent(
+                            android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    }
+                    .setNegativeButton("Cerrar", null).show()
+            } else {
+                AlertDialog.Builder(this)
+                    .setTitle("Verificación real de música · Permiso opcional")
+                    .setMessage("Para saber si Spotify o YouTube realmente reproduce " +
+                        "la canción pedida, Android exige autorización de acceso a " +
+                        "notificaciones. El permiso del sistema es amplio: técnicamente " +
+                        "podría permitir leer notificaciones de otras aplicaciones. " +
+                        "SKY solo consulta sesiones multimedia autorizadas y no " +
+                        "lee, almacena ni envía notificaciones.\n\n" +
+                        "Activá únicamente «SKY · Verificar reproducción musical» " +
+                        "si aceptás ese acceso. Se puede revocar cuando querás. " +
+                        "Sin permiso, SKY seguirá enviando órdenes y declarará " +
+                        "honestamente que no pudo verificar la reproducción.")
+                    .setPositiveButton("Elegir en Ajustes de Android") { _, _ ->
+                        runCatching {
+                            startActivity(android.content.Intent(
+                                android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                        }.onFailure {
+                            home.showMessage("No pude abrir Ajustes de notificaciones.")
+                        }
+                    }
+                    .setNegativeButton("No autorizar", null).show()
+            }
+        })
         content.addView(actionButton("MÚSICA · Spotify / YouTube Music / YouTube") {
             val choices = SkyMusicCommand.Service.entries.toTypedArray()
             AlertDialog.Builder(this)
@@ -2926,6 +2964,7 @@ class MainActivity : Activity() {
         super.onPause()
     }
     override fun onDestroy() {
+        if (::musicLauncher.isInitialized) musicLauncher.close()
         handler.removeCallbacks(instagramPoll)
         handler.removeCallbacks(pollLoop)
         if (::voicePanel.isInitialized) voicePanel.close()
