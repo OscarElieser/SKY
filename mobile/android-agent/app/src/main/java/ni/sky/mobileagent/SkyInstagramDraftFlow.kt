@@ -5,13 +5,18 @@ package ni.sky.mobileagent
  * The incoming DM is untrusted DATA. A draft never grants send permission.
  */
 internal object SkyInstagramDraftFlow {
-    enum class Command { PREPARE, CHECK_SEND, COPY, SEND_REQUEST, NONE }
+    enum class Command { PREPARE, CHECK_SEND, COPY, SEND_REQUEST, STATUS, NONE }
     enum class Approval { YES, NO, NONE }
 
     fun command(raw: String): Command {
         val s = SkyVoicePresence.normalized(raw)
             .replace(Regex("^(?:hola )?(?:sky ia|sky|esky|escai|esquai)\\s*"), "")
             .trim()
+        if (Regex("\\b(instagram|insta)\\b").containsMatchIn(s) &&
+            Regex("\\b(verifica|revisa|comprueba|estado|comprobante)\\b")
+                .containsMatchIn(s) &&
+            Regex("\\b(envio|enviado|enviada|envie|respuesta|mensaje)\\b")
+                .containsMatchIn(s)) return Command.STATUS
         if (Regex("\\b(instagram|insta)\\b").containsMatchIn(s) &&
             (Regex("\\b(puedo|puede|podemos|podria)\\b").containsMatchIn(s) &&
             Regex("\\b(responder|contestar|enviar|mandar)\\b").containsMatchIn(s) ||
