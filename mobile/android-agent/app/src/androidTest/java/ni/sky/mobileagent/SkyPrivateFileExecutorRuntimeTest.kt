@@ -21,6 +21,7 @@ class SkyPrivateFileExecutorRuntimeTest {
             assertNull(first.backupId)
             val second = worker.execute(SkySafeFileConversation.Proposal("reemplazar", filename, "nuevo"))
             assertNotNull(second.backupId)
+            assertTrue(worker.listBackups().any { it.id == second.backupId && it.filename == filename })
             assertEquals("nuevo", file.readText())
             val restored = worker.restoreBackup(filename, second.backupId!!)
             assertEquals("original", file.readText())
