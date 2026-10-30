@@ -4,15 +4,16 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import java.util.UUID
 
 /**
  * Evidencia local de acciones; SENT sólo confirma que Android aceptó la solicitud.
  * No confundir apertura de pantalla con reproducción, envío, publicación o ejecución final.
  */
 class SkyActionEvidence(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "sky_action_evidence.db", null, 1) {
+    SQLiteOpenHelper(context.applicationContext, "sky_action_evidence.db", null, 2) {
     data class Receipt(val id: Long, val action: String, val status: String,
-                       val detail: String, val createdAt: Long)
+                       val detail: String, val createdAt: Long, val eventId: String)
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE action_evidence (
@@ -20,11 +21,18 @@ class SkyActionEvidence(context: Context) :
             action TEXT NOT NULL,
             state TEXT NOT NULL,
             detail TEXT NOT NULL,
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            event_id TEXT
         )""")
         db.execSQL("CREATE INDEX idx_action_evidence_date ON action_evidence(created_at DESC)")
+        db.execSQL("CREATE UNIQUE INDEX idx_action_evidence_event ON action_evidence(event_id)")
     }
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE action_evidence ADD COLUMN event_id TEXT")
+            db.execSQL("CREATE UNIQUE INDEX idx_action_evidence_event ON action_evidence(event_id)")
+        }
+    }
 
     @Synchronized fun record(action: String, state: String, detail: String): Long {
         val status = normalized(state)
@@ -34,6 +42,7 @@ class SkyActionEvidence(context: Context) :
             put("state", status)
             put("detail", detail.take(500))
             put("created_at", System.currentTimeMillis())
+            put("event_id", UUID.randomUUID().toString())
         }
         return writableDatabase.insertOrThrow("action_evidence", null, values)
     }
@@ -72,10 +81,11 @@ class SkyActionEvidence(context: Context) :
     fun recent(limit: Int = 30): List<Receipt> {
         val result = mutableListOf<Receipt>()
         readableDatabase.query("action_evidence",
-            arrayOf("id","action","state","detail","created_at"),
+            arrayOf("id","action","state","detail","created_at","event_id"),
             null,null,null,null,"id DESC",limit.coerceIn(1,200).toString()).use { c ->
             while (c.moveToNext()) result.add(Receipt(c.getLong(0),c.getString(1),
-                c.getString(2),c.getString(3),c.getLong(4)))
+                c.getString(2),c.getString(3),c.getLong(4),
+                c.getString(5) ?: "legacy-" + c.getLong(0)))
         }
         return result
     }
