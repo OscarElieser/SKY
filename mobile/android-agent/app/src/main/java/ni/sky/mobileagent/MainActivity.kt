@@ -103,6 +103,8 @@ class MainActivity : Activity() {
     )
     private var instagramDraftConsent: InstagramDraftConsent? = null
     private var instagramLastDraft: String? = null
+    private var instagramLastDraftEventKey: String? = null
+    private var instagramLastDraftRecipient: String? = null
     private var instagramLastDraftUntil = 0L
     private val instagramDraftBusy = java.util.concurrent.atomic.AtomicBoolean(false)
 
@@ -147,6 +149,8 @@ class MainActivity : Activity() {
                         return@onSuccess
                     }
                     instagramLastDraft = null
+                    instagramLastDraftEventKey = null
+                    instagramLastDraftRecipient = null
                     instagramDraftConsent = InstagramDraftConsent(
                         msg.body, msg.key, msg.sender,
                         android.os.SystemClock.elapsedRealtime() + 120_000L)
@@ -183,10 +187,13 @@ class MainActivity : Activity() {
         }
         result.onSuccess { draft ->
             instagramLastDraft = draft.text
+            instagramLastDraftEventKey = approval.eventKey
+            instagramLastDraftRecipient = approval.senderId
             instagramLastDraftUntil =
                 android.os.SystemClock.elapsedRealtime() + 300_000L
             instagramSay("Preparé una respuesta privada, sin compartir tu mensaje " +
-                "con ninguna IA externa. " + SkyInstagramReplyPlanner.readback(draft))
+                "con ninguna IA externa. " + SkyInstagramReplyPlanner.readback(draft) +
+                " Si estás de acuerdo con este texto exacto, decime «sí, envíala».")
         }.onFailure {
             instagramSay("No pude validar el mensaje original para crear el borrador: " +
                 (it.message ?: "falta el identificador del evento") + ".")
@@ -215,15 +222,78 @@ class MainActivity : Activity() {
                         return@onSuccess
                     }
                     instagramLastDraft = proposed
+                    instagramLastDraftEventKey = approval.eventKey
+                    instagramLastDraftRecipient = approval.senderId
                     instagramLastDraftUntil =
                         android.os.SystemClock.elapsedRealtime() + 300_000L
                     instagramSay("Te propongo esta respuesta, todavía sin enviar: " +
                         proposed + ". Podés decirme copia la respuesta. " +
-                        "El envío directo se habilitará tras verificar la API de Meta.")
+                        "Si estás de acuerdo con este texto, decime «sí, envíala».")
                 }.onFailure {
                     instagramSay("La IA no produjo un borrador seguro: " +
                         (it.message ?: "error del proveedor") + ".")
                 }
+            }
+        }.start()
+    }
+
+
+    /**
+     * Owner's explicit "envíala" authorizes one exact draft for one webhook event.
+     * Server checks Meta scope, recipient and <=24h window, and stores only text hash.
+     * No automatic retry on a network timeout, preventing accidental duplicate DMs.
+     */
+    private fun sendApprovedInstagramReply() {
+        if (!instagramDeviceUnlocked()) {
+            instagramSay("Por seguridad desbloqueá el teléfono antes de enviar.")
+            return
+        }
+        val message = instagramLastDraft?.trim()
+        val eventKey = instagramLastDraftEventKey
+        val recipient = instagramLastDraftRecipient
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (message.isNullOrBlank() || eventKey.isNullOrBlank() ||
+            recipient.isNullOrBlank() || now >= instagramLastDraftUntil) {
+            instagramLastDraft = null
+            instagramLastDraftEventKey = null
+            instagramLastDraftRecipient = null
+            instagramSay("El borrador ya no está disponible. Pedime que lo prepare de nuevo.")
+            return
+        }
+        if (!instagramDraftBusy.compareAndSet(false, true)) {
+            instagramSay("Estoy realizando otra operación de Instagram.")
+            return
+        }
+        // Burn local confirmation before dispatch; never send again on retries.
+        instagramLastDraft = null
+        instagramLastDraftEventKey = null
+        instagramLastDraftRecipient = null
+        instagramLastDraftUntil = 0L
+        instagramSay("Voy a comprobar el destinatario y la autorización de Meta. " +
+            "No confirmaré el envío hasta recibir su comprobante.")
+        Thread {
+            val result = runCatching {
+                val prepared = SkyInstagramAlerts.prepareReply(this, eventKey, message)
+                if (!prepared.canConfirm)
+                    "La respuesta quedó preparada para " + prepared.recipientLabel +
+                    ", pero el envío real está bloqueado hasta habilitar la " +
+                    "función en el servidor. No envié nada."
+                else {
+                    val receipt = SkyInstagramAlerts.confirmReply(this, prepared, message)
+                    if (receipt.sent)
+                        "Meta confirmó que envié tu respuesta a " + prepared.recipientLabel +
+                        ". Identificador de envío: " + receipt.messageId
+                    else "Meta no confirmó el envío. Estado: " + receipt.status +
+                        ". No voy a repetirlo automáticamente."
+                }
+            }.getOrElse {
+                "No pude verificar el envío: " +
+                    (it.message ?: "problema de conexión") +
+                    ". No lo repetiré para evitar duplicados; revisá Instagram."
+            }
+            runOnUiThread {
+                instagramDraftBusy.set(false)
+                if (!isFinishing || visible) instagramSay(result)
             }
         }.start()
     }
@@ -278,7 +348,7 @@ class MainActivity : Activity() {
             instagramDeviceUnlocked() && now < instagramLastDraftUntil) {
             instagramLastDraft = requestedRevision
             instagramSay("Actualicé tu borrador: " + requestedRevision +
-                ". Sigue sin enviarse. Si querés copiarlo, decime «copia la respuesta».")
+                ". No se ha enviado. Podés decir «sí, envíala» si autorizás este texto exacto.")
             return true
         }
         if (instagramDraftOfferUntil > now) {
@@ -327,8 +397,7 @@ class MainActivity : Activity() {
                 true
             }
             SkyInstagramDraftFlow.Command.SEND_REQUEST -> {
-                instagramSay("No he enviado nada. Todavía falta verificar el envío " +
-                    "autorizado con Meta. Si querés hacerlo ahora, decime copia la respuesta.")
+                sendApprovedInstagramReply()
                 true
             }
             SkyInstagramDraftFlow.Command.NONE -> false
