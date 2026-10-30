@@ -10,13 +10,13 @@ object SkySpokenText {
         var text = raw.trim()
         text = text.replace(Regex("""\\(?:text|mathrm|operatorname)\{([^{}]*)\}"""), "$1")
             .replace(Regex("""\\(?:mathbf|mathit)\{([^{}]*)\}"""), "$1")
-            .replace(Regex("""\\(?:dfrac|tfrac|frac)\{([^{}]*)\}\{([^{}]*)\}"""),
-                "$1 dividido entre $2")
-            .replace(Regex("""\\sqrt\{([^{}]*)\}"""), "raíz cuadrada de $1")
             .replace(Regex("""_\{([^{}]*)\}"""), " subíndice $1")
             .replace(Regex("""\^\{([^{}]*)\}"""), " elevado a $1")
             .replace(Regex("""_([a-zA-Z0-9])"""), " subíndice $1")
             .replace(Regex("""\^([a-zA-Z0-9])"""), " elevado a $1")
+            .replace(Regex("""\\(?:dfrac|tfrac|frac)\{([^{}]*)\}\{([^{}]*)\}"""),
+                "$1 dividido entre $2")
+            .replace(Regex("""\\sqrt\{([^{}]*)\}"""), "raíz cuadrada de $1")
         val ops = mapOf(
             "\\rightleftharpoons" to " en equilibrio con ",
             "\\leftrightarrow" to " en equilibrio con ",
