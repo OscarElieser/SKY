@@ -2293,7 +2293,7 @@ class MainActivity : Activity() {
                         "notificaciones. El permiso del sistema es amplio: técnicamente " +
                         "podría permitir leer notificaciones de otras aplicaciones. " +
                         "SKY solo consulta sesiones multimedia autorizadas y no " +
-                        "lee, almacena ni envía notificaciones.\\n\\n" +
+                        "lee, almacena ni envía notificaciones.\n\n" +
                         "Activá únicamente «SKY · Verificar reproducción musical» " +
                         "si aceptás ese acceso. Se puede revocar cuando querás. " +
                         "Sin permiso, SKY seguirá enviando órdenes y declarará " +
