@@ -1,6 +1,14 @@
 package ni.sky.mobileagent
 
 import android.content.Context
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 import org.json.JSONObject
 
 /**
@@ -16,18 +24,74 @@ object SkyOwnerContext {
         """(?i)contrase(?:ñ|n)a\s*[:=]|password\s*[:=]|\bpin\s*[:=]|\bcvv\b|\btoken\s*[:=]|api[_ ]?key\s*[:=]|private[_ -]?key\s*[:=]"""
     )
 
-    fun read(context: Context): String =
-        context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .getString(KEY, "").orEmpty()
+    // Real authenticated encryption, not Base64/obfuscation. The AES key stays
+    // non-exportable in Android Keystore; app backups are disabled in Manifest.
+    private const val ENCRYPTED_FILE = "sky_owner_profile_enc_v1"
+    private const val CIPHER_FIELD = "profile_cipher"
+    private const val NONCE_FIELD = "profile_nonce"
+    private const val KEY_ALIAS = "sky_owner_private_profile_aes_v1"
 
-    fun save(context: Context, content: String) {
+    private fun secretKey(): SecretKey {
+        val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        val existing = store.getKey(KEY_ALIAS, null) as? SecretKey
+        if (existing != null) return existing
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(KeyGenParameterSpec.Builder(KEY_ALIAS,
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setKeySize(256)
+            .setRandomizedEncryptionRequired(true)
+            .build())
+        return generator.generateKey()
+    }
+
+    /**
+     * First read migrates legacy plaintext only after ciphertext is committed.
+     * Corrupt encrypted storage fails closed instead of silently overwriting it.
+     */
+    @Synchronized fun read(context: Context): String {
+        val prefs = context.getSharedPreferences(ENCRYPTED_FILE, Context.MODE_PRIVATE)
+        if (prefs.contains(CIPHER_FIELD) || prefs.contains(NONCE_FIELD)) {
+            val encrypted = prefs.getString(CIPHER_FIELD, null)
+                ?: throw IllegalStateException("El perfil cifrado está incompleto.")
+            val nonce = prefs.getString(NONCE_FIELD, null)
+                ?: throw IllegalStateException("El perfil cifrado no tiene IV.")
+            return try {
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(
+                    128, Base64.decode(nonce, Base64.NO_WRAP)))
+                String(cipher.doFinal(Base64.decode(encrypted, Base64.NO_WRAP)), Charsets.UTF_8)
+            } catch (e: Exception) {
+                throw IllegalStateException("El perfil privado no se puede descifrar. " +
+                    "Conservé los datos; revisá el almacenamiento del teléfono.", e)
+            }
+        }
+        val legacy = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+            .getString(KEY, "").orEmpty()
+        if (legacy.isNotBlank()) save(context, legacy)
+        return legacy
+    }
+
+    @Synchronized fun save(context: Context, content: String) {
         val value = content.trim().replace("\r\n", "\n")
         require(value.length <= MAX_CHARS) { "El perfil no puede superar $MAX_CHARS caracteres." }
         require(!secretPattern.containsMatchIn(value)) {
             "Por seguridad, quitá contraseñas, PIN, tokens y claves API del perfil."
         }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey())
+        val encrypted = Base64.encodeToString(
+            cipher.doFinal(value.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
+        val nonce = Base64.encodeToString(cipher.iv, Base64.NO_WRAP)
+        val prefs = context.getSharedPreferences(ENCRYPTED_FILE, Context.MODE_PRIVATE)
+        check(prefs.edit().putString(CIPHER_FIELD, encrypted)
+            .putString(NONCE_FIELD, nonce).commit()) {
+            "El almacenamiento privado no confirmó el guardado cifrado."
+        }
+        // Only remove the old unencrypted copy after successful encrypted write.
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .edit().putString(KEY, value).apply()
+            .edit().remove(KEY).commit()
     }
 
     fun remember(context: Context, fact: String) {
