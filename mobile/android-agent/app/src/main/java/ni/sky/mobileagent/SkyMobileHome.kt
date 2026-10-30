@@ -339,26 +339,64 @@ class SkyMobileHome(
             setPadding(dp(9), dp(2), dp(9), dp(5))
         }
         item.addView(speaker)
-        val bubble = text(value, 15f, white).apply {
-            gravity = Gravity.START
-            setLineSpacing(dp(3).toFloat(), 1f)
-            setTextIsSelectable(true)
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                if (mine) intArrayOf(Color.rgb(97, 72, 205), Color.rgb(62, 62, 150))
-                else intArrayOf(Color.rgb(36, 52, 92), Color.rgb(32, 42, 76))).apply {
-                cornerRadius = dp(20).toFloat()
+        // Los mensajes del usuario continúan siendo texto nativo editable/copiable.
+        // Las respuestas de SKY se maquetan sin ejecutar HTML, JavaScript ni red.
+        val bubble: View = if (mine) {
+            text(value, 15f, white).apply {
+                gravity = Gravity.START
+                setLineSpacing(dp(3).toFloat(), 1f)
+                setTextIsSelectable(true)
+                setPadding(dp(15), dp(12), dp(15), dp(12))
             }
-            setPadding(dp(15), dp(12), dp(15), dp(12))
-            setOnLongClickListener {
-                val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("SKY IA", value))
-                Toast.makeText(host, "Mensaje copiado", Toast.LENGTH_SHORT).show()
-                true
+        } else {
+            WebView(host).apply {
+                settings.javaScriptEnabled = false
+                settings.domStorageEnabled = false
+                settings.allowFileAccess = false
+                settings.allowContentAccess = false
+                settings.blockNetworkLoads = true
+                setBackgroundColor(Color.TRANSPARENT)
+                isVerticalScrollBarEnabled = false
+                isHorizontalScrollBarEnabled = false
+                overScrollMode = View.OVER_SCROLL_NEVER
+                webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView?, request: WebResourceRequest?
+                    ) = true
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        val web = view ?: return
+                        listOf(60L, 240L, 600L).forEach { delay ->
+                            web.postDelayed({
+                                val desired = (web.contentHeight * web.scale).toInt()
+                                if (desired > dp(25) && web.layoutParams != null &&
+                                    web.layoutParams.height != desired) {
+                                    web.layoutParams.height = desired.coerceAtMost(dp(30000))
+                                    web.requestLayout()
+                                }
+                            }, delay)
+                        }
+                    }
+                }
+                loadDataWithBaseURL(
+                    null, SkyScientificMarkup.toHtml(value), "text/html", "UTF-8", null
+                )
             }
         }
-        item.addView(bubble, LinearLayout.LayoutParams(-2, -2).apply {
-            width = LinearLayout.LayoutParams.WRAP_CONTENT
-        })
+        bubble.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            if (mine) intArrayOf(Color.rgb(97, 72, 205), Color.rgb(62, 62, 150))
+            else intArrayOf(Color.rgb(36, 52, 92), Color.rgb(32, 42, 76))).apply {
+            cornerRadius = dp(20).toFloat()
+        }
+        bubble.setOnLongClickListener {
+            val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("SKY IA", value))
+            Toast.makeText(host, "Mensaje copiado", Toast.LENGTH_SHORT).show()
+            true
+        }
+        item.addView(bubble, LinearLayout.LayoutParams(
+            if (mine) LinearLayout.LayoutParams.WRAP_CONTENT else LinearLayout.LayoutParams.MATCH_PARENT,
+            if (mine) LinearLayout.LayoutParams.WRAP_CONTENT else dp(56)
+        ))
         return item
     }
 
