@@ -539,6 +539,12 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
     r = reglas(texto)
     if r:
         return r
+    # Herramientas científicas puras: uso real desde voz y texto, sin LLM
+    # ni parámetros inventados; las órdenes de dispositivos conservan prioridad.
+    from .sky_conversation_tools import maybe_answer as _verified_answer
+    checked = _verified_answer(texto, mode=modo)
+    if checked is not None:
+        return checked
     turnos = _turnos(historial)
     # SKY decide si necesita expertos cognitivos efimeros. No ofrecen acciones
     # ni sustituyen sky_supervisor / agentes persistentes.

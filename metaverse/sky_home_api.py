@@ -66,6 +66,15 @@ def home_status():
 
 @router.post("/chat")
 def home_chat(body: HomeChat):
+    # Cálculos locales de solo lectura: no necesitan un LLM ni autorización
+    # de nube; el token móvil limitado jamás obtiene acciones del propietario.
+    from neural_core.sky_conversation_tools import maybe_answer as _verified_answer
+    checked = _verified_answer(body.texto, mode="chat")
+    if checked is not None:
+        return {"respuesta": checked["mensaje"], "proveedor": checked["proveedor"],
+                "nube": False, "motivo": "Cálculo local comprobado",
+                "respaldo_local": False, "acciones_ejecutadas": False,
+                "verificacion": checked["verificacion"]}
     from neural_core import providers
     local, cloud, only = _availability()
     route = choose_home_route(

@@ -403,7 +403,16 @@ def mensaje_stream(body: Mensaje, request: Request):
         original = body.texto.strip()
         texto = asis.preparar(original) if original else original
         r = asis.reglas(texto) if texto else None
-        if r or not texto or not asis.usar_cerebro(body.proveedor):
+        if r:
+            yield final(_completar(r, body.dispositivo, request))
+            return
+        # Misma ruta verificable de /mensaje, antes del LLM o la subasta.
+        from neural_core.sky_conversation_tools import maybe_answer as _verified_answer
+        checked = _verified_answer(texto, mode=body.modo) if texto else None
+        if checked is not None:
+            yield final(checked)
+            return
+        if not texto or not asis.usar_cerebro(body.proveedor):
             yield final(_completar(r or asis.atender(original, historial, body.proveedor, body.modo), body.dispositivo, request))
             return
         from neural_core.sky_unified_agents import maybe_answer as _sky_unified_answer
