@@ -264,34 +264,42 @@ class MainActivity : Activity() {
             instagramSay("Estoy realizando otra operación de Instagram.")
             return
         }
-        // Burn local confirmation before dispatch; never send again on retries.
-        instagramLastDraft = null
-        instagramLastDraftEventKey = null
-        instagramLastDraftRecipient = null
-        instagramLastDraftUntil = 0L
-        instagramSay("Voy a comprobar el destinatario y la autorización de Meta. " +
-            "No confirmaré el envío hasta recibir su comprobante.")
+        instagramSay("Estoy comprobando el permiso y el destinatario en Meta. " +
+            "Solo confirmaré un envío si recibo su comprobante.")
         Thread {
+            var consumed = false
             val result = runCatching {
                 val prepared = SkyInstagramAlerts.prepareReply(this, eventKey, message)
                 if (!prepared.canConfirm)
-                    "La respuesta quedó preparada para " + prepared.recipientLabel +
-                    ", pero el envío real está bloqueado hasta habilitar la " +
-                    "función en el servidor. No envié nada."
+                    "El borrador sigue disponible, pero el envío real todavía no está " +
+                    "habilitado. Podés copiarlo desde SKY. No envié nada."
                 else {
+                    // Burn local approval before the one-and-only Meta send attempt.
+                    consumed = true
                     val receipt = SkyInstagramAlerts.confirmReply(this, prepared, message)
                     if (receipt.sent)
                         "Meta confirmó que envié tu respuesta a " + prepared.recipientLabel +
-                        ". Identificador de envío: " + receipt.messageId
+                        ". Comprobante: " + receipt.messageId
                     else "Meta no confirmó el envío. Estado: " + receipt.status +
                         ". No voy a repetirlo automáticamente."
                 }
-            }.getOrElse {
-                "No pude verificar el envío: " +
-                    (it.message ?: "problema de conexión") +
-                    ". No lo repetiré para evitar duplicados; revisá Instagram."
+            }.getOrElse { error ->
+                val reason = error.message.orEmpty()
+                if ("supervised_send_not_enabled" in reason)
+                    "Tu respuesta sigue lista como borrador, pero el envío directo " +
+                    "todavía está deshabilitado en el servidor de SKY. " +
+                    "Podés decir «copia la respuesta» y enviarla manualmente."
+                else "No pude verificar el envío: " +
+                    (error.message ?: "problema de conexión") +
+                    ". No voy a repetirlo automáticamente."
             }
             runOnUiThread {
+                if (consumed) {
+                    instagramLastDraft = null
+                    instagramLastDraftEventKey = null
+                    instagramLastDraftRecipient = null
+                    instagramLastDraftUntil = 0L
+                }
                 instagramDraftBusy.set(false)
                 if (!isFinishing && visible) instagramSay(result)
             }
