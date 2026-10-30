@@ -2876,6 +2876,34 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Google News publishes syndicated headlines, not fact-check certification. */
+    private fun requestNewsHeadlines(question: String) {
+        if (chatPending) {
+            home.showMessage("Voy a terminar primero la consulta anterior.")
+            return
+        }
+        chatPending = true
+        home.beginSending(question)
+        voicePanel.showThinking()
+        chatExecutor.execute {
+            try {
+                val news = SkyPublicNews.fetch(question)
+                runOnUiThread {
+                    if (isFinishing) return@runOnUiThread
+                    home.addExchange(question, news.answer,
+                        "Google Noticias · titulares recibidos", sources = news.sources)
+                    voicePanel.speakReply(news.answer)
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    if (isFinishing) return@runOnUiThread
+                    home.failSending("Google Noticias no entregó titulares verificables: " +
+                        (error.message ?: "fuente temporalmente no disponible"), question)
+                }
+            } finally { chatPending = false }
+        }
+    }
+
     /** Real scholarly source from Windows research parity; no fake bibliography. */
     private fun requestAcademicResearch(question: String) {
         if (chatPending) {
@@ -3002,6 +3030,11 @@ class MainActivity : Activity() {
         if (SkyAcademicResearch.explicit(message)) {
             chatInput.setText("")
             requestAcademicResearch(message)
+            return
+        }
+        if (!tokens.cloudEnabled() && SkyPublicNews.explicit(message)) {
+            chatInput.setText("")
+            requestNewsHeadlines(message)
             return
         }
         if (SkyPublicResearch.explicit(message) ||
@@ -3197,6 +3230,7 @@ class MainActivity : Activity() {
                 val sources: List<SkyPhoneCloud.Source>
                 val searchSuggestions: String
                 val needsLiveSources = SkyPhoneCloud.requiresLiveVerification(message) ||
+                    SkyEvidencePolicy.needsVerification(message) ||
                     (cognitionEnabled() && SkyAndroidCognition.classify(message).verifyWithSources)
                 when {
                     // For up-to-date information, Groq is NOT substituted for a
@@ -3207,7 +3241,7 @@ class MainActivity : Activity() {
                         require(live.searchedWeb && live.sources.isNotEmpty()) {
                             "No recibí fuentes comprobables de Google Search para esta consulta."
                         }
-                        answer = live.answer
+                        answer = SkyEvidencePolicy.qualify(live.answer, live.sources)
                         sources = live.sources
                         searchSuggestions = live.googleSearchHtml
                         provider = "Gemini · búsqueda verificable"
