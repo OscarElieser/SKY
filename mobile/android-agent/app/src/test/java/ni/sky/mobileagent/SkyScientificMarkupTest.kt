@@ -38,6 +38,27 @@ class SkyScientificMarkupTest {
         assertFalse(html.contains("\\(E"))
     }
 
+    @Test fun markdownTablesRenderWithEscapedCellsAndHeaders() {
+        val html = SkyScientificMarkup.toHtml(
+            "| Magnitud | Valor |\n|---|---|\n| Masa | 2 kg |\n| Nota | <img src=x> |"
+        )
+        assertTrue(html.contains("<table>"))
+        assertTrue(html.contains("<th>Magnitud</th>"))
+        assertTrue(html.contains("<td>2 kg</td>"))
+        assertFalse(html.contains("<img"))
+        assertTrue(html.contains("&lt;img"))
+    }
+
+    @Test fun multilineMathDoesNotLeakLatexMarkers() {
+        val html = SkyScientificMarkup.toHtml(
+            "### Ejercicio\n\\[\nv_{\\text{dir}} = k_f[A][B]\n\\]"
+        )
+        assertTrue(html.contains("<math"))
+        assertTrue(html.contains("<msub>"))
+        assertTrue(html.contains("<mtext>dir</mtext>"))
+        assertFalse(html.contains("<p>\\["))
+    }
+
     @Test fun veryLongEquationDoesNotCrashRenderer() {
         val html = SkyScientificMarkup.mathMl("x".repeat(6000))
         assertTrue(html.startsWith("<code>"))
