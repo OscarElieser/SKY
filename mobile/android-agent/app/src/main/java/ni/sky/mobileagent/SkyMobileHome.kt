@@ -341,7 +341,12 @@ class SkyMobileHome(
         item.addView(speaker)
         // Los mensajes del usuario continúan siendo texto nativo editable/copiable.
         // Las respuestas de SKY se maquetan sin ejecutar HTML, JavaScript ni red.
-        val bubble: View = if (mine) {
+        // A lightweight native bubble is enough for short plain messages.
+        // WebView/MathML is reserved for structured answers to save memory.
+        val rich = !mine && (value.contains('\n') || value.contains("\\[") ||
+            value.contains("\\(") || value.contains("**") ||
+            value.trimStart().startsWith("#"))
+        val bubble: View = if (!rich) {
             text(value, 15f, white).apply {
                 gravity = Gravity.START
                 setLineSpacing(dp(3).toFloat(), 1f)
@@ -452,7 +457,18 @@ class SkyMobileHome(
 
     private fun renderConversation() {
         if (!::conversationRows.isInitialized) return
+        // WebViews must be detached and explicitly destroyed on redraw.
+        // Otherwise every new question leaves an obsolete Chromium instance.
+        val outdated = mutableListOf<WebView>()
+        fun collect(view: View) {
+            if (view is WebView) outdated.add(view)
+            else if (view is android.view.ViewGroup) {
+                for (index in 0 until view.childCount) collect(view.getChildAt(index))
+            }
+        }
+        for (index in 0 until conversationRows.childCount) collect(conversationRows.getChildAt(index))
         conversationRows.removeAllViews()
+        outdated.forEach { it.stopLoading(); it.destroy() }
         // Keep the empty-state view attached after re-rendering the conversation.
         conversationRows.addView(chatOutput)
         chatOutput.visibility = if (history.isEmpty() && pendingQuestion == null &&
