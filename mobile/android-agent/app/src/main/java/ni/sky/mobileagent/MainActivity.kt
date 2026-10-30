@@ -97,7 +97,8 @@ class MainActivity : Activity() {
     private val instagramChecking = java.util.concurrent.atomic.AtomicBoolean(false)
     private var instagramReviewOfferUntil = 0L
     private data class InstagramDraftConsent(
-        val incoming: String, val eventKey: String, val expiresAt: Long
+        val incoming: String, val eventKey: String,
+        val senderId: String, val expiresAt: Long
     )
     private var instagramDraftConsent: InstagramDraftConsent? = null
     private var instagramLastDraft: String? = null
@@ -123,10 +124,6 @@ class MainActivity : Activity() {
             instagramSay("Primero vinculá tu cuenta de Instagram con SKY.")
             return
         }
-        if (!tokens.groqEnabled() && !tokens.cloudEnabled()) {
-            instagramSay("Para redactar respuestas con IA configurá Groq o Gemini.")
-            return
-        }
         if (!instagramDraftBusy.compareAndSet(false, true)) {
             instagramSay("Estoy revisando el mensaje anterior.")
             return
@@ -150,19 +147,49 @@ class MainActivity : Activity() {
                     }
                     instagramLastDraft = null
                     instagramDraftConsent = InstagramDraftConsent(
-                        msg.body, msg.key,
+                        msg.body, msg.key, msg.sender,
                         android.os.SystemClock.elapsedRealtime() + 120_000L)
-                    instagramSay("El último mensaje dice: " +
-                        SkyInstagramInboxRules.preview(msg.body, 220) +
-                        ". Para preparar una respuesta, necesito compartir ese texto " +
-                        "con " + (if (tokens.groqEnabled()) "Groq" else "Gemini") +
-                        ". ¿Autorizás esa consulta? Decime sí autorizo o no.")
+                    if (!tokens.groqEnabled() && !tokens.cloudEnabled()) {
+                        generateLocalInstagramDraft(instagramDraftConsent!!)
+                    } else {
+                        instagramSay("El último mensaje dice: " +
+                            SkyInstagramInboxRules.preview(msg.body, 220) +
+                            ". Puedo redactar la respuesta con " +
+                            (if (tokens.groqEnabled()) "Groq" else "Gemini") +
+                            " si autorizás compartir ese texto, " +
+                            "o prepararla localmente sin compartirlo. " +
+                            "Decime «sí autorizo» o «no, hacelo local».")
+                    }
                 }.onFailure {
                     instagramSay("No pude recuperar un mensaje de Instagram válido: " +
                         (it.message ?: "fallo de conexión") + ".")
                 }
             }
         }.start()
+    }
+
+    /** Offline fallback, without API tokens or sharing private DM content. */
+    private fun generateLocalInstagramDraft(approval: InstagramDraftConsent) {
+        instagramDraftConsent = null
+        if (!instagramDeviceUnlocked()) {
+            instagramSay("Desbloqueá el teléfono para revisar tu respuesta.")
+            return
+        }
+        val result = runCatching {
+            SkyInstagramReplyPlanner.propose(approval.eventKey,
+                approval.senderId, approval.incoming,
+                android.os.SystemClock.elapsedRealtime())
+        }
+        result.onSuccess { draft ->
+            instagramLastDraft = draft.text
+            instagramLastDraftUntil =
+                android.os.SystemClock.elapsedRealtime() + 300_000L
+            instagramSay("Preparé una respuesta privada, sin compartir tu mensaje " +
+                "con ninguna IA externa. " + SkyInstagramReplyPlanner.readback(draft))
+        }.onFailure {
+            instagramSay("No pude validar el mensaje original para crear el borrador: " +
+                (it.message ?: "falta el identificador del evento") + ".")
+        }
     }
 
     private fun generateInstagramDraft(approval: InstagramDraftConsent) {
@@ -238,13 +265,20 @@ class MainActivity : Activity() {
                         return true
                     }
                     SkyInstagramDraftFlow.Approval.NO -> {
-                        instagramDraftConsent = null
-                        instagramSay("De acuerdo. No compartiré el mensaje con ninguna IA.")
+                        generateLocalInstagramDraft(waiting)
                         return true
                     }
                     SkyInstagramDraftFlow.Approval.NONE -> Unit
                 }
             }
+        }
+        val requestedRevision = SkyInstagramReplyPlanner.revisedText(message)
+        if (requestedRevision != null && instagramLastDraft != null &&
+            instagramDeviceUnlocked() && now < instagramLastDraftUntil) {
+            instagramLastDraft = requestedRevision
+            instagramSay("Actualicé tu borrador: " + requestedRevision +
+                ". Sigue sin enviarse. Si querés copiarlo, decime «copia la respuesta».")
+            return true
         }
         return when (SkyInstagramDraftFlow.command(message)) {
             SkyInstagramDraftFlow.Command.PREPARE -> {
