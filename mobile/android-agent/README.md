@@ -1,3 +1,11 @@
+## SKY Android — sesiones de voz confiables y sueño persistente (30/10/2026)
+
+**Cambio real de Android, sin tocar SKY Windows.** Se agregaron guardias de generación para impedir que respuestas tardías del reconocedor o de la síntesis de voz interrumpan una sesión más nueva; el estado `SKY duerme` sigue persistente y la interfaz exige el despertar explícito. Una frase ambiental que termina en SKY no se convierte en orden. Incluye pruebas unitarias y de emulador, sin atribuir reconocimiento biométrico ni escucha ininterrumpida al sistema.
+
+[Guía técnica, seguridad y pruebas físicas](docs/SKY_VOICE_SESSION_ISOLATION.md).
+
+---
+
 ## SKY Android — comprobación local y opcional de reproducción (30/10/2026)
 
 **Solo Android. SKY Windows intacta.** Esta actualización agrega un verificador real de la sesión multimedia usando únicamente APIs locales de Android; no incorpora un modelo LLM entrenado en el teléfono ni garantiza que una app de terceros reproduzca automáticamente lo pedido.
