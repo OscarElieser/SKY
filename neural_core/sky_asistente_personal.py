@@ -539,6 +539,11 @@ def atender(texto: str, historial: list[dict] | None = None, proveedor: str = 'a
     r = reglas(texto)
     if r:
         return r
+    # El parser sólo prepara propuestas; nunca modifica archivos desde el LLM.
+    from .sky_file_intents import maybe_prepare as _file_intent
+    file_proposal = _file_intent(texto, mode=modo)
+    if file_proposal is not None:
+        return file_proposal
     # Herramientas científicas puras: uso real desde voz y texto, sin LLM
     # ni parámetros inventados; las órdenes de dispositivos conservan prioridad.
     from .sky_conversation_tools import maybe_answer as _verified_answer

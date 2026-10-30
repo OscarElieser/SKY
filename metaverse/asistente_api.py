@@ -406,6 +406,11 @@ def mensaje_stream(body: Mensaje, request: Request):
         if r:
             yield final(_completar(r, body.dispositivo, request))
             return
+        from neural_core.sky_file_intents import maybe_prepare as _file_intent
+        file_proposal = _file_intent(texto, mode=body.modo) if texto else None
+        if file_proposal is not None:
+            yield final(file_proposal)
+            return
         # Misma ruta verificable de /mensaje, antes del LLM o la subasta.
         from neural_core.sky_conversation_tools import maybe_answer as _verified_answer
         checked = _verified_answer(texto, mode=body.modo) if texto else None

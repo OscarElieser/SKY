@@ -24,6 +24,8 @@ on:
       - 'tests/test_sky_verified_json.py'
       - 'tests/test_sky_role_http.py'
       - 'neural_core/sky_safe_workspace.py'
+      - 'neural_core/sky_file_intents.py'
+      - 'tests/test_sky_file_intents.py'
       - 'metaverse/sky_safe_files_api.py'
       - 'tests/test_sky_safe_files.py'
       - 'metaverse/static/hud.html'
@@ -45,7 +47,7 @@ jobs:
           python-version: '3.11'
       - name: Verify SKY roles (offline)
         run: |
-          python -m py_compile neural_core/sky_safe_workspace.py metaverse/sky_safe_files_api.py neural_core/sky_conversation_tools.py neural_core/sky_asistente_personal.py metaverse/asistente_api.py metaverse/sky_home_api.py neural_core/sky_role_router.py neural_core/sky_role_lessons.py neural_core/sky_verified_roles.py neural_core/sky_verified_science.py metaverse/sky_verified_roles_api.py
+          python -m py_compile neural_core/sky_file_intents.py neural_core/sky_safe_workspace.py metaverse/sky_safe_files_api.py neural_core/sky_conversation_tools.py neural_core/sky_asistente_personal.py metaverse/asistente_api.py metaverse/sky_home_api.py neural_core/sky_role_router.py neural_core/sky_role_lessons.py neural_core/sky_verified_roles.py neural_core/sky_verified_science.py metaverse/sky_verified_roles_api.py
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_verified_*.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_role_lessons.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_role_router.py' -v
@@ -82,3 +84,4 @@ jobs:
         run: |
           python -m py_compile neural_core/sky_safe_workspace.py metaverse/sky_safe_files_api.py
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_safe_files.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_sky_file_intents.py' -v
