@@ -161,6 +161,12 @@ def test_authenticated_endpoints(monkeypatch, tmp_path):
         assert reflection_ok.status_code == 200
         assert reflection_ok.json()["metrics"]["total_observations"] == 0
         assert reflection_ok.json()["capabilities"]["automatic_install"] is False
+        multiagent_denied = client.get("/api/sky/cognition/multiagent-quality")
+        assert multiagent_denied.status_code in (401, 403)
+        multiagent_ok = client.get("/api/sky/cognition/multiagent-quality", headers=headers)
+        assert multiagent_ok.status_code == 200
+        assert multiagent_ok.json()["quality_gate"]["repair_attempts_max"] == 1
+        assert multiagent_ok.json()["auto_actions"] is False
         plan = client.post("/api/sky/cognition/plan",
                            headers=headers,
                            json={"query": "Abrí YouTube", "device": "android"})
