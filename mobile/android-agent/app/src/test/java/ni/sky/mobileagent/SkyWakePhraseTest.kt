@@ -15,6 +15,17 @@ class SkyWakePhraseTest {
             SkyWakePhrase.decide("Me gusta el sky de la canción", false).kind)
     }
 
+    @Test fun suffixSkyDoesNotTurnAmbientSpeechIntoAnOrder() {
+        assertEquals(SkyWakePhrase.Kind.IGNORE,
+            SkyWakePhrase.decide("me gusta SKY", false).kind)
+        assertEquals(SkyWakePhrase.Kind.IGNORE,
+            SkyWakePhrase.decide("ponemos un vídeo sky", false).kind)
+        assertEquals(SkyWakePhrase.Kind.WAKE,
+            SkyWakePhrase.decide("despierta SKY", false).kind)
+        assertEquals(SkyWakePhrase.Kind.COMMAND,
+            SkyWakePhrase.decide("SKY poné música", false).kind)
+    }
+
     @Test fun directCommandsAndContinuousConversation() {
         val first = SkyWakePhrase.decide("SKY, abrí YouTube", false)
         assertEquals(SkyWakePhrase.Kind.COMMAND, first.kind)

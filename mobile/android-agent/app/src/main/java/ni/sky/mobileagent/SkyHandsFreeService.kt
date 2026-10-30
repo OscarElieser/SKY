@@ -69,7 +69,11 @@ class SkyHandsFreeService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
+    /** Only the latest Android SpeechRecognizer session may alter service state. */
+    private val recognitionEpoch = SkyRecognitionEpoch()
     private var tts: TextToSpeech? = null
+    /** A superseded spoken turn cannot resume microphone capture. */
+    private val speechTurns = SkySpeechTurnGuard()
     private var running = false
     private var listening = false
     private var awake = false
@@ -78,11 +82,21 @@ class SkyHandsFreeService : Service() {
     private var speechSuspended = false
     private var retryCount = 0
     private var lastCycle = 0L
+    private var listeningStartedAt = 0L
     private var lastPhraseAtMs = 0L
     private var lastErrorCode = 0
     private var pendingBackgroundCommand: String? = null
     private var pendingExpiresAt = 0L
     private val nextListen = Runnable { arm() }
+    private val listenWatchdog = Runnable {
+        if (SkyListenWatchdog.needsRecovery(running, listening, speechSuspended,
+                SystemClock.elapsedRealtime() - listeningStartedAt)) {
+            lastErrorCode = SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+            stopRecognizer() // invalidates callbacks of the stuck recognizer.
+            retryCount = (retryCount + 1).coerceAtMost(5)
+            schedule(1000L)
+        }
+    }
     private val fallAsleep = Runnable {
         awake = false
         onStatus?.invoke(true)
@@ -90,7 +104,10 @@ class SkyHandsFreeService : Service() {
             "SKY dormida por orden · decí SKY despierta"
             else "SKY en espera · decí SKY")
     }
-    private val safetyResume = Runnable { resumeFromSpeech() }
+    private val safetyResume = Runnable {
+        speechTurns.invalidate()
+        resumeFromSpeech()
+    }
     private val instagramChecking = java.util.concurrent.atomic.AtomicBoolean(false)
     private val instagramPoll = object : Runnable {
         override fun run() {
@@ -143,8 +160,12 @@ class SkyHandsFreeService : Service() {
         }
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {}
-            override fun onDone(utteranceId: String?) { handler.post { resumeFromSpeech() } }
-            override fun onError(utteranceId: String?) { handler.post { resumeFromSpeech() } }
+            override fun onDone(utteranceId: String?) {
+                handler.post { finishSpeechIfCurrent(utteranceId) }
+            }
+            override fun onError(utteranceId: String?) {
+                handler.post { finishSpeechIfCurrent(utteranceId) }
+            }
         })
     }
 
@@ -223,6 +244,9 @@ class SkyHandsFreeService : Service() {
     }
 
     private fun stopRecognizer() {
+        handler.removeCallbacks(listenWatchdog)
+        // Invalidate before cancel/destroy: those calls can produce late callbacks.
+        recognitionEpoch.invalidate()
         listening = false
         val old = recognizer
         recognizer = null
@@ -237,6 +261,7 @@ class SkyHandsFreeService : Service() {
             return
         }
         stopRecognizer()
+        val epoch = recognitionEpoch.begin()
         try {
             val engine = SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
             recognizer = engine
@@ -250,8 +275,8 @@ class SkyHandsFreeService : Service() {
                 override fun onEvent(eventType: Int, params: Bundle?) {}
 
                 override fun onError(error: Int) {
+                    if (!recognitionEpoch.accepts(epoch, listening)) return
                     lastErrorCode = error
-                    if (!listening) return
                     stopRecognizer()
                     if (!running) return
                     if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ||
@@ -271,7 +296,7 @@ class SkyHandsFreeService : Service() {
                 }
 
                 override fun onResults(results: Bundle?) {
-                    if (!listening) return
+                    if (!recognitionEpoch.accepts(epoch, listening)) return
                     val heard = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         ?.firstOrNull().orEmpty()
                     stopRecognizer()
@@ -290,7 +315,9 @@ class SkyHandsFreeService : Service() {
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
             }
             listening = true
+            listeningStartedAt = SystemClock.elapsedRealtime()
             engine.startListening(options)
+            handler.postDelayed(listenWatchdog, SkyListenWatchdog.MAX_CYCLE_MS)
         } catch (_: Exception) {
             stopRecognizer()
             retryCount = (retryCount + 1).coerceAtMost(5)
@@ -306,6 +333,7 @@ class SkyHandsFreeService : Service() {
 
     private fun suspendForSpeech() {
         if (!running) return
+        speechTurns.invalidate() // Previous TTS callbacks are now stale.
         speechSuspended = true
         handler.removeCallbacks(nextListen)
         stopRecognizer()
@@ -321,12 +349,17 @@ class SkyHandsFreeService : Service() {
         schedule(850)
     }
 
+    private fun finishSpeechIfCurrent(utteranceId: String?) {
+        if (speechTurns.finish(utteranceId)) resumeFromSpeech()
+    }
+
     private fun say(message: String) {
         suspendForSpeech()
-        val result = tts?.speak(SkySpokenText.prepare(message), TextToSpeech.QUEUE_FLUSH, Bundle(),
-            "sky-service-" + SystemClock.uptimeMillis())
+        val id = speechTurns.begin()
+        val result = tts?.speak(SkySpokenText.prepare(message), TextToSpeech.QUEUE_FLUSH,
+            Bundle(), id)
         if (result != TextToSpeech.SUCCESS) {
-            handler.postDelayed({ resumeFromSpeech() }, 1500)
+            handler.postDelayed({ finishSpeechIfCurrent(id) }, 1500)
         }
     }
 
