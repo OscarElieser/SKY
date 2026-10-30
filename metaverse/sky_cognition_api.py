@@ -91,6 +91,13 @@ def verified_execution_metrics():
     return execution_report()
 
 
+@router.get("/reflective-metrics")
+def reflective_metrics():
+    """Evidencia categórica de pruebas, sólo con autenticación del propietario."""
+    from neural_core.sky_reflective_core import report, capabilities
+    return {"metrics": report(), "capabilities": capabilities()}
+
+
 @router.get("/native-evolution")
 def native_evolution_status():
     """Lectura protegida de aprendizaje estadístico local, sin secretos."""
