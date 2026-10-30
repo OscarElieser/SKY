@@ -63,7 +63,10 @@ class SkyAndroidActions(
                 launch(intent, "Abrí WhatsApp con tu mensaje preparado. " +
                     "Elegí el destinatario y pulsá Enviar si estás de acuerdo.")
             }
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton("Cancelar") { _, _ ->
+                receipt("Preparar WhatsApp", "REJECTED", "El propietario canceló la preparación")
+                feedback("No preparé ningún mensaje en WhatsApp.")
+            }
             .show()
     }
 
@@ -137,7 +140,10 @@ class SkyAndroidActions(
                 }
                 launch(intent, "Solicité al Reloj el temporizador. Revisá su estado en Android.")
             }
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton("Cancelar") { _, _ ->
+                receipt("Temporizador Android", "REJECTED", "El propietario canceló el temporizador")
+                feedback("No solicité ningún temporizador.")
+            }
             .show()
     }
 
@@ -272,7 +278,10 @@ class SkyAndroidActions(
                 }
             }
         }
-        shareDialog.setNegativeButton("Cancelar", null).show()
+        shareDialog.setNegativeButton("Cancelar") { _, _ ->
+            receipt("Preparar texto para compartir", "REJECTED", "El propietario canceló la preparación")
+            feedback("No compartí ningún texto.")
+        }.show()
     }
 
     private fun launch(intent: Intent, message: String) {
