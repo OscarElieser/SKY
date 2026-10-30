@@ -23,6 +23,10 @@ TOPIC_DESCRIPTIONS = {
     "fechas": "agenda planificación temporal calendarios horarios y fechas",
     "formato": "formato estructurado JSON CSV tablas y listas",
     "datos": "análisis de datos estadísticas indicadores y promedios",
+    "programacion": "desarrollo de software Python Flutter Kotlin programación y depuración",
+    "educacion": "educación técnica docencia pedagogía enseñanza y evaluación",
+    "investigacion": "investigación científica académica tesis y verificación de fuentes",
+    "seguridad": "ciberseguridad auditoría defensiva protección y análisis de vulnerabilidades",
     "general": "otras solicitudes generales sin especialidad identificada",
 }
 MAX_BYTES = 150_000
