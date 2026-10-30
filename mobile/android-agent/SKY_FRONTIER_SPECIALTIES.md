@@ -25,6 +25,23 @@ Las etiquetas son **rutas de respuesta**, no sustituyen hardware, software cient
 
 La app devuelve las condiciones necesarias si faltan datos; no presupone cantidades. Esto representa **tres cálculos verificables**, no un motor FEA, simulador de tokamak, ordenador cuántico ni sistema de robótica.
 
+## Segundo bloque: estadística y álgebra, ejecutadas en Android (0.8.37 en validación)
+
+Este bloque agrega **dos herramientas matemáticas reales adicionales**, sin botones ni conexión obligatoria. La ejecución ocurre **antes de delegar el mensaje a modelos de lenguaje**; si faltan parámetros, SKY pide datos y no supone valores.
+
+| Orden oral o escrita | Operación verificable | Resultado de referencia |
+| --- | --- | --- |
+| «SKY, calcula promedio de 2, 4 y 6» | media, mediana, rango, varianza y desviación estándar poblacional, cálculo Welford + comprobación independiente | media 4, mediana 4, varianza 2.6667, desviación 1.6330 |
+| «SKY, calcula mediana de -2, 3.5, 7, 12» | medianas y estadística descriptiva sobre datos proporcionados | mediana 5.25 |
+| «SKY, resuelve ecuación cuadrática a=1 b=-3 c=2» | solución de ax²+bx+c=0 con manejo de cancelación numérica | raíces 1 y 2 |
+| «SKY, resuelve ecuación cuadrática a=1 b=0 c=1» | raíces complejas si el discriminante es negativo | ±1i |
+
+Módulos: `SkyStatisticsCalculator.kt`, `SkyQuadraticSolver.kt`; pruebas: `SkyStatisticsCalculatorTest.kt`, `SkyQuadraticSolverTest.kt`. Los cuatro cálculos anteriores de ejemplo son **resultados matemáticos esperados**, no evidencia de ejecución en tu Samsung: para eso deben pasar CI y las pruebas físicas.
+
+**Restricciones demostrables:** la estadística acepta 2–100 valores finitos explícitos, punto para los decimales, y determina la **varianza poblacional (N)**, no la muestral. La ecuación cuadrática exige coeficientes `a,b,c`, `a ≠ 0`, con rango numérico limitado. No se sustituyen calculadores de ingeniería, medicina, criptografía ni sistemas físicos. El código no tiene interfaces para enviar mensajes, pagar, controlar equipos o ejecutar scripts.
+
+**Validación pendiente:** JUnit + compilación Android, emuladores 15/16, APK firmada y prueba en Samsung con voz, texto, modo avión, error de datos, permisos y bloqueo de pantalla. No dar por terminada la distribución hasta que se cumplan.
+
 ## Ingeniería y seguridad
 
 Control humano: `interpretar → planificar → seleccionar herramienta → autorizar acción sensible → ejecutar → recibir prueba → reportar`. Ningún rol nuevo obtiene acceso a contactos, micrófono, red, datos médicos, drones o apps de terceros por el simple hecho de ser registrado.
