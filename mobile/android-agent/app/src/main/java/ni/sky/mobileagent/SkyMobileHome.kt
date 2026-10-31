@@ -779,14 +779,17 @@ class SkyMobileHome(
     fun isPanelOpen() = dialogBackdrop.visibility == View.VISIBLE
 
     fun openChat() {
-        if (pendingQuestion == null && pendingInfo != null) {
-            clearTransientNotice()
-            renderConversation()
-        }
+        if (pendingQuestion == null && pendingInfo != null) clearTransientNotice()
+        val opening = !isPanelOpen()
         activeModule = ""
         panelTitle.text = "Conversación"
         panelSubtitle.visibility = View.GONE
         dialogBackdrop.visibility = View.VISIBLE
+        if (opening) {
+            renderConversation(autoScrollToEnd = true)
+        } else if (pendingQuestion == null) {
+            renderConversation()
+        }
     }
 
     fun openModule(id: String) {
@@ -801,7 +804,9 @@ class SkyMobileHome(
     }
 
     fun closePanel() {
+        val noticeWasVisible = pendingInfo != null
         clearTransientNotice()
+        if (noticeWasVisible) renderConversation()
         dialogBackdrop.visibility = View.GONE
         privacy.visibility = View.GONE
         chatInput.clearFocus()
