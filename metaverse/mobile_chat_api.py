@@ -13,6 +13,7 @@ from .api import require_key
 from .sky_home_api import HomeChat, home_chat
 from . import sky_home_api
 from neural_core import sky_mobile_chat as mobile_chat
+from neural_core import sky_inference_gateway as inference
 
 router = APIRouter(prefix="/api/sky/mobile-chat")
 owner = APIRouter(dependencies=[Depends(require_key)])
@@ -69,10 +70,14 @@ def mobile_chat_status(body: Device,
             raise HTTPException(429, "Límite de solicitudes de chat",
                                 headers={"Retry-After": "60"}) from exc
         raise HTTPException(401, "Sesión móvil inválida o caducada") from exc
+    try:
+        health = inference.readiness()
+    except inference.InferenceUnavailable:
+        health = {"local_ollama_ready": False, "ready_workers": 0,
+                  "configured_workers": 0, "model_output_verified": False}
     return {"service": "SKY API", "chat_authenticated": True,
-            "local_ollama_ready": sky_home_api._local_model_ready(),
-            "model_output_verified": False,
-            "note": "Modelo disponible no equivale a respuesta, velocidad ni calidad comprobadas"}
+            **health,
+            "note": "Modelo instalado no implica respuesta, latencia ni calidad comprobadas"}
 
 
 @client.post("/chat")
@@ -87,7 +92,31 @@ def mobile_chat_text(body: MobileChatRequest,
     # The owner endpoint is reused as a function only AFTER scope validation.
     # Its body is restricted to text/provider consent and never invokes tools.
     payload = HomeChat.model_validate(body.model_dump(exclude={"device_id"}))
+    if payload.proveedor == "ollama":
+        if payload.autorizar_nube or payload.autorizar_datos_privados:
+            raise HTTPException(400, "El motor propio solo admite inferencia privada local")
+        messages = [{"role": "system", "content":
+            "Eres SKY IA. Responde con precisión y claridad. No inventes fuentes, " +
+            "no afirmes haber ejecutado herramientas y admite incertidumbre."}]
+        messages.extend({"role": turn.role, "content": turn.content}
+                        for turn in payload.historial)
+        messages.append({"role": "user", "content": payload.texto})
+        try:
+            return inference.generate(messages, max_output_tokens=1200)
+        except inference.InferenceBusy as exc:
+            raise HTTPException(429, "SKY API local ocupada",
+                                headers={"Retry-After": "3"}) from exc
+        except inference.InferenceUnavailable as exc:
+            raise HTTPException(503, "Motor de SKY API sin capacidad disponible") from exc
+        except ValueError as exc:
+            raise HTTPException(422, "Solicitud de inferencia inválida") from exc
     return home_chat(payload)
+
+
+@owner.get("/inference/metrics")
+def inference_metrics():
+    """Owner-only process counters; no prompts, tokens or device identities."""
+    return inference.metrics_snapshot()
 
 
 router.include_router(owner)
