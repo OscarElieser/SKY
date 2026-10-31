@@ -114,6 +114,13 @@ def mobile_chat_text(body: MobileChatRequest,
         except ValueError as exc:
             raise HTTPException(422, "El proveedor externo admite hasta 4000 caracteres") from exc
     if payload.proveedor == "sky_auto":
+        # If external fallback is authorized, its historical context retains
+        # the legacy 2K-per-turn cap; never leak 4K private local context.
+        may_fallback = payload.autorizar_nube and (
+            payload.datos == "generales" or payload.autorizar_datos_privados)
+        if may_fallback and any(len(turn.content) > 2000
+                                for turn in payload.historial):
+            raise HTTPException(422, "El contexto autorizado para nube excede 2000 caracteres por turno")
         messages = [{"role": "system",
                      "content": answer_quality.system_prompt(payload.texto)}]
         messages.extend({"role": turn.role, "content": turn.content}
