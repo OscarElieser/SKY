@@ -68,6 +68,34 @@ class SkyPremiumHistoryRuntimeTest {
         }
     }
 
+    @Test fun newChatKeepsOlderSqliteEntriesAndPreservesLongPrompts() {
+        SkyConversationArchive(app).use { archive ->
+            val lengthy = "Proyecto de tesis: " + "Apartado académico completo. ".repeat(270)
+            assertTrue(lengthy.length > 4_000)
+            val old = archive.append("Conversación anterior " + System.nanoTime(),
+                "Respuesta guardada", "SKY · test")
+            var current: SkyConversationArchive.Entry? = null
+            try {
+                val cutoff = SkyChatSessionPolicy.newBoundary(old.id)
+                assertFalse(SkyChatSessionPolicy.visible(old.id, cutoff))
+                current = archive.append(lengthy, "Documento completo", "SKY · test")
+                assertTrue(SkyChatSessionPolicy.visible(current.id, cutoff))
+                // New chat changes only the visual/session boundary, not SQLite.
+                val archivedOld = archive.page(old.title, limit = 25)
+                    .firstOrNull { it.id == old.id }
+                assertNotNull(archivedOld)
+                assertEquals("Respuesta guardada", archivedOld!!.answer)
+                val archivedLong = archive.page(current.title, limit = 25)
+                    .firstOrNull { it.id == current.id }
+                assertNotNull(archivedLong)
+                assertEquals(lengthy, archivedLong!!.question)
+            } finally {
+                current?.let { archive.delete(it.id) }
+                archive.delete(old.id)
+            }
+        }
+    }
+
     @Test fun regularHistoryStillWorksAfterAdditiveMigration() {
         SkyConversationArchive(app).use { archive ->
             val original = archive.append("Consulta de compatibilidad SKY",
