@@ -78,7 +78,7 @@ def _validate(messages: list[dict]) -> None:
                 item.get("role") not in ("system", "user", "assistant") or
                 not isinstance(item.get("content"), str) or
                 not 1 <= len(item["content"]) <= (
-                    32_000 if item["role"] == "user" else 4000)):
+                    48_000 if item["role"] == "user" else 4000)):
             raise ValueError("Mensaje de SKY fuera de límites")
     if messages[-1]["role"] != "user":
         raise ValueError("Falta el mensaje de usuario")
@@ -105,7 +105,8 @@ def generate(messages: list[dict], *, cloud_consent: bool = False,
                  (not private_data or private_cloud_consent))
     local_busy = False
     try:
-        local_budget = 4096 if len(messages[-1]["content"]) > 4000 else 2048
+        local_budget = (6144 if len(messages[-1]["content"]) > 32000 else
+                        4096 if len(messages[-1]["content"]) > 4000 else 2048)
         result = local.generate(messages, max_output_tokens=local_budget)
         # Provenance must reflect reality, not a self-reported chat message.
         return dict(result, ruta="SKY_AUTO_LOCAL", alternativa=False)

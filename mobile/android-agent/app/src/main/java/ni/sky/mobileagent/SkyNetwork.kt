@@ -31,7 +31,7 @@ object SkyNetwork {
             conn.requestMethod = "POST"
             conn.instanceFollowRedirects = false
             conn.connectTimeout = 8000
-            conn.readTimeout = if (path.endsWith("/chat")) 210000 else 8000
+            conn.readTimeout = if (path.endsWith("/chat")) 360000 else 8000
             conn.setRequestProperty("Accept", "application/json")
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             val header = if (path.endsWith("/pair")) "X-SKY-MOBILE-TOKEN" else "X-SKY-CHAT-TOKEN"

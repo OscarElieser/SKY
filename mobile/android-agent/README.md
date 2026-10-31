@@ -1,3 +1,13 @@
+## SKY Android 0.8.44 — respuestas naturales y trabajo profesional (en validación)
+
+**Código en revisión:** **184 expresiones (176 nuevas y 8 respuestas anteriores conservadas)** de diez categorías (saludos, despedidas, agradecimiento, refranes, motivación, chistes, trabalenguas, adivinanzas, reflexión y estudio), rotación sin uso de nubes ni desvíos de solicitudes académicas. Se amplía **solo la ruta SKY API privada** hasta 48.000 caracteres por consulta, con hasta 6.144 tokens de respuesta si el operador tiene Ollama real configurado para 65.536 tokens de contexto; las nubes externas mantienen 4.000 caracteres y autorizaciones. Se corrigió el historial Android para guardar los textos largos completos. Las órdenes explícitas de planificación generan un **artefacto Markdown editable** en el historial (plan de tesis, investigación o programación), sin afirmar que el trabajo ya esté terminado.
+
+**Pendiente de certificar:** ejecución en servidor de pesos Ollama reales, calidad del contenido, Android 15/16 y Samsung físico (audio, voz, archivos, seguridad y Play Protect), métricas de carga y preparación comercial. No tocar SKY Windows ni BAQUEANO. El código debe pasar CI y firmarse antes de anunciar APK disponible.
+
+[Capacidades, criterios y pruebas de 0.8.44](../../docs/SKY_ANDROID_0844_EXPRESIONES_Y_TRABAJOS_EXTENSOS.md) · [GitHub Actions](https://github.com/OscarElieser/SKY/actions).
+
+---
+
 ## SKY Android 0.8.43 — corrección de instalación Play Protect (candidato, no certificado)
 
 Se elimina de la APK **estándar** el servicio de acceso amplio a notificaciones que estaba en el manifiesto 0.8.42; se mantiene en la variante experimental separada, **no publicada**. Google documenta el bloqueo de instalaciones externas que solicitan ese permiso. La nueva build conservará el mismo paquete, firma de release y datos instalados si Android acepta actualizarla, pero **no se garantiza** que Play Protect permita instalarla hasta probar el APK firmado en Samsung. Se refuerzan las auditorías del binario y el test instrumentado. SKY no debe reportar reproducción audible sin evidencia.

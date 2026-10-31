@@ -33,7 +33,7 @@ class ChatPair(Device):
 class MobileChatRequest(HomeChat):
     # Expanded ONLY for self-hosted inference (the legacy Home API and
     # external cloud adapters retain their lower, separately enforced limits).
-    texto: str = Field(min_length=1, max_length=32_000)
+    texto: str = Field(min_length=1, max_length=48_000)
     device_id: str = Field(pattern=r"^[a-f0-9]{32}$")
 
 
@@ -135,7 +135,8 @@ def mobile_chat_text(body: MobileChatRequest,
                         for turn in payload.historial)
         messages.append({"role": "user", "content": payload.texto})
         try:
-            return inference.generate(messages, max_output_tokens=(4096 if len(payload.texto) > 4000 else 2048))
+            return inference.generate(messages, max_output_tokens=(6144 if len(payload.texto) > 32000 else
+                4096 if len(payload.texto) > 4000 else 2048))
         except inference.InferenceBusy as exc:
             raise HTTPException(429, "SKY API local ocupada",
                                 headers={"Retry-After": "3"}) from exc

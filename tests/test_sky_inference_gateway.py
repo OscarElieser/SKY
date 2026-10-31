@@ -148,13 +148,13 @@ def test_large_context_requires_operator_budget_before_http(model_worker, monkey
     assert not model_worker.requests
 
 
-def test_reject_over_32k_input_and_excess_generation_budget(model_worker, monkeypatch):
+def test_reject_over_48k_input_and_excess_generation_budget(model_worker, monkeypatch):
     monkeypatch.setenv("SKY_INFERENCE_NUM_CTX", "32768")
     with pytest.raises(ValueError):
-        gateway.generate([{"role": "user", "content": "A" * 32001}])
+        gateway.generate([{"role": "user", "content": "A" * 48001}])
     with pytest.raises(ValueError):
         gateway.generate([{"role": "user", "content": "consulta"}],
-                         max_output_tokens=4097)
+                         max_output_tokens=6145)
     assert not model_worker.requests
 
 
@@ -171,3 +171,30 @@ def test_invalid_context_configuration_is_not_silently_ignored(model_worker, mon
     with pytest.raises(gateway.InferenceUnavailable):
         gateway.generate([{"role": "user", "content": "consulta"}])
     assert not model_worker.requests
+
+
+def test_40k_long_research_requires_64k_operator_context(model_worker, monkeypatch):
+    prompt = "Tesis y programación " + "capítulos " * 4300
+    assert 32_000 < len(prompt) < 48_000
+    monkeypatch.setenv("SKY_INFERENCE_NUM_CTX", "32768")
+    with pytest.raises(ValueError, match="65536"):
+        gateway.generate([{"role": "user", "content": prompt}],
+                         max_output_tokens=6144)
+    assert model_worker.requests == []
+    monkeypatch.setenv("SKY_INFERENCE_NUM_CTX", "65536")
+    out = gateway.generate([{"role": "user", "content": prompt}],
+                           max_output_tokens=6144)
+    sent = model_worker.requests[-1]
+    assert sent["messages"][-1]["content"] == prompt
+    assert sent["options"]["num_ctx"] == 65536
+    assert sent["options"]["num_predict"] == 6144
+    assert out["metricas"]["contexto_tokens"] == 65536
+    assert out["nube"] is False
+
+
+def test_6k_output_budget_refused_when_context_small(model_worker, monkeypatch):
+    monkeypatch.setenv("SKY_INFERENCE_NUM_CTX", "32768")
+    with pytest.raises(ValueError, match="65536"):
+        gateway.generate([{"role": "user", "content": "Proyecto"}],
+                         max_output_tokens=6144)
+    assert model_worker.requests == []

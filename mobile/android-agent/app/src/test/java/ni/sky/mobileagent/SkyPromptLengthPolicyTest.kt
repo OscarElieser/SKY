@@ -30,14 +30,14 @@ class SkyPromptLengthPolicyTest {
         assertNull(SkyPromptLengthPolicy.compose("B".repeat(16001), "", true))
     }
 
-    @Test fun privateSkyAccepts32KWithoutExpandingExternalDeepMode() {
-        val privatePrompt = "Consulta académica: " + "R".repeat(31980)
+    @Test fun privateSkyAccepts48KWithoutExpandingExternalDeepMode() {
+        val privatePrompt = "Consulta académica: " + "R".repeat(47980)
         assertEquals(privatePrompt, SkyPromptLengthPolicy.compose(
             privatePrompt, "contenido auxiliar", deep = true, ownApi = true))
         assertNull(SkyPromptLengthPolicy.compose(privatePrompt, "", deep = true))
-        assertNull(SkyPromptLengthPolicy.compose("Z".repeat(32001), "", true, true))
+        assertNull(SkyPromptLengthPolicy.compose("Z".repeat(48001), "", true, true))
         assertEquals(16000, SkyPromptLengthPolicy.limit(true))
-        assertEquals(32000, SkyPromptLengthPolicy.limit(true, ownApi = true))
+        assertEquals(48000, SkyPromptLengthPolicy.limit(true, ownApi = true))
     }
 
     @Test fun blankTextNeverStartsNetworkRequest() {

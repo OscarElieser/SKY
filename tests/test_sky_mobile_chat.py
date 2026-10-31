@@ -160,6 +160,18 @@ long_result = endpoint.mobile_chat_text(endpoint.MobileChatRequest(
     x_sky_chat_token=paired["token"])
 assert long_result["respuesta"] == "Informe académico local"
 assert len(provider_calls) == 1
+very_long = "Investigación de desarrollo profesional: " + "método " * 6000
+assert 32000 < len(very_long) <= 48000
+def fake_very_long(messages, max_output_tokens):
+    assert messages[-1]["content"] == very_long
+    assert max_output_tokens == 6144
+    return {"respuesta": "Trabajo organizado por partes", "proveedor": "ollama",
+            "nube": False, "acciones_ejecutadas": False}
+endpoint.inference.generate = fake_very_long
+larger_result = endpoint.mobile_chat_text(endpoint.MobileChatRequest(
+    device_id=did, texto=very_long, proveedor="ollama"),
+    x_sky_chat_token=paired["token"])
+assert larger_result["nube"] is False and len(provider_calls) == 1
 try:
     endpoint.mobile_chat_text(endpoint.MobileChatRequest(
         device_id=did, texto="texto", proveedor="ollama", autorizar_nube=True),
