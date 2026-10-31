@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-CLOUD_ORDER = ("gemini", "openai", "anthropic", "mistral", "groq", "deepseek")
+# Optional providers are not candidates unless configured and a cloud request
+# is explicitly authorized. Never replace a selected provider after a failure.
+CLOUD_ORDER = ("gemini", "openai", "anthropic", "mistral", "groq",
+               "deepseek", "openrouter", "cloudflare")
 ALLOWED = ("auto", "ollama", *CLOUD_ORDER)
 
 
