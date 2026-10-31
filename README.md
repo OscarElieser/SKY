@@ -1,3 +1,13 @@
+## SKY Automático — motor propio primero, sin elegir API manualmente (30/10/2026)
+
+**Implementado como nueva ruta móvil en `main`, pendiente de pruebas de CI y de despliegue real.** SKY Android usa `sky_auto` de forma predeterminada cuando dispone del chat privado de SKY emparejado y autorizado. Selecciona Ollama de SKY primero y solo considera servicios externos si el propietario los ha autorizado y el servidor los ha permitido explícitamente. Las rutas anteriores `ollama`, `auto` y proveedores manuales permanecen disponibles, sin eliminación de funciones ni modificaciones a SKY Windows.
+
+La ruta `neural_core/sky_smart_router.py` mantiene lista de respaldo del servidor `SKY_AUTO_CLOUD_ORDER`: vacía por defecto (solo local), por ejemplo `groq,openrouter,mistral` tras configurar claves, cuotas y autorización comercial. Una cuota agotada provoca enfriamiento temporal, máximo dos intentos externos diferentes y nunca una sustitución oculta de proveedor. El consentimiento de enviar consultas a terceros es opcional, explícito y revocable desde Ajustes en la app; sin él no existe transferencia remota. Incluye pruebas aisladas y CI de enrutamiento, autenticación y privacidad.
+
+[Arquitectura y salvaguardas de SKY Automático](docs/SKY_API_AUTOMATICA_2026.md) · [GitHub Actions](https://github.com/OscarElieser/SKY/actions) · [Releases Android](https://github.com/OscarElieser/SKY/releases).
+
+---
+
 ## SKY API — conectores opcionales y con autorización (30/10/2026)
 
 Se agregaron al backend de SKY los adaptadores **OpenRouter, Mistral, Groq y Cloudflare Workers AI**, compatibles con chat completions de texto. **Ollama propio sigue siendo la opción predeterminada** de SKY Android. Las claves externas pertenecen al servidor, nunca a la APK ni a Git. El uso externo requiere consentimiento individual de Nube y Datos privados y no tiene fallback automático a proveedores de pago. **Gemini permanece integrado por su vía existente**; ninguna integración ha sido validada aún con claves reales desde este trabajo.
