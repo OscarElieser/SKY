@@ -4132,9 +4132,12 @@ class MainActivity : Activity() {
         val id = tokens.deviceId()
         val token = tokens.chatToken()
         val ownApiPrefs = getSharedPreferences("sky_own_api", MODE_PRIVATE)
-        val ownApiPreferred = ownApiPrefs.getBoolean("prefer_self_hosted_ollama", false)
-        val selectedSkyApiProvider = SkyOwnApiRoutingPolicy.chosenProvider(
-            ownApiPrefs.getString("sky_server_provider", "ollama"))
+        val ownApiPreferred = ownApiPrefs.getBoolean("prefer_self_hosted_ollama",
+            id.isNotBlank() && token.isNotBlank() && tokens.server().isNotBlank())
+        val selectedSkyApiProvider = if (
+            ownApiPrefs.getBoolean("automatic_routing", true)) "sky_auto"
+            else SkyOwnApiRoutingPolicy.chosenProvider(
+                ownApiPrefs.getString("sky_server_provider", "sky_auto"))
         if (SkyOwnApiRoutingPolicy.canPromptForSetup(ownApiPreferred,
                 id.isNotBlank() && token.isNotBlank() && tokens.server().isNotBlank())) {
             home.showMessage("Para usar tu SKY API primero autorizá el chat del " +
@@ -4202,6 +4205,19 @@ class MainActivity : Activity() {
         }
         val skyApiPaired = id.isNotBlank() && token.isNotBlank() &&
             tokens.server().isNotBlank()
+        val ownApiAutomatic = selectedSkyApiProvider == "sky_auto" &&
+            SkyOwnApiRoutingPolicy.useAutomaticViaSkyApi(
+                optedIn = ownApiPreferred,
+                pairedChatToken = skyApiPaired,
+                explicitGeminiMode = selection.explicit,
+                verifiedWebRequired = needsVerifiedSources,
+                promptChars = personalizedMessage.length
+            )
+        val automaticCloudConsent = ownApiAutomatic &&
+            SkyOwnApiRoutingPolicy.authorizedAutomaticCloud(
+                perTurnCloud = cloud,
+                perTurnPrivate = privateData,
+                standingConsent = ownApiPrefs.getBoolean("automatic_external_backup", false))
         val ownApiLocal = selectedSkyApiProvider == "ollama" &&
             SkyOwnApiRoutingPolicy.usePrivateApi(
                 optedIn = ownApiPreferred,
@@ -4220,7 +4236,7 @@ class MainActivity : Activity() {
             privateDataConsent = privateData,
             promptChars = personalizedMessage.length
         )
-        if (ownApiPreferred && selectedSkyApiProvider != "ollama" &&
+        if (ownApiPreferred && selectedSkyApiProvider !in listOf("ollama", "sky_auto") &&
             !selection.explicit && !needsVerifiedSources &&
             personalizedMessage.length <= SkyOwnApiRoutingPolicy.SERVER_PROMPT_LIMIT &&
             !ownApiExternal) {
@@ -4229,7 +4245,7 @@ class MainActivity : Activity() {
                 "El borrador permanece intacto y no se usará otro proveedor.")
             return
         }
-        val ownApiChat = ownApiLocal || ownApiExternal
+        val ownApiChat = ownApiAutomatic || ownApiLocal || ownApiExternal
         if (ownApiPreferred && !selection.explicit && !ownApiChat &&
             personalizedMessage.length > SkyOwnApiRoutingPolicy.SERVER_PROMPT_LIMIT &&
             !SkyPhoneCloud.requiresLiveVerification(message)) {
@@ -4296,16 +4312,23 @@ class MainActivity : Activity() {
                             .put("historial", history)
                             .put("proveedor", selectedSkyApiProvider)
                             .put("datos", "privados")
-                            .put("autorizar_nube", ownApiExternal)
-                            .put("autorizar_datos_privados", ownApiExternal)
+                            .put("autorizar_nube", ownApiExternal || automaticCloudConsent)
+                            .put("autorizar_datos_privados", ownApiExternal || automaticCloudConsent)
                         val local = SkyNetwork.requestChat(tokens.server(),
                             "/api/sky/mobile-chat/chat", token, payload)
-                        if (!ownApiExternal && local.optBoolean("nube", false)) {
+                        if (!(ownApiExternal || automaticCloudConsent) &&
+                            local.optBoolean("nube", false)) {
                             error("SKY API respondió con nube sin consentimiento.")
                         }
                         if (ownApiExternal && local.optBoolean("nube", false) &&
                             local.optString("proveedor") != selectedSkyApiProvider) {
                             error("SKY API cambió el proveedor externo sin autorización.")
+                        }
+                        if (ownApiAutomatic && local.optBoolean("nube", false) &&
+                            local.optString("proveedor") !in
+                                SkyOwnApiRoutingPolicy.SERVER_PROVIDERS.filter {
+                                    it != "sky_auto" && it != "ollama" }) {
+                            error("SKY API devolvió un proveedor externo no autorizado.")
                         }
                         answer = local.getString("respuesta")
                         provider = "SKY API · " +
