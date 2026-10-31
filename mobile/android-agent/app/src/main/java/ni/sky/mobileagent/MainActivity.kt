@@ -4093,8 +4093,10 @@ class MainActivity : Activity() {
         val groqReady = tokens.groqEnabled()
         val id = tokens.deviceId()
         val token = tokens.chatToken()
-        val ownApiPreferred = getSharedPreferences("sky_own_api", MODE_PRIVATE)
-            .getBoolean("prefer_self_hosted_ollama", false)
+        val ownApiPrefs = getSharedPreferences("sky_own_api", MODE_PRIVATE)
+        val ownApiPreferred = ownApiPrefs.getBoolean("prefer_self_hosted_ollama", false)
+        val selectedSkyApiProvider = SkyOwnApiRoutingPolicy.chosenProvider(
+            ownApiPrefs.getString("sky_server_provider", "ollama"))
         if (SkyOwnApiRoutingPolicy.canPromptForSetup(ownApiPreferred,
                 id.isNotBlank() && token.isNotBlank() && tokens.server().isNotBlank())) {
             home.showMessage("Para usar tu SKY API primero autorizá el chat del " +
@@ -4160,20 +4162,42 @@ class MainActivity : Activity() {
                 "si decidís autorizar un servicio externo.")
             return
         }
-        val ownApiChat = SkyOwnApiRoutingPolicy.usePrivateApi(
+        val skyApiPaired = id.isNotBlank() && token.isNotBlank() &&
+            tokens.server().isNotBlank()
+        val ownApiLocal = selectedSkyApiProvider == "ollama" &&
+            SkyOwnApiRoutingPolicy.usePrivateApi(
+                optedIn = ownApiPreferred,
+                pairedChatToken = skyApiPaired,
+                explicitGeminiMode = selection.explicit,
+                verifiedWebRequired = needsVerifiedSources,
+                promptChars = personalizedMessage.length
+            )
+        val ownApiExternal = SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
             optedIn = ownApiPreferred,
-            pairedChatToken = id.isNotBlank() && token.isNotBlank() &&
-                tokens.server().isNotBlank(),
+            pairedChatToken = skyApiPaired,
+            selectedProvider = selectedSkyApiProvider,
             explicitGeminiMode = selection.explicit,
             verifiedWebRequired = needsVerifiedSources,
+            cloudConsent = cloud,
+            privateDataConsent = privateData,
             promptChars = personalizedMessage.length
         )
+        if (ownApiPreferred && selectedSkyApiProvider != "ollama" &&
+            !selection.explicit && !needsVerifiedSources &&
+            personalizedMessage.length <= SkyOwnApiRoutingPolicy.SERVER_PROMPT_LIMIT &&
+            !ownApiExternal) {
+            home.showMessage("SKY API externa requiere autorizar Nube y Datos " +
+                "privados para esta consulta antes de enviarla. " +
+                "El borrador permanece intacto y no se usará otro proveedor.")
+            return
+        }
+        val ownApiChat = ownApiLocal || ownApiExternal
         if (ownApiPreferred && !selection.explicit && !ownApiChat &&
             personalizedMessage.length > SkyOwnApiRoutingPolicy.SERVER_PROMPT_LIMIT &&
             !SkyPhoneCloud.requiresLiveVerification(message)) {
             home.showMessage("Tu SKY API admite hasta " +
                 "${SkyOwnApiRoutingPolicy.SERVER_PROMPT_LIMIT} caracteres por consulta. " +
-                "No envié un texto incompleto a Ollama. Dividilo en partes " +
+                "No envié un texto incompleto. Dividilo en partes " +
                 "o desactivá la prioridad SKY API para elegir otro motor autorizado.")
             return
         }
@@ -4232,15 +4256,23 @@ class MainActivity : Activity() {
                             .put("device_id", id)
                             .put("texto", personalizedMessage)
                             .put("historial", history)
-                            .put("proveedor", "ollama")
+                            .put("proveedor", selectedSkyApiProvider)
                             .put("datos", "privados")
-                            .put("autorizar_nube", false)
-                            .put("autorizar_datos_privados", false)
+                            .put("autorizar_nube", ownApiExternal)
+                            .put("autorizar_datos_privados", ownApiExternal)
                         val local = SkyNetwork.requestChat(tokens.server(),
                             "/api/sky/mobile-chat/chat", token, payload)
+                        if (!ownApiExternal && local.optBoolean("nube", false)) {
+                            error("SKY API respondió con nube sin consentimiento.")
+                        }
+                        if (ownApiExternal && local.optBoolean("nube", false) &&
+                            local.optString("proveedor") != selectedSkyApiProvider) {
+                            error("SKY API cambió el proveedor externo sin autorización.")
+                        }
                         answer = local.getString("respuesta")
-                        provider = "SKY API privada · " +
-                            local.optString("proveedor", "Ollama")
+                        provider = "SKY API · " +
+                            local.optString("proveedor", selectedSkyApiProvider) +
+                            if (local.optBoolean("nube", false)) " · externo autorizado" else " · local"
                         sources = emptyList()
                         searchSuggestions = ""
                     }
