@@ -4179,7 +4179,11 @@ class MainActivity : Activity() {
         val prefix = (if (privateData) SkyOwnerContext.forPrompt(this) else "") +
             memoryPrompt + documentGuide + cognitionGuide + factCheckGuide +
             evidenceRecall + skillsPrompt
-        val deepPrompt = selection.tier == SkyGeminiModes.Tier.DEEP
+        // SKY's own local-only route may accept a long academic instruction
+        // without requiring the user to select Gemini Deep.
+        val deepPrompt = selection.tier == SkyGeminiModes.Tier.DEEP ||
+            (ownApiPreferred && !selection.explicit &&
+                selectedSkyApiProvider in listOf("sky_auto", "ollama"))
         val messageLimit = SkyPromptLengthPolicy.limit(deepPrompt)
         if (selection.prompt.length > messageLimit) {
             val detail = "Tu prompt contiene ${selection.prompt.length} caracteres; el límite " +
@@ -4238,7 +4242,7 @@ class MainActivity : Activity() {
         )
         if (ownApiPreferred && selectedSkyApiProvider !in listOf("ollama", "sky_auto") &&
             !selection.explicit && !needsVerifiedSources &&
-            personalizedMessage.length <= SkyOwnApiRoutingPolicy.SERVER_PROMPT_LIMIT &&
+            personalizedMessage.length <= SkyOwnApiRoutingPolicy.EXTERNAL_PROMPT_LIMIT &&
             !ownApiExternal) {
             home.showMessage("SKY API externa requiere autorizar Nube y Datos " +
                 "privados para esta consulta antes de enviarla. " +
@@ -4246,6 +4250,15 @@ class MainActivity : Activity() {
             return
         }
         val ownApiChat = ownApiAutomatic || ownApiLocal || ownApiExternal
+        if (ownApiPreferred && !selection.explicit &&
+            selectedSkyApiProvider !in listOf("ollama", "sky_auto") &&
+            personalizedMessage.length > SkyOwnApiRoutingPolicy.EXTERNAL_PROMPT_LIMIT) {
+            home.showMessage("El proveedor externo admite hasta " +
+                "${SkyOwnApiRoutingPolicy.EXTERNAL_PROMPT_LIMIT} caracteres. " +
+                "No enviaré fragmentos del prompt sin autorización: " +
+                "seleccioná SKY Automático o Ollama para trabajar localmente.")
+            return
+        }
         if (ownApiPreferred && !selection.explicit && !ownApiChat &&
             personalizedMessage.length > SkyOwnApiRoutingPolicy.SERVER_PROMPT_LIMIT &&
             !SkyPhoneCloud.requiresLiveVerification(message)) {
