@@ -21,7 +21,7 @@ class SkyPromptLengthPolicyTest {
     @Test fun oversizedNormalPromptIsRejectedRatherThanSilentlyTruncated() {
         val prompt = "Estudio ".repeat(900)
         assertNull(SkyPromptLengthPolicy.compose(prompt, "", false))
-        assertEquals(prompt.length, prompt.length) // original user data not mutated
+        assertEquals("Estudio ".repeat(900), prompt) // original data stays intact
     }
 
     @Test fun deepModeAcceptsLongTextAndRejectsExcess() {
