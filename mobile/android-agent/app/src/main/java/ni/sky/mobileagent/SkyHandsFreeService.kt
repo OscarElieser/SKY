@@ -59,8 +59,24 @@ class SkyHandsFreeService : Service() {
             service.handler.post { service.process(command) }
             return true
         }
-        fun pauseForReply() { current?.handler?.post { current?.suspendForSpeech() } }
-        fun resumeAfterReply() { current?.handler?.post { current?.resumeFromSpeech() } }
+        // The visible SKY panel owns spoken responses. Keep the mic paused only
+        // while text-to-speech is actually pending, not after silent app commands.
+        fun pauseForReply() {
+            val service = current ?: return
+            service.handler.post {
+                if (service.running) {
+                    service.panelSpeechPending = true
+                    service.suspendForSpeech()
+                }
+            }
+        }
+        fun resumeAfterReply() {
+            val service = current ?: return
+            service.handler.post {
+                service.panelSpeechPending = false
+                service.resumeFromSpeech()
+            }
+        }
         fun stop(context: android.content.Context) {
             context.startService(Intent(context, SkyHandsFreeService::class.java)
                 .setAction(ACTION_STOP))
@@ -76,6 +92,12 @@ class SkyHandsFreeService : Service() {
     private var presence = SkyVoicePresence.Mode.WAKE_ONLY
     private val voiceSettings by lazy { getSharedPreferences("sky_voice_settings", MODE_PRIVATE) }
     private var speechSuspended = false
+    private var panelSpeechPending = false
+    private val resumeAfterSilentCommand = Runnable {
+        // A silent foreground action must not keep the microphone deaf for
+        // the full 20-second TTS safety timeout.
+        if (running && speechSuspended && !panelSpeechPending) resumeFromSpeech()
+    }
     private var retryCount = 0
     private var lastCycle = 0L
     private var lastPhraseAtMs = 0L
@@ -310,6 +332,7 @@ class SkyHandsFreeService : Service() {
         handler.removeCallbacks(nextListen)
         stopRecognizer()
         handler.removeCallbacks(safetyResume)
+        handler.removeCallbacks(resumeAfterSilentCommand)
         handler.postDelayed(safetyResume, 20_000L)
     }
 
@@ -317,6 +340,7 @@ class SkyHandsFreeService : Service() {
         if (!running) return
         speechSuspended = false
         handler.removeCallbacks(safetyResume)
+        handler.removeCallbacks(resumeAfterSilentCommand)
         resetInactivity()
         schedule(850)
     }
@@ -493,7 +517,14 @@ class SkyHandsFreeService : Service() {
                     val callback = onPhrase
                     if (callback != null) {
                         suspendForSpeech()
-                        callback.invoke(decision.command)
+                        try {
+                            callback.invoke(decision.command)
+                        } finally {
+                            // Async spoken replies call pauseForReply() and
+                            // resumeAfterReply(). Silent commands regain the
+                            // recognizer promptly without waiting 20 seconds.
+                            handler.postDelayed(resumeAfterSilentCommand, 900L)
+                        }
                     } else {
                         // Audio from the environment is not proof of speaker
                         // identity: repeat and require a second explicit command
