@@ -1,3 +1,16 @@
+## SKY Android 0.8.42 — priorizar SKY API propia con Ollama (30/10/2026)
+
+**Estado:** integración de rutas de código en `main`; no se debe afirmar que existe un servidor desplegado, un modelo local activo en el Samsung ni que ya se aprobaron los tests Android.
+
+- **Ruta real de texto:** en Ajustes → Motor, la opción «Priorizar mi SKY API privada» activa el enrutamiento de consultas compatibles por `SkyNetwork.requestChat()` hacia `POST /api/sky/mobile-chat/chat` sobre HTTPS, usando `X-SKY-CHAT-TOKEN` limitado y `proveedor=ollama`. Las claves maestras y el puerto local de Ollama nunca van en la APK. No requiere integrar Termux.
+- **Autorización y límites:** requiere dispositivo emparejado y sesión de chat independiente vigente (24 h). El texto no se recorta en silencio; la API admite hasta 4.000 caracteres. El estado HTTP 409 indica falta de modelo, 429 indica cuota de protección del chat propio; no se confunden con cuota Gemini. La consulta no se redirige automáticamente a un proveedor externo.
+- **Diagnóstico comprobable:** `POST /api/sky/mobile-chat/status` requiere token de chat; el botón «CONFIGURAR / COMPROBAR SKY API» consulta si el modelo Ollama configurado está presente en el servidor. No asegura funcionamiento ni rendimiento por el solo estado de disponibilidad.
+- **Compatibilidad:** la opción no sustituye una consulta web con citas verificadas ni el modo profundo de Gemini solicitado explícitamente. No altera SKY Windows. La app de Samsung aún NO tiene motor LiteRT-LM ni pesos locales.
+- **Pruebas de código:** `SkyOwnApiRoutingPolicyTest.kt` y `tests/test_sky_mobile_chat.py` cubren consentimiento, enrutamiento, límites de longitud, protección del estado y alcance del token. Los resultados reales de GitHub Actions y emuladores deben confirmarse antes de publicar.
+- **Comercialización:** el backend actual es de propietario/dispositivo, no de múltiples clientes independientes; usarlo como servidor de miles de usuarios o exponer Ollama directamente no es seguro. Ver el [plan de arquitectura comercial y criterios de aceptación](../../docs/SKY_API_COMERCIAL_INFERENCIA_2026.md).
+
+---
+
 ## SKY Android 0.8.42 — Nuevo chat, historial intacto y cuota Gemini (30/10/2026)
 
 **Situación observada en Samsung:** tras escribir un prompt académico, el proveedor Gemini respondió que su límite de uso había sido alcanzado. El cuadro de entrada volvió a mostrar el borrador y la conversación no ofrecía «Nuevo chat». Estas mejoras están en el código de `main`; no declarar pruebas de APK o Samsung realizadas sin evidencia.
