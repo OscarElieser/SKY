@@ -18,6 +18,8 @@ class SkyExpressionCatalogTest {
     @Test fun naturalRequestsRouteToTheirCategoriesWithoutNetwork() {
         assertEquals(SkyExpressionCatalog.Kind.SALUDO,
             SkyExpressionCatalog.requested("¡Hola, SKY!"))
+        assertEquals(SkyExpressionCatalog.Kind.SALUDO,
+            SkyExpressionCatalog.requested("Qué onda Sky"))
         assertEquals(SkyExpressionCatalog.Kind.REFRAN,
             SkyExpressionCatalog.requested("SKY, decime un refrán"))
         assertEquals(SkyExpressionCatalog.Kind.TRABALENGUAS,
