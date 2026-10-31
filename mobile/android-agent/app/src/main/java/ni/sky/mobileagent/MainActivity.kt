@@ -4146,9 +4146,24 @@ class MainActivity : Activity() {
                         searchSuggestions = ""
                     }
                     mobileCloud -> {
-                        answer = SkyPhoneCloud.reply(tokens.personalCloudKey(), personalizedMessage,
-                            history, selectedMode = selection)
-                        provider = "Gemini · " + selection.model
+                        val response = try {
+                            Pair(SkyPhoneCloud.reply(tokens.personalCloudKey(), personalizedMessage,
+                                history, selectedMode = selection),
+                                "Gemini · " + selection.model)
+                        } catch (quota: SkyPhoneCloud.GeminiQuotaException) {
+                            if (!SkyProviderFallbackPolicy.canUseGroq(
+                                    groqAuthorized = groqReady,
+                                    explicitGemini = selection.explicit,
+                                    needsVerifiedWeb = needsLiveSources,
+                                    promptLength = personalizedMessage.length
+                                )) throw quota
+                            // Groq was explicitly enabled by its owner in
+                            // Settings; this never retries against Gemini's quota.
+                            Pair(SkyGroqCloud.reply(tokens.groqKey(), personalizedMessage,
+                                history), "Groq · alternativa autorizada (Gemini sin cuota)")
+                        }
+                        answer = response.first
+                        provider = response.second
                         sources = emptyList()
                         searchSuggestions = ""
                     }
