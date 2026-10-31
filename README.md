@@ -1,3 +1,13 @@
+## SKY Android 0.8.45 — integridad de investigaciones extensas (código en validación)
+
+**Se corrigió un defecto P0 de continuidad:** aunque SQLite archivaba el texto completo de cada trabajo, el contexto enviado para continuarlo podía exceder el contrato del servidor y producir errores **422**. La ruta privada ahora limita el contexto a **8 turnos × 4.000 caracteres**, con extractos **marcados explícitamente** y sin borrar los originales del historial; las nubes externas mantienen 8 × 2.000 caracteres y sus consentimientos. Se mejoró el transporte de respuestas Unicode hasta 512 KB con corte seguro, y se conserva el identificador auténtico de operación de Ollama en el metadato de historial.
+
+No se incrementan artificialmente los límites del modelo: 48.000 caracteres por petición / hasta 6.144 tokens de salida, condicionados por hardware y un contexto Ollama configurado. Se deben certificar CI, emuladores, Samsung físico y generación de un modelo Ollama real antes de anunciarlo como comercial. Se conserva SKY Windows, BAQUEANO, firma, seguridad y versiones anteriores.
+
+[Diagnóstico, pruebas y criterios P0](docs/SKY_ANDROID_0845_CONTINUIDAD_Y_TRAZABILIDAD.md) · [GitHub Actions](https://github.com/OscarElieser/SKY/actions).
+
+---
+
 ## SKY Android 0.8.44 — respuestas naturales y trabajo profesional (en validación)
 
 **Código en revisión:** **184 expresiones (176 nuevas y 8 respuestas anteriores conservadas)** de diez categorías (saludos, despedidas, agradecimiento, refranes, motivación, chistes, trabalenguas, adivinanzas, reflexión y estudio), rotación sin uso de nubes ni desvíos de solicitudes académicas. Se amplía **solo la ruta SKY API privada** hasta 48.000 caracteres por consulta, con hasta 6.144 tokens de respuesta si el operador tiene Ollama real configurado para 65.536 tokens de contexto; las nubes externas mantienen 4.000 caracteres y autorizaciones. Se corrigió el historial Android para guardar los textos largos completos. Las órdenes explícitas de planificación generan un **artefacto Markdown editable** en el historial (plan de tesis, investigación o programación), sin afirmar que el trabajo ya esté terminado.
