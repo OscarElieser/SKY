@@ -108,6 +108,11 @@ def home_chat(body: HomeChat):
         else:
             result = providers.reply(messages, provider=route.provider,
                                      max_output_tokens=1200)
+    except optional.CloudProviderRateLimited as exc:
+        # No automatic retry or hidden paid-provider fallback on a free quota.
+        raise HTTPException(status_code=429,
+                            detail="El proveedor externo alcanzó su cuota o límite.",
+                            headers={"Retry-After": "60"}) from exc
     except (providers.ProviderError, optional.CloudProviderUnavailable, ValueError) as exc:
         # Only an AUTO cloud request may fall back to a verified local model.
         # Never change silently to a different cloud service (cost/privacy).
