@@ -40,6 +40,7 @@ class SkyMobileHome(
     private val host: Activity,
     val voicePanel: SkyEyeVoicePanel,
     private val onSend: () -> Unit,
+    private val onNewChat: () -> Unit,
     private val onSettings: () -> Unit,
     private val onChatAccess: () -> Unit,
     private val onAttach: () -> Unit,
@@ -71,8 +72,10 @@ class SkyMobileHome(
         val title: String = SkyConversationArchive.titleFor(question),
         val dateLabel: String = ""
     )
+    private var sessionAfterId = host.getSharedPreferences(
+        "sky_chat_session", Context.MODE_PRIVATE).getLong("after_id", 0L)
     private val history = ArrayList<Exchange>().apply {
-        archive.recent(150).forEach { saved ->
+        archive.recent(150).filter { it.id > sessionAfterId }.forEach { saved ->
             add(Exchange(saved.question, saved.answer, saved.engine,
                 emptyList(), "", saved.title, saved.localTime()))
         }
@@ -582,6 +585,10 @@ class SkyMobileHome(
             gravity = Gravity.CENTER_VERTICAL
         }
         header.addView(panelTitle, LinearLayout.LayoutParams(0, dp(50), 1f))
+        header.addView(pill("＋ Nuevo", Color.rgb(47, 107, 146), onNewChat).apply {
+            textSize = 12f
+            contentDescription = "Iniciar un nuevo chat sin borrar las conversaciones guardadas"
+        }, LinearLayout.LayoutParams(dp(92), dp(40)).apply { rightMargin = dp(6) })
         header.addView(pill("Enseñar", Color.rgb(54, 81, 133), onTeach).apply {
             textSize = 12f
             contentDescription = "Corregir y enseñarle una respuesta a SKY"
@@ -687,6 +694,21 @@ class SkyMobileHome(
         renderConversation()
     }
 
+    /** New chat clears only the active screen and draft. SQLite history survives. */
+    fun startNewChat(afterId: Long) {
+        sessionAfterId = afterId.coerceAtLeast(0L)
+        history.clear()
+        pendingQuestion = null
+        pendingInfo = null
+        expandedHistory = false
+        activeModule = ""
+        chatInput.setText("")
+        panelTitle.text = "Conversación nueva"
+        panelSubtitle.visibility = View.GONE
+        renderConversation()
+        dialogBackdrop.visibility = View.VISIBLE
+    }
+
     /** Abrir una consulta histórica sin volver a guardarla ni perder su texto. */
     fun openSavedExchange(entry: SkyConversationArchive.Entry) {
         history.clear()
@@ -700,7 +722,7 @@ class SkyMobileHome(
     /** Recargar historial tras editar, borrar o renombrar; no toca la base. */
     fun reloadHistory() {
         history.clear()
-        archive.recent(150).forEach { entry ->
+        archive.recent(150).filter { it.id > sessionAfterId }.forEach { entry ->
             history.add(Exchange(entry.question, entry.answer, entry.engine,
                 emptyList(), "", entry.title, entry.localTime()))
         }
