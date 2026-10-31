@@ -1,3 +1,11 @@
+## SKY IA Android — avances verificables de calidad (30/10/2026)
+
+**Objetivo:** subir las calificaciones de SKY con pruebas reales, sin eliminar funciones, historial, código Windows ni comprometer BAQUEANO. La ruta `sky_auto` y Ollama ahora admiten hasta **16.000 caracteres** en el chat móvil autenticado, sin recortar la instrucción del usuario ni enviarla a proveedores externos por error; la salida local admite hasta 2.048 tokens. Las nubes externas siguen limitadas a 4.000 caracteres y requieren autorización. `sky_answer_quality.py` aporta instrucciones especializadas para ciencia, investigación, código y archivos, pero no afirma crear documentos ni ejecutar herramientas inexistentes.
+
+**Verificación:** contratos y pruebas CI en el repositorio; modelo GPU real y pruebas físicas Android aún pendientes. [Matriz de capacidades, pruebas y criterios para mejorar puntuaciones](docs/SKY_CAPACIDADES_VERIFICABLES_Y_HOJA_DE_CALIDAD_2026.md) · [Auditoría técnica](docs/AUDITORIA_SKY_ANDROID_API_PRELANZAMIENTO_2026-10-30.md) · [Actions](https://github.com/OscarElieser/SKY/actions).
+
+---
+
 ## Auditoría real de preparación para el mercado (30/10/2026)
 
 **Dictamen NO-GO para lanzamiento comercial abierto.** La APK 0.8.42 firmada se publicó desde el commit `d2834ef0`, anterior a los cambios nuevos de `sky_auto` y no certifica el `main` actual. El proyecto Supabase `SKY-IA` está activo y ya hospeda `sky-platform-readiness` (JWT obligatorio), pero NO se ha conectado un servidor de inferencia Ollama probado. El motor local de SKY tiene límite de dos generaciones simultáneas por proceso. La regresión de seguridad que inicialmente falló 4 casos se corrigió y la nueva prueba backend alcanzó 59/59, pero falta aprobar Android y realizar pruebas en Samsung y GPU.
