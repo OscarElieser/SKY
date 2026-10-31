@@ -1,7 +1,7 @@
 ## SKY Android 0.8.42 — selección de motores en SKY API (30/10/2026)
 
 - **Principal:** SKY API privada → Ollama del servidor, sin consumir claves Gemini/Groq.
-- En **Ajustes → MOTOR SKY API · ELEGIR MODELO**, el propietario puede seleccionar OpenRouter, Mistral, Groq o Cloudflare Workers AI, todos del lado del **servidor HTTPS**. No se insertan claves externas en la APK.
+- En **Ajustes → MOTOR SKY API · ELEGIR MODELO**, el propietario puede seleccionar Gemini (adaptador ya existente), OpenRouter, Mistral, Groq o Cloudflare Workers AI. Todos funcionan mediante el **servidor HTTPS de SKY** y requieren autorización por consulta. No se insertan nuevas claves externas en la APK.
 - El servidor valida consentimiento de nube **y datos privados por consulta** antes de contactar un tercero; si faltan permisos, no transmite el texto ni cambia de motor. La opción «Priorizar mi SKY API privada» y emparejamiento siguen siendo requisitos.
 - OpenRouter usa `openrouter/free` por defecto y bloquea modelos de pago salvo configuración voluntaria del servidor. «Gratis» no significa cuotas ilimitadas.
 - Las pruebas unitarias de enrutamiento no validan credenciales, saldo, cobertura o calidad de respuesta en teléfono. Ver [seguridad y conexión de proveedores](../../docs/SKY_API_PROVEEDORES_COMPATIBLES_2026.md).
