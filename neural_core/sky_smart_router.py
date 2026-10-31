@@ -100,6 +100,9 @@ def generate(messages: list[dict], *, cloud_consent: bool = False,
     # prompts remain local rather than being silently truncated or leaked.
     long_or_sensitive = contains_credential or any(
         len(item["content"]) > 4000 for item in messages
+    ) or any(
+        item["role"] != "system" and item is not messages[-1] and
+        len(item["content"]) > 2000 for item in messages
     )
     permitted = (cloud_consent and not local_only and not long_or_sensitive and
                  (not private_data or private_cloud_consent))
