@@ -78,15 +78,16 @@ class SkyPremiumHistoryRuntimeTest {
             try {
                 val cutoff = SkyChatSessionPolicy.newBoundary(old.id)
                 assertFalse(SkyChatSessionPolicy.visible(old.id, cutoff))
-                current = archive.append(lengthy, "Documento completo", "SKY · test")
-                assertTrue(SkyChatSessionPolicy.visible(current.id, cutoff))
+                val fresh = archive.append(lengthy, "Documento completo", "SKY · test")
+                current = fresh
+                assertTrue(SkyChatSessionPolicy.visible(fresh.id, cutoff))
                 // New chat changes only the visual/session boundary, not SQLite.
                 val archivedOld = archive.page(old.title, limit = 25)
                     .firstOrNull { it.id == old.id }
                 assertNotNull(archivedOld)
                 assertEquals("Respuesta guardada", archivedOld!!.answer)
-                val archivedLong = archive.page(current.title, limit = 25)
-                    .firstOrNull { it.id == current.id }
+                val archivedLong = archive.page(fresh.title, limit = 25)
+                    .firstOrNull { it.id == fresh.id }
                 assertNotNull(archivedLong)
                 assertEquals(lengthy, archivedLong!!.question)
             } finally {
