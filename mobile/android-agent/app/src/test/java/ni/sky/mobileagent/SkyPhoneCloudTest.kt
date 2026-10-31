@@ -75,6 +75,17 @@ class SkyPhoneCloudTest {
         assertFalse(SkyPhoneCloud.validPersonalKey("abc\nInjected"))
         assertTrue(SkyPhoneCloud.validPersonalKey("TESTSyEXAMPLEonly-for-validation_12345"))
     }
+    @Test fun academicYearAndEmotionalClimateAreNotLiveWebQueries() {
+        assertFalse(SkyPhoneCloud.requiresLiveVerification(
+            "Desarrolla una tesis de informática educativa en 2026"))
+        assertFalse(SkyPhoneCloud.requiresLiveVerification(
+            "Estudia el clima emocional en el aula universitaria"))
+        assertFalse(SkyPhoneCloud.requiresLiveVerification(
+            "Tiempo disponible seis meses y cronograma del proyecto"))
+        assertTrue(SkyPhoneCloud.requiresLiveVerification(
+            "¿Qué clima hace hoy en Managua?"))
+    }
+
     @Test fun changingFactsRequireWebVerification() {
         assertTrue(SkyPhoneCloud.requiresLiveVerification("¿Cuáles son las noticias de hoy?"))
         assertTrue(SkyPhoneCloud.requiresLiveVerification("Dime el precio actual del dólar"))
