@@ -370,7 +370,7 @@ class SkyMobileHome(
                 (host.resources.displayMetrics.heightPixels * 0.67f).toInt()))
         }
         val dialog = android.app.AlertDialog.Builder(host)
-            .setTitle("SKY IA · Respuesta completa")
+            .setTitle("SKY IA · Mensaje completo")
             .setView(wrapper)
             .setNeutralButton("Copiar texto") { _, _ ->
                 val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -402,8 +402,8 @@ class SkyMobileHome(
         item.addView(speaker)
         // Los mensajes del usuario continúan siendo texto nativo editable/copiable.
         // Las respuestas de SKY se maquetan sin ejecutar HTML, JavaScript ni red.
-        // A lightweight native bubble is enough for short plain messages.
-        // WebView/MathML is reserved for structured answers to save memory.
+        // Multiline plain text must be a native WRAP_CONTENT TextView.
+        // Offline WebView/MathML is reserved for structured scientific output.
         val visibleValue = SkyChatPresentationPolicy.preview(value)
         val tooLong = SkyChatPresentationPolicy.hasFullViewer(value)
         val rich = !mine && SkyChatPresentationPolicy.requiresScientificRenderer(visibleValue)
