@@ -49,3 +49,24 @@ def test_unknown_provider_rejected():
 
 def test_local_requested_never_changes_to_cloud():
     assert route(requested="ollama", local_available=False, cloud_consent=True, private_cloud_consent=True).provider is None
+
+
+@pytest.mark.parametrize("provider", ["openrouter", "cloudflare", "mistral", "groq"])
+def test_optional_cloud_provider_needs_explicit_consent_and_configuration(provider):
+    config = (provider,)
+    result = choose_home_route(requested=provider, configured_cloud=config,
+                               local_available=True, private_data=True,
+                               cloud_consent=False, private_cloud_consent=False)
+    assert result.provider is None
+    blocked = choose_home_route(requested=provider, configured_cloud=config,
+                                local_available=True, private_data=True,
+                                cloud_consent=True, private_cloud_consent=False)
+    assert blocked.provider is None
+    allowed = choose_home_route(requested=provider, configured_cloud=config,
+                                local_available=True, private_data=True,
+                                cloud_consent=True, private_cloud_consent=True)
+    assert allowed.provider == provider and allowed.remote
+    local_only = choose_home_route(requested=provider, configured_cloud=config,
+                                   cloud_consent=True, private_cloud_consent=True,
+                                   local_only=True)
+    assert local_only.provider is None
