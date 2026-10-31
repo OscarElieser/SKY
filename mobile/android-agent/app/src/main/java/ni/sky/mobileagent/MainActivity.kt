@@ -637,7 +637,7 @@ class MainActivity : Activity() {
                 chatInput.setText(transcript)
                 if (!tokens.cloudEnabled() && !tokens.groqEnabled() &&
                     tokens.chatToken().isEmpty() &&
-                    SkyLocalConversation.reply(transcript) == null &&
+                    !SkyLocalConversation.handles(transcript) &&
                     SkyAdaptiveMemory.correctionFromCommand(transcript) == null &&
                     (SkyAdaptiveMemory.ineligibleReason(transcript) != null ||
                         adaptiveMemory.find(transcript) == null) &&
