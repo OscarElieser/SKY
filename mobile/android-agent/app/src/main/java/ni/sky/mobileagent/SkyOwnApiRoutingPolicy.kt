@@ -54,7 +54,8 @@ internal object SkyOwnApiRoutingPolicy {
         privateDataConsent: Boolean,
         promptChars: Int
     ): Boolean = optedIn && pairedChatToken &&
-        selectedProvider in SERVER_PROVIDERS && selectedProvider != "ollama" &&
+        selectedProvider in SERVER_PROVIDERS &&
+        selectedProvider != "ollama" && selectedProvider != "sky_auto" &&
         cloudConsent && privateDataConsent &&
         !explicitGeminiMode && !verifiedWebRequired &&
         promptChars in 1..SERVER_PROMPT_LIMIT
