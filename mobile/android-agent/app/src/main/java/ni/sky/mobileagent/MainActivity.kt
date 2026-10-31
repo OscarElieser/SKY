@@ -4124,14 +4124,23 @@ class MainActivity : Activity() {
         // Optional context may be shortened; user instructions are never cut.
         val personalizedMessage = SkyPromptLengthPolicy.compose(
             selection.prompt, prefix, deepPrompt) ?: return
+        val needsVerifiedSources = SkyPhoneCloud.requiresLiveVerification(message) ||
+            SkyEvidencePolicy.needsVerification(message) ||
+            (cognitionEnabled() && SkyAndroidCognition.classify(message).verifyWithSources)
+        if (ownApiPreferred && !selection.explicit && needsVerifiedSources) {
+            home.showMessage("Pediste información que necesita fuentes verificables. " +
+                "SKY API local no dispone de búsqueda web confirmada, y tu preferencia " +
+                "privada impide enviar esta consulta a Gemini o Groq. " +
+                "No envié ni recorté el mensaje. Desactivá esa preferencia " +
+                "si decidís autorizar un servicio externo.")
+            return
+        }
         val ownApiChat = SkyOwnApiRoutingPolicy.usePrivateApi(
             optedIn = ownApiPreferred,
             pairedChatToken = id.isNotBlank() && token.isNotBlank() &&
                 tokens.server().isNotBlank(),
             explicitGeminiMode = selection.explicit,
-            verifiedWebRequired = SkyPhoneCloud.requiresLiveVerification(message) ||
-                SkyEvidencePolicy.needsVerification(message) ||
-                (cognitionEnabled() && SkyAndroidCognition.classify(message).verifyWithSources),
+            verifiedWebRequired = needsVerifiedSources,
             promptChars = personalizedMessage.length
         )
         if (ownApiPreferred && !selection.explicit && !ownApiChat &&
