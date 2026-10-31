@@ -44,8 +44,9 @@ object SkyNetwork {
                     401, 403 -> "SKY API rechazó la sesión. Renovala desde Ajustes."
                     409 -> "SKY API no tiene disponible el modelo Ollama seleccionado. " +
                         "Revisá el servidor y el modelo instalado. No se envió a Gemini."
-                    429 -> "SKY API aplicó su límite de protección por dispositivo. " +
-                        "Reintentá luego; no es la cuota de Gemini."
+                    429 -> "SKY API o el proveedor externo alcanzó un límite " +
+                        "de solicitudes. No se reintentará ni se cambiará de modelo " +
+                        "automáticamente. Conservá el mensaje para más tarde."
                     in 500..599 -> "SKY API no pudo responder. " +
                         "Verificá que el servidor esté disponible."
                     else -> "SKY API respondió HTTP $code."
