@@ -73,6 +73,18 @@ def _model() -> str:
     return name
 
 
+def _context_window() -> int:
+    """Server operator chooses the actual KV-cache budget; never trust Android."""
+    raw = os.getenv("SKY_INFERENCE_NUM_CTX", "16384")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise InferenceUnavailable("Contexto Ollama mal configurado") from exc
+    if value not in (8192, 16384, 32768):
+        raise InferenceUnavailable("Contexto Ollama debe ser 8192, 16384 o 32768")
+    return value
+
+
 def _read_limited(response) -> dict:
     raw = response.read(_MAX_RESPONSE_BYTES + 1)
     if len(raw) > _MAX_RESPONSE_BYTES:
@@ -159,10 +171,20 @@ def generate(messages: list[dict], *, max_output_tokens: int = 1200) -> dict:
                 message.get("role") not in ("system", "user", "assistant") or
                 not isinstance(message.get("content"), str) or
                 not 1 <= len(message["content"]) <= (
-                    16_000 if message["role"] == "user" else 4000)):
+                    32_000 if message["role"] == "user" else 4000)):
             raise ValueError("Mensaje de inferencia inválido")
-    if not isinstance(max_output_tokens, int) or not 1 <= max_output_tokens <= 2048:
+    if not isinstance(max_output_tokens, int) or not 1 <= max_output_tokens <= 4096:
         raise ValueError("Presupuesto de respuesta inválido")
+    context_window = _context_window()
+    # Conservative byte-based preflight. Exact tokenization depends on model;
+    # this never claims a long prompt fits a smaller physical context.
+    if any(len(m["content"]) > 16_000 for m in messages if m["role"] == "user") and context_window < 32768:
+        raise ValueError("Consulta superior a 16K requiere SKY_INFERENCE_NUM_CTX=32768")
+    estimated_tokens = sum((len(m["content"].encode("utf-8")) + 1) // 2 for m in messages)
+    if estimated_tokens + max_output_tokens + 512 > context_window:
+        raise ValueError("Texto e historial exceden el contexto configurado; dividí la consulta")
+    extended = max_output_tokens > 2048 or any(
+        len(m["content"]) > 16_000 for m in messages if m["role"] == "user")
     # A process-local bound; production must add a shared cluster admission
     # controller or each replica may exceed the physical GPU's capacity.
     if not _GATE.acquire(blocking=False):
@@ -174,15 +196,15 @@ def generate(messages: list[dict], *, max_output_tokens: int = 1200) -> dict:
         worker = _active_worker()
         payload = json.dumps({
             "model": _model(), "messages": messages, "stream": False,
-            "options": {"num_predict": max_output_tokens},
+            "options": {"num_predict": max_output_tokens, "num_ctx": context_window},
             "keep_alive": "5m",
         }, ensure_ascii=False).encode("utf-8")
-        if len(payload) > 90_000:
+        if len(payload) > 150_000:
             raise ValueError("La solicitud supera el presupuesto seguro de entrada")
         req = request.Request(worker + "/api/chat", data=payload, method="POST",
                               headers={"Content-Type": "application/json"})
         try:
-            with request.urlopen(req, timeout=68.0) as response:
+            with request.urlopen(req, timeout=190.0 if extended else 68.0) as response:
                 data = _read_limited(response)
         except (error.HTTPError, error.URLError, TimeoutError, OSError) as exc:
             _worker_result(worker, False)
@@ -203,10 +225,12 @@ def generate(messages: list[dict], *, max_output_tokens: int = 1200) -> dict:
         return {
             "respuesta": answer.strip(), "proveedor": "ollama", "nube": False,
             "acciones_ejecutadas": False, "respaldo_local": False,
+            "respuesta_incompleta": data.get("done_reason") == "length",
             "operacion": uuid.uuid4().hex,
             "metricas": {"duracion_ms": duration,
                          "tokens_entrada": input_tokens,
-                         "tokens_salida": output_tokens},
+                         "tokens_salida": output_tokens,
+                         "contexto_tokens": context_window},
         }
     except (InferenceBusy, InferenceUnavailable, ValueError):
         _record(False, (time.monotonic() - started) * 1000)

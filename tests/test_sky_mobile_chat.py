@@ -146,6 +146,20 @@ local = endpoint.mobile_chat_text(endpoint.MobileChatRequest(
     x_sky_chat_token=paired["token"])
 assert local["proveedor"] == "ollama" and local["nube"] is False
 assert len(provider_calls) == 1  # home provider never invoked
+# A long academic mobile request must stay private and preserve all 20K+ chars.
+long_prompt = "Tesis educación superior: " + "conocimiento " * 1750
+assert 16000 < len(long_prompt) < 32000
+def fake_academic(messages, max_output_tokens):
+    assert messages[-1]["content"] == long_prompt
+    assert max_output_tokens == 4096
+    return {"respuesta": "Informe académico local", "proveedor": "ollama",
+            "nube": False, "acciones_ejecutadas": False}
+endpoint.inference.generate = fake_academic
+long_result = endpoint.mobile_chat_text(endpoint.MobileChatRequest(
+    device_id=did, texto=long_prompt, proveedor="ollama"),
+    x_sky_chat_token=paired["token"])
+assert long_result["respuesta"] == "Informe académico local"
+assert len(provider_calls) == 1
 try:
     endpoint.mobile_chat_text(endpoint.MobileChatRequest(
         device_id=did, texto="texto", proveedor="ollama", autorizar_nube=True),

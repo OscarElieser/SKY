@@ -3969,9 +3969,9 @@ class MainActivity : Activity() {
 
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
-        if (message.length > SkyPromptLengthPolicy.DEEP_MAX) {
+        if (message.length > SkyPromptLengthPolicy.OWN_API_MAX) {
             home.showMessage("El prompt tiene ${message.length} caracteres y el mayor " +
-                "límite configurado es ${SkyPromptLengthPolicy.DEEP_MAX}. " +
+                "límite configurado es ${SkyPromptLengthPolicy.OWN_API_MAX}. " +
                 "Conservé tu texto completo en el editor; no lo recorté ni envié. " +
                 "Dividilo en partes o adjuntalo como documento para analizarlo.")
             voicePanel.showError("Prompt demasiado largo: no se envió incompleto.")
@@ -4181,10 +4181,10 @@ class MainActivity : Activity() {
             evidenceRecall + skillsPrompt
         // SKY's own local-only route may accept a long academic instruction
         // without requiring the user to select Gemini Deep.
-        val deepPrompt = selection.tier == SkyGeminiModes.Tier.DEEP ||
-            (ownApiPreferred && !selection.explicit &&
-                selectedSkyApiProvider in listOf("sky_auto", "ollama"))
-        val messageLimit = SkyPromptLengthPolicy.limit(deepPrompt)
+        val ownApiLong = ownApiPreferred && !selection.explicit &&
+            selectedSkyApiProvider in listOf("sky_auto", "ollama")
+        val deepPrompt = selection.tier == SkyGeminiModes.Tier.DEEP || ownApiLong
+        val messageLimit = SkyPromptLengthPolicy.limit(deepPrompt, ownApiLong)
         if (selection.prompt.length > messageLimit) {
             val detail = "Tu prompt contiene ${selection.prompt.length} caracteres; el límite " +
                 "del proveedor y modo elegidos es $messageLimit. No recorté ni envié " +
@@ -4195,7 +4195,7 @@ class MainActivity : Activity() {
         }
         // Optional context may be shortened; user instructions are never cut.
         val personalizedMessage = SkyPromptLengthPolicy.compose(
-            selection.prompt, prefix, deepPrompt) ?: return
+            selection.prompt, prefix, deepPrompt, ownApiLong) ?: return
         val needsVerifiedSources = SkyPhoneCloud.requiresLiveVerification(message) ||
             SkyEvidencePolicy.needsVerification(message) ||
             (cognitionEnabled() && SkyAndroidCognition.classify(message).verifyWithSources)
@@ -4343,7 +4343,9 @@ class MainActivity : Activity() {
                                     it != "sky_auto" && it != "ollama" }) {
                             error("SKY API devolvió un proveedor externo no autorizado.")
                         }
-                        answer = local.getString("respuesta")
+                        answer = SkyLongAnswerStatus.annotate(
+                            local.getString("respuesta"),
+                            local.optBoolean("respuesta_incompleta", false))
                         provider = "SKY API · " +
                             local.optString("proveedor", selectedSkyApiProvider) +
                             (if (local.optBoolean("nube", false))

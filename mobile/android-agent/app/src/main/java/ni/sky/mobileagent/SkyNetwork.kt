@@ -31,7 +31,7 @@ object SkyNetwork {
             conn.requestMethod = "POST"
             conn.instanceFollowRedirects = false
             conn.connectTimeout = 8000
-            conn.readTimeout = if (path.endsWith("/chat")) 90000 else 8000
+            conn.readTimeout = if (path.endsWith("/chat")) 210000 else 8000
             conn.setRequestProperty("Accept", "application/json")
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             val header = if (path.endsWith("/pair")) "X-SKY-MOBILE-TOKEN" else "X-SKY-CHAT-TOKEN"
@@ -56,13 +56,13 @@ object SkyNetwork {
             val output = ByteArrayOutputStream()
             conn.inputStream.use { stream ->
                 val bytes = ByteArray(2048)
-                while (output.size() <= 32768) {
+                while (output.size() <= 131072) {
                     val count = stream.read(bytes)
                     if (count < 0) break
                     output.write(bytes, 0, count)
                 }
             }
-            require(output.size() <= 32768) { "Respuesta de chat demasiado grande" }
+            require(output.size() <= 131072) { "Respuesta de chat demasiado grande" }
             return JSONObject(output.toString("UTF-8"))
         } finally {
             conn.disconnect()
