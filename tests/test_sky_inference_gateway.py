@@ -22,7 +22,7 @@ class MockOllama(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(size))
         self.server.requests.append(body)
         self._send({"done": True,
-                    "message": {"role": "assistant", "content": "Respuesta SKY local comprobada"},
+                    "message": {"role": "assistant", "content": getattr(self.server, "reply_text", "Respuesta SKY local comprobada")},
                     "prompt_eval_count": 37, "eval_count": 13})
 
     def _send(self, payload):
@@ -198,3 +198,20 @@ def test_6k_output_budget_refused_when_context_small(model_worker, monkeypatch):
         gateway.generate([{"role": "user", "content": "Proyecto"}],
                          max_output_tokens=6144)
     assert model_worker.requests == []
+
+
+def test_large_non_latin_model_response_is_not_lost_by_old_wire_limit(model_worker):
+    # Ollama may encode multilingual text as JSON-escaped Unicode; the old
+    # 262 KiB wire cap rejected legal model output even under 60K characters.
+    model_worker.reply_text = "研究教育" * 14000  # 56K characters; >300 KiB JSON-escaped.
+    outcome = gateway.generate([{"role": "user", "content": "Analiza este trabajo"}],
+                               max_output_tokens=1200)
+    assert outcome["respuesta"] == model_worker.reply_text
+    assert len(outcome["respuesta"]) == 56000
+
+
+def test_oversized_model_response_fails_closed_without_partial_text(model_worker):
+    model_worker.reply_text = "研究教育" * 24000  # 96K characters, >512 KiB encoded.
+    with pytest.raises(gateway.InferenceUnavailable, match="excesivamente"):
+        gateway.generate([{"role": "user", "content": "Informe"}],
+                         max_output_tokens=1200)
