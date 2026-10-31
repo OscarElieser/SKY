@@ -33,7 +33,7 @@ class SkyChatPresentationPolicyTest {
         assertTrue(preview.length < original.length)
         assertTrue(preview.contains("Vista previa"))
         assertTrue(preview.contains("Leer mensaje completo"))
-        assertEquals(original, original) // viewer receives untouched original, never truncated
+        assertTrue(original.endsWith("Final.")) // full viewer receives original, not preview
     }
 
     @Test fun shortMultilineTextHasNoArtificialPreviewOrTruncation() {
