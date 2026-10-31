@@ -117,6 +117,21 @@ ok = endpoint.mobile_chat_text(payload, x_sky_chat_token=paired["token"])
 assert ok["acciones_ejecutadas"] is False and len(provider_calls) == 1
 assert provider_calls[0].autorizar_nube is False
 assert provider_calls[0].datos == "privados"
+# Status is scoped, read-only, and does not pretend to verify generated text.
+with __import__("unittest.mock", fromlist=["patch"]).patch.object(
+        endpoint.sky_home_api, "_local_model_ready", return_value=True):
+    status = endpoint.mobile_chat_status(endpoint.Device(device_id=did),
+                                        x_sky_chat_token=paired["token"])
+assert status["service"] == "SKY API"
+assert status["local_ollama_ready"] is True
+assert status["model_output_verified"] is False
+try:
+    endpoint.mobile_chat_status(endpoint.Device(device_id=did), x_sky_chat_token=atoken)
+except HTTPException as e:
+    assert e.status_code == 401
+else:
+    raise AssertionError("Agent token wrongly allowed private API status")
+assert len(provider_calls) == 1  # no model inference performed by status
 endpoint.revoke_mobile_chat(endpoint.Device(device_id=did))
 try:
     endpoint.mobile_chat_text(payload, x_sky_chat_token=paired["token"])
