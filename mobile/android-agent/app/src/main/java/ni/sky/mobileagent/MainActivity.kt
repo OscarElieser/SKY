@@ -2267,9 +2267,46 @@ class MainActivity : Activity() {
             "SKY API: chat emparejado; disponibilidad del modelo sin comprobar."
             else "SKY API: todavía falta el enlace y autorización del chat privado."))
         content.addView(actionButton("CONFIGURAR / COMPROBAR SKY API") {
-            showOptionalWindowsLink = true
-            settingsDialog?.dismiss()
-            showSettings()
+            val did = tokens.deviceId()
+            val chatToken = tokens.chatToken()
+            val endpoint = tokens.server()
+            if (did.isBlank() || chatToken.isBlank() || endpoint.isBlank()) {
+                showOptionalWindowsLink = true
+                settingsDialog?.dismiss()
+                showSettings()
+                home.showMessage("Primero vinculá tu teléfono y autorizá el chat " +
+                    "privado de SKY. Se requiere un servidor HTTPS real.")
+            } else {
+                execute {
+                    try {
+                        val result = SkyNetwork.requestChat(endpoint,
+                            "/api/sky/mobile-chat/status", chatToken,
+                            JSONObject().put("device_id", did))
+                        val ollama = result.optBoolean("local_ollama_ready", false)
+                        runOnUiThread {
+                            if (!isFinishing) AlertDialog.Builder(this)
+                                .setTitle("SKY API · Comprobación real")
+                                .setMessage(if (ollama)
+                                    "El servidor confirmó un modelo Ollama instalado " +
+                                        "y accesible por loopback. Falta probar la " +
+                                        "respuesta completa y su rendimiento."
+                                    else "La API respondió, pero el modelo Ollama " +
+                                        "configurado no está disponible. Revisá " +
+                                        "Ollama y el modelo en el servidor.")
+                                .setPositiveButton("Entendido", null)
+                                .show()
+                        }
+                    } catch (error: Exception) {
+                        runOnUiThread {
+                            if (!isFinishing) AlertDialog.Builder(this)
+                                .setTitle("SKY API no comprobada")
+                                .setMessage(error.message?.take(300)
+                                    ?: "No fue posible verificar el servidor.")
+                                .setPositiveButton("Entendido", null).show()
+                        }
+                    }
+                }
+            }
         })
         if (tokens.cloudEnabled()) {
             content.addView(description("SKY móvil está activada. Conversa con Gemini por internet. " +
