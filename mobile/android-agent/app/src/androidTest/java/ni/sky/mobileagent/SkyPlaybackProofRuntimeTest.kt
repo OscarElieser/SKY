@@ -11,7 +11,7 @@ import org.junit.runner.RunWith
 /** Verifies the manifest's Android OS permission boundary, not a playback simulation. */
 @RunWith(AndroidJUnit4::class)
 class SkyPlaybackProofRuntimeTest {
-    @Test fun optionalListenerIsControlledByAndroidSystemPermission() {
+    @Test fun standardFlavorDoesNotDeclareSensitiveNotificationListener() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         @Suppress("DEPRECATION")
         val info = context.packageManager.getPackageInfo(
@@ -19,11 +19,16 @@ class SkyPlaybackProofRuntimeTest {
         val service = info.services?.firstOrNull {
             it.name.endsWith("SkyPlaybackProofListener")
         }
-        assertNotNull("La verificación requiere un servicio declarado explícitamente", service)
-        assertEquals(Manifest.permission.BIND_NOTIFICATION_LISTENER_SERVICE, service?.permission)
-        assertFalse("El servicio solo debe ser accesible al sistema", service?.exported ?: true)
-        assertFalse("Una instalación de prueba limpia no debe activar permisos por sí sola",
-            SkyPlaybackProof.available(context))
+        if (BuildConfig.ENABLE_TEXT_ASSIST) {
+            assertNotNull("La variante asistida conserva el servicio opcional", service)
+            assertEquals(Manifest.permission.BIND_NOTIFICATION_LISTENER_SERVICE,
+                service?.permission)
+            assertFalse("El servicio no debe ser exportado", service?.exported ?: true)
+        } else {
+            assertNull("SKY estándar no debe pedir acceso sensible a notificaciones",
+                service)
+            assertFalse(SkyPlaybackProof.available(context))
+        }
     }
 
     @Test fun noPlaybackIsClaimedWithoutUserEnablingPermission() {
