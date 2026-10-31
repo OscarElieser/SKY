@@ -334,6 +334,7 @@ class SkyMobileHome(
      * Long scientific answers can exceed Android's single-view height limit.
      * Open them in their own scrollable, offline viewer instead of truncating.
      */
+    /** Accessible full-screen offline reader; the original text is never truncated. */
     private fun openFullResponse(answer: String) {
         val viewer = WebView(host).apply {
             settings.javaScriptEnabled = false
@@ -341,125 +342,120 @@ class SkyMobileHome(
             settings.allowFileAccess = false
             settings.allowContentAccess = false
             settings.blockNetworkLoads = true
-            setBackgroundColor(Color.rgb(20, 30, 57))
+            isVerticalScrollBarEnabled = true
+            setBackgroundColor(Color.rgb(14, 26, 52))
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(
                     view: WebView?, request: WebResourceRequest?
                 ) = true
             }
-            loadDataWithBaseURL(null, SkyScientificMarkup.toHtml(answer),
-                "text/html", "UTF-8", null)
         }
-        val wrapper = FrameLayout(host).apply {
-            addView(viewer, FrameLayout.LayoutParams(-1,
-                (host.resources.displayMetrics.heightPixels * 0.67f).toInt()))
+        val container = LinearLayout(host).apply {
+            orientation = LinearLayout.VERTICAL
+            background = bg(Color.rgb(13, 23, 51), 22)
+            setPadding(dp(12), dp(14), dp(12), dp(10))
         }
-        val dialog = android.app.AlertDialog.Builder(host)
-            .setTitle("SKY IA · Respuesta completa")
-            .setView(wrapper)
-            .setNeutralButton("Copiar texto") { _, _ ->
-                val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("SKY IA", answer))
-                Toast.makeText(host, "Respuesta copiada", Toast.LENGTH_SHORT).show()
-            }
-            .setPositiveButton("Cerrar", null)
-            .create()
+        container.addView(text("SKY IA · LECTURA COMPLETA", 18f, white).apply {
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            setPadding(dp(4), dp(3), dp(4), dp(4))
+        })
+        container.addView(text(
+            "Contenido íntegro · ${answer.length} caracteres · Deslizá para leer",
+            12f, soft).apply { setPadding(dp(4), dp(2), dp(4), dp(11)) })
+        container.addView(viewer, LinearLayout.LayoutParams(-1, 0, 1f))
+        val actions = LinearLayout(host).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(12), 0, 0)
+        }
+        val dialog = android.app.AlertDialog.Builder(host).setView(container).create()
+        actions.addView(pill("Copiar todo", Color.rgb(36, 83, 116)) {
+            copyMessage(answer)
+        }.apply { textSize = 13f }, LinearLayout.LayoutParams(0, dp(49), 1f).apply {
+            rightMargin = dp(8)
+        })
+        actions.addView(pill("Cerrar", Color.rgb(92, 72, 169)) {
+            dialog.dismiss()
+        }.apply { textSize = 13f }, LinearLayout.LayoutParams(0, dp(49), 1f))
+        container.addView(actions)
         dialog.setOnDismissListener {
-            wrapper.removeView(viewer)
+            container.removeView(viewer)
             viewer.stopLoading()
             viewer.destroy()
         }
-        dialog.show()
+        SkyPremiumUi.showDialog(host, dialog, 0.94)
+        viewer.loadDataWithBaseURL(null, SkyScientificMarkup.toHtml(answer),
+            "text/html", "UTF-8", null)
     }
 
+    private fun copyMessage(value: String) {
+        val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("SKY IA", value))
+        Toast.makeText(host, "Texto copiado", Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * Native, selectable text: no clipped 56dp WebViews nor late height probes.
+     * Complex MathML, tables and large documents use the dedicated offline reader.
+     */
     private fun makeBubble(value: String, mine: Boolean): LinearLayout {
         val item = LinearLayout(host).apply {
             orientation = LinearLayout.VERTICAL
             gravity = if (mine) Gravity.END else Gravity.START
-            setPadding(dp(4), dp(5), dp(4), dp(5))
+            setPadding(dp(2), dp(7), dp(2), dp(10))
         }
-        val speaker = text(if (mine) "VOS" else "SKY IA", 10f,
-            if (mine) Color.rgb(185, 169, 255) else cyan).apply {
+        item.addView(text(if (mine) "VOS" else "SKY IA", 11f,
+            if (mine) Color.rgb(192, 180, 255) else cyan).apply {
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-            letterSpacing = 0.12f
-            setPadding(dp(9), dp(2), dp(9), dp(5))
-        }
-        item.addView(speaker)
-        // Los mensajes del usuario continúan siendo texto nativo editable/copiable.
-        // Las respuestas de SKY se maquetan sin ejecutar HTML, JavaScript ni red.
-        // A lightweight native bubble is enough for short plain messages.
-        // WebView/MathML is reserved for structured answers to save memory.
-        val rich = !mine && (value.contains('\n') || value.contains("\\[") ||
-            value.contains("\\(") || value.contains("**") || value.contains("$") ||
-            value.trimStart().startsWith("#"))
-        val tooLong = !mine && value.length > 9000
-        val visibleValue = if (tooLong)
-            value.take(6800) + "\n\nVista previa de la respuesta. Tocá «Leer completa» para ver el resto."
-            else value
-        val bubble: View = if (!rich) {
-            text(visibleValue, 15f, white).apply {
-                gravity = Gravity.START
-                setLineSpacing(dp(3).toFloat(), 1f)
-                setTextIsSelectable(true)
-                setPadding(dp(15), dp(12), dp(15), dp(12))
+            letterSpacing = 0.08f
+            setPadding(dp(11), dp(2), dp(9), dp(7))
+        })
+        val preview = SkyReadableAnswer.preview(value, mine)
+        val bubble = text("", if (mine) 15f else 15.5f, white).apply {
+            text = if (mine) preview.text else SkyReadableAnswer.styled(preview.text)
+            gravity = Gravity.START
+            includeFontPadding = true
+            setLineSpacing(dp(4).toFloat(), 1.1f)
+            setTextIsSelectable(true)
+            setPadding(dp(16), dp(14), dp(16), dp(15))
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                if (mine) intArrayOf(Color.rgb(79, 62, 162), Color.rgb(56, 56, 120))
+                else intArrayOf(Color.rgb(30, 46, 82), Color.rgb(22, 38, 69))).apply {
+                cornerRadius = dp(18).toFloat()
+                setStroke(dp(1), if (mine) Color.rgb(111, 100, 187)
+                    else Color.rgb(66, 91, 127))
             }
-        } else {
-            WebView(host).apply {
-                settings.javaScriptEnabled = false
-                settings.domStorageEnabled = false
-                settings.allowFileAccess = false
-                settings.allowContentAccess = false
-                settings.blockNetworkLoads = true
-                setBackgroundColor(Color.TRANSPARENT)
-                isVerticalScrollBarEnabled = false
-                isHorizontalScrollBarEnabled = false
-                overScrollMode = View.OVER_SCROLL_NEVER
-                webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(
-                        view: WebView?, request: WebResourceRequest?
-                    ) = true
-                    override fun onPageFinished(view: WebView?, url: String?) {
-                        val web = view ?: return
-                        listOf(60L, 240L, 600L).forEach { delay ->
-                            web.postDelayed({
-                                val desired = (web.contentHeight * web.scale).toInt()
-                                if (web.parent != null && web.isAttachedToWindow &&
-                                    desired > dp(25) && web.layoutParams != null &&
-                                    web.layoutParams.height != desired) {
-                                    web.layoutParams.height = desired.coerceAtMost(dp(30000))
-                                    web.requestLayout()
-                                }
-                            }, delay)
-                        }
-                    }
-                }
-                loadDataWithBaseURL(
-                    null, SkyScientificMarkup.toHtml(visibleValue), "text/html", "UTF-8", null
-                )
+            setOnLongClickListener {
+                copyMessage(value)
+                true
             }
-        }
-        bubble.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            if (mine) intArrayOf(Color.rgb(97, 72, 205), Color.rgb(62, 62, 150))
-            else intArrayOf(Color.rgb(36, 52, 92), Color.rgb(32, 42, 76))).apply {
-            cornerRadius = dp(20).toFloat()
-        }
-        bubble.setOnLongClickListener {
-            val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(ClipData.newPlainText("SKY IA", value))
-            Toast.makeText(host, "Mensaje copiado", Toast.LENGTH_SHORT).show()
-            true
         }
         item.addView(bubble, LinearLayout.LayoutParams(
-            if (mine) LinearLayout.LayoutParams.WRAP_CONTENT else LinearLayout.LayoutParams.MATCH_PARENT,
-            if (mine) LinearLayout.LayoutParams.WRAP_CONTENT else dp(56)
-        ))
-        if (tooLong) {
-            item.addView(pill("Leer respuesta completa", Color.rgb(54, 81, 133)) {
-                openFullResponse(value)
-            }.apply {
+            if (mine) LinearLayout.LayoutParams.WRAP_CONTENT
+                else LinearLayout.LayoutParams.MATCH_PARENT, -2))
+        if (preview.needsReader) {
+            item.addView(text(
+                "Vista previa · ${preview.totalChars} caracteres en total",
+                11f, soft).apply { setPadding(dp(12), dp(9), dp(12), dp(3)) })
+        }
+        if (preview.needsReader || preview.rich) {
+            val controls = LinearLayout(host).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            controls.addView(pill(
+                if (preview.needsReader) "Leer completo" else "Ver formato",
+                Color.rgb(39, 88, 125)) { openFullResponse(value) }.apply {
                 textSize = 13f
-                contentDescription = "Leer toda la respuesta científica, sin recortes"
-            }, LinearLayout.LayoutParams(-1, dp(43)).apply {
+                contentDescription = "Abrir texto íntegro con fórmulas, tablas y código"
+            }, LinearLayout.LayoutParams(0, dp(43), 1f).apply {
+                rightMargin = dp(8)
+            })
+            controls.addView(pill("Copiar", Color.rgb(48, 56, 105)) {
+                copyMessage(value)
+            }.apply { textSize = 13f },
+                LinearLayout.LayoutParams(dp(95), dp(43)))
+            item.addView(controls, LinearLayout.LayoutParams(-1, -2).apply {
                 topMargin = dp(8)
             })
         }
