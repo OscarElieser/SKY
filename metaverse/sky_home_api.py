@@ -24,7 +24,7 @@ class Turn(BaseModel):
 class HomeChat(BaseModel):
     texto: str = Field(min_length=1, max_length=4000)
     historial: list[Turn] = Field(default_factory=list, max_length=8)
-    proveedor: Literal["auto", "ollama", "gemini", "openai", "anthropic", "mistral", "groq", "deepseek"] = "auto"
+    proveedor: Literal["auto", "ollama", "gemini", "openai", "anthropic", "mistral", "groq", "deepseek", "openrouter", "cloudflare"] = "auto"
     datos: Literal["privados", "generales"] = "privados"
     autorizar_nube: bool = False
     autorizar_datos_privados: bool = False
@@ -48,7 +48,10 @@ def _local_model_ready() -> bool:
 
 def _availability() -> tuple[bool, tuple[str, ...], bool]:
     from neural_core import providers
-    cloud = tuple(name for name in CLOUD_ORDER if providers.provider_ready(name))
+    from neural_core import sky_optional_cloud_providers as optional
+    configured = set(optional.ready_names())
+    cloud = tuple(name for name in CLOUD_ORDER if
+                  name in configured or providers.provider_ready(name))
     local = _local_model_ready()  # loopback-only; never downloads a model
     return local, cloud, providers.local_only()
 
@@ -96,9 +99,16 @@ def home_chat(body: HomeChat):
     )}]
     messages.extend({"role": item.role, "content": item.content} for item in body.historial)
     messages.append({"role": "user", "content": body.texto})
+    from neural_core import sky_optional_cloud_providers as optional
     try:
-        result = providers.reply(messages, provider=route.provider, max_output_tokens=1200)
-    except (providers.ProviderError, ValueError) as exc:
+        if route.provider in optional.OPTIONAL_PROVIDERS:
+            # Enforce consent through choose_home_route BEFORE entering any
+            # HTTP adapter. Never hand external providers device-action scopes.
+            result = optional.reply(route.provider, messages, max_output_tokens=1200)
+        else:
+            result = providers.reply(messages, provider=route.provider,
+                                     max_output_tokens=1200)
+    except (providers.ProviderError, optional.CloudProviderUnavailable, ValueError) as exc:
         # Only an AUTO cloud request may fall back to a verified local model.
         # Never change silently to a different cloud service (cost/privacy).
         if body.proveedor == "auto" and route.remote and local:
