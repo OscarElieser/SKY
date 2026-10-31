@@ -47,6 +47,15 @@ object SkyWeatherNow {
         clean = clean.replace(Regex("""^(?:(?:hola|hey)\s+)?(?:sky ia|sky|esky)\s+"""), "")
             .replace(Regex("""^(?:por favor\s+)?(?:dime|decime|consulta|dame|quiero saber|necesito saber)\s+"""), "")
             .replace(Regex("""^(?:el|la|del)\s+"""), "")
+        // Even a short sentence may describe educational/emotional climate
+        // rather than atmospheric conditions.
+        val academicContext = Regex(
+            """\b(?:tesis|investigacion|educacion|educativa|educativo|""" +
+                """emocion(?:al|ales|es)|socioemocional|universidad|""" +
+                """universitaria|estudiantes|docencia|aula|cronograma|""" +
+                """tiempo disponible|tiempo de estudio)\b"""
+        )
+        if (academicContext.containsMatchIn(clean)) return false
         return weatherOpening.containsMatchIn(clean) ||
             weatherTimeOpening.containsMatchIn(clean)
     }
