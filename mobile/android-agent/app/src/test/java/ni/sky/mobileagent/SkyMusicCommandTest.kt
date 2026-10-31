@@ -25,6 +25,15 @@ class SkyMusicCommandTest {
         assertEquals("eres tu", youtubeMusic?.query)
         assertNull(SkyMusicCommand.parse("Abre YouTube y reproduce música"))
     }
+    @Test fun youtubePlaybackRequestFromSamsungIsNotJustAnAppLaunch() {
+        val spoken = SkyMusicCommand.parse(
+            "SKY abre YouTube reproduce Maldito duende de Héroes del Silencio")
+        assertEquals(SkyMusicCommand.Service.YOUTUBE, spoken?.service)
+        assertEquals("maldito duende de heroes del silencio", spoken?.query)
+        // Parsing a command is NOT proof of audible music.
+        assertNull(SkyMusicCommand.parse("Abre YouTube"))
+    }
+
     @Test fun providerCanComeBeforeTheSong() {
         val a = SkyMusicCommand.parse("Reproduce en Spotify la canción mi persona favorita")
         assertEquals(SkyMusicCommand.Service.SPOTIFY, a?.service)
