@@ -4,7 +4,7 @@
 
 ## 1. Expresiones integradas y activación explícita
 
-`SkyExpressionCatalog.kt` contiene **176 expresiones originales** en diez áreas: saludos (20), despedidas (18), agradecimiento (14), motivación (22), refranes (20), chistes (24), trabalenguas (16), adivinanzas (16), reflexión (14), técnicas de estudio (12).
+`SkyExpressionCatalog.kt` contiene **184 expresiones (176 nuevas y 8 respuestas originales conservadas)** en diez áreas: saludos (21), despedidas (18), agradecimiento (15), motivación (22), refranes (20), chistes (30), trabalenguas (16), adivinanzas (16), reflexión (14), técnicas de estudio (12).
 
 - Se alternan respuestas por categoría en la sesión, sin recopilar datos ni invocar servicios externos.
 - Ejemplos de petición: «SKY, decime un refrán», «SKY, contame un chiste», «motivame», «otro trabalenguas», «una adivinanza», «un consejo de estudio», «hasta luego».
