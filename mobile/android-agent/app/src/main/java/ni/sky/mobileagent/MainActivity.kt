@@ -4354,7 +4354,12 @@ class MainActivity : Activity() {
                                     item.optString("role"), item.optString("content"))
                             }
                         }
-                        val localModel = selectedSkyApiProvider in listOf("sky_auto", "ollama")
+                        // A user-approved automatic cloud fallback must carry only the
+                        // narrower external-history budget, even when Ollama
+                        // happens to handle the first attempt.
+                        val localModel = selectedSkyApiProvider == "ollama" ||
+                            (selectedSkyApiProvider == "sky_auto" &&
+                                !automaticCloudConsent)
                         val context = JSONArray()
                         SkyPrivateHistoryPolicy.pack(inputTurns, privateModel = localModel)
                             .forEach { turn ->
