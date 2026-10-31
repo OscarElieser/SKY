@@ -75,7 +75,7 @@ class SkyMobileHome(
     private var sessionAfterId = host.getSharedPreferences(
         "sky_chat_session", Context.MODE_PRIVATE).getLong("after_id", 0L)
     private val history = ArrayList<Exchange>().apply {
-        archive.recent(150).filter { it.id > sessionAfterId }.forEach { saved ->
+        archive.recent(150).filter { SkyChatSessionPolicy.visible(it.id, sessionAfterId) }.forEach { saved ->
             add(Exchange(saved.question, saved.answer, saved.engine,
                 emptyList(), "", saved.title, saved.localTime()))
         }
@@ -722,7 +722,7 @@ class SkyMobileHome(
     /** Recargar historial tras editar, borrar o renombrar; no toca la base. */
     fun reloadHistory() {
         history.clear()
-        archive.recent(150).filter { it.id > sessionAfterId }.forEach { entry ->
+        archive.recent(150).filter { SkyChatSessionPolicy.visible(it.id, sessionAfterId) }.forEach { entry ->
             history.add(Exchange(entry.question, entry.answer, entry.engine,
                 emptyList(), "", entry.title, entry.localTime()))
         }
