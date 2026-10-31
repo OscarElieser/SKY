@@ -17,24 +17,22 @@ internal object SkyLongWorkPlanner {
     fun prepare(raw: String): Plan? {
         val clean = raw.trim().replaceFirst(
             Regex("""^sky\s*[,.:;!?¡¿-]*\s*""", RegexOption.IGNORE_CASE), "")
-        val normalized = Normalizer.normalize(clean.lowercase(Locale.ROOT),
-            Normalizer.Form.NFD).replace(Regex("""\p{M}+"""), "")
         val match = Regex(
             """^(?:planifica|prepara un plan para|crea un plan para)\s+""" +
-                """(?:una?\s+)?(tesis|investigacion|proyecto de programacion)\s+""" +
+                """(?:una?\s+)?(tesis|investigaci[oó]n|proyecto de programaci[oó]n)\s+""" +
                 """(?:sobre|de|para)\s+(.+)$""",
-            RegexOption.DOT_MATCHES_ALL
-        ).matchEntire(normalized) ?: return null
-        val kind = when (match.groupValues[1]) {
+            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
+        ).matchEntire(clean) ?: return null
+        val normalizedKind = Normalizer.normalize(match.groupValues[1]
+            .lowercase(Locale.ROOT), Normalizer.Form.NFD)
+            .replace(Regex("""\p{M}+"""), "")
+        val kind = when (normalizedKind) {
             "tesis" -> Kind.TESIS
             "investigacion" -> Kind.INVESTIGACION
             else -> Kind.PROGRAMACION
         }
-        // Topic preserves accents and original wording where possible:
-        // the normalized text is only used for matching the command.
-        val suffix = Regex("""\s+(?:sobre|de|para)\s+""", RegexOption.IGNORE_CASE)
-            .findAll(clean).lastOrNull()?.range?.last?.plus(1) ?: return null
-        val topic = clean.substring(suffix).trim().replace(Regex("""\s+"""), " ")
+        // Keep the exact topic, accents and all internal "de/sobre" phrases.
+        val topic = match.groupValues[2].trim().replace(Regex("""\s+"""), " ")
         if (topic.length !in 5..600) return null
         val sections = when (kind) {
             Kind.TESIS -> listOf("Delimitación del problema y preguntas",
