@@ -17,14 +17,14 @@ object SkyWeatherNow {
     // "tiempo disponible", "clima emocional" or a 350-page thesis brief must
     // never hijack the academic/work/document intent.
     private val weatherOpening = Regex(
-        """^(?:(?:como|que|cual es|cuanto es|cuantos grados hace)\\s+""" +
-            """(?:(?:esta|estara|sera|hace|va a estar|hay)\\s+)?""" +
-            """(?:(?:el|la|del)\\s+)?)?""" +
-            """(?:clima|pronostico|temperatura)\\b"""
+        """^(?:(?:como|que|cual es|cuanto es|cuantos grados hace)\s+""" +
+            """(?:(?:esta|estara|sera|hace|va a estar|hay)\s+)?""" +
+            """(?:(?:el|la|del)\s+)?)?""" +
+            """(?:clima|pronostico|temperatura)\b"""
     )
     private val weatherTimeOpening = Regex(
         """^(?:que tiempo hace|como esta el tiempo|como estara el tiempo|""" +
-            """tiempo (?:en|de|para)\\s+|estado del tiempo\\b)"""
+            """tiempo (?:en|de|para)\s+|estado del tiempo\b)"""
     )
     private val named = Regex(
         """(?:clima|tiempo|temperatura|pron[oó]stico)(?:\s+(?:actual|de hoy|ahora))?\s+(?:en|de)\s+([\p{L}][\p{L} ,.'-]{1,78})[?.!]*$""",
@@ -38,15 +38,15 @@ object SkyWeatherNow {
     fun isWeatherQuery(raw: String): Boolean {
         // Only a short, explicitly meteorological instruction can route here.
         // Never infer weather from research context or the word "tiempo".
-        if (raw.length !in 3..260 || raw.contains('\\n')) return false
+        if (raw.length !in 3..260 || raw.contains('\n')) return false
         var clean = java.text.Normalizer.normalize(
             raw.lowercase(Locale.ROOT), java.text.Normalizer.Form.NFD)
-            .replace(Regex("""\\p{M}+"""), "")
+            .replace(Regex("""\p{M}+"""), "")
             .replace(Regex("""[^a-z0-9 ]"""), " ")
-            .replace(Regex("""\\s+"""), " ").trim()
-        clean = clean.replace(Regex("""^(?:(?:hola|hey)\\s+)?(?:sky ia|sky|esky)\\s+"""), "")
-            .replace(Regex("""^(?:por favor\\s+)?(?:dime|decime|consulta|dame|quiero saber|necesito saber)\\s+"""), "")
-            .replace(Regex("""^(?:el|la|del)\\s+"""), "")
+            .replace(Regex("""\s+"""), " ").trim()
+        clean = clean.replace(Regex("""^(?:(?:hola|hey)\s+)?(?:sky ia|sky|esky)\s+"""), "")
+            .replace(Regex("""^(?:por favor\s+)?(?:dime|decime|consulta|dame|quiero saber|necesito saber)\s+"""), "")
+            .replace(Regex("""^(?:el|la|del)\s+"""), "")
         return weatherOpening.containsMatchIn(clean) ||
             weatherTimeOpening.containsMatchIn(clean)
     }
