@@ -12,7 +12,7 @@ def _parse(text):
         return None
     t=re.sub(r"^\s*(?:(?:oye|hey|ok)\s+)?sky[\s,.:;!¡-]*","",text,flags=re.I).strip()
     # Cortesía conversacional: no concede autorización adicional.
-    t=re.sub(r"^(?:(?:por favor|podrias|podrías|puedes|podes|necesito que|quiero que)\\s+)+", "", t, flags=re.I).strip()
+    t=re.sub(r"^(?:(?:por favor|podrias|podrías|puedes|podes|necesito que|quiero que)\s+)+", "", t, flags=re.I).strip()
     rules=(
         ("create",rf"(?:crea|crear|genera|generar|prepara|preparar|prepares)\s+(?:un\s+|una\s+)?(?:archivo|documento|informe)\s+({FILE})\s+con\s+contenido\s*:\s*([\s\S]+)"),
         ("replace",rf"(?:reemplaza|reemplazar|sustituye|sustituir|actualiza|actualizar|actualices)\s+(?:el\s+)?(?:contenido\s+(?:de|del)\s+)?(?:archivo\s+)?({FILE})\s+(?:por|con)\s*:\s*([\s\S]+)"),
