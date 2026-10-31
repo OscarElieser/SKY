@@ -26,6 +26,15 @@ class SkyWordExportIntentTest {
         assertFalse(SkyWordExportIntent.wantsExistingWord(brief))
     }
 
+    @Test fun longThesisInstructionsAreNotMistakenForExistingWordDownload() {
+        val request = "Redacta un documento Word sobre investigación educativa. " +
+            "Incluye hoja de ruta hasta la entrega, explica cómo evitar errores " +
+            "frecuentes, identifica fases de redacción, métodos y bibliografía. " +
+            "Tiempo disponible seis meses."
+        assertTrue(SkyWordExportIntent.wantsNewWord(request))
+        assertFalse(SkyWordExportIntent.wantsExistingWord(request))
+    }
+
     @Test fun newDocumentIsGeneratedBeforeExport() {
         assertTrue(SkyWordExportIntent.wantsNewWord(
             "SKY crea un documento Word sobre los volcanes de Nicaragua"))
