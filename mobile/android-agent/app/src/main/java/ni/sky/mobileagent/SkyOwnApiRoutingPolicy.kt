@@ -5,11 +5,12 @@ package ni.sky.mobileagent
  * It never contacts local Android loopback, opens a LAN port, or sends a
  * prompt to a third-party provider without that provider's separate consent.
  *
- * The existing SKY Home API accepts at most 4,000 characters per turn and
- * can select Ollama on the server only when it has the chosen model loaded.
+ * SKY's local-only mobile route accepts 16,000 characters; external cloud
+ * adapters retain a separate 4,000-character bound. Neither truncates text.
  */
 internal object SkyOwnApiRoutingPolicy {
-    const val SERVER_PROMPT_LIMIT = 4_000
+    const val SERVER_PROMPT_LIMIT = 16_000
+    const val EXTERNAL_PROMPT_LIMIT = 4_000
 
     fun usePrivateApi(
         optedIn: Boolean,
@@ -58,7 +59,7 @@ internal object SkyOwnApiRoutingPolicy {
         selectedProvider != "ollama" && selectedProvider != "sky_auto" &&
         cloudConsent && privateDataConsent &&
         !explicitGeminiMode && !verifiedWebRequired &&
-        promptChars in 1..SERVER_PROMPT_LIMIT
+        promptChars in 1..EXTERNAL_PROMPT_LIMIT
 
     fun canPromptForSetup(optedIn: Boolean, pairedChatToken: Boolean): Boolean =
         optedIn && !pairedChatToken
