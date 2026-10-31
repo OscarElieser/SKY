@@ -73,15 +73,21 @@ internal object SkyMusicAudioCheck {
         )
     }
 
-    /** Show Android's standard volume panel only when muted/zero.
-     * The owner chooses the actual volume; SKY never raises it automatically.
-     */
-    fun offerVolumePanel(context: Context, snapshot: Snapshot) {
-        if (!snapshot.silentBySystemSettings || snapshot.fixed == true) return
+    /** Android's volume panel does not change the owner's selected level. */
+    fun showVolumePanel(context: Context) {
         runCatching {
             val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            audio.adjustStreamVolume(AudioManager.STREAM_MUSIC,
-                AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
+            if (!audio.isVolumeFixed) {
+                audio.adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                    AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
+            }
+        }
+    }
+
+    /** Suggest volume adjustment only when muted or at zero; never force it. */
+    fun offerVolumePanel(context: Context, snapshot: Snapshot) {
+        if (snapshot.silentBySystemSettings && snapshot.fixed != true) {
+            showVolumePanel(context)
         }
     }
 }
