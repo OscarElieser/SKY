@@ -5,11 +5,11 @@ package ni.sky.mobileagent
  * It never contacts local Android loopback, opens a LAN port, or sends a
  * prompt to a third-party provider without that provider's separate consent.
  *
- * SKY's local-only mobile route accepts 16,000 characters; external cloud
+ * SKY's local-only mobile route accepts 32,000 characters; external cloud
  * adapters retain a separate 4,000-character bound. Neither truncates text.
  */
 internal object SkyOwnApiRoutingPolicy {
-    const val SERVER_PROMPT_LIMIT = 16_000
+    const val SERVER_PROMPT_LIMIT = 32_000
     const val EXTERNAL_PROMPT_LIMIT = 4_000
 
     fun usePrivateApi(
