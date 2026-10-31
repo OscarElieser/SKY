@@ -38,10 +38,30 @@ class SkyOwnApiRoutingPolicyTest {
         assertFalse(SkyOwnApiRoutingPolicy.usePrivateApi(
             true, true, false, false, 0))
     }
-    @Test fun localOllamaRemainsDefaultWhenNoOptionalServerProviderSelected() {
-        assertEquals("ollama", SkyOwnApiRoutingPolicy.chosenProvider(null))
-        assertEquals("ollama", SkyOwnApiRoutingPolicy.chosenProvider("unknown"))
-        assertTrue("ollama" in SkyOwnApiRoutingPolicy.SERVER_PROVIDERS)
+    @Test fun automaticIsDefaultWhileManualOllamaRemainsAvailable() {
+        assertEquals("sky_auto", SkyOwnApiRoutingPolicy.chosenProvider(null))
+        assertEquals("sky_auto", SkyOwnApiRoutingPolicy.chosenProvider("unknown"))
+        assertEquals("ollama", SkyOwnApiRoutingPolicy.chosenProvider("ollama"))
+        assertEquals("sky_auto", SkyOwnApiRoutingPolicy.SERVER_PROVIDERS.first())
+    }
+
+    @Test fun automaticCanRunLocallyWithoutCloudConsent() {
+        assertTrue(SkyOwnApiRoutingPolicy.useAutomaticViaSkyApi(
+            optedIn = true, pairedChatToken = true, explicitGeminiMode = false,
+            verifiedWebRequired = false, promptChars = 350))
+        assertFalse(SkyOwnApiRoutingPolicy.useAutomaticViaSkyApi(
+            optedIn = true, pairedChatToken = false, explicitGeminiMode = false,
+            verifiedWebRequired = false, promptChars = 350))
+        assertFalse(SkyOwnApiRoutingPolicy.useAutomaticViaSkyApi(
+            optedIn = true, pairedChatToken = true, explicitGeminiMode = false,
+            verifiedWebRequired = true, promptChars = 350))
+    }
+
+    @Test fun remoteBackupRequiresExplicitConsentOnceOrBothTurnPermissions() {
+        assertFalse(SkyOwnApiRoutingPolicy.authorizedAutomaticCloud(false, false, false))
+        assertFalse(SkyOwnApiRoutingPolicy.authorizedAutomaticCloud(true, false, false))
+        assertTrue(SkyOwnApiRoutingPolicy.authorizedAutomaticCloud(true, true, false))
+        assertTrue(SkyOwnApiRoutingPolicy.authorizedAutomaticCloud(false, false, true))
     }
 
     @Test fun optionalServerProvidersRequireBothPerMessagePermissions() {
