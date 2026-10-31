@@ -26,6 +26,8 @@ class SkyWeatherNowTest {
             "Necesito tiempo disponible para entregar una tesis de 350 páginas"))
         assertFalse(SkyWeatherNow.isWeatherQuery(
             "Investiga el clima emocional en educación superior"))
+        assertFalse(SkyWeatherNow.isWeatherQuery("Clima emocional en educación universitaria"))
+        assertFalse(SkyWeatherNow.isWeatherQuery("Temperatura emocional del aula"))
         assertFalse(SkyWeatherNow.isWeatherQuery(
             "El clima de aula puede influir en el rendimiento académico"))
         assertFalse(SkyWeatherNow.isWeatherQuery(
