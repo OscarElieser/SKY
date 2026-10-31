@@ -639,7 +639,7 @@ class SkyMobileHome(
         conversationScroll = ScrollView(host).apply {
             isFillViewport = true
             isVerticalScrollBarEnabled = true
-            fadingEdgeLength = dp(20)
+            setFadingEdgeLength(dp(20))
             clipToPadding = false
             addView(conversationRows)
         }
