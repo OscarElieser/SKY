@@ -53,7 +53,9 @@ class SkyEyeVoicePanel(
     private var continuousTurns = 0
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private val resumeListening = Runnable {
-        if (foreground && fluidConversation && !listening && continuousTurns < 8) {
+        // Foreground conversation is explicitly enabled in Settings. No need to
+        // tap the eyes after reopening SKY or after a normal reply.
+        if (foreground && fluidConversation && !handsFreeOn && !listening) {
             continuousTurns++
             listenAutomatic()
         }
@@ -188,12 +190,9 @@ class SkyEyeVoicePanel(
                 host.runOnUiThread {
                     onSpeechFinished?.invoke()
                     setMode(EyeMode.IDLE, "SKY lista para escucharte.")
-                    if (fluidConversation && foreground && continuousTurns < 8) {
+                    if (fluidConversation && foreground && !handsFreeOn) {
                         handler.removeCallbacks(resumeListening)
                         handler.postDelayed(resumeListening, 650L)
-                    } else if (fluidConversation && continuousTurns >= 8) {
-                        setConversationMode(false)
-                        setMode(EyeMode.IDLE, "Conversación pausada · tocá HABLAR.")
                     }
                 }
             }
@@ -279,6 +278,10 @@ class SkyEyeVoicePanel(
         fluidConversation = enabled
         continuousTurns = 0
         handler.removeCallbacks(resumeListening)
+        if (enabled && foreground && !handsFreeOn) {
+            // A setting called 'al abrir SKY' must actually listen on entry.
+            handler.postDelayed(resumeListening, 650L)
+        }
     }
 
     fun onEnterForeground() {
@@ -327,6 +330,14 @@ class SkyEyeVoicePanel(
             setMode(EyeMode.IDLE, "Respuesta vacía.")
             return
         }
+        // Prevent SKY from recognizing and repeating its own spoken answer.
+        handler.removeCallbacks(resumeListening)
+        if (listening) {
+            listening = false
+            recognizer?.cancel()
+            recognizer?.destroy()
+            recognizer = null
+        }
         onSpeechStarted?.invoke()
         val result = speechEngine?.speak(
             clean,
@@ -337,6 +348,8 @@ class SkyEyeVoicePanel(
         if (result != TextToSpeech.SUCCESS) {
             onSpeechFinished?.invoke()
             setMode(EyeMode.ERROR, "Android no pudo iniciar la voz.")
+            if (fluidConversation && foreground && !handsFreeOn)
+                handler.postDelayed(resumeListening, 1250L)
         }
     }
 
@@ -386,7 +399,13 @@ class SkyEyeVoicePanel(
                 override fun onError(error: Int) {
                     handler.removeCallbacks(resumeListening)
                     listening = false
-                    setMode(EyeMode.ERROR, "No pude escucharte bien. Tocá los ojos o decí SKY en manos libres.")
+                    setMode(EyeMode.ERROR, "No pude escucharte bien. Revisá el micrófono o el modo manos libres.")
+                    if (fluidConversation && foreground && !handsFreeOn &&
+                        error != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS &&
+                        error != SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED &&
+                        error != SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE) {
+                        handler.postDelayed(resumeListening, 2000L)
+                    }
                 }
                 override fun onResults(results: Bundle?) {
                     listening = false
@@ -394,10 +413,18 @@ class SkyEyeVoicePanel(
                         ?.firstOrNull()?.trim().orEmpty()
                     if (heard.isEmpty()) {
                         setMode(EyeMode.IDLE, "No detecté palabras. Intentá otra vez.")
+                        if (fluidConversation && foreground && !handsFreeOn)
+                            handler.postDelayed(resumeListening, 950L)
                     } else {
                         eye.reactTo(heard)
                         showThinking()
                         onTranscript(heard)
+                        // Silent actions (e.g. opening YouTube) have no TTS
+                        // completion callback, so they must re-arm as well.
+                        if (fluidConversation && foreground && !handsFreeOn &&
+                            !listening) {
+                            handler.postDelayed(resumeListening, 1500L)
+                        }
                     }
                 }
                 override fun onPartialResults(partialResults: Bundle?) {
