@@ -45,7 +45,7 @@ class SkyOwnApiRoutingPolicyTest {
     }
 
     @Test fun optionalServerProvidersRequireBothPerMessagePermissions() {
-        for (name in listOf("openrouter", "mistral", "groq", "cloudflare")) {
+        for (name in listOf("gemini", "openrouter", "mistral", "groq", "cloudflare")) {
             assertTrue(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
                 true, true, name, false, false, true, true, 800))
             assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
