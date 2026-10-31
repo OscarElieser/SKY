@@ -2258,6 +2258,31 @@ class MainActivity : Activity() {
                     else "SKY API privada sin prioridad. No se eliminaron conexiones.")
             }
         })
+        content.addView(actionButton("MOTOR SKY API · ELEGIR MODELO") {
+            val names = arrayOf("Ollama (modelo propio · principal)",
+                "OpenRouter (modelos gratuitos limitados)",
+                "Mistral (cuotas externas)",
+                "Groq (cuotas externas)",
+                "Cloudflare Workers AI (cuotas externas)")
+            val prefs = getSharedPreferences("sky_own_api", MODE_PRIVATE)
+            val selected = SkyOwnApiRoutingPolicy.chosenProvider(
+                prefs.getString("sky_server_provider", "ollama"))
+            val chosenIndex = SkyOwnApiRoutingPolicy.SERVER_PROVIDERS.indexOf(selected)
+            AlertDialog.Builder(this)
+                .setTitle("SKY API · Proveedor autorizado")
+                .setMessage("Ollama trabaja en nuestro servidor. Los demás requieren " +
+                    "claves en el servidor y consentimiento de nube y datos " +
+                    "para cada consulta. No son ilimitados ni siempre gratuitos.")
+                .setSingleChoiceItems(names, chosenIndex) { dialog, which ->
+                    val provider = SkyOwnApiRoutingPolicy.SERVER_PROVIDERS[which]
+                    prefs.edit().putString("sky_server_provider", provider).apply()
+                    home.showMessage("Motor de SKY API elegido: $provider. " +
+                        "No se enviará nada a terceros sin autorizar el mensaje.")
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        })
         content.addView(description("Sin claves externas en la APK: SKY usa el token " +
             "de chat limitado y HTTPS. Esta opción NO instala Ollama en el Samsung, " +
             "NO habilita modelos que no existan en el servidor y NO sustituye " +
