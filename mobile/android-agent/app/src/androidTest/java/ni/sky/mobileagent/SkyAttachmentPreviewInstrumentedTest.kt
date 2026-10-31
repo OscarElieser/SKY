@@ -18,7 +18,8 @@ class SkyAttachmentPreviewInstrumentedTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val local = File.createTempFile("sky-preview-", ".pdf", context.cacheDir)
         try {
-            PdfDocument().use { document ->
+            val document = PdfDocument()
+            try {
                 for (n in 1..2) {
                     val info = PdfDocument.PageInfo.Builder(300, 440, n).create()
                     val page = document.startPage(info)
@@ -31,6 +32,8 @@ class SkyAttachmentPreviewInstrumentedTest {
                     document.finishPage(page)
                 }
                 local.outputStream().use { document.writeTo(it) }
+            } finally {
+                document.close()
             }
             val item = SkyAttachmentBatch.Item(
                 Uri.fromFile(local), local.name, local.length(),
