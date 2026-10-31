@@ -3338,7 +3338,7 @@ class MainActivity : Activity() {
         if (chatPending || pendingFileCancel != null) return
         // Only the private current-session boundary is updated; never delete
         // any saved conversations or overwrite the user's archival records.
-        val newestSavedId = archive.recent(1).lastOrNull()?.id ?: 0L
+        val newestSavedId = SkyChatSessionPolicy.newBoundary(archive.recent(1).lastOrNull()?.id)
         getSharedPreferences("sky_chat_session", MODE_PRIVATE).edit()
             .putLong("after_id", newestSavedId).apply()
         while (chatHistory.length() > 0) chatHistory.remove(0)
@@ -4064,7 +4064,7 @@ class MainActivity : Activity() {
                     // Excluye órdenes Android, memorias explícitas y archivos.
                     val sessionAfterId = getSharedPreferences("sky_chat_session", MODE_PRIVATE)
                         .getLong("after_id", 0L)
-                    val eligible = archive.recent(150).filter { it.id > sessionAfterId }.map { saved ->
+                    val eligible = archive.recent(150).filter { SkyChatSessionPolicy.visible(it.id, sessionAfterId) }.map { saved ->
                         SkyContextPlanner.Turn(saved.id, saved.question,
                             saved.answer, saved.engine)
                     }
