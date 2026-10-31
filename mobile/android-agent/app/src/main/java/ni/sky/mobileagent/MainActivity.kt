@@ -4272,7 +4272,8 @@ class MainActivity : Activity() {
                         answer = local.getString("respuesta")
                         provider = "SKY API · " +
                             local.optString("proveedor", selectedSkyApiProvider) +
-                            if (local.optBoolean("nube", false)) " · externo autorizado" else " · local"
+                            (if (local.optBoolean("nube", false))
+                                " · externo autorizado" else " · local")
                         sources = emptyList()
                         searchSuggestions = ""
                     }
