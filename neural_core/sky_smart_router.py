@@ -77,7 +77,8 @@ def _validate(messages: list[dict]) -> None:
         if (not isinstance(item, dict) or
                 item.get("role") not in ("system", "user", "assistant") or
                 not isinstance(item.get("content"), str) or
-                not 1 <= len(item["content"]) <= 4000):
+                not 1 <= len(item["content"]) <= (
+                    16_000 if item["role"] == "user" else 4000)):
             raise ValueError("Mensaje de SKY fuera de límites")
     if messages[-1]["role"] != "user":
         raise ValueError("Falta el mensaje de usuario")
@@ -95,18 +96,23 @@ def generate(messages: list[dict], *, cloud_consent: bool = False,
     """
     _validate(messages)
     contains_credential = any(_CREDENTIAL.search(item["content"]) for item in messages)
-    permitted = (cloud_consent and not local_only and not contains_credential and
+    # The remote adapters were deliberately capped to 4K. Long research
+    # prompts remain local rather than being silently truncated or leaked.
+    long_or_sensitive = contains_credential or any(
+        len(item["content"]) > 4000 for item in messages
+    )
+    permitted = (cloud_consent and not local_only and not long_or_sensitive and
                  (not private_data or private_cloud_consent))
     local_busy = False
     try:
-        result = local.generate(messages, max_output_tokens=1200)
+        result = local.generate(messages, max_output_tokens=2048)
         # Provenance must reflect reality, not a self-reported chat message.
         return dict(result, ruta="SKY_AUTO_LOCAL", alternativa=False)
     except local.InferenceBusy:
         local_busy = True
     except local.InferenceUnavailable:
         pass
-    # Never turn a bad prompt or a credential-bearing prompt into cloud data.
+    # Never turn a long or credential-bearing prompt into cloud data.
     if not permitted:
         if local_busy:
             raise AutoRouteBusy("SKY está atendiendo otras consultas; no se enviaron datos externos")
