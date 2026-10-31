@@ -1,3 +1,13 @@
+## SKY Android 0.8.43 — corrección de instalación Play Protect (candidato, no certificado)
+
+Se elimina de la APK **estándar** el servicio de acceso amplio a notificaciones que estaba en el manifiesto 0.8.42; se mantiene en la variante experimental separada, **no publicada**. Google documenta el bloqueo de instalaciones externas que solicitan ese permiso. La nueva build conservará el mismo paquete, firma de release y datos instalados si Android acepta actualizarla, pero **no se garantiza** que Play Protect permita instalarla hasta probar el APK firmado en Samsung. Se refuerzan las auditorías del binario y el test instrumentado. SKY no debe reportar reproducción audible sin evidencia.
+
+Los cambios académicos de [32.000 caracteres / hasta 4.096 tokens Ollama](docs/SKY_P0_ACADEMIC_32K_2026-10-30.md) están integrados en `main` y se incluirán en la nueva compilación. La ejecución de pesos reales de Ollama, las pruebas de voz/audio y archivos en Samsung siguen pendientes de aceptación.
+
+**Documento de seguridad y pasos de aceptación:** [SKY Android Play Protect 0.8.43](docs/SKY_ANDROID_PLAY_PROTECT_0843.md). **Sin cambios en SKY Windows ni BAQUEANO.**
+
+---
+
 ## SKY IA — prioridad P0 de contexto académico y pruebas reales (30/10/2026)
 
 **Cambio de código sujeto a CI y aceptación física:** el chat emparejado mediante SKY API privada y SKY Automático local admite hasta **32.000 caracteres** por turno, sin recortar el texto, y presupuesto de **hasta 4.096 tokens de salida** para consultas de más de 4.000 caracteres. El servidor debe tener capacidad de contexto suficiente (`SKY_INFERENCE_NUM_CTX=32768` para entradas de más de 16.000); una configuración insuficiente se rechaza. Esto no significa capacidad ilimitada ni demuestra un modelo Ollama desplegado. Los proveedores externos mantienen el límite de 4.000 caracteres y consentimiento independiente. SKY Windows y BAQUEANO no se alteran.

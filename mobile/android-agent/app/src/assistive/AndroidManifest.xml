@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <!-- Experimental only: notification access is explicitly opt-in,
+             never declared in the standard Play-Protect-compatible APK. -->
+        <service android:name=".SkyPlaybackProofListener"
+            android:label="SKY · Verificar reproducción musical"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
         <!-- Separate experimental build only. Requires a deliberate user opt-in.
              Do not distribute as the standard SKY Android APK. -->
         <service android:name=".SkyTextAssistService"
