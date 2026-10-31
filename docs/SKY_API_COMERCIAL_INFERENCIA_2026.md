@@ -1,3 +1,11 @@
+## 0A. Conectores externos opcionales (no reemplazan el motor propio)
+
+`neural_core/sky_optional_cloud_providers.py` incorpora adaptadores de texto para **OpenRouter**, **Mistral**, **Groq** y **Cloudflare Workers AI**, accesibles mediante `SKY Home /chat` y la API móvil autenticada, únicamente cuando el usuario selecciona el proveedor y consiente transferir el mensaje. Ollama permanece predeterminado, sin dependencia externa. El módulo no abre herramientas ni ejecuta acciones del teléfono; claves solo en el servidor y endpoints HTTPS de lista cerrada. **Gemini** sigue disponible por la integración anterior; no se ha reconstruido ni probado aquí. Se exige un token de Cloudflare restringido a Workers AI y se bloquean por defecto modelos OpenRouter de pago. Las cuotas gratuitas son limitadas y no sirven como presupuesto de producción.
+
+[Configuración de los cinco proveedores, controles y evidencias](SKY_API_PROVEEDORES_COMPATIBLES_2026.md).
+
+---
+
 # SKY API propia — arquitectura de inferencia y preparación comercial
 
 ## 0. SKY Inference Gateway: implementación local real (30/10/2026)
