@@ -1,3 +1,13 @@
+## SKY Android 0.8.47 — limpieza visual y exportación sin confusiones (código en revisión)
+
+Se conserva el diseño premium introducido por 0.8.46. Los avisos se descartan con `×` o expiran en 8 segundos, y se redibujan correctamente al cerrar/reabrir; los mensajes antiguos dejan de saltar al final. El lector seguro de respuestas, tablas y fórmulas ahora utiliza hasta 94 % de la altura con botones de lectura completa, copiar y cerrar. Ante errores de SQLite, SKY muestra la respuesta sin afirmar que está archivada. Word solo exporta la consulta recién guardada, nunca otra anterior; los errores transitorios de los ojos se limpian sin interrumpir la voz.
+
+Código pendiente de CI Android, auditoría de permisos, APK firmada y emuladores 35/36. Samsung físico y Play Protect siguen pendientes. No modificar SKY Windows, BAQUEANO ni la memoria existente.
+
+[Correcciones únicas y pruebas 0.8.47](../../docs/SKY_ANDROID_0847_ESTADOS_Y_RESPUESTAS.md).
+
+---
+
 ## SKY Android 0.8.46 — conversación premium y mensajes completos (código en validación)
 
 **Corrección visual P0:** mensajes multilínea con alto automático (se elimina la altura rígida 56dp que recortaba las respuestas), texto nativo para avisos y párrafos, renderizador matemático/Markdown offline redimensionable, vista previa identificada con acceso al mensaje original, y compositor más compacto con botón para borrar el borrador. Nuevo chat limpia la pantalla sin tocar SQLite. Una orden no enviada por falta de autorización se conserva como borrador recuperable, no se elimina silenciosamente.
