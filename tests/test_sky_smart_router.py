@@ -175,6 +175,24 @@ def test_long_thesis_prompt_stays_local_even_with_cloud_permission(monkeypatch):
     assert seen == [(full_brief, 4096)]
 
 
+def test_over_16k_prompt_routes_to_private_ollama_without_external_transfer(monkeypatch):
+    full_prompt = "Tesis con evidencia: " + "investigación" * 1900
+    assert 16000 < len(full_prompt) < 32000
+    calls = []
+    monkeypatch.setattr(inference, "generate",
+                        lambda turns, max_output_tokens:
+                        (calls.append((turns[-1]["content"], max_output_tokens)) or
+                         {"respuesta": "Análisis", "proveedor": "ollama",
+                          "nube": False, "acciones_ejecutadas": False}))
+    monkeypatch.setattr(router, "_try_cloud",
+                        lambda *a: (_ for _ in ()).throw(
+                            AssertionError("No enviar un prompt largo a la nube")))
+    result = router.generate([{"role": "user", "content": full_prompt}],
+                             cloud_consent=True, private_cloud_consent=True)
+    assert calls == [(full_prompt, 4096)]
+    assert result["nube"] is False
+
+
 def test_long_thesis_is_never_fallback_to_cloud_if_local_fails(monkeypatch):
     full_brief = "Investiga IA educativa con variables emocionales. " * 180
     assert 4000 < len(full_brief) <= 16000
