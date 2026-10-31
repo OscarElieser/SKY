@@ -374,35 +374,52 @@ class SkyMobileHome(
             settings.allowFileAccess = false
             settings.allowContentAccess = false
             settings.blockNetworkLoads = true
-            setBackgroundColor(Color.rgb(20, 30, 57))
+            isVerticalScrollBarEnabled = true
+            setBackgroundColor(Color.rgb(14, 26, 52))
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(
                     view: WebView?, request: WebResourceRequest?
                 ) = true
             }
-            loadDataWithBaseURL(null, SkyScientificMarkup.toHtml(answer),
-                "text/html", "UTF-8", null)
         }
-        val wrapper = FrameLayout(host).apply {
-            addView(viewer, FrameLayout.LayoutParams(-1,
-                (host.resources.displayMetrics.heightPixels * 0.67f).toInt()))
+        val container = LinearLayout(host).apply {
+            orientation = LinearLayout.VERTICAL
+            background = bg(Color.rgb(13, 23, 51), 22)
+            setPadding(dp(12), dp(14), dp(12), dp(10))
         }
-        val dialog = android.app.AlertDialog.Builder(host)
-            .setTitle("SKY IA · Mensaje completo")
-            .setView(wrapper)
-            .setNeutralButton("Copiar texto") { _, _ ->
-                val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("SKY IA", answer))
-                Toast.makeText(host, "Respuesta copiada", Toast.LENGTH_SHORT).show()
-            }
-            .setPositiveButton("Cerrar", null)
-            .create()
+        container.addView(text("SKY IA · LECTURA COMPLETA", 18f, white).apply {
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            setPadding(dp(4), dp(3), dp(4), dp(4))
+        })
+        container.addView(text(
+            "Contenido íntegro · ${answer.length} caracteres · Deslizá para leer",
+            12f, soft).apply { setPadding(dp(4), dp(2), dp(4), dp(11)) })
+        container.addView(viewer, LinearLayout.LayoutParams(-1, 0, 1f))
+        val actions = LinearLayout(host).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(12), 0, 0)
+        }
+        val dialog = android.app.AlertDialog.Builder(host).setView(container).create()
+        actions.addView(pill("Copiar todo", Color.rgb(36, 83, 116)) {
+            val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("SKY IA", answer))
+            Toast.makeText(host, "Texto completo copiado", Toast.LENGTH_SHORT).show()
+        }.apply { textSize = 13f }, LinearLayout.LayoutParams(0, dp(49), 1f).apply {
+            rightMargin = dp(8)
+        })
+        actions.addView(pill("Cerrar", Color.rgb(92, 72, 169)) {
+            dialog.dismiss()
+        }.apply { textSize = 13f }, LinearLayout.LayoutParams(0, dp(49), 1f))
+        container.addView(actions)
         dialog.setOnDismissListener {
-            wrapper.removeView(viewer)
+            container.removeView(viewer)
             viewer.stopLoading()
             viewer.destroy()
         }
-        dialog.show()
+        SkyPremiumUi.showDialog(host, dialog, 0.94)
+        viewer.loadDataWithBaseURL(null, SkyScientificMarkup.toHtml(answer),
+            "text/html", "UTF-8", null)
     }
 
     private fun makeBubble(value: String, mine: Boolean): LinearLayout {
@@ -493,8 +510,9 @@ class SkyMobileHome(
             if (mine) LinearLayout.LayoutParams.WRAP_CONTENT else LinearLayout.LayoutParams.MATCH_PARENT,
             if (rich) dp(148) else LinearLayout.LayoutParams.WRAP_CONTENT
         ))
-        if (tooLong) {
-            item.addView(pill("Leer mensaje completo", Color.rgb(54, 81, 133)) {
+        if (tooLong || rich) {
+            item.addView(pill(if (tooLong) "Leer mensaje completo" else
+                "Ver respuesta con formato", Color.rgb(54, 81, 133)) {
                 openFullResponse(value)
             }.apply {
                 textSize = 13f
