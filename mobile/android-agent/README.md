@@ -1,12 +1,12 @@
-## SKY Android — respuestas académicas extensas y verificables (30/10/2026)
+## SKY Android — consulta académica de 32K y respuestas extensas (30/10/2026)
 
-La ruta autenticada `SKY Automático` ahora permite enviar un prompt propio de hasta **16.000 caracteres sin truncarlo** a Ollama alojado por SKY, incluso sin seleccionar «Modo profundo» de Gemini. Los proveedores externos permanecen limitados a **4.000 caracteres** y una consulta larga no se transfere a sus servidores mediante respaldo automático, aunque exista permiso previo. El servidor puede solicitar **hasta 2.048 tokens de salida** y aplica instrucciones de calidad específicas de academia, ciencia, programación y entregables.
+**Código pendiente de aceptación:** SKY Automático y Ollama privados admiten hasta **32.000 caracteres** por turno emparejado, conservando el texto completo y sin respaldo cloud para consultas largas. Una consulta de más de 4.000 caracteres solicita hasta **4.096 tokens de respuesta**, condicionados al contexto y hardware del Ollama real. Para más de 16.000 caracteres es obligatorio `SKY_INFERENCE_NUM_CTX=32768`; no se declara al modelo operativo sin generación auténtica. Los proveedores externos mantienen su máximo de **4.000 caracteres** y su autorización por consulta. El modo profundo externo mantiene límites previos.
 
-No confundir la longitud aceptada por software con el contexto del modelo real: un Ollama de memoria insuficiente todavía podría fallar, devolver respuesta corta o requerir trabajo por fases. Esto no convierte el motor textual en una herramienta creadora de DOCX o PDF; el archivo debe producirse por el módulo de Office autorizado y confirmarse su existencia.
+No confundir la longitud aceptada por software con el contexto del modelo real: un Ollama de memoria insuficiente podría fallar o requerir trabajo por etapas. Un modelo de texto no crea por sí solo DOCX/PDF; sus archivos deben verificarse mediante módulos autorizados.
 
-**Evidencia exigida antes de marcar funcional:** CI Python y Kotlin verdes para el mismo commit; ejecución del script `python scripts/verify_sky_local_inference.py --long-academic` en un servidor GPU auténtico; prueba física de recepción íntegra, sin pérdida de historial, en el Samsung. Las pruebas simuladas verifican contratos, no rendimiento productivo.
+**Evidencia exigida:** CI Python y Kotlin verdes sobre el mismo commit; `python scripts/verify_sky_local_inference.py --long-academic` con pesos de Ollama reales y métricas verificables; respuesta íntegra y pruebas físicas de audio, voz, adjuntos e historial en Samsung. Los mocks validan contratos, no capacidad comercial.
 
-[Hoja de aceptación de capacidades](../../docs/SKY_CAPACIDADES_VERIFICABLES_Y_HOJA_DE_CALIDAD_2026.md) · [GitHub Actions](https://github.com/OscarElieser/SKY/actions).
+[Validación P0: Ollama real y Samsung](../../docs/SKY_P0_ACADEMIC_32K_2026-10-30.md) · [Hoja de aceptación](../../docs/SKY_CAPACIDADES_VERIFICABLES_Y_HOJA_DE_CALIDAD_2026.md) · [GitHub Actions](https://github.com/OscarElieser/SKY/actions).
 
 ---
 
