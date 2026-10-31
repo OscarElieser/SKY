@@ -85,6 +85,24 @@ class SkyMobileHome(
     private var keyboardVisible = false
     private var pendingQuestion: String? = null
     private var pendingInfo: String? = null
+    private var noticeRevision = 0
+
+    private fun clearTransientNotice() {
+        noticeRevision++
+        pendingInfo = null
+    }
+
+    private fun showTransientNotice(info: String) {
+        clearTransientNotice()
+        pendingInfo = info
+        val revision = noticeRevision
+        if (::conversationRows.isInitialized) conversationRows.postDelayed({
+            if (revision == noticeRevision && pendingQuestion == null) {
+                clearTransientNotice()
+                renderConversation()
+            }
+        }, 8000L)
+    }
     private lateinit var conversationScroll: ScrollView
     private lateinit var conversationRows: LinearLayout
     private lateinit var footerBar: LinearLayout
@@ -173,7 +191,7 @@ class SkyMobileHome(
                 // A stale setup/authorization error is dismissed as soon as
                 // the user starts correcting the draft, never stored as a turn.
                 if (pendingInfo != null && pendingQuestion == null) {
-                    pendingInfo = null
+                    clearTransientNotice()
                     if (::conversationRows.isInitialized) renderConversation()
                 }
             }
@@ -538,7 +556,7 @@ class SkyMobileHome(
         conversationRows.addView(view, LinearLayout.LayoutParams(-1, dp(68)))
     }
 
-    private fun renderConversation() {
+    private fun renderConversation(autoScrollToEnd: Boolean = false) {
         if (!::conversationRows.isInitialized) return
         // WebViews must be detached and explicitly destroyed on redraw.
         // Otherwise every new question leaves an obsolete Chromium instance.
@@ -571,7 +589,25 @@ class SkyMobileHome(
             conversationRows.addView(makeBubble(question, true))
             conversationRows.addView(makeBubble("Un momento, estoy preparando tu respuesta…", false))
         }
-        pendingInfo?.let { info -> conversationRows.addView(makeBubble(info, false)) }
+        pendingInfo?.let { info ->
+            val notice = LinearLayout(host).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = bg(Color.rgb(48, 54, 93), 16)
+                setPadding(dp(12), dp(8), dp(8), dp(8))
+            }
+            notice.addView(text(info, 13f, soft).apply {
+                setLineSpacing(dp(2).toFloat(), 1f)
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            notice.addView(pill("×", Color.rgb(76, 76, 121)) {
+                clearTransientNotice()
+                renderConversation()
+            }.apply { contentDescription = "Descartar aviso temporal de SKY" },
+                LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+                    leftMargin = dp(8)
+                })
+            conversationRows.addView(notice)
+        }
         progressLabel.text = when {
             pendingQuestion != null -> "● SKY está pensando…"
             history.isEmpty() -> "● SKY lista para conversar"
@@ -579,24 +615,27 @@ class SkyMobileHome(
         }
         updateSendButton()
         updateSuggestions()
-        conversationScroll.post { conversationScroll.fullScroll(View.FOCUS_DOWN) }
+        if (autoScrollToEnd) conversationScroll.post {
+            if (conversationScroll.isAttachedToWindow)
+                conversationScroll.fullScroll(View.FOCUS_DOWN)
+        }
     }
 
     fun beginSending(message: String) {
+        clearTransientNotice()
         pendingQuestion = message
-        pendingInfo = null
         chatInput.setText("")
         chatInput.clearFocus()
         (host.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
             ?.hideSoftInputFromWindow(chatInput.windowToken, 0)
-        renderConversation()
+        renderConversation(autoScrollToEnd = true)
     }
 
     fun failSending(reason: String, original: String) {
         pendingQuestion = null
-        pendingInfo = "No pude enviar el mensaje. $reason"
+        showTransientNotice("No pude enviar el mensaje. $reason")
         if (chatInput.text.isBlank()) chatInput.setText(original)
-        renderConversation()
+        renderConversation(autoScrollToEnd = true)
     }
 
     private fun buildPanel() {
@@ -746,7 +785,7 @@ class SkyMobileHome(
         sessionAfterId = afterId.coerceAtLeast(0L)
         history.clear()
         pendingQuestion = null
-        pendingInfo = null
+        clearTransientNotice()
         expandedHistory = false
         activeModule = ""
         chatInput.setText("")
@@ -783,10 +822,13 @@ class SkyMobileHome(
     fun isPanelOpen() = dialogBackdrop.visibility == View.VISIBLE
 
     fun openChat() {
+        if (pendingQuestion == null && pendingInfo != null) clearTransientNotice()
+        val opening = !isPanelOpen()
         activeModule = ""
         panelTitle.text = "Conversación"
         panelSubtitle.visibility = View.GONE
         dialogBackdrop.visibility = View.VISIBLE
+        if (opening) renderConversation(autoScrollToEnd = true)
     }
 
     fun openModule(id: String) {
@@ -794,13 +836,16 @@ class SkyMobileHome(
         panelTitle.text = moduleTitle(id)
         panelSubtitle.text = "Consultas con SKY Android · Internet opcional"
         panelSubtitle.visibility = View.VISIBLE
-        pendingInfo = "¿Qué necesitás hacer en " + moduleTitle(id) + "? Puedo conversar " +
-            "sobre esta tarea; algunas acciones requieren permisos del dispositivo."
+        showTransientNotice("¿Qué necesitás hacer en " + moduleTitle(id) +
+            "? Algunas acciones requieren permisos del dispositivo.")
         renderConversation()
         dialogBackdrop.visibility = View.VISIBLE
     }
 
     fun closePanel() {
+        val hadNotice = pendingInfo != null
+        clearTransientNotice()
+        if (hadNotice) renderConversation()
         dialogBackdrop.visibility = View.GONE
         privacy.visibility = View.GONE
         chatInput.clearFocus()
@@ -826,8 +871,8 @@ class SkyMobileHome(
     fun showMessage(s: String) {
         status.text = s
         if (isPanelOpen()) {
-            pendingInfo = s
-            renderConversation()
+            showTransientNotice(s)
+            renderConversation(autoScrollToEnd = true)
         } else {
             Toast.makeText(host, s, Toast.LENGTH_SHORT).show()
         }
@@ -840,15 +885,22 @@ class SkyMobileHome(
         revealPanel: Boolean = true,
         sources: List<SkyPhoneCloud.Source> = emptyList(),
         googleSearchHtml: String = ""
-    ) {
+    ): SkyConversationArchive.Entry? {
         pendingQuestion = null
-        pendingInfo = null
-        // Persistir solamente consultas completadas, en el almacenamiento privado.
-        val saved = archive.append(question, answer, engine)
-        history.add(Exchange(saved.question, saved.answer, saved.engine,
-            sources, googleSearchHtml, saved.title, saved.localTime()))
+        clearTransientNotice()
+        // Failure to persist must never conceal a successful inference reply.
+        val saved = runCatching { archive.append(question, answer, engine) }.getOrNull()
+        history.add(if (saved != null) {
+            Exchange(saved.question, saved.answer, saved.engine,
+                sources, googleSearchHtml, saved.title, saved.localTime())
+        } else {
+            Exchange(question, answer, engine, sources, googleSearchHtml)
+        })
         if (history.size > 150) history.removeAt(0)
-        renderConversation()
+        if (saved == null) showTransientNotice(
+            "Respuesta visible, pero no se guardó en el historial. Copiala antes de salir.")
+        renderConversation(autoScrollToEnd = true)
         if (revealPanel && !isPanelOpen()) openChat()
+        return saved
     }
 }
