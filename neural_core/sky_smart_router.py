@@ -7,6 +7,7 @@ No unapproved transfer, prompt logging, device tools, or fabricated responses.
 from __future__ import annotations
 
 import os
+import re
 import threading
 import time
 
@@ -18,6 +19,13 @@ from neural_core import sky_optional_cloud_providers as optional
 SUPPORTED_CLOUD = ("groq", "openrouter", "mistral", "cloudflare", "gemini")
 _LOCK = threading.RLock()
 _COOLDOWN: dict[str, float] = {}
+# Automatic routing must never forward apparent credentials. This guard
+# catches common explicit secret formats; it is not a full DLP scanner.
+_CREDENTIAL = re.compile(
+    r"(?i)(?:\\bsk-[a-z0-9_-]{16,}\\b|\\bbearer\\s+[a-z0-9_.-]{16,}\\b|"
+    r"\\b(?:api[_ -]?key|access[_ -]?token|password|contrasena|contraseña|"
+    r"secret[_ -]?key)\\s*[:=]\\s*[^\\s]{8,})"
+)
 
 
 class AutoRouteUnavailable(RuntimeError):
@@ -86,7 +94,8 @@ def generate(messages: list[dict], *, cloud_consent: bool = False,
     allowlist enable them. Failed own model is not assumed to mean success.
     """
     _validate(messages)
-    permitted = (cloud_consent and not local_only and
+    contains_credential = any(_CREDENTIAL.search(item["content"]) for item in messages)
+    permitted = (cloud_consent and not local_only and not contains_credential and
                  (not private_data or private_cloud_consent))
     local_busy = False
     try:
@@ -97,7 +106,7 @@ def generate(messages: list[dict], *, cloud_consent: bool = False,
         local_busy = True
     except local.InferenceUnavailable:
         pass
-    # Never turn a bad prompt into a cloud request.
+    # Never turn a bad prompt or a credential-bearing prompt into cloud data.
     if not permitted:
         if local_busy:
             raise AutoRouteBusy("SKY está atendiendo otras consultas; no se enviaron datos externos")
