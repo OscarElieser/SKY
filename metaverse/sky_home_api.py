@@ -24,7 +24,7 @@ class Turn(BaseModel):
 class HomeChat(BaseModel):
     texto: str = Field(min_length=1, max_length=4000)
     historial: list[Turn] = Field(default_factory=list, max_length=8)
-    proveedor: Literal["auto", "ollama", "gemini", "openai", "anthropic", "mistral", "groq", "deepseek", "openrouter", "cloudflare"] = "auto"
+    proveedor: Literal["auto", "ollama", "gemini", "openai", "anthropic", "mistral", "groq", "deepseek", "openrouter", "cloudflare", "sky_auto"] = "auto"
     datos: Literal["privados", "generales"] = "privados"
     autorizar_nube: bool = False
     autorizar_datos_privados: bool = False
@@ -69,6 +69,9 @@ def home_status():
 
 @router.post("/chat")
 def home_chat(body: HomeChat):
+    # Preserve original Home API routes; SKY Automatic is mobile-scoped.
+    if body.proveedor == "sky_auto":
+        raise HTTPException(400, "SKY Automático requiere chat móvil autorizado")
     # Cálculos locales de solo lectura: no necesitan un LLM ni autorización
     # de nube; el token móvil limitado jamás obtiene acciones del propietario.
     from neural_core.sky_conversation_tools import maybe_answer as _verified_answer
