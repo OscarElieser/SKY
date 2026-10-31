@@ -59,7 +59,9 @@ internal object SkyPlaybackProof {
         ComponentName(context, SkyPlaybackProofListener::class.java)
 
     fun available(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < 27) return false
+        // Fail closed even if a previous installation held this special grant.
+        // The standard flavor never declares the sensitive OS listener.
+        if (!BuildConfig.ENABLE_TEXT_ASSIST || Build.VERSION.SDK_INT < 27) return false
         return runCatching {
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
                 as NotificationManager
