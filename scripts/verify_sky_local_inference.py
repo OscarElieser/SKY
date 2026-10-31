@@ -20,22 +20,31 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--long-academic", action="store_true",
                         help="Comprobar consulta académica >16K y respuesta extensa con tokens reales")
+    parser.add_argument("--maximal-academic", action="store_true",
+                        help="Validar ~42K caracteres y hasta 6144 tokens con Ollama real y 64K de contexto")
     args = parser.parse_args()
+    if args.long_academic and args.maximal_academic:
+        parser.error("Seleccioná solo una longitud de prueba")
     academic = (
         "Proyecto sobre inteligencia artificial y dimensión socioemocional "
         "en educación técnica y universitaria. "
     )
     prompt = (
-        academic * 220 + (
+        academic * (400 if args.maximal_academic else 220) + (
             "Redacta un análisis académico estructurado con problema, objetivos, "
             "método, variables, limitaciones, implicaciones y conclusiones. "
             "No inventes referencias ni resultados empíricos; distinguí hipótesis "
             "de evidencias y utilizá ejemplos educativos concretos."
         )
-        if args.long_academic else
+        if (args.long_academic or args.maximal_academic) else
         "Indica en una oración qué significa una hipótesis investigativa."
     )
-    assert 16_000 < len(prompt) <= 32_000 if args.long_academic else len(prompt) < 4000
+    if args.maximal_academic:
+        assert 32_000 < len(prompt) <= 48_000
+    elif args.long_academic:
+        assert 16_000 < len(prompt) <= 32_000
+    else:
+        assert len(prompt) < 4000
     try:
         ready = gateway.readiness()
         if not ready["local_ollama_ready"]:
@@ -46,12 +55,14 @@ def main() -> int:
         result = gateway.generate([
             {"role": "system", "content": "Eres SKY IA. Responde en español."},
             {"role": "user", "content": prompt}
-        ], max_output_tokens=4096 if args.long_academic else 180)
+        ], max_output_tokens=(6144 if args.maximal_academic else
+                              4096 if args.long_academic else 180))
         output_chars = len(result["respuesta"])
         generated = result["metricas"]["tokens_salida"]
         passed = bool(result["respuesta"].strip()) and (
-            not args.long_academic or
-            (output_chars >= 2000 and generated >= 500 and
+            (not args.long_academic and not args.maximal_academic) or
+            (output_chars >= (3500 if args.maximal_academic else 2000) and
+             generated >= (1000 if args.maximal_academic else 500) and
              result["metricas"]["tokens_entrada"] > 0 and
              not result.get("respuesta_incompleta", False))
         )
@@ -65,6 +76,7 @@ def main() -> int:
                           "complete": not result.get("respuesta_incompleta", False),
                           "input_characters": len(prompt),
                           "long_academic": args.long_academic,
+                          "maximal_academic": args.maximal_academic,
                           "note": "Prueba de inferencia real; la calidad académica requiere revisión humana"},
                          ensure_ascii=False))
         return 0 if passed else 4
