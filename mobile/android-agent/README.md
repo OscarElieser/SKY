@@ -1,3 +1,21 @@
+## SKY Android 0.8.42 — corrección de desvío de tesis hacia el clima (30/10/2026)
+
+**Incidencia observada en Samsung:** ante un prompt largo para construir una tesis en Informática Educativa sobre inteligencia artificial y variables emocionales, SKY respondió «¿De qué ciudad querés consultar el clima?» en lugar de atender la petición académica.
+
+**Causa reproducible:** `SkyWeatherNow.isWeatherQuery` consideraba meteorológica cualquier consulta que contuviera las palabras «tiempo», «clima» o «temperatura», incluso expresiones como «tiempo disponible: seis meses», «clima emocional» y «temperatura emocional». El manejador del clima se ejecutaba antes del proceso de investigación y creación de Word.
+
+**Corrección integrada en `main`:**
+- El clima se procesa ahora solo cuando la frase breve solicita explícitamente información meteorológica. La duración de una tesis, el clima socioemocional y los planes docentes no activan la consulta meteorológica.
+- Los tests `SkyWeatherNowTest.kt` cubren el prompt de tesis y consultas legítimas como «clima en Managua» y «qué tiempo hace en Granada».
+- `SkyWordExportIntent.kt` reconoce instrucciones académicas extensas que piden **crear** un DOCX. Una mención incidental a la «entrega» del cronograma o a «cómo evitar errores» ya no dispara una descarga de Word existente ni bloquea la creación; `SkyWordExportIntentTest.kt` incorpora estas regresiones.
+- La generación de contenidos académicos sigue dependiendo de las fuentes, servicios autorizados, límites reales de respuesta y aceptación del usuario. SKY no debe inventar citas, resultados empíricos ni afirmar que una tesis de 350 páginas se terminó en un turno.
+
+**Estado real:** cambios subidos a `main`, pero no se garantiza que la APK esté lista ni que funcione en el Samsung hasta revisar compilación, pruebas de regresión y emuladores Android 15/16, además de pruebas físicas. SKY Windows no fue modificada en este bloque.
+
+[CI Android](https://github.com/OscarElieser/SKY/actions/workflows/sky-mobile-release.yml) · [Releases](https://github.com/OscarElieser/SKY/releases).
+
+---
+
 ## SKY Android 0.8.42 — escucha automática y prompts sin recortes silenciosos (31/10/2026)
 
 **Estado:** cambios de código integrados en `main`, sujetos a pruebas y publicación de APK firmada. No implica funcionamiento verificado en el Samsung. SKY Windows permanece sin modificaciones.
