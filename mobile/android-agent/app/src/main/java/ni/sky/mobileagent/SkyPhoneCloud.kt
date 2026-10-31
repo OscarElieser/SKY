@@ -36,8 +36,17 @@ object SkyPhoneCloud {
         val normalized = java.text.Normalizer.normalize(
             message.lowercase(java.util.Locale.ROOT), java.text.Normalizer.Form.NFD
         ).replace(Regex("""\p{M}+"""), "")
-        return Regex("""\b(hoy|ahora|actual|actuales|actualmente|ultimo|ultima|ultimos|ultimas|reciente|recientes|esta semana|este mes|en vivo|tiempo real|noticias|clima|temperatura|pronostico|precio|cotizacion|tipo de cambio|marcador|resultado del partido|resultados de las elecciones|quien es el presidente|quien gobierna|2026)\b""")
-            .containsMatchIn(normalized)
+        // A date in an academic proposal, or an "emotional climate" study,
+        // does NOT by itself request current meteorological or market data.
+        val explicitFreshness = Regex(
+            """\b(hoy|ahora|actual|actuales|actualmente|ultimo|ultima|ultimos|ultimas|""" +
+                """reciente|recientes|esta semana|este mes|en vivo|tiempo real|""" +
+                """noticias|precio|cotizacion|tipo de cambio|marcador|""" +
+                """resultado del partido|resultados de las elecciones|""" +
+                """quien es el presidente|quien gobierna)\b"""
+        )
+        return explicitFreshness.containsMatchIn(normalized) ||
+            SkyWeatherNow.isWeatherQuery(message)
     }
 
     /**
