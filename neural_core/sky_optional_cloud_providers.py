@@ -49,7 +49,7 @@ def configuration(provider: str) -> ProviderConfig:
         "openrouter": ("OPENROUTER_API_KEY", "OPENROUTER_MODEL", "openrouter/free"),
         "mistral": ("MISTRAL_API_KEY", "MISTRAL_MODEL", "mistral-small-latest"),
         "groq": ("GROQ_API_KEY", "GROQ_MODEL", "openai/gpt-oss-20b"),
-        "cloudflare": ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_AI_MODEL",
+        "cloudflare": ("SKY_WORKERS_AI_TOKEN", "CLOUDFLARE_AI_MODEL",
                        "@cf/meta/llama-3.1-8b-instruct"),
     }
     env_key, env_model, default_model = meta[provider]
