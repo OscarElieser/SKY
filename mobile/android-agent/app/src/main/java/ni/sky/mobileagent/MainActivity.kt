@@ -2240,26 +2240,29 @@ class MainActivity : Activity() {
         }
         val linked = tokens.token().isNotEmpty() && tokens.deviceId().isNotEmpty()
         content.addView(SkyPremiumUi.section(this, "Motor",
-            "SKY API propia · Ollama autorizado · Groq y Gemini", "⚡"))
+            "SKY Automático · motor propio y respaldo supervisado", "⚡"))
         content.addView(description("SKY Android · Ajustes y permisos"))
         content.addView(description("MODO INDEPENDIENTE · No necesitás Windows ni una PC para " +
             "usar las funciones locales del teléfono. El cerebro Ollama del servidor es opcional."))
         content.addView(CheckBox(this).apply {
-            text = "Priorizar mi SKY API privada (modelo Ollama del servidor)"
+            text = "SKY Automático · priorizar nuestra API sin elegir modelos"
             isChecked = getSharedPreferences("sky_own_api", MODE_PRIVATE)
-                .getBoolean("prefer_self_hosted_ollama", false)
+                .getBoolean("prefer_self_hosted_ollama",
+                    tokens.deviceId().isNotBlank() &&
+                        tokens.chatToken().isNotBlank() &&
+                        tokens.server().isNotBlank())
             setOnCheckedChangeListener { _, enabled ->
                 getSharedPreferences("sky_own_api", MODE_PRIVATE).edit()
                     .putBoolean("prefer_self_hosted_ollama", enabled).apply()
                 home.showMessage(if (enabled)
-                    "SKY API tendrá prioridad en textos compatibles. Requiere " +
-                        "chat HTTPS emparejado y Ollama activo en el servidor. " +
-                        "Si falta el modelo, se conservará tu borrador."
-                    else "SKY API privada sin prioridad. No se eliminaron conexiones.")
+                    "SKY Automático elegirá Ollama primero. Requiere chat HTTPS " +
+                        "emparejado. No enviará datos a proveedores externos sin permiso."
+                    else "Priorización automática desactivada. Se conservan las conexiones.")
             }
         })
-        content.addView(actionButton("MOTOR SKY API · ELEGIR MODELO") {
-            val names = arrayOf("Ollama (modelo propio · principal)",
+        content.addView(actionButton("AJUSTE AVANZADO · FIJAR PROVEEDOR") {
+            val names = arrayOf("SKY Automático (recomendado · modelo propio primero)",
+                "Ollama (modelo propio · principal)",
                 "Gemini (integración existente · cuotas externas)",
                 "OpenRouter (modelos gratuitos limitados)",
                 "Mistral (cuotas externas)",
@@ -2267,7 +2270,7 @@ class MainActivity : Activity() {
                 "Cloudflare Workers AI (cuotas externas)")
             val prefs = getSharedPreferences("sky_own_api", MODE_PRIVATE)
             val selected = SkyOwnApiRoutingPolicy.chosenProvider(
-                prefs.getString("sky_server_provider", "ollama"))
+                prefs.getString("sky_server_provider", "sky_auto"))
             val chosenIndex = SkyOwnApiRoutingPolicy.SERVER_PROVIDERS.indexOf(selected)
             AlertDialog.Builder(this)
                 .setTitle("SKY API · Proveedor autorizado")
@@ -2276,14 +2279,48 @@ class MainActivity : Activity() {
                     "para cada consulta. No son ilimitados ni siempre gratuitos.")
                 .setSingleChoiceItems(names, chosenIndex) { dialog, which ->
                     val provider = SkyOwnApiRoutingPolicy.SERVER_PROVIDERS[which]
-                    prefs.edit().putString("sky_server_provider", provider).apply()
-                    home.showMessage("Motor de SKY API elegido: $provider. " +
-                        "No se enviará nada a terceros sin autorizar el mensaje.")
+                    prefs.edit().putString("sky_server_provider", provider)
+                        .putBoolean("automatic_routing", provider == "sky_auto").apply()
+                    home.showMessage("Modo de SKY API: $provider. " +
+                        "Las autorizaciones externas se respetan.")
                     dialog.dismiss()
                 }
                 .setNegativeButton("Cancelar", null)
                 .show()
         })
+        content.addView(CheckBox(this).apply {
+            text = "Autorizar respaldo automático de texto con IA externa"
+            val prefs = getSharedPreferences("sky_own_api", MODE_PRIVATE)
+            isChecked = prefs.getBoolean("automatic_external_backup", false)
+            setOnCheckedChangeListener { _, enabled ->
+                if (!enabled) {
+                    prefs.edit().putBoolean("automatic_external_backup", false).apply()
+                } else {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Autorización de proveedores externos")
+                        .setMessage("Si Ollama no puede responder, SKY podrá enviar " +
+                            "automáticamente el texto y contexto de tus consultas " +
+                            "(incluidos datos privados) a los proveedores " +
+                            "habilitados por el servidor. Esto consume sus cuotas y " +
+                            "está sujeto a sus políticas de datos. " +
+                            "Puedes revocar este permiso en cualquier momento. " +
+                            "¿Autorizas el respaldo externo?")
+                        .setPositiveButton("Sí, autorizo") { _, _ ->
+                            prefs.edit().putBoolean("automatic_external_backup", true).apply()
+                            home.showMessage("Respaldo externo autorizado. " +
+                                "Ollama sigue siendo prioritario.")
+                        }
+                        .setNegativeButton("Solo modelo propio") { _, _ ->
+                            isChecked = false
+                        }
+                        .setOnCancelListener { isChecked = false }
+                        .show()
+                }
+            }
+        })
+        content.addView(description("La autorización externa es opcional; " +
+            "viene desactivada. Ollama funciona sin ella. " +
+            "Las solicitudes de información actual requieren fuentes verificadas."))
         content.addView(description("Sin claves externas en la APK: SKY usa el token " +
             "de chat limitado y HTTPS. Esta opción NO instala Ollama en el Samsung, " +
             "NO habilita modelos que no existan en el servidor y NO sustituye " +
