@@ -241,6 +241,7 @@ internal object SkyExpressionCatalog {
             .replace(Regex("""[^a-z0-9]+"""), " ")
             .replace(Regex("""\s+"""), " ").trim()
             .removePrefix("sky ").trim()
+            .removeSuffix(" sky").trim()
         if (normalized.length !in 2..110) return null
         return when (normalized) {
             "hola", "holi", "buenas", "buenos dias", "buenas tardes",
