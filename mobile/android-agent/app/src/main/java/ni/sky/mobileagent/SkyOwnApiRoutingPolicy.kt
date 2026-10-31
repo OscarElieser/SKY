@@ -22,7 +22,8 @@ internal object SkyOwnApiRoutingPolicy {
         promptChars in 1..SERVER_PROMPT_LIMIT
 
     /** Local-first is default. Cloud adapters are selected by owner only. */
-    val SERVER_PROVIDERS = listOf("ollama", "openrouter", "mistral", "groq", "cloudflare")
+    val SERVER_PROVIDERS = listOf("ollama", "gemini", "openrouter",
+        "mistral", "groq", "cloudflare")
 
     fun chosenProvider(raw: String?): String =
         raw?.takeIf { it in SERVER_PROVIDERS } ?: "ollama"
