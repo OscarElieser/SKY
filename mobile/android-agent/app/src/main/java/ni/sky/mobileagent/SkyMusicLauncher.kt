@@ -37,9 +37,13 @@ class SkyMusicLauncher(
                               requestId: Int, operation: String, step: Int = 0) {
         if (requestId != playbackRequestId) return
         if (SkyPlaybackProof.playing(host, playerPackage, request.query)) {
+            val audio = SkyMusicAudioCheck.read(host)
             receipt(request.query, "VERIFIED_LOCAL",
-                "Android MediaSession confirmó PLAYING y metadatos de canción coincidentes en $label; audio audible no medido", operation)
-            tell("Android confirmó que $label está reproduciendo «${request.query}».")
+                "Android MediaSession confirmó PLAYING y metadatos coincidentes en $label; " +
+                    audio.evidence(), operation)
+            tell("Android confirmó PLAYING de «${request.query}» en $label. " +
+                audio.guidance())
+            SkyMusicAudioCheck.offerVolumePanel(host, audio)
             return
         }
         if (step < 12) {
@@ -47,11 +51,13 @@ class SkyMusicLauncher(
                 checkPlayback(request, playerPackage, label, requestId, operation, step + 1)
             }, 1000L)
         } else {
+            val audio = SkyMusicAudioCheck.read(host)
             receipt(request.query, "ESTADO_DESCONOCIDO",
                 "No se detectó una MediaSession PLAYING con el título exacto en $label " +
-                    "tras 12 comprobaciones; no se confirma reproducción ni audio audible", operation)
-            tell("Android recibió la orden para «${request.query}» en $label, " +
-                "pero no pude confirmar la canción en reproducción. Revisá el reproductor.")
+                    "tras 12 comprobaciones; " + audio.evidence(), operation)
+            tell("No pude confirmar la reproducción de «${request.query}» en $label. " +
+                audio.guidance())
+            SkyMusicAudioCheck.offerVolumePanel(host, audio)
         }
     }
 
@@ -98,8 +104,10 @@ class SkyMusicLauncher(
             val launch = host.packageManager.getLaunchIntentForPackage(pkg)
                 ?: throw ActivityNotFoundException("La aplicación no está instalada")
             host.startActivity(launch)
-            receipt(request.query, "SENT", "Android abrió reproductor; reproducción pendiente de verificación")
-            tell("Estoy buscando «${request.query}» en $title, pero aún no he confirmado la reproducción.")
+            val audio = SkyMusicAudioCheck.read(host)
+            receipt(request.query, "SENT", "Android abrió reproductor; " + audio.evidence())
+            tell("Estoy buscando «${request.query}» en $title. " + audio.guidance())
+            SkyMusicAudioCheck.offerVolumePanel(host, audio)
         } catch (_: Exception) {
             SkyMusicControlService.cancelPending()
             receipt(request.query, "FAILED", "No pudo abrir reproductor")
@@ -114,6 +122,7 @@ class SkyMusicLauncher(
         val chosen = request.service ?: preferred()
         val title = SkyMusicCommand.label(chosen)
         val pkg = packageName(chosen)
+        val initialAudio = SkyMusicAudioCheck.read(host)
         val player = Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).apply {
             setPackage(pkg)
             addCategory(Intent.CATEGORY_DEFAULT)
@@ -130,10 +139,11 @@ class SkyMusicLauncher(
         } catch (_: SecurityException) { false
         } catch (_: IllegalArgumentException) { false }
         if (launched) {
-            receipt(request.query, "SENT", "Intent de reproducción aceptado; audio no verificado")
+            receipt(request.query, "SENT",
+                "Intent de reproducción aceptado; " + initialAudio.evidence())
             tell("Solicité reproducir «${request.query}» en $title. " +
-                "La aplicación decidirá si puede iniciar esa canción. " +
-                "Todavía no he comprobado que esté sonando.")
+                "La aplicación decidirá si inicia la canción. " + initialAudio.guidance())
+            SkyMusicAudioCheck.offerVolumePanel(host, initialAudio)
             if (SkyPlaybackProof.available(host)) {
                 checkPlayback(request, pkg, title, requestId, operationId)
             }
@@ -150,9 +160,12 @@ class SkyMusicLauncher(
         }
         try {
             host.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
-            receipt(request.query, "SENT", "Solo búsqueda abierta; reproducción no verificada")
+            receipt(request.query, "SENT",
+                "Solo búsqueda abierta; " + initialAudio.evidence())
             tell("Abrí la búsqueda de «${request.query}» en $title, " +
-                "pero esa app no aceptó la reproducción directa por Android.")
+                "pero esa app no aceptó la reproducción directa por Android. " +
+                initialAudio.guidance())
+            SkyMusicAudioCheck.offerVolumePanel(host, initialAudio)
         } catch (_: Exception) {
             receipt(request.query, "FAILED", "Android no abrió búsqueda musical")
             tell("No encontré una aplicación compatible para abrir música.")
