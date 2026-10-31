@@ -3810,6 +3810,14 @@ class MainActivity : Activity() {
 
     private fun sendChatText(message: String) {
         if (message.isEmpty()) return
+        if (message.length > SkyPromptLengthPolicy.DEEP_MAX) {
+            home.showMessage("El prompt tiene ${message.length} caracteres y el mayor " +
+                "límite configurado es ${SkyPromptLengthPolicy.DEEP_MAX}. " +
+                "Conservé tu texto completo en el editor; no lo recorté ni envié. " +
+                "Dividilo en partes o adjuntalo como documento para analizarlo.")
+            voicePanel.showError("Prompt demasiado largo: no se envió incompleto.")
+            return
+        }
         if (showSafeFileBackups(message)) return
         if (previewSafeFileProposal(message)) return
         if (processOwnerProfileImport(message)) {
@@ -3999,7 +4007,8 @@ class MainActivity : Activity() {
         val prefix = (if (privateData) SkyOwnerContext.forPrompt(this) else "") +
             memoryPrompt + documentGuide + cognitionGuide + factCheckGuide +
             evidenceRecall + skillsPrompt
-        val messageLimit = if (selection.tier == SkyGeminiModes.Tier.DEEP) 16000 else 4000
+        val deepPrompt = selection.tier == SkyGeminiModes.Tier.DEEP
+        val messageLimit = SkyPromptLengthPolicy.limit(deepPrompt)
         if (selection.prompt.length > messageLimit) {
             val detail = "Tu prompt contiene ${selection.prompt.length} caracteres; el límite " +
                 "del proveedor y modo elegidos es $messageLimit. No recorté ni envié " +
@@ -4008,9 +4017,9 @@ class MainActivity : Activity() {
             voicePanel.showError("Prompt extenso: se conserva completo sin enviar.")
             return
         }
-        val personalizedMessage =
-            prefix.take((messageLimit - selection.prompt.length).coerceAtLeast(0)) +
-            selection.prompt
+        // Optional context may be shortened; user instructions are never cut.
+        val personalizedMessage = SkyPromptLengthPolicy.compose(
+            selection.prompt, prefix, deepPrompt) ?: return
         cloudConsent.isChecked = false
         privateConsent.isChecked = false
         chatPending = true
