@@ -193,6 +193,17 @@ except HTTPException as e:
     assert e.status_code == 422
 else:
     raise AssertionError("Private 4K history wrongly accepted by external provider")
+# SKY Automatic can use private 4K context only when cloud fallback is off.
+try:
+    endpoint.mobile_chat_text(endpoint.MobileChatRequest(
+        device_id=did, texto="Continuar investigación",
+        proveedor="sky_auto", historial=prior_turns,
+        autorizar_nube=True, autorizar_datos_privados=True),
+        x_sky_chat_token=paired["token"])
+except HTTPException as e:
+    assert e.status_code == 422
+else:
+    raise AssertionError("Cloud-eligible automatic chat exposed 4K private context")
 # More than eight private turns are rejected at the model boundary.
 from pydantic import ValidationError
 try:
