@@ -2,6 +2,7 @@ package ni.sky.mobileagent
 
 import java.text.Normalizer
 import java.util.Locale
+import java.util.UUID
 
 /**
  * Produces a real editable Markdown work-plan artifact, NOT a fictitious thesis,
@@ -12,7 +13,8 @@ import java.util.Locale
  */
 internal object SkyLongWorkPlanner {
     enum class Kind { TESIS, INVESTIGACION, PROGRAMACION }
-    data class Plan(val kind: Kind, val topic: String, val markdown: String)
+    data class Plan(val kind: Kind, val topic: String, val markdown: String,
+                    val operationId: String)
 
     fun prepare(raw: String): Plan? {
         val clean = raw.trim().replaceFirst(
@@ -58,8 +60,10 @@ internal object SkyLongWorkPlanner {
                 "Seguridad, observabilidad y recuperación",
                 "Documentación de despliegue y entregables")
         }
+        val operationId = UUID.randomUUID().toString()
         return Plan(kind, topic, buildString {
             append("# Plan de trabajo SKY IA\n\n")
+            append("**Operación local:** ").append(operationId).append("\n")
             append("**Modalidad:** ").append(kind.name.lowercase(Locale.ROOT)).append("\n")
             append("**Tema:** ").append(topic).append("\n\n")
             append("> Este documento es un plan editable, no un trabajo final. ")
@@ -81,6 +85,6 @@ internal object SkyLongWorkPlanner {
             append("## Continuación\n\n")
             append("Solicitá elaborar la etapa correspondiente. Los textos extensos ")
             append("se trabajan por partes y se integran tras verificar cada sección.\n")
-        })
+        }, operationId)
     }
 }
