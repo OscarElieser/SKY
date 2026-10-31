@@ -1,5 +1,24 @@
 # SKY API propia — arquitectura de inferencia y preparación comercial
 
+## 0. SKY Inference Gateway: implementación local real (30/10/2026)
+
+**Integrado en código**: `neural_core/sky_inference_gateway.py` ejecuta `POST /api/chat` contra Ollama local, sin ninguna API comercial, con `stream=false`, presupuesto de salida delimitado, respuesta JSON validada, identificador de operación y métricas de tokens/latencia. `metaverse/mobile_chat_api.py` sólo permite esta ruta tras autenticación `chat:write`, y expone métricas agregadas exclusivamente al propietario (`GET /api/sky/mobile-chat/inference/metrics` con autorización maestra). La consulta no invoca herramientas ni controla dispositivos.
+
+**Operación segura sobre servidor de inferencia controlado por SKY**:
+
+1. Instalar Ollama según instrucciones oficiales y descargar **un modelo cuyos términos permitan el uso comercial previsto**. No descargar un modelo automáticamente al recibir un chat.
+2. Mantener `OLLAMA_HOST=127.0.0.1:11434` (loopback). No abrir `:11434` en la red pública.
+3. En el entorno del servidor SKY, seleccionar `SKY_INFERENCE_MODEL=llama3.2` (o el identificador exacto del modelo instalado, previa revisión de licencia) y opcionalmente `SKY_INFERENCE_WORKERS=http://127.0.0.1:11434,http://127.0.0.1:11435`. Son servicios **locales**, no hosts remotos arbitrarios. Hasta 8 workers; los servidores de GPU compartidos por red aún requieren una red interna autenticada y validaciones nuevas.
+4. Desde la raíz del repo ejecutar `python scripts/verify_sky_local_inference.py` en el equipo que contiene Ollama. Exit code 0 y `ok=true` prueban una **generación auténtica de modelo local**, no la calidad ni el throughput; códigos 2/3 indican que no se pudo verificar.
+5. Configurar HTTPS para la API FastAPI de SKY, emparejar el dispositivo con código propietario y autorizar un token `chat:write` separado. Activar explícitamente en Android «Priorizar mi SKY API privada». La aplicación no llama directamente a Ollama.
+6. Consultar los resultados de `tests/test_sky_inference_gateway.py` en CI. Sus pruebas usan un **servidor HTTP local simulado** para comprobar el protocolo, la validación de datos, la configuración estricta y el rechazo por concurrencia; **no equivalen** a haber instalado ni ejecutado un modelo de pesos reales en un GPU.
+
+**Capacidad actualmente implementada:** máximo **dos generaciones simultáneas por proceso**, límite de **12 consultas/minuto por sesión móvil** en la autenticación previa, separación entre solicitudes de usuarios del mismo proceso y circuito de recuperación para workers que fallan repetidamente. Las métricas en memoria no contienen prompts y son **por proceso**. No hay almacenamiento de cola distribuida, balanceo intermáquina, replicación de GPU, autoscaling, pagos, cuotas por empresa, tenancy comercial, ni SLO medido; **no anunciar disponibilidad para miles de clientes**.
+
+**Ruta de hipercrecimiento pendiente**, orden técnico obligatorio: aprovisionamiento de GPU según benchmark real → balanceador de ingreso seguro → identidad comercial y aislamiento por tenant → admisión distribuida/Redis y presupuesto por plan → workers dedicados Ollama y luego vLLM si el hardware y la carga justifican batching → colas, circuit breakers globales y cancelación → registro de costes, uso, auditoría y métricas Prometheus → pruebas de carga con mezclas de prompts y contexto antes de prometer capacidad. Un servicio autogestionado permite independencia de cuotas de Gemini/Groq, pero sigue limitado por hardware, electricidad, concurrencia y licencias de modelos.
+
+---
+
 **Estado: desarrollo incremental — no aprobada para venta masiva.** Esta guía no declara desplegados servicios, hardware, inferencia en Android, facturación, autoscaling ni disponibilidad 24/7. Actualizada el 30 de octubre de 2026.
 
 ## 1. Lo que está conectado mediante código
