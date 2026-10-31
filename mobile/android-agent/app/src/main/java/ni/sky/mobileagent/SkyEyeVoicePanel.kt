@@ -46,6 +46,7 @@ class SkyEyeVoicePanel(
     private var recognizer: SpeechRecognizer? = null
     private var speechEngine: TextToSpeech? = null
     private var speechReady = false
+    private var voiceSpeaking = false
     private var listening = false
     /** Explicitly enabled, foreground-only voice turn taking. */
     private var fluidConversation = false
@@ -55,7 +56,8 @@ class SkyEyeVoicePanel(
     private val resumeListening = Runnable {
         // Foreground conversation is explicitly enabled in Settings. No need to
         // tap the eyes after reopening SKY or after a normal reply.
-        if (foreground && fluidConversation && !handsFreeOn && !listening) {
+        if (foreground && fluidConversation && !handsFreeOn &&
+            !listening && !voiceSpeaking) {
             continuousTurns++
             listenAutomatic()
         }
@@ -188,6 +190,7 @@ class SkyEyeVoicePanel(
             }
             override fun onDone(utteranceId: String) {
                 host.runOnUiThread {
+                    voiceSpeaking = false
                     onSpeechFinished?.invoke()
                     setMode(EyeMode.IDLE, "SKY lista para escucharte.")
                     if (fluidConversation && foreground && !handsFreeOn) {
@@ -198,8 +201,11 @@ class SkyEyeVoicePanel(
             }
             override fun onError(utteranceId: String) {
                 host.runOnUiThread {
+                    voiceSpeaking = false
                     onSpeechFinished?.invoke()
                     setMode(EyeMode.ERROR, "No fue posible reproducir la voz.")
+                    if (fluidConversation && foreground && !handsFreeOn)
+                        handler.postDelayed(resumeListening, 1250L)
                 }
             }
         })
@@ -338,6 +344,7 @@ class SkyEyeVoicePanel(
             recognizer?.destroy()
             recognizer = null
         }
+        voiceSpeaking = true
         onSpeechStarted?.invoke()
         val result = speechEngine?.speak(
             clean,
@@ -346,6 +353,7 @@ class SkyEyeVoicePanel(
             "sky-eye-" + SystemClock.uptimeMillis()
         )
         if (result != TextToSpeech.SUCCESS) {
+            voiceSpeaking = false
             onSpeechFinished?.invoke()
             setMode(EyeMode.ERROR, "Android no pudo iniciar la voz.")
             if (fluidConversation && foreground && !handsFreeOn)
@@ -422,7 +430,7 @@ class SkyEyeVoicePanel(
                         // Silent actions (e.g. opening YouTube) have no TTS
                         // completion callback, so they must re-arm as well.
                         if (fluidConversation && foreground && !handsFreeOn &&
-                            !listening) {
+                            !listening && !voiceSpeaking) {
                             handler.postDelayed(resumeListening, 1500L)
                         }
                     }
@@ -458,6 +466,7 @@ class SkyEyeVoicePanel(
         listening = false
         recognizer?.cancel()
         speechEngine?.stop()
+        voiceSpeaking = false
         setMode(EyeMode.IDLE, "Voz detenida. SKY lista.")
     }
 
@@ -480,6 +489,7 @@ class SkyEyeVoicePanel(
         speechEngine?.shutdown()
         speechEngine = null
         speechReady = false
+        voiceSpeaking = false
     }
 
     private class SkyEyeView(host: Activity) : View(host) {
