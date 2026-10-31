@@ -4002,6 +4002,14 @@ class MainActivity : Activity() {
         val groqReady = tokens.groqEnabled()
         val id = tokens.deviceId()
         val token = tokens.chatToken()
+        val ownApiPreferred = getSharedPreferences("sky_own_api", MODE_PRIVATE)
+            .getBoolean("prefer_self_hosted_ollama", false)
+        if (SkyOwnApiRoutingPolicy.canPromptForSetup(ownApiPreferred,
+                id.isNotBlank() && token.isNotBlank() && tokens.server().isNotBlank())) {
+            home.showMessage("Para usar tu SKY API primero autorizá el chat del " +
+                "servidor HTTPS desde Ajustes. No se cambiará automáticamente a Gemini.")
+            return
+        }
         if (!mobileCloud && !groqReady && (id.isEmpty() || token.isEmpty())) {
             setStatus("Configurá SKY móvil independiente desde Ajustes.")
             showSettings()
@@ -4050,6 +4058,25 @@ class MainActivity : Activity() {
         // Optional context may be shortened; user instructions are never cut.
         val personalizedMessage = SkyPromptLengthPolicy.compose(
             selection.prompt, prefix, deepPrompt) ?: return
+        val ownApiChat = SkyOwnApiRoutingPolicy.usePrivateApi(
+            optedIn = ownApiPreferred,
+            pairedChatToken = id.isNotBlank() && token.isNotBlank() &&
+                tokens.server().isNotBlank(),
+            explicitGeminiMode = selection.explicit,
+            verifiedWebRequired = SkyPhoneCloud.requiresLiveVerification(message) ||
+                SkyEvidencePolicy.needsVerification(message) ||
+                (cognitionEnabled() && SkyAndroidCognition.classify(message).verifyWithSources),
+            promptChars = personalizedMessage.length
+        )
+        if (ownApiPreferred && !selection.explicit && !ownApiChat &&
+            personalizedMessage.length > SkyOwnApiRoutingPolicy.SERVER_PROMPT_LIMIT &&
+            !SkyPhoneCloud.requiresLiveVerification(message)) {
+            home.showMessage("Tu SKY API admite hasta " +
+                "${SkyOwnApiRoutingPolicy.SERVER_PROMPT_LIMIT} caracteres por consulta. " +
+                "No envié un texto incompleto a Ollama. Dividilo en partes " +
+                "o desactivá la prioridad SKY API para elegir otro motor autorizado.")
+            return
+        }
         cloudConsent.isChecked = false
         privateConsent.isChecked = false
         chatPending = true
@@ -4059,7 +4086,7 @@ class MainActivity : Activity() {
             val started = android.os.SystemClock.elapsedRealtime()
             try {
                 val history = JSONArray()
-                if (cloud && (mobileCloud || groqReady)) {
+                if (!ownApiChat && cloud && (mobileCloud || groqReady)) {
                     // Relevancia + recencia; cero historial persistente sin permiso.
                     // Excluye órdenes Android, memorias explícitas y archivos.
                     val sessionAfterId = getSharedPreferences("sky_chat_session", MODE_PRIVATE)
@@ -4096,6 +4123,27 @@ class MainActivity : Activity() {
                     SkyEvidencePolicy.needsVerification(message) ||
                     (cognitionEnabled() && SkyAndroidCognition.classify(message).verifyWithSources)
                 when {
+                    // Owners explicitly connected this app to their SKY HTTPS
+                    // chat API. The API is instructed to use ONLY its own
+                    // loopback Ollama provider; no cloud fallback and no direct
+                    // connection from Android to an unprotected Ollama port.
+                    ownApiChat -> {
+                        val payload = JSONObject()
+                            .put("device_id", id)
+                            .put("texto", personalizedMessage)
+                            .put("historial", history)
+                            .put("proveedor", "ollama")
+                            .put("datos", "privados")
+                            .put("autorizar_nube", false)
+                            .put("autorizar_datos_privados", false)
+                        val local = SkyNetwork.requestChat(tokens.server(),
+                            "/api/sky/mobile-chat/chat", token, payload)
+                        answer = local.getString("respuesta")
+                        provider = "SKY API privada · " +
+                            local.optString("proveedor", "Ollama")
+                        sources = emptyList()
+                        searchSuggestions = ""
+                    }
                     // For up-to-date information, Groq is NOT substituted for a
                     // verified web search: it has no search tool in this client.
                     needsLiveSources && mobileCloud -> {
