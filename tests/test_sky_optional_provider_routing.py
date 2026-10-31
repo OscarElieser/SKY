@@ -52,7 +52,7 @@ try:
         texto="Consulta con cuota agotada", proveedor="openrouter",
         datos="generales", autorizar_nube=True))
 except HTTPException as exc:
-    assert exc.status_code == 503
+    assert exc.status_code == 429
 else:
     raise AssertionError("Explicit provider silently changed after quota exhaustion")
 assert len(used) == len(cloud.OPTIONAL_PROVIDERS)
