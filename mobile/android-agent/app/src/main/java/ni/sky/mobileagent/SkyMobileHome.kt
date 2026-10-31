@@ -841,15 +841,25 @@ class SkyMobileHome(
         revealPanel: Boolean = true,
         sources: List<SkyPhoneCloud.Source> = emptyList(),
         googleSearchHtml: String = ""
-    ) {
+    ): SkyConversationArchive.Entry? {
         pendingQuestion = null
         clearTransientNotice()
-        // Persistir solamente consultas completadas, en el almacenamiento privado.
-        val saved = archive.append(question, answer, engine)
-        history.add(Exchange(saved.question, saved.answer, saved.engine,
-            sources, googleSearchHtml, saved.title, saved.localTime()))
+        // A storage error must not hide an otherwise successful model response.
+        // Never claim a message was archived unless SQLite actually accepted it.
+        val saved = runCatching { archive.append(question, answer, engine) }.getOrNull()
+        history.add(if (saved != null) {
+            Exchange(saved.question, saved.answer, saved.engine,
+                sources, googleSearchHtml, saved.title, saved.localTime())
+        } else {
+            Exchange(question, answer, engine, sources, googleSearchHtml)
+        })
         if (history.size > 150) history.removeAt(0)
+        if (saved == null) {
+            showTransientNotice("Respuesta visible, pero no se pudo guardar en el historial. " +
+                "Copiala antes de cerrar SKY.")
+        }
         renderConversation(autoScrollToEnd = true)
         if (revealPanel && !isPanelOpen()) openChat()
+        return saved
     }
 }
