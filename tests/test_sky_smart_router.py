@@ -193,6 +193,23 @@ def test_over_16k_prompt_routes_to_private_ollama_without_external_transfer(monk
     assert result["nube"] is False
 
 
+def test_40k_work_remains_private_and_requests_6144_tokens(monkeypatch):
+    long_text = "Explicación de arquitectura de software. " + "desarrollo" * 4000
+    assert 32000 < len(long_text) <= 48000
+    calls = []
+    monkeypatch.setattr(inference, "generate",
+                        lambda messages, max_output_tokens:
+                        (calls.append((messages[-1]["content"], max_output_tokens)) or
+                         {"respuesta": "Capítulo uno", "proveedor": "ollama", "nube": False}))
+    monkeypatch.setattr(router, "_try_cloud",
+                        lambda *a: (_ for _ in ()).throw(
+                            AssertionError("No cloud for long private briefs")))
+    result = router.generate([{"role": "user", "content": long_text}],
+                             cloud_consent=True, private_cloud_consent=True)
+    assert result["nube"] is False
+    assert calls == [(long_text, 6144)]
+
+
 def test_long_thesis_is_never_fallback_to_cloud_if_local_fails(monkeypatch):
     full_brief = "Investiga IA educativa con variables emocionales. " * 180
     assert 4000 < len(full_brief) <= 16000
