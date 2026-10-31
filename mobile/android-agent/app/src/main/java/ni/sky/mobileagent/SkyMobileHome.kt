@@ -28,7 +28,6 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import android.text.InputFilter
 import android.text.InputType
 import android.text.TextUtils
 
@@ -155,7 +154,9 @@ class SkyMobileHome(
         imeOptions = EditorInfo.IME_ACTION_SEND
         maxLines = 4
         minLines = 1
-        filters = arrayOf(InputFilter.LengthFilter(16000))
+        // Reject oversized prompts explicitly on Send. InputFilter would
+        // silently truncate pasted instructions, which is unsafe for long tasks.
+        filters = emptyArray()
         setPadding(dp(15), dp(10), dp(7), dp(10))
         addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
