@@ -172,6 +172,47 @@ larger_result = endpoint.mobile_chat_text(endpoint.MobileChatRequest(
     device_id=did, texto=very_long, proveedor="ollama"),
     x_sky_chat_token=paired["token"])
 assert larger_result["nube"] is False and len(provider_calls) == 1
+# Private context accepts up to eight prior 4K turns without loss.
+prior_turns = [{"role": "assistant", "content": "A" * 3500},
+               {"role": "user", "content": "B" * 3800}]
+def fake_with_context(messages, max_output_tokens):
+    assert [x["content"] for x in messages[1:-1]] == ["A" * 3500, "B" * 3800]
+    assert messages[-1]["content"] == "Continuá el capítulo"
+    return {"respuesta": "Sección siguiente", "proveedor": "ollama", "nube": False}
+endpoint.inference.generate = fake_with_context
+out = endpoint.mobile_chat_text(endpoint.MobileChatRequest(
+    device_id=did, texto="Continuá el capítulo", proveedor="ollama",
+    historial=prior_turns), x_sky_chat_token=paired["token"])
+assert out["respuesta"] == "Sección siguiente"
+# Expanded history must never leak into the public/cloud HomeChat 2K contract.
+try:
+    endpoint.mobile_chat_text(endpoint.MobileChatRequest(
+        device_id=did, texto="Consulta", proveedor="groq",
+        historial=prior_turns), x_sky_chat_token=paired["token"])
+except HTTPException as e:
+    assert e.status_code == 422
+else:
+    raise AssertionError("Private 4K history wrongly accepted by external provider")
+# SKY Automatic can use private 4K context only when cloud fallback is off.
+try:
+    endpoint.mobile_chat_text(endpoint.MobileChatRequest(
+        device_id=did, texto="Continuar investigación",
+        proveedor="sky_auto", historial=prior_turns,
+        autorizar_nube=True, autorizar_datos_privados=True),
+        x_sky_chat_token=paired["token"])
+except HTTPException as e:
+    assert e.status_code == 422
+else:
+    raise AssertionError("Cloud-eligible automatic chat exposed 4K private context")
+# More than eight private turns are rejected at the model boundary.
+from pydantic import ValidationError
+try:
+    endpoint.MobileChatRequest(device_id=did, texto="a", proveedor="ollama",
+        historial=[{"role": "user", "content": "x"}] * 9)
+except ValidationError:
+    pass
+else:
+    raise AssertionError("History over eight turns was accepted")
 try:
     endpoint.mobile_chat_text(endpoint.MobileChatRequest(
         device_id=did, texto="texto", proveedor="ollama", autorizar_nube=True),

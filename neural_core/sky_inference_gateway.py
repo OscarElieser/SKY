@@ -15,7 +15,7 @@ import time
 import uuid
 from urllib import error, parse, request
 
-_MAX_RESPONSE_BYTES = 262_144
+_MAX_RESPONSE_BYTES = 512_000
 _MAX_WORKERS = 8
 _LOCK = threading.RLock()
 _GATE_LOCK = threading.Lock()
@@ -203,7 +203,7 @@ def generate(messages: list[dict], *, max_output_tokens: int = 1200) -> dict:
             "options": {"num_predict": max_output_tokens, "num_ctx": context_window},
             "keep_alive": "5m",
         }, ensure_ascii=False).encode("utf-8")
-        if len(payload) > 150_000:
+        if len(payload) > 400_000:
             raise ValueError("La solicitud supera el presupuesto seguro de entrada")
         req = request.Request(worker + "/api/chat", data=payload, method="POST",
                               headers={"Content-Type": "application/json"})

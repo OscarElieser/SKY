@@ -7,6 +7,7 @@ Conversation uses the text-only SKY Home provider route (no tools/memory).
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from typing import Literal
 from pydantic import BaseModel, Field
 
 from .api import require_key
@@ -30,10 +31,17 @@ class ChatPair(Device):
     code: str = Field(min_length=16, max_length=128)
 
 
+class MobileChatTurn(BaseModel):
+    """Expanded context only for the paired SKY-local model route."""
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4_000)
+
+
 class MobileChatRequest(HomeChat):
     # Expanded ONLY for self-hosted inference (the legacy Home API and
     # external cloud adapters retain their lower, separately enforced limits).
     texto: str = Field(min_length=1, max_length=48_000)
+    historial: list[MobileChatTurn] = Field(default_factory=list, max_length=8)
     device_id: str = Field(pattern=r"^[a-f0-9]{32}$")
 
 
@@ -106,6 +114,13 @@ def mobile_chat_text(body: MobileChatRequest,
         except ValueError as exc:
             raise HTTPException(422, "El proveedor externo admite hasta 4000 caracteres") from exc
     if payload.proveedor == "sky_auto":
+        # If external fallback is authorized, its historical context retains
+        # the legacy 2K-per-turn cap; never leak 4K private local context.
+        may_fallback = payload.autorizar_nube and (
+            payload.datos == "generales" or payload.autorizar_datos_privados)
+        if may_fallback and any(len(turn.content) > 2000
+                                for turn in payload.historial):
+            raise HTTPException(422, "El contexto autorizado para nube excede 2000 caracteres por turno")
         messages = [{"role": "system",
                      "content": answer_quality.system_prompt(payload.texto)}]
         messages.extend({"role": turn.role, "content": turn.content}

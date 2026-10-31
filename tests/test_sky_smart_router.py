@@ -210,6 +210,24 @@ def test_40k_work_remains_private_and_requests_6144_tokens(monkeypatch):
     assert calls == [(long_text, 6144)]
 
 
+def test_cloud_fallback_rejects_prior_context_above_2k(monkeypatch):
+    monkeypatch.setenv("SKY_AUTO_CLOUD_ORDER", "groq")
+    monkeypatch.setattr(router, "_configured", lambda name: True)
+    monkeypatch.setattr(inference, "generate",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            inference.InferenceUnavailable("modelo apagado")))
+    monkeypatch.setattr(router, "_try_cloud",
+                        lambda *a: (_ for _ in ()).throw(
+                            AssertionError("4K private context leaked to cloud")))
+    messages = [
+        {"role": "system", "content": "Eres SKY"},
+        {"role": "assistant", "content": "A" * 3500},
+        {"role": "user", "content": "Continuá el capítulo"},
+    ]
+    with pytest.raises(router.AutoRouteUnavailable):
+        router.generate(messages, cloud_consent=True, private_cloud_consent=True)
+
+
 def test_long_thesis_is_never_fallback_to_cloud_if_local_fails(monkeypatch):
     full_brief = "Investiga IA educativa con variables emocionales. " * 180
     assert 4000 < len(full_brief) <= 16000
