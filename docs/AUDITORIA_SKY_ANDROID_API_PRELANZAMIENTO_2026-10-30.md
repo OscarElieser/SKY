@@ -1,15 +1,15 @@
 # Auditoría técnica de lanzamiento — SKY Android / SKY API
 
 **Fecha de revisión:** 30 de octubre de 2026 (Nicaragua).  
-**Alcance:** aplicación Android 0.8.41 publicada y cambios 0.8.42 en `main`, API FastAPI Python, motor local Ollama, enrutamiento SKY Automático, workflows de GitHub Actions y proyecto Supabase SKY-IA.  
+**Alcance:** aplicación Android 0.8.42 publicada desde un commit anterior y cambios posteriores en `main`, API FastAPI Python, motor local Ollama, enrutamiento SKY Automático, workflows de GitHub Actions y proyecto Supabase SKY-IA.  
 **Dictamen:** **NO-GO para acceso público comercial**. Es razonable preparar un **piloto cerrado** únicamente después de completar los bloqueadores P0.  
 **Evidencia:** revisión remota de código, resultados de CI, Releases y metadatos reales de Supabase. **No hubo** instalación en Samsung, prueba de síntesis de voz en el teléfono, benchmark con GPU real, medición de uptime de varios días, prueba de intrusión ni prueba del endpoint con JWT en vivo.
 
 ## Resumen ejecutivo
 
 **Lo que existe de verdad**
-- Repositorio público `OscarElieser/SKY`, integración `main` y APK Android 0.8.41 firmada publicada en Releases con huella de firmante y SHA256.
-- APK 0.8.42 declarada en Gradle (`versionCode=55`), con código nuevo de voz, multimedia, chat, documentos y selección `sky_auto`. La publicación de 0.8.42 **no está verificada**.
+- Repositorio público `OscarElieser/SKY`, integración `main` y APK Android 0.8.42 *pre-release* firmada, con huella de firmante y SHA256, publicada desde `d2834ef0`. La release NO contiene la totalidad de los cambios posteriores a ese commit.
+- APK 0.8.42 declarada en Gradle (`versionCode=55`) y publicada el 31/10/2026 01:37 UTC desde `d2834ef0`, anterior a la selección completa `sky_auto`, nuevas pruebas y despliegue cloud. El código actual en `main` es más nuevo que la APK y requiere una nueva compilación con trazabilidad de commit.
 - FastAPI de SKY, endpoints autenticados de chat móvil y tokens limitados por dispositivo. Inferencia Ollama en `neural_core/sky_inference_gateway.py`, con registro agregado de latencia/tokens y máximo dos generaciones simultáneas **por proceso**.
 - Enrutador `neural_core/sky_smart_router.py` con Ollama prioritario, respaldos externos opcionales autorizados, enfriamiento por cuota y sin intentos ilimitados.
 - Supabase **SKY-IA** está `ACTIVE_HEALTHY`. Función `sky-instagram` activa y nueva función `sky-platform-readiness` **ACTIVE v1 con `verify_jwt=true`**. Esto confirma un servidor de control real, **no** una GPU Ollama en línea. BAQUEANO es un proyecto separado y no se tocó.
@@ -38,8 +38,8 @@
 ### P0 — Bloquean lanzamiento
 
 1. **API de IA no desplegada en servidor de inferencia real y validado.** El proyecto Supabase activo hospeda función de control/Instagram, no un proceso GPU persistente. Supabase Edge Functions tienen recursos limitados y no son apropiadas para hospedar Ollama grande. `sky-platform-readiness` indica explícitamente `ollama_inference=not_verified`. Requiere instancia de cómputo real con modelo aprobado, endpoint HTTPS propio y prueba `python scripts/verify_sky_local_inference.py`.
-2. **Seguridad del fallback inicialmente fallida.** En GitHub Actions `41155473762`, tests de credenciales fallaron **4**, aprobaron **55**, porque el regex llevaba doble escape. Se corrigió en commit `22f6576a`. La corrección aún debe aprobar CI en un nuevo run; el error no debe darse por resuelto hasta prueba satisfactoria. El detector es heurístico, no DLP completo.
-3. **Build actual no certificado.** La release pública 0.8.41 y los tests de versiones anteriores no validan el `main` actual. Verificar Android debug + release firmado, emulator API 35/36, proveedor 429 y consentimientos en una misma revisión estable. No publicar si hay fallos o workflows cancelados.
+2. **Seguridad del fallback inicialmente fallida.** En GitHub Actions `41155473762`, tests de credenciales fallaron **4**, aprobaron **55**, porque el regex llevaba doble escape. Se corrigió en commit `22f6576a`. La ejecución posterior `41156279036` aprobó **59 pruebas de backend** en 4,20 s, incluyendo las cuatro pruebas de credenciales que anteriormente fallaban. Esto no equivale a una auditoría DLP completa ni a aprobación de Android. El detector es heurístico, no DLP completo.
+3. **Build actual no certificado.** La release pública 0.8.42 está firmada pero el tag `d2834ef0` no corresponde al `main` actual. Verificar Android debug + release firmado, emulator API 35/36, proveedor 429 y consentimientos en una misma revisión estable. No publicar si hay fallos o workflows cancelados.
 4. **Android real sin pruebas de aceptación suficientes.** La experiencia reportó clasificación equivocada de tesis, rechazos 429, audio ausente al reproducir YouTube, y necesidad de tocar ojos para voz; las correcciones en código no equivalen a resultado probado con pantalla bloqueada, permisos, ahorro de batería, interfaz, Spotify/YouTube y archivos grandes.
 5. **Sin identidad multi-tenant ni privacidad verificable.** Los tokens de chat emparejan dispositivos bajo control del propietario; no equivalen a suscripciones comerciales aisladas por usuario/empresa. Deben añadirse cuentas, consentimiento, límites por usuario, borrado/exportación, defensa contra abuso, auditoría y pruebas de aislamiento.
 6. **No hay métricas de capacidad y costo productivo.** Solo dos generaciones por proceso y un rate-limit de chat en el servidor. Los límites en memoria no se comparten entre réplicas. Hacer pruebas reales de rendimiento antes de ofrecer continuidad de servicio o anunciar miles de clientes.
@@ -71,7 +71,7 @@ No contratar GPU por suposición. Elegir configuración según pruebas de modelo
 
 | Puerta | Condición verificable | Estado |
 |---|---|---|
-| G0 — código | main coherente, tests backend/Android de versión actual sin fallos | Pendiente |
+| G0 — código | main coherente, tests backend/Android de versión actual sin fallos | Backend 59/59 aprobado sobre `22f6576a`; Android y release de `main` pendientes |
 | G1 — seguridad | token, permisos, DLP, auth, revocación, aislamiento y secretos probados | Pendiente |
 | G2 — inferencia real | 100 solicitudes al modelo propio, registradas por operación y sin API externa | No ejecutada |
 | G3 — dispositivos | Android 15/16, Samsung real, manos libres, volumen YouTube, adjuntos, bloqueo y reanudación | No ejecutada |
@@ -85,6 +85,8 @@ No contratar GPU por suposición. Elegir configuración según pruebas de modelo
 ## Fuentes de evidencia (enlaces directos)
 
 - [SKY Releases](https://github.com/OscarElieser/SKY/releases) — APK firmadas publicadas
+- [Backend 59 pruebas aprobadas tras corrección](https://github.com/OscarElieser/SKY/actions/runs/41156279036)
+- [APK 0.8.42 firmada publicada desde commit anterior](https://github.com/OscarElieser/SKY/releases/tag/sky-android-v0.8.42)
 - [GitHub Actions](https://github.com/OscarElieser/SKY/actions)
 - [CI con regresiones en credenciales](https://github.com/OscarElieser/SKY/actions/runs/41155473762)
 - [Issue P0 Android](https://github.com/OscarElieser/SKY/issues/97)
