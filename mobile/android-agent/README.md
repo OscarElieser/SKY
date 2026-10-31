@@ -1,3 +1,17 @@
+## SKY Android 0.8.42 — revisión del audio de YouTube en Samsung (30/10/2026)
+
+**Estado:** corrección de código en `main`. La APK 0.8.42 requiere aprobar la compilación firmada y las pruebas Android 15/16 antes de considerarse publicada. La prueba de audio audible en el teléfono real sigue siendo imprescindible. SKY Windows no se ha modificado.
+
+- **Problema observado:** SKY abre YouTube y solicita reproducir una canción, pero no se oye en el Samsung. Una sesión Android en estado `PLAYING` no demuestra que el sonido llegue al altavoz.
+- **Diagnóstico seguro:** `SkyMusicAudioCheck.kt` consulta el volumen `STREAM_MUSIC` y el estado de silencio; anota el nivel observado y si la salida audible sigue sin comprobarse. Si Android informa silencio o volumen cero, ofrece el control **estándar** de volumen, pero SKY nunca aumenta el nivel automáticamente.
+- **Comprobación manual:** en SKY, abrir **Ajustes → Diagnóstico del Galaxy** y revisar «Audio multimedia». El botón «Control de volumen» permite ajustar el nivel de forma explícita. Si el nivel es positivo pero YouTube sigue sin sonar, verificar que el video no esté silenciado y comprobar la **salida multimedia** del Samsung (altavoz, Bluetooth o auriculares).
+- **Pruebas de regresión:** `SkyMusicAudioCheckTest.kt` cubre volumen cero, silencio con nivel positivo, nivel positivo sin falsa prueba acústica y ausencia de datos; `SkyMusicCommandTest.kt` comprueba la orden concreta de abrir YouTube y reproducir una canción.
+- **Límites reales:** SKY no puede leer ni imponer el control interno de silencio de YouTube, ni medir el sonido audible por el altavoz desde una sesión de terceros. La experiencia debe verificarse en el equipo físico con YouTube abierto, no solo mediante emuladores. No se habilita Accesibilidad ni se cambia la política de consentimiento.
+
+[Compilaciones de SKY Android](https://github.com/OscarElieser/SKY/actions/workflows/sky-mobile-release.yml) · [Descargas verificadas](https://github.com/OscarElieser/SKY/releases).
+
+---
+
 ## SKY Android 0.8.40 — validación científica y previsualización paginada (30/10/2026)
 
 > **Corrección académica de 30/10/2026:** \`SkyScientificCalculator\` ahora reconoce aceleración con superíndice \`m/s²\` y resistencia con \`Ω\`, conserva aceleraciones negativas, evita que resultados pequeños no nulos se redondeen a cero y presenta cálculos de energía cinética, fuerza y ley de Ohm como datos → fórmula → sustitución → resultado → verificación dimensional. Pruebas de regresión ampliadas en \`SkyScientificCalculatorTest.kt\`. Se comprobó localmente el comportamiento de expresiones y formato usando el compilador Kotlin, pero **no** se certifica la APK 0.8.40 sin los jobs de GitHub Actions y el Samsung real.
