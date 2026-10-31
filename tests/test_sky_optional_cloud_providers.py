@@ -39,7 +39,7 @@ class FakeOpener:
 @pytest.fixture
 def api_keys(monkeypatch):
     for name in ("OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY",
-                 "CLOUDFLARE_API_TOKEN"):
+                 "SKY_WORKERS_AI_TOKEN"):
         monkeypatch.setenv(name, "test_server_side_only_key_not_for_distribution")
     monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "a" * 32)
     monkeypatch.setenv("OPENROUTER_MODEL", "openrouter/free")
@@ -79,7 +79,7 @@ def test_explicit_provider_real_request_shape_never_uses_dynamic_host(
 
 def test_only_optional_configured_accounts_are_offered(api_keys, monkeypatch):
     assert set(cloud.ready_names()) == set(cloud.OPTIONAL_PROVIDERS)
-    monkeypatch.delenv("CLOUDFLARE_API_TOKEN")
+    monkeypatch.delenv("SKY_WORKERS_AI_TOKEN")
     monkeypatch.delenv("MISTRAL_API_KEY")
     assert set(cloud.ready_names()) == {"openrouter", "groq"}
 
