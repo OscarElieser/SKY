@@ -14,6 +14,8 @@ class SkyLongWorkPlannerTest {
         assertTrue(plan.markdown.contains("## Control de calidad"))
         assertTrue(plan.markdown.contains("Referencias verificadas"))
         assertTrue(plan.markdown.contains("- [ ]"))
+        assertTrue(plan.operationId.matches(Regex("[0-9a-f-]{36}")))
+        assertTrue(plan.markdown.contains(plan.operationId))
     }
 
     @Test fun researchAndProgrammingPlansHaveDistinctSections() {
