@@ -119,7 +119,9 @@ assert provider_calls[0].autorizar_nube is False
 assert provider_calls[0].datos == "privados"
 # Status is scoped, read-only, and does not pretend to verify generated text.
 with __import__("unittest.mock", fromlist=["patch"]).patch.object(
-        endpoint.sky_home_api, "_local_model_ready", return_value=True):
+        endpoint.inference, "readiness",
+        return_value={"local_ollama_ready": True, "ready_workers": 1,
+                      "configured_workers": 1, "model_output_verified": False}):
     status = endpoint.mobile_chat_status(endpoint.Device(device_id=did),
                                         x_sky_chat_token=paired["token"])
 assert status["service"] == "SKY API"
@@ -132,6 +134,26 @@ except HTTPException as e:
 else:
     raise AssertionError("Agent token wrongly allowed private API status")
 assert len(provider_calls) == 1  # no model inference performed by status
+# Dedicated local-only inference is isolated from any third-party provider.
+def fake_inference(messages, max_output_tokens):
+    assert messages[-1]["content"] == "explica el método científico"
+    assert max_output_tokens == 1200
+    return {"respuesta": "Inferencia autenticada desde SKY", "proveedor": "ollama",
+            "nube": False, "acciones_ejecutadas": False, "operacion": "test"}
+endpoint.inference.generate = fake_inference
+local = endpoint.mobile_chat_text(endpoint.MobileChatRequest(
+    device_id=did, texto="explica el método científico", proveedor="ollama"),
+    x_sky_chat_token=paired["token"])
+assert local["proveedor"] == "ollama" and local["nube"] is False
+assert len(provider_calls) == 1  # home provider never invoked
+try:
+    endpoint.mobile_chat_text(endpoint.MobileChatRequest(
+        device_id=did, texto="texto", proveedor="ollama", autorizar_nube=True),
+        x_sky_chat_token=paired["token"])
+except HTTPException as e:
+    assert e.status_code == 400
+else:
+    raise AssertionError("Ollama-only must reject cloud transfer flags")
 endpoint.revoke_mobile_chat(endpoint.Device(device_id=did))
 try:
     endpoint.mobile_chat_text(payload, x_sky_chat_token=paired["token"])
