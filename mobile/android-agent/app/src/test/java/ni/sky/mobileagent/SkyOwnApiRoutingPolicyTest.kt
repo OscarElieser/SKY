@@ -34,9 +34,9 @@ class SkyOwnApiRoutingPolicyTest {
         assertTrue(SkyOwnApiRoutingPolicy.usePrivateApi(
             true, true, false, false, 4000))
         assertTrue(SkyOwnApiRoutingPolicy.useAutomaticViaSkyApi(
-            true, true, false, false, 16000))
+            true, true, false, false, 32000))
         assertFalse(SkyOwnApiRoutingPolicy.usePrivateApi(
-            true, true, false, false, 16001))
+            true, true, false, false, 32001))
         assertFalse(SkyOwnApiRoutingPolicy.usePrivateApi(
             true, true, false, false, 0))
     }
