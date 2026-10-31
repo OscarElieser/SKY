@@ -7,6 +7,7 @@ Conversation uses the text-only SKY Home provider route (no tools/memory).
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from typing import Literal
 from pydantic import BaseModel, Field
 
 from .api import require_key
@@ -30,10 +31,17 @@ class ChatPair(Device):
     code: str = Field(min_length=16, max_length=128)
 
 
+class MobileChatTurn(BaseModel):
+    """Expanded context only for the paired SKY-local model route."""
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4_000)
+
+
 class MobileChatRequest(HomeChat):
     # Expanded ONLY for self-hosted inference (the legacy Home API and
     # external cloud adapters retain their lower, separately enforced limits).
     texto: str = Field(min_length=1, max_length=48_000)
+    historial: list[MobileChatTurn] = Field(default_factory=list, max_length=8)
     device_id: str = Field(pattern=r"^[a-f0-9]{32}$")
 
 
