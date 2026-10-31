@@ -4346,10 +4346,26 @@ class MainActivity : Activity() {
                     // loopback Ollama provider; no cloud fallback and no direct
                     // connection from Android to an unprotected Ollama port.
                     ownApiChat -> {
+                        // Private API permits at most eight history turns. Every
+                        // excerpt is labelled; original responses stay in SQLite.
+                        val inputTurns = (0 until history.length()).mapNotNull { index ->
+                            history.optJSONObject(index)?.let { item ->
+                                SkyPrivateHistoryPolicy.Turn(
+                                    item.optString("role"), item.optString("content"))
+                            }
+                        }
+                        val localModel = selectedSkyApiProvider in listOf("sky_auto", "ollama")
+                        val context = JSONArray()
+                        SkyPrivateHistoryPolicy.pack(inputTurns, privateModel = localModel)
+                            .forEach { turn ->
+                                context.put(JSONObject()
+                                    .put("role", turn.role)
+                                    .put("content", turn.content))
+                            }
                         val payload = JSONObject()
                             .put("device_id", id)
                             .put("texto", personalizedMessage)
-                            .put("historial", history)
+                            .put("historial", context)
                             .put("proveedor", selectedSkyApiProvider)
                             .put("datos", "privados")
                             .put("autorizar_nube", ownApiExternal || automaticCloudConsent)
@@ -4373,10 +4389,13 @@ class MainActivity : Activity() {
                         answer = SkyLongAnswerStatus.annotate(
                             local.getString("respuesta"),
                             local.optBoolean("respuesta_incompleta", false))
+                        val operationRef = SkyPrivateHistoryPolicy.validatedOperationId(
+                            local.optString("operacion", ""))
                         provider = "SKY API · " +
                             local.optString("proveedor", selectedSkyApiProvider) +
                             (if (local.optBoolean("nube", false))
-                                " · externo autorizado" else " · local")
+                                " · externo autorizado" else " · local") +
+                            (operationRef?.let { " · op:$it" } ?: "")
                         sources = emptyList()
                         searchSuggestions = ""
                     }
@@ -4468,8 +4487,12 @@ class MainActivity : Activity() {
                         searchSuggestions = ""
                     }
                 }
-                chatHistory.put(JSONObject().put("role", "user").put("content", message))
-                chatHistory.put(JSONObject().put("role", "assistant").put("content", answer.take(5000)))
+                chatHistory.put(JSONObject().put("role", "user").put("content",
+                    SkyPrivateHistoryPolicy.excerpt(message,
+                        SkyPrivateHistoryPolicy.SESSION_TURN_MAX)))
+                chatHistory.put(JSONObject().put("role", "assistant").put("content",
+                    SkyPrivateHistoryPolicy.excerpt(answer,
+                        SkyPrivateHistoryPolicy.SESSION_TURN_MAX)))
                 while (chatHistory.length() > 80) chatHistory.remove(0)
                 runOnUiThread {
                     // Keep any newer draft typed while SKY was thinking.
