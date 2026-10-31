@@ -2691,7 +2691,20 @@ class MainActivity : Activity() {
                 "dentro de otras apps. Algunas canciones necesitarán una acción " +
                 "dentro del reproductor."))
         }
-        content.addView(actionButton("VERIFICAR REPRODUCCIÓN · ANDROID LOCAL") {
+        content.addView(actionButton("VERIFICACIÓN MUSICAL · ESTADO Y PERMISOS") {
+            if (!BuildConfig.ENABLE_TEXT_ASSIST) {
+                AlertDialog.Builder(this)
+                    .setTitle("SKY · Instalación estándar protegida")
+                    .setMessage("Para evitar solicitar acceso amplio a las notificaciones, " +
+                        "esta versión no incorpora ese servicio. SKY puede abrir el " +
+                        "reproductor y solicitar la canción, pero no afirma " +
+                        "reproducción comprobada sin evidencia. Se conservan las " +
+                        "funciones de chat, voz, archivos y órdenes permitidas. " +
+                        "La verificación mediante sesiones de otras aplicaciones " +
+                        "solo existe en una variante experimental no distribuida.")
+                    .setPositiveButton("Entendido", null).show()
+                return@actionButton
+            }
             val enabled = SkyPlaybackProof.available(this)
             if (enabled) {
                 AlertDialog.Builder(this)
