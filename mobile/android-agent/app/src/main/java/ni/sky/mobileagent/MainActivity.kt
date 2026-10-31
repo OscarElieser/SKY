@@ -2239,9 +2239,38 @@ class MainActivity : Activity() {
             setPadding(30, 18, 30, 18)
         }
         val linked = tokens.token().isNotEmpty() && tokens.deviceId().isNotEmpty()
-        content.addView(SkyPremiumUi.section(this, "Motor", "Groq y Gemini · Conexiones verificables", "⚡"))
+        content.addView(SkyPremiumUi.section(this, "Motor",
+            "SKY API propia · Ollama autorizado · Groq y Gemini", "⚡"))
         content.addView(description("SKY Android · Ajustes y permisos"))
-        content.addView(description("MODO INDEPENDIENTE · No necesitás Windows, Tailscale ni código de vinculación."))
+        content.addView(description("MODO INDEPENDIENTE · No necesitás Windows ni una PC para " +
+            "usar las funciones locales del teléfono. El cerebro Ollama del servidor es opcional."))
+        content.addView(CheckBox(this).apply {
+            text = "Priorizar mi SKY API privada (modelo Ollama del servidor)"
+            isChecked = getSharedPreferences("sky_own_api", MODE_PRIVATE)
+                .getBoolean("prefer_self_hosted_ollama", false)
+            setOnCheckedChangeListener { _, enabled ->
+                getSharedPreferences("sky_own_api", MODE_PRIVATE).edit()
+                    .putBoolean("prefer_self_hosted_ollama", enabled).apply()
+                home.showMessage(if (enabled)
+                    "SKY API tendrá prioridad en textos compatibles. Requiere " +
+                        "chat HTTPS emparejado y Ollama activo en el servidor. " +
+                        "Si falta el modelo, se conservará tu borrador."
+                    else "SKY API privada sin prioridad. No se eliminaron conexiones.")
+            }
+        })
+        content.addView(description("Sin claves externas en la APK: SKY usa el token " +
+            "de chat limitado y HTTPS. Esta opción NO instala Ollama en el Samsung, " +
+            "NO habilita modelos que no existan en el servidor y NO sustituye " +
+            "investigación web verificada ni modos Gemini elegidos explícitamente."))
+        content.addView(description(if (tokens.deviceId().isNotBlank() &&
+                tokens.chatToken().isNotBlank() && tokens.server().isNotBlank())
+            "SKY API: chat emparejado; disponibilidad del modelo sin comprobar."
+            else "SKY API: todavía falta el enlace y autorización del chat privado."))
+        content.addView(actionButton("CONFIGURAR / COMPROBAR SKY API") {
+            showOptionalWindowsLink = true
+            settingsDialog?.dismiss()
+            showSettings()
+        })
         if (tokens.cloudEnabled()) {
             content.addView(description("SKY móvil está activada. Conversa con Gemini por internet. " +
                 "La voz, los ojos y las acciones locales funcionan independientemente del PC."))
