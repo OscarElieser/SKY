@@ -17,6 +17,12 @@ import java.net.URL
 object SkyPhoneCloud {
     const val MODEL = SkyGeminiModes.ECONOMY_MODEL
 
+    /** Genuine HTTP 429, distinct from broken credentials or a failed network. */
+    class GeminiQuotaException : IllegalStateException(
+        "Gemini alcanzó su límite de uso (HTTP 429). La solicitud no se completó. " +
+            "Podés reintentarlo más tarde o utilizar Groq si está autorizado."
+    )
+
     data class Source(val title: String, val url: String)
     data class VerifiedReply(
         val answer: String,
@@ -432,6 +438,7 @@ object SkyPhoneCloud {
             connection.doOutput = true
             connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
             val status = connection.responseCode
+            if (status == 429) throw GeminiQuotaException()
             if (status !in 200..299) {
                 val reason = when (status) {
                     400 -> "Solicitud no aceptada por Gemini."
