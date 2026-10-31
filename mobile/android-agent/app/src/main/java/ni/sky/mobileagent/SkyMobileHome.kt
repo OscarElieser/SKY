@@ -633,8 +633,8 @@ class SkyMobileHome(
 
     fun failSending(reason: String, original: String) {
         pendingQuestion = null
-        showTransientNotice("No pude enviar el mensaje. $reason")
         if (chatInput.text.isBlank()) chatInput.setText(original)
+        showTransientNotice("No pude enviar el mensaje. $reason")
         renderConversation(autoScrollToEnd = true)
     }
 
