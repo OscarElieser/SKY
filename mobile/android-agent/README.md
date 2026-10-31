@@ -1,3 +1,18 @@
+## SKY Android 0.8.42 — escucha automática y prompts sin recortes silenciosos (31/10/2026)
+
+**Estado:** cambios de código integrados en `main`, sujetos a pruebas y publicación de APK firmada. No implica funcionamiento verificado en el Samsung. SKY Windows permanece sin modificaciones.
+
+- **Manos libres autorizado:** después de consentir el micrófono y activar «Escucha sin tocar» en Ajustes → Voz, `SkyHandsFreeService` escucha el nombre SKY sin tocar ojos ni pantalla. La notificación fija permite apagar el micrófono. No se enciende a escondidas ni se reinicia automáticamente desde un arranque sin consentimiento.
+- **Regreso a escucha:** `SkyHandsFreeService` reanuda el reconocimiento en aproximadamente un segundo tras órdenes del primer plano que no producen voz; antes podía quedar hasta 20 segundos en pausa. Si SKY está hablando, se mantiene la suspensión hasta terminar la síntesis para evitar capturar sus propias respuestas.
+- **Modo conversación en pantalla:** la opción explícita «Escuchar automáticamente al abrir SKY» comienza un turno de reconocimiento sin tocar los ojos; reanuda tras respuestas o comandos silenciosos mientras la aplicación está visible. Este modo alternativo no sustituye al servicio permanente y está sujeto a los límites de `SpeechRecognizer`.
+- **Palabras de control:** «SKY», «SKY estate atenta», «SKY duerme», «SKY despierta». `ATTENTIVE` elimina el temporizador de espera normal; `SLEEP_LOCKED` conserva el bloqueo de órdenes hasta la frase de activación explícita.
+- **Prompts largos:** se eliminó el recorte silencioso del campo de entrada y el `takeLast` que perdía el principio de una orden. `SkyPromptLengthPolicy` conserva todas las instrucciones enviadas, reduce únicamente el contexto opcional y rechaza explícitamente las solicitudes que exceden la capacidad actual del proveedor: 4.000 caracteres en modo normal/Groq y 16.000 en modo profundo, sin enviarlas parcialmente. Para materiales mayores hay que dividir instrucciones o adjuntar documentos compatibles.
+- **Prueba física requerida:** comprobar Samsung Android 16 tras consentimiento inicial, diez órdenes consecutivas sin tocar, silencio entre turnos, reproducción de YouTube con volumen verificable, sueño/bloqueo, y que las entradas de más de 4.000 caracteres no se mutilan. Los emuladores no prueban escucha ininterrumpida, reconocimiento biométrico del dueño ni audio audible.
+
+[GitHub Actions](https://github.com/OscarElieser/SKY/actions/workflows/sky-mobile-release.yml) · [Releases](https://github.com/OscarElieser/SKY/releases).
+
+---
+
 ## SKY Android 0.8.42 — revisión del audio de YouTube en Samsung (30/10/2026)
 
 **Estado:** corrección de código en `main`. La APK 0.8.42 requiere aprobar la compilación firmada y las pruebas Android 15/16 antes de considerarse publicada. La prueba de audio audible en el teléfono real sigue siendo imprescindible. SKY Windows no se ha modificado.
