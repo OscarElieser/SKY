@@ -15,6 +15,7 @@ from . import sky_home_api
 from neural_core import sky_mobile_chat as mobile_chat
 from neural_core import sky_inference_gateway as inference
 from neural_core import sky_smart_router as smart
+from neural_core import sky_answer_quality as answer_quality
 
 router = APIRouter(prefix="/api/sky/mobile-chat")
 owner = APIRouter(dependencies=[Depends(require_key)])
@@ -105,9 +106,8 @@ def mobile_chat_text(body: MobileChatRequest,
         except ValueError as exc:
             raise HTTPException(422, "El proveedor externo admite hasta 4000 caracteres") from exc
     if payload.proveedor == "sky_auto":
-        messages = [{"role": "system", "content":
-            "Eres SKY IA, asistente de investigación y trabajo. Responde con " +
-            "rigor. No inventes citas ni ejecuciones. Esta ruta solo genera texto."}]
+        messages = [{"role": "system",
+                     "content": answer_quality.system_prompt(payload.texto)}]
         messages.extend({"role": turn.role, "content": turn.content}
                         for turn in payload.historial)
         messages.append({"role": "user", "content": payload.texto})
@@ -129,9 +129,8 @@ def mobile_chat_text(body: MobileChatRequest,
     if payload.proveedor == "ollama":
         if payload.autorizar_nube or payload.autorizar_datos_privados:
             raise HTTPException(400, "El motor propio solo admite inferencia privada local")
-        messages = [{"role": "system", "content":
-            "Eres SKY IA. Responde con precisión y claridad. No inventes fuentes, " +
-            "no afirmes haber ejecutado herramientas y admite incertidumbre."}]
+        messages = [{"role": "system",
+                     "content": answer_quality.system_prompt(payload.texto)}]
         messages.extend({"role": turn.role, "content": turn.content}
                         for turn in payload.historial)
         messages.append({"role": "user", "content": payload.texto})
