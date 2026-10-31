@@ -58,7 +58,7 @@ assert result["acciones_ejecutadas"] is False
 
 # Real Pydantic + authenticated mobile endpoint: a 16K thesis prompt passes
 # completely to the self-hosted engine; a legacy cloud route rejects it.
-long_thesis = "Investigación educativa, capítulo y metodología. " * 340
+long_thesis = "Investigación educativa, capítulo y metodología. " * 320
 assert 4000 < len(long_thesis) <= 16000
 def check_long(messages, **kwargs):
     assert messages[-1]["content"] == long_thesis
