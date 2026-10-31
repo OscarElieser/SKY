@@ -190,7 +190,7 @@ internal object SkyScientificMarkup {
                 }
                 if (expression.contains(close)) {
                     content.append("<div class=\"formula\">")
-                        .append(mathMl(expression.substringBefore(close), true))
+                        .append(mathMl(expression.toString().substringBefore(close), true))
                         .append("</div>")
                 } else content.append("<p>").append(escape(open + expression)).append("</p>")
                 i++; continue
