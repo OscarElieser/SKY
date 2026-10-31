@@ -30,13 +30,22 @@ class SkyOwnApiRoutingPolicyTest {
             true, true, false, true, 300))
     }
 
-    @Test fun serverTextLimitNeverSilentlyTruncates() {
+    @Test fun skyOwnModelAcceptsLongAcademicPromptWithoutTruncation() {
         assertTrue(SkyOwnApiRoutingPolicy.usePrivateApi(
             true, true, false, false, 4000))
+        assertTrue(SkyOwnApiRoutingPolicy.useAutomaticViaSkyApi(
+            true, true, false, false, 16000))
         assertFalse(SkyOwnApiRoutingPolicy.usePrivateApi(
-            true, true, false, false, 4001))
+            true, true, false, false, 16001))
         assertFalse(SkyOwnApiRoutingPolicy.usePrivateApi(
             true, true, false, false, 0))
+    }
+
+    @Test fun manualCloudIsCappedAtFourThousandEvenIfSkyLocalAllowsSixteenThousand() {
+        assertTrue(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+            true, true, "groq", false, false, true, true, 4000))
+        assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+            true, true, "groq", false, false, true, true, 4001))
     }
     @Test fun automaticIsDefaultWhileManualOllamaRemainsAvailable() {
         assertEquals("sky_auto", SkyOwnApiRoutingPolicy.chosenProvider(null))
