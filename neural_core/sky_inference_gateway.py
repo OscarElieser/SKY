@@ -80,8 +80,8 @@ def _context_window() -> int:
         value = int(raw)
     except (TypeError, ValueError) as exc:
         raise InferenceUnavailable("Contexto Ollama mal configurado") from exc
-    if value not in (8192, 16384, 32768):
-        raise InferenceUnavailable("Contexto Ollama debe ser 8192, 16384 o 32768")
+    if value not in (8192, 16384, 32768, 65536):
+        raise InferenceUnavailable("Contexto Ollama debe ser 8192, 16384, 32768 o 65536")
     return value
 
 
@@ -171,15 +171,19 @@ def generate(messages: list[dict], *, max_output_tokens: int = 1200) -> dict:
                 message.get("role") not in ("system", "user", "assistant") or
                 not isinstance(message.get("content"), str) or
                 not 1 <= len(message["content"]) <= (
-                    32_000 if message["role"] == "user" else 4000)):
+                    48_000 if message["role"] == "user" else 4000)):
             raise ValueError("Mensaje de inferencia inválido")
-    if not isinstance(max_output_tokens, int) or not 1 <= max_output_tokens <= 4096:
+    if not isinstance(max_output_tokens, int) or not 1 <= max_output_tokens <= 6144:
         raise ValueError("Presupuesto de respuesta inválido")
     context_window = _context_window()
     # Conservative byte-based preflight. Exact tokenization depends on model;
     # this never claims a long prompt fits a smaller physical context.
     if any(len(m["content"]) > 16_000 for m in messages if m["role"] == "user") and context_window < 32768:
         raise ValueError("Consulta superior a 16K requiere SKY_INFERENCE_NUM_CTX=32768")
+    if any(len(m["content"]) > 32_000 for m in messages if m["role"] == "user") and context_window < 65536:
+        raise ValueError("Consulta superior a 32K requiere SKY_INFERENCE_NUM_CTX=65536")
+    if max_output_tokens > 4096 and context_window < 65536:
+        raise ValueError("Salida superior a 4096 tokens requiere contexto de 65536")
     estimated_tokens = sum((len(m["content"].encode("utf-8")) + 1) // 2 for m in messages)
     if estimated_tokens + max_output_tokens + 512 > context_window:
         raise ValueError("Texto e historial exceden el contexto configurado; dividí la consulta")
@@ -204,7 +208,7 @@ def generate(messages: list[dict], *, max_output_tokens: int = 1200) -> dict:
         req = request.Request(worker + "/api/chat", data=payload, method="POST",
                               headers={"Content-Type": "application/json"})
         try:
-            with request.urlopen(req, timeout=190.0 if extended else 68.0) as response:
+            with request.urlopen(req, timeout=330.0 if extended else 68.0) as response:
                 data = _read_limited(response)
         except (error.HTTPError, error.URLError, TimeoutError, OSError) as exc:
             _worker_result(worker, False)
