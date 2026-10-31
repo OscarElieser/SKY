@@ -22,9 +22,9 @@ _COOLDOWN: dict[str, float] = {}
 # Automatic routing must never forward apparent credentials. This guard
 # catches common explicit secret formats; it is not a full DLP scanner.
 _CREDENTIAL = re.compile(
-    r"(?i)(?:\\bsk-[a-z0-9_-]{16,}\\b|\\bbearer\\s+[a-z0-9_.-]{16,}\\b|"
-    r"\\b(?:api[_ -]?key|access[_ -]?token|password|contrasena|contraseña|"
-    r"secret[_ -]?key)\\s*[:=]\\s*[^\\s]{8,})"
+    r"(?i)(?:\bsk-[a-z0-9_-]{16,}\b|\bbearer\s+[a-z0-9_.-]{16,}\b|"
+    r"\b(?:api[_ -]?key|access[_ -]?token|password|contrasena|contraseña|"
+    r"secret[_ -]?key)\s*[:=]\s*[^\s]{8,})"
 )
 
 
