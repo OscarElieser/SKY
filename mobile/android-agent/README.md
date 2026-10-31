@@ -1,3 +1,13 @@
+## SKY Android 0.8.43 — corrección de instalación Play Protect (candidato, no certificado)
+
+Se elimina de la APK **estándar** el servicio de acceso amplio a notificaciones que estaba en el manifiesto 0.8.42; se mantiene en la variante experimental separada, **no publicada**. Google documenta el bloqueo de instalaciones externas que solicitan ese permiso. La nueva build conservará el mismo paquete, firma de release y datos instalados si Android acepta actualizarla, pero **no se garantiza** que Play Protect permita instalarla hasta probar el APK firmado en Samsung. Se refuerzan las auditorías del binario y el test instrumentado. SKY no debe reportar reproducción audible sin evidencia.
+
+Los cambios académicos de [32.000 caracteres / hasta 4.096 tokens Ollama](../../docs/SKY_P0_ACADEMIC_32K_2026-10-30.md) están integrados en `main` y se incluirán en la nueva compilación. La ejecución de pesos reales de Ollama, las pruebas de voz/audio y archivos en Samsung siguen pendientes de aceptación.
+
+**Documento de seguridad y pasos de aceptación:** [SKY Android Play Protect 0.8.43](../../docs/SKY_ANDROID_PLAY_PROTECT_0843.md). **Sin cambios en SKY Windows ni BAQUEANO.**
+
+---
+
 ## SKY Android — consulta académica de 32K y respuestas extensas (30/10/2026)
 
 **Código pendiente de aceptación:** SKY Automático y Ollama privados admiten hasta **32.000 caracteres** por turno emparejado, conservando el texto completo y sin respaldo cloud para consultas largas. Una consulta de más de 4.000 caracteres solicita hasta **4.096 tokens de respuesta**, condicionados al contexto y hardware del Ollama real. Para más de 16.000 caracteres es obligatorio `SKY_INFERENCE_NUM_CTX=32768`; no se declara al modelo operativo sin generación auténtica. Los proveedores externos mantienen su máximo de **4.000 caracteres** y su autorización por consulta. El modo profundo externo mantiene límites previos.
