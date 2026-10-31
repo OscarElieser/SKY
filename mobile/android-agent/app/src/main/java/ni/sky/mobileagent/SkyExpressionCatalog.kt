@@ -13,6 +13,7 @@ internal object SkyExpressionCatalog {
 
     private val entries: Map<Kind, List<String>> = mapOf(
         Kind.SALUDO to listOf(
+            "¡Qué onda! Aquí estoy, lista para ayudarte. ¿Qué hacemos?",
             "¡Hola! Estoy aquí y lista para ayudarte con lo que necesités.",
             "¡Buen día! ¿Qué objetivo vamos a resolver hoy?",
             "¡Qué gusto saludarte! ¿En qué proyecto trabajamos?",
@@ -55,6 +56,7 @@ internal object SkyExpressionCatalog {
             "¡Que tengas una buena tarde! Seguimos después."
         ),
         Kind.AGRADECIMIENTO to listOf(
+            "¡Con mucho gusto! ¿En qué más te ayudo?",
             "¡Con gusto! Me alegra que la respuesta te sirva.",
             "¡Para eso estoy! ¿Querés revisar algún detalle?",
             "¡Gracias a vos por la confianza! Seguimos cuando quieras.",
@@ -117,6 +119,12 @@ internal object SkyExpressionCatalog {
             "El error que se comprende deja de repetirse tan fácilmente."
         ),
         Kind.CHISTE to listOf(
+            "¿Por qué la computadora fue al médico? ¡Porque tenía un virus y no era de los que se curan con sopa!",
+            "¿Qué le dijo un cero a un ocho? ¡Qué bonito cinturón!",
+            "¿Por qué el lápiz estaba feliz? ¡Porque por fin encontró su punto!",
+            "¿Qué hace una nube con sueño? ¡Se echa una siestalluvia!",
+            "¿Por qué la calculadora estaba tranquila? Porque tenía todos sus problemas resueltos.",
+            "¿Qué dijo el teléfono cuando salió a caminar? Hoy sí voy a dar muchos pasos… sin mover las piernas.",
             "¿Por qué la carpeta se fue de vacaciones? Porque tenía demasiados archivos pendientes.",
             "¿Qué dijo el teclado en la fiesta? Hoy sí voy a soltar todas las teclas.",
             "¿Por qué la impresora llegó tarde? Se quedó atascada pensando en el papel.",
