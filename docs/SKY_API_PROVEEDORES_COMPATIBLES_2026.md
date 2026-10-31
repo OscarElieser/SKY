@@ -7,7 +7,7 @@
 `SKY Android → SKY API HTTPS → autenticación de chat por dispositivo → proveedor seleccionado`.
 
 1. **Principal:** Ollama en la infraestructura controlada por SKY, sin cuotas de Gemini/Groq. Sigue limitado por potencia de cálculo, latencia, RAM/VRAM, red, seguridad y energía.
-2. **Opcionales:** OpenRouter, Mistral, Groq y Cloudflare Workers AI, conectados **solo desde el backend SKY**. Gemini ya existe mediante `neural_core/providers.py` y su cliente Android de pruebas; no se han reemplazado estas integraciones ni el motor Windows.
+2. **Opcionales:** Gemini (por la integración previa de SKY), OpenRouter, Mistral, Groq y Cloudflare Workers AI. Todos se pueden seleccionar a través del **backend SKY**. Solo los cuatro últimos comparten el nuevo adaptador OpenAI-compatible; no se modificó el motor Windows.
 3. El propietario debe activar «Priorizar mi SKY API privada» y seleccionar un proveedor desde «MOTOR SKY API · ELEGIR MODELO». El predeterminado es **Ollama**. Cada consulta externa requiere el permiso explícito de **Nube** y **Datos privados** en la pantalla; las fuentes de actualidad siguen necesitando herramientas de verificación y no se presentan como verificadas por el LLM.
 4. Si falla un proveedor, **no** hay cambio oculto a otro ni reintento automático; el borrador permanece disponible. Un error HTTP 429 significa cuota agotada o límite temporal y no se debe intentar evitarlo creando solicitudes repetidas.
 
@@ -15,6 +15,7 @@
 
 | Proveedor | Variables del servidor | Modelo inicial de referencia | Endpoint fijo |
 |---|---|---|---|
+| Gemini (ruta ya existente) | `GEMINI_API_KEY`, `GEMINI_MODEL` | modelo configurado por el servidor | adaptador Gemini anterior de SKY; no nuevo endpoint implementado |
 | OpenRouter | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | `openrouter/free` | `https://openrouter.ai/api/v1/chat/completions` |
 | Mistral | `MISTRAL_API_KEY`, `MISTRAL_MODEL` | `mistral-small-latest` | `https://api.mistral.ai/v1/chat/completions` |
 | Groq | `GROQ_API_KEY`, `GROQ_MODEL` | `openai/gpt-oss-20b` | `https://api.groq.com/openai/v1/chat/completions` |
