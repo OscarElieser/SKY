@@ -22,11 +22,27 @@ internal object SkyOwnApiRoutingPolicy {
         promptChars in 1..SERVER_PROMPT_LIMIT
 
     /** Local-first is default. Cloud adapters are selected by owner only. */
-    val SERVER_PROVIDERS = listOf("ollama", "gemini", "openrouter",
-        "mistral", "groq", "cloudflare")
+    val SERVER_PROVIDERS = listOf("sky_auto", "ollama", "gemini",
+        "openrouter", "mistral", "groq", "cloudflare")
 
     fun chosenProvider(raw: String?): String =
-        raw?.takeIf { it in SERVER_PROVIDERS } ?: "ollama"
+        raw?.takeIf { it in SERVER_PROVIDERS } ?: "sky_auto"
+
+    fun useAutomaticViaSkyApi(
+        optedIn: Boolean,
+        pairedChatToken: Boolean,
+        explicitGeminiMode: Boolean,
+        verifiedWebRequired: Boolean,
+        promptChars: Int
+    ): Boolean = usePrivateApi(optedIn, pairedChatToken,
+        explicitGeminiMode, verifiedWebRequired, promptChars)
+
+    /** Consent controls transfer; router choice remains automatic. */
+    fun authorizedAutomaticCloud(
+        perTurnCloud: Boolean,
+        perTurnPrivate: Boolean,
+        standingConsent: Boolean
+    ): Boolean = standingConsent || (perTurnCloud && perTurnPrivate)
 
     fun useExternalViaSkyApi(
         optedIn: Boolean,
