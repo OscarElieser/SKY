@@ -172,7 +172,7 @@ def test_long_thesis_prompt_stays_local_even_with_cloud_permission(monkeypatch):
     result = router.generate([{"role": "user", "content": full_brief}],
                              cloud_consent=True, private_cloud_consent=True)
     assert result["nube"] is False
-    assert seen == [(full_brief, 2048)]
+    assert seen == [(full_brief, 4096)]
 
 
 def test_long_thesis_is_never_fallback_to_cloud_if_local_fails(monkeypatch):
