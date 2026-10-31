@@ -1,3 +1,13 @@
+## SKY Android 0.8.42 — SKY Automático, sin selección repetida (30/10/2026)
+
+**Cambios en código `main`, APK no certificada todavía.** En los teléfonos con chat privado de SKY emparejado, la opción «SKY Automático · priorizar nuestra API sin elegir modelos» se propone como predeterminada. Usa el backend HTTPS de SKY y su modelo Ollama local. Se conserva el selector avanzado y todas las preferencias previas, pero no es necesario elegir una API cada vez.
+
+Cuando el modelo propio falla, solo puede usar los proveedores externos configurados y autorizados en el servidor, y se requiere consentimiento en Android. Una casilla opcional «Autorizar respaldo automático de texto con IA externa» permite conceder una autorización persistente y revocable tras un aviso explícito que incluye la posible transferencia de datos privados; está **desactivada** por defecto. Sin ella, la autorización se solicita mediante los controles existentes por consulta. Nunca se usan claves de proveedores directamente desde el nuevo motor en la APK.
+
+`SkyOwnApiRoutingPolicyTest.kt` incluye regresiones para confirmar modo automático predeterminado, conservar elección manual, separar permisos y no activar respaldos externos por error. No se presume funcionamiento probado hasta que GitHub Actions, Android 15/16 y el Samsung real aprueben. Consultá [documentación técnica](../../docs/SKY_API_AUTOMATICA_2026.md).
+
+---
+
 ## SKY Android 0.8.42 — selección de motores en SKY API (30/10/2026)
 
 - **Principal:** SKY API privada → Ollama del servidor, sin consumir claves Gemini/Groq.
