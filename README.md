@@ -1,3 +1,11 @@
+## Auditoría real de preparación para el mercado (30/10/2026)
+
+**Dictamen NO-GO para lanzamiento comercial abierto.** La APK 0.8.42 firmada se publicó desde el commit `d2834ef0`, anterior a los cambios nuevos de `sky_auto` y no certifica el `main` actual. El proyecto Supabase `SKY-IA` está activo y ya hospeda `sky-platform-readiness` (JWT obligatorio), pero NO se ha conectado un servidor de inferencia Ollama probado. El motor local de SKY tiene límite de dos generaciones simultáneas por proceso. La regresión de seguridad que inicialmente falló 4 casos se corrigió y la nueva prueba backend alcanzó 59/59, pero falta aprobar Android y realizar pruebas en Samsung y GPU.
+
+**Informe técnico completo y puertas de lanzamiento:** [Auditoría SKY Android / API — sostenibilidad, escalabilidad, seguridad e infraestructura](docs/AUDITORIA_SKY_ANDROID_API_PRELANZAMIENTO_2026-10-30.md).
+
+---
+
 ## SKY Automático — motor propio primero, sin elegir API manualmente (30/10/2026)
 
 **Implementado como nueva ruta móvil en `main`, pendiente de pruebas de CI y de despliegue real.** SKY Android usa `sky_auto` de forma predeterminada cuando dispone del chat privado de SKY emparejado y autorizado. Selecciona Ollama de SKY primero y solo considera servicios externos si el propietario los ha autorizado y el servidor los ha permitido explícitamente. Las rutas anteriores `ollama`, `auto` y proveedores manuales permanecen disponibles, sin eliminación de funciones ni modificaciones a SKY Windows.
