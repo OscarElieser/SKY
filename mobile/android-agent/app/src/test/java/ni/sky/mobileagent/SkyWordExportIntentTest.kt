@@ -16,6 +16,16 @@ class SkyWordExportIntentTest {
             "Explica la historia de Microsoft Word"))
     }
 
+    @Test fun longAcademicBriefStillAsksForRealWordCreation() {
+        val brief = ("Comité académico de metodología, estadística y redacción. " +
+            "Define el problema, las preguntas, las hipótesis, la muestra, " +
+            "los instrumentos y una hoja de ruta por semanas. ").repeat(12) +
+            "Ayúdame a redactar esta tesis en un documento Word."
+        assertTrue(brief.length > 600)
+        assertTrue(SkyWordExportIntent.wantsNewWord(brief))
+        assertFalse(SkyWordExportIntent.wantsExistingWord(brief))
+    }
+
     @Test fun newDocumentIsGeneratedBeforeExport() {
         assertTrue(SkyWordExportIntent.wantsNewWord(
             "SKY crea un documento Word sobre los volcanes de Nicaragua"))
