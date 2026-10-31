@@ -1,3 +1,13 @@
+## SKY Android 0.8.46 — conversación premium y mensajes completos (código en validación)
+
+**Corrección visual P0:** mensajes multilínea con alto automático (se elimina la altura rígida 56dp que recortaba las respuestas), texto nativo para avisos y párrafos, renderizador matemático/Markdown offline redimensionable, vista previa identificada con acceso al mensaje original, y compositor más compacto con botón para borrar el borrador. Nuevo chat limpia la pantalla sin tocar SQLite. Una orden no enviada por falta de autorización se conserva como borrador recuperable, no se elimina silenciosamente.
+
+No cambia autenticación, permisos mínimos, voz, archivos, servidor, SKY Windows ni BAQUEANO. Se requieren CI, firma de distribución, pruebas de emulador y prueba física Samsung con Play Protect activo.
+
+[Diagnóstico y aceptación 0.8.46](docs/SKY_ANDROID_0846_CHAT_PREMIUM_VISUAL.md) · [Acciones de GitHub](https://github.com/OscarElieser/SKY/actions).
+
+---
+
 ## SKY Android 0.8.45 — integridad de investigaciones extensas (código en validación)
 
 **Se corrigió un defecto P0 de continuidad:** aunque SQLite archivaba el texto completo de cada trabajo, el contexto enviado para continuarlo podía exceder el contrato del servidor y producir errores **422**. La ruta privada ahora limita el contexto a **8 turnos × 4.000 caracteres**, con extractos **marcados explícitamente** y sin borrar los originales del historial; las nubes externas mantienen 8 × 2.000 caracteres y sus consentimientos. Se mejoró el transporte de respuestas Unicode hasta 512 KB con corte seguro, y se conserva el identificador auténtico de operación de Ollama en el metadato de historial.
