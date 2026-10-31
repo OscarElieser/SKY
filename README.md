@@ -1,3 +1,11 @@
+## SKY API — conectores opcionales y con autorización (30/10/2026)
+
+Se agregaron al backend de SKY los adaptadores **OpenRouter, Mistral, Groq y Cloudflare Workers AI**, compatibles con chat completions de texto. **Ollama propio sigue siendo la opción predeterminada** de SKY Android. Las claves externas pertenecen al servidor, nunca a la APK ni a Git. El uso externo requiere consentimiento individual de Nube y Datos privados y no tiene fallback automático a proveedores de pago. **Gemini permanece integrado por su vía existente**; ninguna integración ha sido validada aún con claves reales desde este trabajo.
+
+[Instrucciones, modelos, seguridad y pruebas de conectores](docs/SKY_API_PROVEEDORES_COMPATIBLES_2026.md) · [SKY Inference Gateway y escalabilidad comercial](docs/SKY_API_COMERCIAL_INFERENCIA_2026.md).
+
+---
+
 ## SKY API propia — ruta Ollama segura para Android (30/10/2026)
 
 **Implementación de código en `main`, aún no certificada por APK ni despliegue productivo.** Android puede optar por usar primero la API privada de SKY sobre **HTTPS con un token limitado de chat**, solicitando al servidor un modelo Ollama disponible en loopback. Se agregó verificación autenticada de disponibilidad del modelo, sin exponer el puerto 11434, sin copiar claves maestras a la APK y sin sustituir silenciosamente un proveedor externo. No es inferencia nativa en Android y no elimina costos ni límites de operación.
