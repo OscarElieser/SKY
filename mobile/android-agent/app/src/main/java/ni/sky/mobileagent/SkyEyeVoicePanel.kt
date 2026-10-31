@@ -53,6 +53,11 @@ class SkyEyeVoicePanel(
     private var foreground = false
     private var continuousTurns = 0
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val clearTransientError = Runnable {
+        if (!listening && !voiceSpeaking) {
+            setMode(EyeMode.IDLE, "SKY lista para una nueva consulta.")
+        }
+    }
     private val resumeListening = Runnable {
         // Foreground conversation is explicitly enabled in Settings. No need to
         // tap the eyes after reopening SKY or after a normal reply.
@@ -263,6 +268,8 @@ class SkyEyeVoicePanel(
     private fun dp(value: Int) = (value * resources.displayMetrics.density + 0.5f).toInt()
 
     private fun setMode(mode: EyeMode, label: String) {
+        handler.removeCallbacks(clearTransientError)
+        if (mode == EyeMode.ERROR) handler.postDelayed(clearTransientError, 8000L)
         eye.mode = if (mode == EyeMode.IDLE && handsFreeOn && handsFreeAsleep)
             "SLEEPING" else mode.name
         message.text = label
@@ -486,6 +493,7 @@ class SkyEyeVoicePanel(
 
     fun close() {
         handler.removeCallbacks(resumeListening)
+        handler.removeCallbacks(clearTransientError)
         recognizer?.destroy()
         recognizer = null
         speechEngine?.stop()
