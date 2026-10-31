@@ -56,6 +56,29 @@ assert calls[-1]["cloud_consent"] is True
 assert calls[-1]["private_cloud_consent"] is True
 assert result["acciones_ejecutadas"] is False
 
+# Real Pydantic + authenticated mobile endpoint: a 16K thesis prompt passes
+# completely to the self-hosted engine; a legacy cloud route rejects it.
+long_thesis = "Investigación educativa, capítulo y metodología. " * 340
+assert 4000 < len(long_thesis) <= 16000
+def check_long(messages, **kwargs):
+    assert messages[-1]["content"] == long_thesis
+    return {"respuesta": "Resultado del motor local de prueba",
+            "proveedor": "ollama", "nube": False, "acciones_ejecutadas": False}
+endpoint.smart.generate = check_long
+long_body = endpoint.MobileChatRequest(
+    device_id=did, texto=long_thesis, proveedor="sky_auto")
+assert endpoint.mobile_chat_text(long_body,
+    x_sky_chat_token=chat_token)["nube"] is False
+try:
+    endpoint.mobile_chat_text(endpoint.MobileChatRequest(
+        device_id=did, texto=long_thesis, proveedor="groq",
+        autorizar_nube=True, autorizar_datos_privados=True),
+        x_sky_chat_token=chat_token)
+except HTTPException as exc:
+    assert exc.status_code == 422
+else:
+    raise AssertionError("Long brief must not enter legacy remote provider")
+
 endpoint.revoke_mobile_chat(endpoint.Device(device_id=did))
 try:
     endpoint.mobile_chat_text(payload, x_sky_chat_token=chat_token)
