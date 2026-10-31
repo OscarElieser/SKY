@@ -1,3 +1,15 @@
+## SKY API propia — ruta Ollama segura para Android (30/10/2026)
+
+**Implementación de código en `main`, aún no certificada por APK ni despliegue productivo.** Android puede optar por usar primero la API privada de SKY sobre **HTTPS con un token limitado de chat**, solicitando al servidor un modelo Ollama disponible en loopback. Se agregó verificación autenticada de disponibilidad del modelo, sin exponer el puerto 11434, sin copiar claves maestras a la APK y sin sustituir silenciosamente un proveedor externo. No es inferencia nativa en Android y no elimina costos ni límites de operación.
+
+- Código: `mobile/android-agent/app/src/main/java/ni/sky/mobileagent/SkyOwnApiRoutingPolicy.kt`, `metaverse/mobile_chat_api.py`; pruebas `SkyOwnApiRoutingPolicyTest.kt` y `tests/test_sky_mobile_chat.py`.
+- Guía: [SKY API comercial — seguridad, inferencia, licencias, capacidad y pendientes](docs/SKY_API_COMERCIAL_INFERENCIA_2026.md).
+- Versión declarada en el código Android: **0.8.42**. La versión publicada más reciente debe verificarse en [Releases](https://github.com/OscarElieser/SKY/releases); no instalar una APK sin firma y evidencias verificadas.
+
+> Los estados históricos que aparecen más abajo reflejan auditorías anteriores. No sustituyen el resultado actual de [GitHub Actions](https://github.com/OscarElieser/SKY/actions).
+
+---
+
 ## SKY Core unificado · Windows y Android
 
 **Organización del repositorio:** [Mapa oficial de carpetas y plan de migración segura](docs/arquitectura/ESTRUCTURA_REPOSITORIO_SKY.md). Mantener las rutas existentes hasta superar pruebas de compatibilidad.
