@@ -90,6 +90,7 @@ class SkyMobileHome(
     private lateinit var footerBar: LinearLayout
     private lateinit var suggestionBar: HorizontalScrollView
     private lateinit var sendButton: TextView
+    private lateinit var clearDraftButton: TextView
     private var uploadingFiles = false
     private val cancelUploadButton = pill("Cancelar carga de archivos", Color.rgb(106, 48, 80)) {
         onCancelUpload()
@@ -150,8 +151,11 @@ class SkyMobileHome(
         hint = "Escribile a SKY..."
         setHintTextColor(Color.rgb(175, 180, 211))
         setTextColor(white)
-        textSize = 15f
+        textSize = 15.5f
         background = null
+        gravity = Gravity.TOP or Gravity.START
+        isVerticalScrollBarEnabled = true
+        setHorizontallyScrolling(false)
         inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or
             InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
         imeOptions = EditorInfo.IME_ACTION_SEND
@@ -160,12 +164,18 @@ class SkyMobileHome(
         // Reject oversized prompts explicitly on Send. InputFilter would
         // silently truncate pasted instructions, which is unsafe for long tasks.
         filters = emptyArray()
-        setPadding(dp(15), dp(10), dp(7), dp(10))
+        setPadding(dp(12), dp(12), dp(6), dp(10))
         addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 if (::sendButton.isInitialized) updateSendButton()
                 if (::suggestionBar.isInitialized) updateSuggestions()
+                // A stale setup/authorization error is dismissed as soon as
+                // the user starts correcting the draft, never stored as a turn.
+                if (pendingInfo != null && pendingQuestion == null) {
+                    pendingInfo = null
+                    if (::conversationRows.isInitialized) renderConversation()
+                }
             }
             override fun afterTextChanged(s: Editable?) = Unit
         })
@@ -176,9 +186,10 @@ class SkyMobileHome(
             } else false
         }
     }
-    val chatOutput = text("¿En qué te ayudo hoy?\n\nEscribí tu mensaje o hablame con naturalidad.", 15f, soft).apply {
+    val chatOutput = text("Tu próxima idea comienza aquí.\nEscribí o dictá una orden para SKY.", 16f, soft).apply {
         gravity = Gravity.CENTER
-        setPadding(dp(15), dp(24), dp(15), dp(24))
+        setPadding(dp(14), dp(50), dp(14), dp(18))
+        setLineSpacing(dp(6).toFloat(), 1f)
     }
     val cloudConsent = CheckBox(host).apply {
         text = "Nube autorizada para ESTE mensaje e historial"
@@ -211,7 +222,7 @@ class SkyMobileHome(
         isClickable = true
         elevation = dp(12).toFloat()
     }
-    private val panelTitle = text("Conversación", 19f, white).apply {
+    private val panelTitle = text("Conversación", 20f, white).apply {
         typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
     }
     private val panelSubtitle = text("", 12f, soft).apply { visibility = View.GONE }
@@ -326,6 +337,10 @@ class SkyMobileHome(
         val canSend = (chatInput.text.isNotBlank() ||
             attachmentLabel.visibility == View.VISIBLE) && pendingQuestion == null
         sendButton.alpha = if (canSend) 1f else 0.46f
+        if (::clearDraftButton.isInitialized) {
+            clearDraftButton.visibility = if (chatInput.text.isBlank())
+                View.GONE else View.VISIBLE
+        }
         sendButton.contentDescription = if (pendingQuestion != null)
             "SKY está procesando un mensaje" else "Enviar mensaje escrito a SKY"
     }
@@ -355,7 +370,7 @@ class SkyMobileHome(
                 (host.resources.displayMetrics.heightPixels * 0.67f).toInt()))
         }
         val dialog = android.app.AlertDialog.Builder(host)
-            .setTitle("SKY IA · Respuesta completa")
+            .setTitle("SKY IA · Mensaje completo")
             .setView(wrapper)
             .setNeutralButton("Copiar texto") { _, _ ->
                 val clipboard = host.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -387,21 +402,19 @@ class SkyMobileHome(
         item.addView(speaker)
         // Los mensajes del usuario continúan siendo texto nativo editable/copiable.
         // Las respuestas de SKY se maquetan sin ejecutar HTML, JavaScript ni red.
-        // A lightweight native bubble is enough for short plain messages.
-        // WebView/MathML is reserved for structured answers to save memory.
-        val rich = !mine && (value.contains('\n') || value.contains("\\[") ||
-            value.contains("\\(") || value.contains("**") || value.contains("$") ||
-            value.trimStart().startsWith("#"))
-        val tooLong = !mine && value.length > 9000
-        val visibleValue = if (tooLong)
-            value.take(6800) + "\n\nVista previa de la respuesta. Tocá «Leer completa» para ver el resto."
-            else value
+        // Multiline plain text must be a native WRAP_CONTENT TextView.
+        // Offline WebView/MathML is reserved for structured scientific output.
+        val visibleValue = SkyChatPresentationPolicy.preview(value)
+        val tooLong = SkyChatPresentationPolicy.hasFullViewer(value)
+        val rich = !mine && SkyChatPresentationPolicy.requiresScientificRenderer(visibleValue)
         val bubble: View = if (!rich) {
-            text(visibleValue, 15f, white).apply {
-                gravity = Gravity.START
-                setLineSpacing(dp(3).toFloat(), 1f)
+            text(visibleValue, 16f, white).apply {
+                gravity = Gravity.TOP or Gravity.START
+                setLineSpacing(dp(4).toFloat(), 1.07f)
                 setTextIsSelectable(true)
-                setPadding(dp(15), dp(12), dp(15), dp(12))
+                setHorizontallyScrolling(false)
+                if (mine) maxWidth = (host.resources.displayMetrics.widthPixels * 0.84f).toInt()
+                setPadding(dp(15), dp(13), dp(15), dp(13))
             }
         } else {
             WebView(host).apply {
@@ -424,10 +437,16 @@ class SkyMobileHome(
                             web.postDelayed({
                                 val desired = (web.contentHeight * web.scale).toInt()
                                 if (web.parent != null && web.isAttachedToWindow &&
-                                    desired > dp(25) && web.layoutParams != null &&
-                                    web.layoutParams.height != desired) {
-                                    web.layoutParams.height = desired.coerceAtMost(dp(30000))
-                                    web.requestLayout()
+                                    desired > dp(25) && web.layoutParams != null) {
+                                    val height = desired.coerceIn(dp(78), dp(30000))
+                                    if (web.layoutParams.height != height) {
+                                        web.layoutParams.height = height
+                                        web.requestLayout()
+                                        conversationScroll.post {
+                                            if (pendingQuestion != null) conversationScroll
+                                                .fullScroll(View.FOCUS_DOWN)
+                                        }
+                                    }
                                 }
                             }, delay)
                         }
@@ -449,16 +468,19 @@ class SkyMobileHome(
             Toast.makeText(host, "Mensaje copiado", Toast.LENGTH_SHORT).show()
             true
         }
+        // Never force a 56dp bubble: it clipped every multiline SKY reply.
+        // Native TextView measures its own height; scientific WebView starts
+        // at a safe size then expands after offline content is rendered.
         item.addView(bubble, LinearLayout.LayoutParams(
             if (mine) LinearLayout.LayoutParams.WRAP_CONTENT else LinearLayout.LayoutParams.MATCH_PARENT,
-            if (mine) LinearLayout.LayoutParams.WRAP_CONTENT else dp(56)
+            if (rich) dp(148) else LinearLayout.LayoutParams.WRAP_CONTENT
         ))
         if (tooLong) {
-            item.addView(pill("Leer respuesta completa", Color.rgb(54, 81, 133)) {
+            item.addView(pill("Leer mensaje completo", Color.rgb(54, 81, 133)) {
                 openFullResponse(value)
             }.apply {
                 textSize = 13f
-                contentDescription = "Leer toda la respuesta científica, sin recortes"
+                contentDescription = "Leer todo el mensaje sin perder contenido"
             }, LinearLayout.LayoutParams(-1, dp(43)).apply {
                 topMargin = dp(8)
             })
@@ -564,6 +586,9 @@ class SkyMobileHome(
         pendingQuestion = message
         pendingInfo = null
         chatInput.setText("")
+        chatInput.clearFocus()
+        (host.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
+            ?.hideSoftInputFromWindow(chatInput.windowToken, 0)
         renderConversation()
     }
 
@@ -584,36 +609,37 @@ class SkyMobileHome(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        header.addView(panelTitle, LinearLayout.LayoutParams(0, dp(50), 1f))
-        header.addView(pill("×", Color.rgb(60, 62, 119)) { closePanel() }.apply {
-            textSize = 28f
+        header.addView(panelTitle, LinearLayout.LayoutParams(0, dp(46), 1f))
+        header.addView(pill("×", Color.rgb(48, 53, 103)) { closePanel() }.apply {
+            textSize = 23f
             contentDescription = "Cerrar panel y volver a SKY"
-        }, LinearLayout.LayoutParams(dp(47), dp(45)))
+        }, LinearLayout.LayoutParams(dp(42), dp(42)))
         panel.addView(header)
         val chatToolbar = LinearLayout(host).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
             setPadding(0, dp(2), 0, dp(5))
         }
-        chatToolbar.addView(pill("＋ Nuevo chat", Color.rgb(47, 107, 146), onNewChat).apply {
-            textSize = 12f
+        chatToolbar.addView(pill("＋ Nuevo chat", Color.rgb(39, 102, 141), onNewChat).apply {
+            textSize = 12.5f
             contentDescription = "Iniciar un nuevo chat sin borrar las conversaciones guardadas"
-        }, LinearLayout.LayoutParams(dp(126), dp(40)).apply { rightMargin = dp(8) })
-        chatToolbar.addView(pill("Enseñar", Color.rgb(54, 81, 133), onTeach).apply {
-            textSize = 12f
+        }, LinearLayout.LayoutParams(dp(124), dp(38)).apply { rightMargin = dp(8) })
+        chatToolbar.addView(pill("Enseñar", Color.rgb(50, 70, 118), onTeach).apply {
+            textSize = 12.5f
             contentDescription = "Corregir y enseñarle una respuesta a SKY"
-        }, LinearLayout.LayoutParams(dp(85), dp(40)))
+        }, LinearLayout.LayoutParams(dp(86), dp(38)))
         panel.addView(chatToolbar)
         panel.addView(panelSubtitle)
 
         conversationRows = LinearLayout(host).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(1), dp(6), dp(1), dp(8))
+            setPadding(dp(2), dp(6), dp(2), dp(12))
             addView(chatOutput)
         }
         conversationScroll = ScrollView(host).apply {
             isFillViewport = true
-            isVerticalScrollBarEnabled = false
+            isVerticalScrollBarEnabled = true
+            setFadingEdgeLength(dp(20))
             clipToPadding = false
             addView(conversationRows)
         }
@@ -646,19 +672,32 @@ class SkyMobileHome(
 
         val composer = LinearLayout(host).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.BOTTOM
+            gravity = Gravity.CENTER_VERTICAL
             background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.rgb(44, 52, 100), Color.rgb(59, 56, 116))).apply {
+                intArrayOf(Color.rgb(32, 44, 85), Color.rgb(41, 47, 93))).apply {
                 cornerRadius = dp(23).toFloat()
-                setStroke(dp(1), Color.rgb(96, 102, 161))
+                setStroke(dp(1), Color.rgb(87, 110, 161))
             }
-            setPadding(dp(2), dp(3), dp(4), dp(3))
+            setPadding(dp(3), dp(3), dp(3), dp(3))
         }
         composer.addView(pill("＋", Color.rgb(49, 64, 117), onAttach).apply {
             textSize = 24f
             contentDescription = "Adjuntar archivo para analizar con SKY"
-        }, LinearLayout.LayoutParams(dp(46), dp(50)))
+        }, LinearLayout.LayoutParams(dp(44), dp(44)))
         composer.addView(chatInput, LinearLayout.LayoutParams(0, -2, 1f))
+        clearDraftButton = pill("×", Color.TRANSPARENT) {
+            chatInput.setText("")
+            if (pendingQuestion == null && pendingInfo != null) {
+                pendingInfo = null
+                renderConversation()
+            }
+        }.apply {
+            textSize = 21f
+            setTextColor(soft)
+            contentDescription = "Borrar borrador y cerrar avisos anteriores"
+            visibility = View.GONE
+        }
+        composer.addView(clearDraftButton, LinearLayout.LayoutParams(dp(29), dp(44)))
         sendButton = pill("➤", violet) {
             if ((chatInput.text.isNotBlank() || attachmentLabel.visibility == View.VISIBLE) &&
                 pendingQuestion == null) onSend()
@@ -667,9 +706,11 @@ class SkyMobileHome(
             contentDescription = "Enviar mensaje escrito a SKY"
             elevation = dp(3).toFloat()
         }
-        composer.addView(sendButton, LinearLayout.LayoutParams(dp(52), dp(50)))
+        composer.addView(sendButton, LinearLayout.LayoutParams(dp(46), dp(44)))
         panel.addView(attachmentLabel, LinearLayout.LayoutParams(-1, -2))
-        panel.addView(composer, LinearLayout.LayoutParams(-1, -2))
+        panel.addView(composer, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = dp(3)
+        })
         // Privacidad, Motor, Acceso, Enseñar e Historial viven en Configuración.
         // Los permisos para la siguiente consulta permanecen en los CheckBox
         // originales, solo se presentan desde Ajustes.
@@ -711,7 +752,11 @@ class SkyMobileHome(
         chatInput.setText("")
         panelTitle.text = "Conversación nueva"
         panelSubtitle.visibility = View.GONE
+        chatInput.clearFocus()
+        (host.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
+            ?.hideSoftInputFromWindow(chatInput.windowToken, 0)
         renderConversation()
+        conversationScroll.post { conversationScroll.scrollTo(0, 0) }
         dialogBackdrop.visibility = View.VISIBLE
     }
 
