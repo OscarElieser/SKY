@@ -585,19 +585,25 @@ class SkyMobileHome(
             gravity = Gravity.CENTER_VERTICAL
         }
         header.addView(panelTitle, LinearLayout.LayoutParams(0, dp(50), 1f))
-        header.addView(pill("＋ Nuevo", Color.rgb(47, 107, 146), onNewChat).apply {
-            textSize = 12f
-            contentDescription = "Iniciar un nuevo chat sin borrar las conversaciones guardadas"
-        }, LinearLayout.LayoutParams(dp(92), dp(40)).apply { rightMargin = dp(6) })
-        header.addView(pill("Enseñar", Color.rgb(54, 81, 133), onTeach).apply {
-            textSize = 12f
-            contentDescription = "Corregir y enseñarle una respuesta a SKY"
-        }, LinearLayout.LayoutParams(dp(80), dp(40)).apply { rightMargin = dp(7) })
         header.addView(pill("×", Color.rgb(60, 62, 119)) { closePanel() }.apply {
             textSize = 28f
             contentDescription = "Cerrar panel y volver a SKY"
         }, LinearLayout.LayoutParams(dp(47), dp(45)))
         panel.addView(header)
+        val chatToolbar = LinearLayout(host).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            setPadding(0, dp(2), 0, dp(5))
+        }
+        chatToolbar.addView(pill("＋ Nuevo chat", Color.rgb(47, 107, 146), onNewChat).apply {
+            textSize = 12f
+            contentDescription = "Iniciar un nuevo chat sin borrar las conversaciones guardadas"
+        }, LinearLayout.LayoutParams(dp(126), dp(40)).apply { rightMargin = dp(8) })
+        chatToolbar.addView(pill("Enseñar", Color.rgb(54, 81, 133), onTeach).apply {
+            textSize = 12f
+            contentDescription = "Corregir y enseñarle una respuesta a SKY"
+        }, LinearLayout.LayoutParams(dp(85), dp(40)))
+        panel.addView(chatToolbar)
         panel.addView(panelSubtitle)
 
         conversationRows = LinearLayout(host).apply {
