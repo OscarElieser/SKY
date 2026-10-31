@@ -10,16 +10,7 @@ class SkyCompanionBrain {
     var mode: Mode = Mode.OFF
         private set
 
-    private var jokeIndex = 0
     private var checkIndex = 0
-    private val jokes = listOf(
-        "¿Por qué la computadora fue al médico? ¡Porque tenía un virus y no era de los que se curan con sopa!",
-        "¿Qué le dijo un cero a un ocho? ¡Qué bonito cinturón!",
-        "¿Por qué el lápiz estaba feliz? ¡Porque por fin encontró su punto!",
-        "¿Qué hace una nube con sueño? ¡Se echa una siestalluvia!",
-        "¿Por qué la calculadora estaba tranquila? Porque tenía todos sus problemas resueltos.",
-        "¿Qué dijo el teléfono cuando salió a caminar? Hoy sí voy a dar muchos pasos… sin mover las piernas."
-    )
 
     fun answer(raw: String): Response? {
         val q = SkyAppNameMatcher.norm(raw).removePrefix("sky ").trim()
@@ -48,16 +39,24 @@ class SkyCompanionBrain {
         if (q in listOf("contame un chiste", "cuentame un chiste", "cuenta un chiste",
                 "dime un chiste", "conta un chiste", "otro chiste",
                 "hazme reir", "haceme reir")) {
-            val next = jokes[jokeIndex++ % jokes.size]
-            return Response(next)
+            return Response(SkyExpressionCatalog.next(SkyExpressionCatalog.Kind.CHISTE))
         }
         if (q in listOf("silba", "silbame", "silba algo", "silba una melodia",
                 "hace un silbido", "haz un silbido", "silbido")) {
             return Response("¡Escuchá este silbidito original!", whistle = true)
         }
         if (q in listOf("sorprendeme", "dime algo divertido", "decime algo divertido")) {
-            val next = jokes[jokeIndex++ % jokes.size]
-            return Response("¡Una sonrisa viene en camino! " + next)
+            return Response("¡Una sonrisa viene en camino! " +
+                SkyExpressionCatalog.next(SkyExpressionCatalog.Kind.CHISTE))
+        }
+        val category = SkyExpressionCatalog.requested(raw)
+        if (category in setOf(SkyExpressionCatalog.Kind.REFRAN,
+                SkyExpressionCatalog.Kind.MOTIVACION,
+                SkyExpressionCatalog.Kind.TRABALENGUAS,
+                SkyExpressionCatalog.Kind.ADIVINANZA,
+                SkyExpressionCatalog.Kind.REFLEXION,
+                SkyExpressionCatalog.Kind.ESTUDIO)) {
+            return Response(SkyExpressionCatalog.next(category!!))
         }
         return null
     }
