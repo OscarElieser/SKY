@@ -38,7 +38,19 @@ object SkyNetwork {
             conn.doOutput = true
             conn.outputStream.use { it.write(data.toString().toByteArray(Charsets.UTF_8)) }
             val code = conn.responseCode
-            if (code !in 200..299) throw IllegalStateException("SKY Chat respondió HTTP " + code)
+            if (code !in 200..299) {
+                val reason = when (code) {
+                    401, 403 -> "SKY API rechazó la sesión. Renovala desde Ajustes."
+                    409 -> "SKY API no tiene disponible el modelo Ollama seleccionado. " +
+                        "Revisá el servidor y el modelo instalado. No se envió a Gemini."
+                    429 -> "SKY API aplicó su límite de protección por dispositivo. " +
+                        "Reintentá luego; no es la cuota de Gemini."
+                    in 500..599 -> "SKY API no pudo responder. " +
+                        "Verificá que el servidor esté disponible."
+                    else -> "SKY API respondió HTTP $code."
+                }
+                throw IllegalStateException(reason)
+            }
             val output = ByteArrayOutputStream()
             conn.inputStream.use { stream ->
                 val bytes = ByteArray(2048)
