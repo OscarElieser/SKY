@@ -158,7 +158,8 @@ def generate(messages: list[dict], *, max_output_tokens: int = 1200) -> dict:
         if (not isinstance(message, dict) or
                 message.get("role") not in ("system", "user", "assistant") or
                 not isinstance(message.get("content"), str) or
-                not 1 <= len(message["content"]) <= 4000):
+                not 1 <= len(message["content"]) <= (
+                    16_000 if message["role"] == "user" else 4000)):
             raise ValueError("Mensaje de inferencia inválido")
     if not isinstance(max_output_tokens, int) or not 1 <= max_output_tokens <= 2048:
         raise ValueError("Presupuesto de respuesta inválido")
