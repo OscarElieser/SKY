@@ -14,9 +14,12 @@ on:
       - 'metaverse/static/hud.js'
       - 'neural_core/sky_mobile_chat.py'
       - 'neural_core/sky_inference_gateway.py'
+      - 'neural_core/sky_smart_router.py'
       - 'neural_core/sky_optional_cloud_providers.py'
       - 'neural_core/sky_home_routing.py'
       - 'tests/test_sky_inference_gateway.py'
+      - 'tests/test_sky_smart_router.py'
+      - 'tests/test_sky_smart_mobile_api.py'
       - 'tests/test_sky_optional_cloud_providers.py'
       - 'tests/test_sky_optional_provider_routing.py'
       - 'tests/test_sky_home_api.py'
@@ -37,9 +40,12 @@ on:
       - 'metaverse/static/hud.js'
       - 'neural_core/sky_mobile_chat.py'
       - 'neural_core/sky_inference_gateway.py'
+      - 'neural_core/sky_smart_router.py'
       - 'neural_core/sky_optional_cloud_providers.py'
       - 'neural_core/sky_home_routing.py'
       - 'tests/test_sky_inference_gateway.py'
+      - 'tests/test_sky_smart_router.py'
+      - 'tests/test_sky_smart_mobile_api.py'
       - 'tests/test_sky_optional_cloud_providers.py'
       - 'tests/test_sky_optional_provider_routing.py'
       - 'tests/test_sky_home_api.py'
@@ -61,9 +67,9 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install 'pytest>=8,<10' 'fastapi>=0.115,<1'
       - name: Python syntax
-        run: python -m py_compile metaverse/sentinel.py neural_core/sky_mobile_agent.py neural_core/sky_mobile_chat.py neural_core/sky_inference_gateway.py neural_core/sky_optional_cloud_providers.py neural_core/sky_home_routing.py metaverse/mobile_agent_api.py metaverse/mobile_chat_api.py metaverse/sky_home_api.py metaverse/asistente_api.py metaverse/api.py
+        run: python -m py_compile metaverse/sentinel.py neural_core/sky_mobile_agent.py neural_core/sky_mobile_chat.py neural_core/sky_inference_gateway.py neural_core/sky_smart_router.py neural_core/sky_optional_cloud_providers.py neural_core/sky_home_routing.py metaverse/mobile_agent_api.py metaverse/mobile_chat_api.py metaverse/sky_home_api.py metaverse/asistente_api.py metaverse/api.py
       - name: Consent and queue tests
-        run: python -m pytest -q tests/test_sky_mobile_agent.py tests/test_sky_mobile_chat.py tests/test_sky_inference_gateway.py tests/test_sky_optional_cloud_providers.py tests/test_sky_optional_provider_routing.py tests/test_sky_home_api.py tests/test_sky_home_routing.py
+        run: python -m pytest -q tests/test_sky_mobile_agent.py tests/test_sky_mobile_chat.py tests/test_sky_inference_gateway.py tests/test_sky_smart_router.py tests/test_sky_smart_mobile_api.py tests/test_sky_optional_cloud_providers.py tests/test_sky_optional_provider_routing.py tests/test_sky_home_api.py tests/test_sky_home_routing.py
   android:
     runs-on: ubuntu-latest
     steps:
