@@ -30,6 +30,9 @@ class ChatPair(Device):
 
 
 class MobileChatRequest(HomeChat):
+    # Expanded ONLY for self-hosted inference (the legacy Home API and
+    # external cloud adapters retain their lower, separately enforced limits).
+    texto: str = Field(min_length=1, max_length=16_000)
     device_id: str = Field(pattern=r"^[a-f0-9]{32}$")
 
 
@@ -92,7 +95,15 @@ def mobile_chat_text(body: MobileChatRequest,
         raise HTTPException(401, "Sesión móvil inválida o caducada") from exc
     # The owner endpoint is reused as a function only AFTER scope validation.
     # Its body is restricted to text/provider consent and never invokes tools.
-    payload = HomeChat.model_validate(body.model_dump(exclude={"device_id"}))
+    # Avoid revalidating the 16K private request through the legacy HomeChat
+    # 4K field. Manual external routes retain their original HomeChat limit.
+    if body.proveedor in ("sky_auto", "ollama"):
+        payload = body
+    else:
+        try:
+            payload = HomeChat.model_validate(body.model_dump(exclude={"device_id"}))
+        except ValueError as exc:
+            raise HTTPException(422, "El proveedor externo admite hasta 4000 caracteres") from exc
     if payload.proveedor == "sky_auto":
         messages = [{"role": "system", "content":
             "Eres SKY IA, asistente de investigación y trabajo. Responde con " +
@@ -125,7 +136,7 @@ def mobile_chat_text(body: MobileChatRequest,
                         for turn in payload.historial)
         messages.append({"role": "user", "content": payload.texto})
         try:
-            return inference.generate(messages, max_output_tokens=1200)
+            return inference.generate(messages, max_output_tokens=2048)
         except inference.InferenceBusy as exc:
             raise HTTPException(429, "SKY API local ocupada",
                                 headers={"Retry-After": "3"}) from exc
