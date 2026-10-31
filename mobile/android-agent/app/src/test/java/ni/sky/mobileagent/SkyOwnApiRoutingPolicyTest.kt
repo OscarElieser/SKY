@@ -83,6 +83,8 @@ class SkyOwnApiRoutingPolicyTest {
         assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
             true, true, "ollama", false, false, true, true, 100))
         assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+            true, true, "sky_auto", false, false, true, true, 100))
+        assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
             true, true, "external-untrusted", false, false, true, true, 100))
         assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
             true, true, "openrouter", true, false, true, true, 100))
