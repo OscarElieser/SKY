@@ -271,9 +271,12 @@ class SkyEyeVoicePanel(
             EyeMode.THINKING -> "✦ UN MOMENTO, ESTOY PENSANDO"
             EyeMode.SPEAKING -> "♫ SKY ESTÁ HABLANDO"
             EyeMode.ERROR -> "REVISÁ EL AVISO DE SKY"
-            EyeMode.IDLE -> if (handsFreeOn) {
-                if (handsFreeAsleep) "SKY DURMIENDO · DECÍ SKY" else "SKY ESTÁ ESCUCHÁNDOTE"
-            } else "SKY LISTA · TOCÁ MIS OJOS"
+            EyeMode.IDLE -> when {
+                handsFreeOn -> if (handsFreeAsleep) "SKY DURMIENDO · DECÍ SKY"
+                    else "SKY ESTÁ ESCUCHÁNDOTE"
+                fluidConversation -> "SKY LISTA PARA ESCUCHARTE · AUTOMÁTICO"
+                else -> "SKY LISTA · ACTIVÁ MANOS LIBRES EN AJUSTES"
+            }
         })
     }
 
