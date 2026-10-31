@@ -4504,13 +4504,17 @@ class MainActivity : Activity() {
                     val keepFace = voiceReplyOnFace
                     voiceReplyOnFace = false
                     val elapsedMs = android.os.SystemClock.elapsedRealtime() - started
-                    home.addExchange(message, answer,
+                    val savedExchange = home.addExchange(message, answer,
                         provider + " · " + String.format(java.util.Locale.US, "%.1f s", elapsedMs / 1000.0),
                         revealPanel = !keepFace, sources = sources, googleSearchHtml = searchSuggestions)
                     voicePanel.express(answer)
-                    if (createWord) {
+                    if (createWord && savedExchange != null) {
                         voicePanel.speakReply("Preparé el texto. Elegí dónde guardar el documento Word.")
-                        archive.recent(1).lastOrNull()?.let { startWordExport(it) }
+                        startWordExport(savedExchange)
+                    } else if (createWord) {
+                        home.showMessage("La respuesta se muestra completa, pero no pudo guardarse. " +
+                            "No voy a exportar por error una conversación anterior.")
+                        voicePanel.speakReply("No se pudo guardar el documento. Copiá la respuesta antes de cerrar.")
                     } else {
                         voicePanel.speakReply(answer)
                     }
