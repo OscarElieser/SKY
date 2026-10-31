@@ -4343,7 +4343,9 @@ class MainActivity : Activity() {
                                     it != "sky_auto" && it != "ollama" }) {
                             error("SKY API devolvió un proveedor externo no autorizado.")
                         }
-                        answer = local.getString("respuesta")
+                        answer = SkyLongAnswerStatus.annotate(
+                            local.getString("respuesta"),
+                            local.optBoolean("respuesta_incompleta", false))
                         provider = "SKY API · " +
                             local.optString("proveedor", selectedSkyApiProvider) +
                             (if (local.optBoolean("nube", false))
