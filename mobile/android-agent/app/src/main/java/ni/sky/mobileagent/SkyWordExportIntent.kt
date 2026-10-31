@@ -16,6 +16,12 @@ object SkyWordExportIntent {
     private val existing = Regex(
         """\b(?:descarg\w*|export\w*|guard\w*|entreg\w*|brind\w*|pasame|dame|mandame)\b"""
     )
+    // "Entrega" in a thesis schedule is not an instruction to export an
+    // existing DOCX. A download/export verb must relate directly to Word.
+    private val existingWord = Regex(
+        """\\b(?:descarg\\w*|export\\w*|guard\\w*|entreg\\w*|brind\\w*|pasame|dame|mandame)""" +
+            """(?:\\s+[^\\s]+){0,9}\\s+(?:word|docx)\\b"""
+    )
     private val generate = Regex(
         """\b(?:crea\w*|gener\w*|elabor\w*|redact\w*|prepara\w*|haz|hace|hacer)\b"""
     )
@@ -25,14 +31,14 @@ object SkyWordExportIntent {
     fun wantsExistingWord(raw: String): Boolean {
         val s = normalize(raw)
         return s.length in 7..16000 && word.containsMatchIn(s) &&
-            existing.containsMatchIn(s) && !howTo.containsMatchIn(s)
+            existingWord.containsMatchIn(s) && !howTo.containsMatchIn(s)
     }
 
     /** "Crea un documento Word sobre..." with new content to generate first. */
     fun wantsNewWord(raw: String): Boolean {
         val s = normalize(raw)
         return s.length in 7..16000 && word.containsMatchIn(s) &&
-            generate.containsMatchIn(s) && !existing.containsMatchIn(s) &&
+            generate.containsMatchIn(s) && !existingWord.containsMatchIn(s) &&
             !howTo.containsMatchIn(s)
     }
 }
