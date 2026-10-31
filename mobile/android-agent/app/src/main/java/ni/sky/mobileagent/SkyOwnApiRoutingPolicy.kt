@@ -21,6 +21,27 @@ internal object SkyOwnApiRoutingPolicy {
         !explicitGeminiMode && !verifiedWebRequired &&
         promptChars in 1..SERVER_PROMPT_LIMIT
 
+    /** Local-first is default. Cloud adapters are selected by owner only. */
+    val SERVER_PROVIDERS = listOf("ollama", "openrouter", "mistral", "groq", "cloudflare")
+
+    fun chosenProvider(raw: String?): String =
+        raw?.takeIf { it in SERVER_PROVIDERS } ?: "ollama"
+
+    fun useExternalViaSkyApi(
+        optedIn: Boolean,
+        pairedChatToken: Boolean,
+        selectedProvider: String,
+        explicitGeminiMode: Boolean,
+        verifiedWebRequired: Boolean,
+        cloudConsent: Boolean,
+        privateDataConsent: Boolean,
+        promptChars: Int
+    ): Boolean = optedIn && pairedChatToken &&
+        selectedProvider in SERVER_PROVIDERS && selectedProvider != "ollama" &&
+        cloudConsent && privateDataConsent &&
+        !explicitGeminiMode && !verifiedWebRequired &&
+        promptChars in 1..SERVER_PROMPT_LIMIT
+
     fun canPromptForSetup(optedIn: Boolean, pairedChatToken: Boolean): Boolean =
         optedIn && !pairedChatToken
 }
