@@ -148,13 +148,13 @@ def test_large_context_requires_operator_budget_before_http(model_worker, monkey
     assert not model_worker.requests
 
 
-def test_reject_over_32k_input_and_excess_generation_budget(model_worker, monkeypatch):
+def test_reject_over_48k_input_and_excess_generation_budget(model_worker, monkeypatch):
     monkeypatch.setenv("SKY_INFERENCE_NUM_CTX", "32768")
     with pytest.raises(ValueError):
-        gateway.generate([{"role": "user", "content": "A" * 32001}])
+        gateway.generate([{"role": "user", "content": "A" * 48001}])
     with pytest.raises(ValueError):
         gateway.generate([{"role": "user", "content": "consulta"}],
-                         max_output_tokens=4097)
+                         max_output_tokens=6145)
     assert not model_worker.requests
 
 
