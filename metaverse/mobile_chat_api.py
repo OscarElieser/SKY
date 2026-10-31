@@ -14,6 +14,7 @@ from .sky_home_api import HomeChat, home_chat
 from . import sky_home_api
 from neural_core import sky_mobile_chat as mobile_chat
 from neural_core import sky_inference_gateway as inference
+from neural_core import sky_smart_router as smart
 
 router = APIRouter(prefix="/api/sky/mobile-chat")
 owner = APIRouter(dependencies=[Depends(require_key)])
@@ -92,6 +93,28 @@ def mobile_chat_text(body: MobileChatRequest,
     # The owner endpoint is reused as a function only AFTER scope validation.
     # Its body is restricted to text/provider consent and never invokes tools.
     payload = HomeChat.model_validate(body.model_dump(exclude={"device_id"}))
+    if payload.proveedor == "sky_auto":
+        messages = [{"role": "system", "content":
+            "Eres SKY IA, asistente de investigación y trabajo. Responde con " +
+            "rigor. No inventes citas ni ejecuciones. Esta ruta solo genera texto."}]
+        messages.extend({"role": turn.role, "content": turn.content}
+                        for turn in payload.historial)
+        messages.append({"role": "user", "content": payload.texto})
+        from neural_core import providers
+        try:
+            return smart.generate(
+                messages,
+                cloud_consent=payload.autorizar_nube,
+                private_data=(payload.datos == "privados"),
+                private_cloud_consent=payload.autorizar_datos_privados,
+                local_only=providers.local_only())
+        except smart.AutoRouteBusy as exc:
+            raise HTTPException(429, "Motor SKY local ocupado; no se enviaron datos externos",
+                                headers={"Retry-After": "3"}) from exc
+        except smart.AutoRouteUnavailable as exc:
+            raise HTTPException(503, "No hay capacidad autorizada en SKY Automático") from exc
+        except ValueError as exc:
+            raise HTTPException(422, "Consulta de SKY Automático inválida") from exc
     if payload.proveedor == "ollama":
         if payload.autorizar_nube or payload.autorizar_datos_privados:
             raise HTTPException(400, "El motor propio solo admite inferencia privada local")
