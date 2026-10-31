@@ -1,3 +1,18 @@
+## SKY Android 0.8.42 — Nuevo chat, historial intacto y cuota Gemini (30/10/2026)
+
+**Situación observada en Samsung:** tras escribir un prompt académico, el proveedor Gemini respondió que su límite de uso había sido alcanzado. El cuadro de entrada volvió a mostrar el borrador y la conversación no ofrecía «Nuevo chat». Estas mejoras están en el código de `main`; no declarar pruebas de APK o Samsung realizadas sin evidencia.
+
+- **Nuevo chat (interfaz):** en la barra superior del panel «Conversación» se añadió «＋ Nuevo chat». Se muestra confirmación si existe un borrador o adjuntos seleccionados. No se puede reiniciar mientras una carga o consulta está en curso.
+- **Historial preservado:** el botón limpia solo la vista, el texto pendiente y los adjuntos seleccionados; nunca ejecuta `archive.deleteAll()`. Todas las consultas respondidas permanecen en la base privada `sky_conversations.db` y en Historial. `SkyChatSessionPolicy` usa el último ID guardado como límite exclusivo para separar la sesión visible, incluso después de reabrir la aplicación. El contexto pasado no se reenvía automáticamente al nuevo chat.
+- **Borrador y envío:** `beginSending()` ya limpia el cuadro cuando SKY acepta la consulta. Si Gemini o Groq falla, `failSending()` conserva el texto para reintentar: una consulta rechazada por cuota **no se considera entregada ni respondida**. El usuario puede descartarla con «Nuevo chat», previa confirmación.
+- **Cuota real:** `SkyPhoneCloud.GeminiQuotaException` identifica HTTP 429. No modifica facturación, suscripciones ni límites externos. Para texto ordinario, SKY puede probar el Groq previamente autorizado si está configurado, el modelo Gemini no fue solicitado explícitamente, el mensaje cabe completo en 4.000 caracteres y no exige investigación web verificable. No envía a un proveedor distinto sin autorización previa ni presenta un respaldo no verificado como bibliografía.
+- **Conservación de prompts:** `SkyConversationArchive` guarda la consulta académica completa hasta 16.000 caracteres cuando hay respuesta, sin el recorte anterior a 4.000. No borra datos previos ni altera SKY Windows.
+- **Pruebas:** `SkyChatSessionPolicyTest`, `SkyProviderFallbackPolicyTest` y `SkyPremiumHistoryRuntimeTest` comprueban los límites de sesión, condiciones del respaldo y conservación real de datos SQLite en emulador. **Pendiente:** resultados de GitHub Actions, firma, Android 15/16 y aceptación manual en Samsung.
+
+[Compilación y firma](https://github.com/OscarElieser/SKY/actions/workflows/sky-mobile-release.yml) · [Releases publicadas](https://github.com/OscarElieser/SKY/releases).
+
+---
+
 ## SKY Android 0.8.42 — corrección de desvío de tesis hacia el clima (30/10/2026)
 
 **Incidencia observada en Samsung:** ante un prompt largo para construir una tesis en Informática Educativa sobre inteligencia artificial y variables emocionales, SKY respondió «¿De qué ciudad querés consultar el clima?» en lugar de atender la petición académica.
