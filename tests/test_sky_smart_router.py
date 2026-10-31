@@ -153,3 +153,40 @@ def test_never_send_obvious_credentials_to_external_models(
                          {"role": "user", "content": secret_text}],
                         cloud_consent=True, private_cloud_consent=True)
     assert calls == []
+
+
+def test_long_thesis_prompt_stays_local_even_with_cloud_permission(monkeypatch):
+    full_brief = "Tesis de Informática Educativa: " + "objetivo metodología emociones. " * 240
+    assert 4000 < len(full_brief) <= 16000
+    seen = []
+    def own_model(turns, max_output_tokens):
+        seen.append((turns[-1]["content"], max_output_tokens))
+        return {"respuesta": "Sección académica local", "proveedor": "ollama",
+                "nube": False, "acciones_ejecutadas": False}
+    monkeypatch.setattr(inference, "generate", own_model)
+    monkeypatch.setenv("SKY_AUTO_CLOUD_ORDER", "groq,openrouter")
+    monkeypatch.setattr(router, "_configured", lambda _: True)
+    monkeypatch.setattr(router, "_try_cloud",
+                        lambda *a: (_ for _ in ()).throw(
+                            AssertionError("No enviar una tesis larga a terceros")))
+    result = router.generate([{"role": "user", "content": full_brief}],
+                             cloud_consent=True, private_cloud_consent=True)
+    assert result["nube"] is False
+    assert seen == [(full_brief, 2048)]
+
+
+def test_long_thesis_is_never_fallback_to_cloud_if_local_fails(monkeypatch):
+    full_brief = "Investiga IA educativa con variables emocionales. " * 180
+    assert 4000 < len(full_brief) <= 16000
+    monkeypatch.setattr(inference, "generate",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            inference.InferenceUnavailable("Servidor GPU no disponible")))
+    monkeypatch.setenv("SKY_AUTO_CLOUD_ORDER", "groq,openrouter")
+    monkeypatch.setattr(router, "_configured", lambda _: True)
+    attempted = []
+    monkeypatch.setattr(router, "_try_cloud",
+                        lambda *a: attempted.append(a))
+    with pytest.raises(router.AutoRouteUnavailable):
+        router.generate([{"role": "user", "content": full_brief}],
+                        cloud_consent=True, private_cloud_consent=True)
+    assert attempted == []
