@@ -38,4 +38,38 @@ class SkyOwnApiRoutingPolicyTest {
         assertFalse(SkyOwnApiRoutingPolicy.usePrivateApi(
             true, true, false, false, 0))
     }
+    @Test fun localOllamaRemainsDefaultWhenNoOptionalServerProviderSelected() {
+        assertEquals("ollama", SkyOwnApiRoutingPolicy.chosenProvider(null))
+        assertEquals("ollama", SkyOwnApiRoutingPolicy.chosenProvider("unknown"))
+        assertTrue("ollama" in SkyOwnApiRoutingPolicy.SERVER_PROVIDERS)
+    }
+
+    @Test fun optionalServerProvidersRequireBothPerMessagePermissions() {
+        for (name in listOf("openrouter", "mistral", "groq", "cloudflare")) {
+            assertTrue(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+                true, true, name, false, false, true, true, 800))
+            assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+                true, true, name, false, false, false, true, 800))
+            assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+                true, true, name, false, false, true, false, 800))
+            assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+                false, true, name, false, false, true, true, 800))
+            assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+                true, false, name, false, false, true, true, 800))
+        }
+    }
+
+    @Test fun noHiddenFallbackToCloudOrUnverifiedSearch() {
+        assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+            true, true, "ollama", false, false, true, true, 100))
+        assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+            true, true, "external-untrusted", false, false, true, true, 100))
+        assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+            true, true, "openrouter", true, false, true, true, 100))
+        assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+            true, true, "cloudflare", false, true, true, true, 100))
+        assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
+            true, true, "groq", false, false, true, true, 4001))
+    }
+
 }
