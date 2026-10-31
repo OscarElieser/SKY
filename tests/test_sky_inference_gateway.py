@@ -122,3 +122,52 @@ def test_invalid_turn_is_rejected_before_network(model_worker):
     with pytest.raises(ValueError):
         gateway.generate([{"role": "tool", "content": "ejecutar"}])
     assert len(model_worker.requests) == 0
+
+
+
+def test_academic_24k_prompt_and_4096_output_tokens_are_sent_intact(model_worker, monkeypatch):
+    monkeypatch.setenv("SKY_INFERENCE_NUM_CTX", "32768")
+    prompt = "Investigación educativa: " + "x" * 23975
+    assert 16_000 < len(prompt) <= 32_000
+    result = gateway.generate([{"role": "system", "content": "Eres SKY"},
+                               {"role": "user", "content": prompt}],
+                              max_output_tokens=4096)
+    payload = model_worker.requests[-1]
+    assert payload["messages"][-1]["content"] == prompt
+    assert payload["options"] == {"num_predict": 4096, "num_ctx": 32768}
+    assert result["metricas"]["contexto_tokens"] == 32768
+    assert result["respuesta_incompleta"] is False
+    assert result["nube"] is False
+
+
+def test_large_context_requires_operator_budget_before_http(model_worker, monkeypatch):
+    monkeypatch.setenv("SKY_INFERENCE_NUM_CTX", "16384")
+    with pytest.raises(ValueError, match="32768"):
+        gateway.generate([{"role": "user", "content": "Q" * 20_000}],
+                         max_output_tokens=4096)
+    assert not model_worker.requests
+
+
+def test_reject_over_32k_input_and_excess_generation_budget(model_worker, monkeypatch):
+    monkeypatch.setenv("SKY_INFERENCE_NUM_CTX", "32768")
+    with pytest.raises(ValueError):
+        gateway.generate([{"role": "user", "content": "A" * 32001}])
+    with pytest.raises(ValueError):
+        gateway.generate([{"role": "user", "content": "consulta"}],
+                         max_output_tokens=4097)
+    assert not model_worker.requests
+
+
+def test_multibyte_prompt_rejected_when_context_cannot_fit(model_worker, monkeypatch):
+    monkeypatch.setenv("SKY_INFERENCE_NUM_CTX", "32768")
+    with pytest.raises(ValueError, match="contexto"):
+        gateway.generate([{"role": "user", "content": "界" * 32_000}],
+                         max_output_tokens=4096)
+    assert not model_worker.requests
+
+
+def test_invalid_context_configuration_is_not_silently_ignored(model_worker, monkeypatch):
+    monkeypatch.setenv("SKY_INFERENCE_NUM_CTX", "unbounded")
+    with pytest.raises(gateway.InferenceUnavailable):
+        gateway.generate([{"role": "user", "content": "consulta"}])
+    assert not model_worker.requests
