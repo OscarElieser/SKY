@@ -23,7 +23,8 @@ object SkyNetwork {
     fun requestChat(server: String, path: String, token: String,
                     data: JSONObject): JSONObject {
         require(path == "/api/sky/mobile-chat/pair" ||
-                path == "/api/sky/mobile-chat/chat") { "Ruta móvil no permitida" }
+                path == "/api/sky/mobile-chat/chat" ||
+                path == "/api/sky/mobile-chat/status") { "Ruta móvil no permitida" }
         val base = validateServer(server)
         val conn = URL(base + path).openConnection() as HttpURLConnection
         try {
