@@ -873,6 +873,7 @@ class MainActivity : Activity() {
         val unlocked = !(getSystemService(KEYGUARD_SERVICE) as
             android.app.KeyguardManager).isKeyguardLocked
         val voiceHealth = SkyHandsFreeService.health()
+        val musicAudio = SkyMusicAudioCheck.read(this)
         val lastVoice = if (voiceHealth.lastPhraseAtMs <= 0L) "sin registro" else
             java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss",
                 java.util.Locale("es", "NI")).format(
@@ -897,6 +898,8 @@ class MainActivity : Activity() {
             "Última frase detectada: $lastVoice",
             "Último error de reconocimiento: ${voiceHealth.errorCode} · reintentos ${voiceHealth.retries}",
             "Voz de SKY: " + if (voicePanel.isSpeechEngineReady()) "Lista" else "Pendiente",
+            "Audio multimedia: " + musicAudio.evidence(),
+            "Audio: " + musicAudio.guidance(),
             "Apps visibles para abrir: ${installedApps.discover().size}",
             "Notas privadas guardadas: $notes",
             "Groq: " + if (tokens.groqEnabled()) "Configurado (conexión no comprobada)"
@@ -922,6 +925,9 @@ class MainActivity : Activity() {
                 android.widget.Toast.makeText(this,
                     "Diagnóstico copiado sin claves ni identificadores privados.",
                     android.widget.Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Control de volumen") { _, _ ->
+                SkyMusicAudioCheck.showVolumePanel(this)
             }
             .setPositiveButton("Cerrar", null)
             .show()
