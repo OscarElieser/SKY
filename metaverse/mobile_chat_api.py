@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from .api import require_key
 from .sky_home_api import HomeChat, home_chat
+from . import sky_home_api
 from neural_core import sky_mobile_chat as mobile_chat
 
 router = APIRouter(prefix="/api/sky/mobile-chat")
@@ -50,6 +51,28 @@ def exchange_invitation(body: ChatPair, x_sky_mobile_token: str = Header(default
         return mobile_chat.pair(body.device_id, x_sky_mobile_token, body.code)
     except (PermissionError, ValueError) as exc:
         raise HTTPException(401, "Autorización móvil inválida o caducada") from exc
+
+
+@client.post("/status")
+def mobile_chat_status(body: Device,
+                       x_sky_chat_token: str = Header(default="", max_length=128)):
+    """Read-only model readiness for authenticated Android chat devices.
+
+    A reachable API does not prove that Ollama is installed or loaded.
+    The availability check is loopback-only, with no credentials, URLs,
+    files, or cloud-provider list disclosed to the mobile client.
+    """
+    try:
+        mobile_chat.authorize(body.device_id, x_sky_chat_token)
+    except PermissionError as exc:
+        if str(exc).startswith("Límite"):
+            raise HTTPException(429, "Límite de solicitudes de chat",
+                                headers={"Retry-After": "60"}) from exc
+        raise HTTPException(401, "Sesión móvil inválida o caducada") from exc
+    return {"service": "SKY API", "chat_authenticated": True,
+            "local_ollama_ready": sky_home_api._local_model_ready(),
+            "model_output_verified": False,
+            "note": "Modelo disponible no equivale a respuesta, velocidad ni calidad comprobadas"}
 
 
 @client.post("/chat")
