@@ -8,7 +8,7 @@ package ni.sky.mobileagent
 internal object SkyPromptLengthPolicy {
     const val NORMAL_MAX = 4000
     const val DEEP_MAX = 16000
-    const val OWN_API_MAX = 32000
+    const val OWN_API_MAX = 48000
 
     // Own-hosted Ollama and SKY Automatic alone use the expanded budget.
     // Other providers keep their former limits and never inherit this setting.
