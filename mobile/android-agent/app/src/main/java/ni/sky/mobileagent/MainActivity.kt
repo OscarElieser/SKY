@@ -669,6 +669,7 @@ class MainActivity : Activity() {
         home = SkyMobileHome(
             this, voicePanel,
             onSend = { voiceReplyOnFace = false; sendChat() },
+            onNewChat = { askNewChat() },
             onSettings = { showSettings() },
             onChatAccess = { showSettings() },
             onAttach = { chooseChatAttachment() },
@@ -3318,6 +3319,35 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun askNewChat() {
+        if (chatPending || pendingFileCancel != null) {
+            home.showMessage("SKY sigue procesando una consulta. Terminá o cancelá esa operación antes de abrir otro chat.")
+            return
+        }
+        if (chatInput.text.isNotBlank() || selectedAttachments.isNotEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("SKY · Nueva conversación")
+                .setMessage("Se limpiarán la pantalla y el borrador actual. Las conversaciones guardadas en Historial no se eliminarán. ¿Continuar?")
+                .setPositiveButton("Nuevo chat") { _, _ -> startNewChat() }
+                .setNegativeButton("Conservar borrador", null)
+                .show()
+        } else startNewChat()
+    }
+
+    private fun startNewChat() {
+        if (chatPending || pendingFileCancel != null) return
+        // Only the private current-session boundary is updated; never delete
+        // any saved conversations or overwrite the user's archival records.
+        val newestSavedId = archive.recent(1).lastOrNull()?.id ?: 0L
+        getSharedPreferences("sky_chat_session", MODE_PRIVATE).edit()
+            .putLong("after_id", newestSavedId).apply()
+        while (chatHistory.length() > 0) chatHistory.remove(0)
+        selectedAttachments.clear()
+        refreshSelectedAttachments()
+        voiceReplyOnFace = false
+        home.startNewChat(newestSavedId)
+    }
+
     private fun sendChat() {
         val selected = selectedAttachments.toList()
         val query = chatInput.text.toString().trim()
@@ -4032,7 +4062,9 @@ class MainActivity : Activity() {
                 if (cloud && (mobileCloud || groqReady)) {
                     // Relevancia + recencia; cero historial persistente sin permiso.
                     // Excluye órdenes Android, memorias explícitas y archivos.
-                    val eligible = archive.recent(150).map { saved ->
+                    val sessionAfterId = getSharedPreferences("sky_chat_session", MODE_PRIVATE)
+                        .getLong("after_id", 0L)
+                    val eligible = archive.recent(150).filter { it.id > sessionAfterId }.map { saved ->
                         SkyContextPlanner.Turn(saved.id, saved.question,
                             saved.answer, saved.engine)
                     }
