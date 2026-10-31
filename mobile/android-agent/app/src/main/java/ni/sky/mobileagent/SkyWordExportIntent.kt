@@ -24,14 +24,14 @@ object SkyWordExportIntent {
     /** "Necesito descargar el archivo Word" or "bríndame el Word". */
     fun wantsExistingWord(raw: String): Boolean {
         val s = normalize(raw)
-        return s.length in 7..600 && word.containsMatchIn(s) &&
+        return s.length in 7..16000 && word.containsMatchIn(s) &&
             existing.containsMatchIn(s) && !howTo.containsMatchIn(s)
     }
 
     /** "Crea un documento Word sobre..." with new content to generate first. */
     fun wantsNewWord(raw: String): Boolean {
         val s = normalize(raw)
-        return s.length in 7..600 && word.containsMatchIn(s) &&
+        return s.length in 7..16000 && word.containsMatchIn(s) &&
             generate.containsMatchIn(s) && !existing.containsMatchIn(s) &&
             !howTo.containsMatchIn(s)
     }
