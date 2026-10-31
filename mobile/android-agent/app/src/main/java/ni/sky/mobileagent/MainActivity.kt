@@ -2901,12 +2901,12 @@ class MainActivity : Activity() {
         content.addView(SkyPremiumUi.section(this, "Voz",
             "Manos libres, conversación fluida y lectura natural", "♫"))
         content.addView(CheckBox(this).apply {
-            text = "Manos libres: decir SKY para despertar (micrófono local y notificación permanente)"
+            text = "Escucha sin tocar: decí SKY (micrófono local autorizado y notificación)"
             isChecked = handsFreePrefs.getBoolean("hands_free_opt_in", false)
             setOnCheckedChangeListener { _, enabled -> setHandsFreeEnabled(enabled) }
         })
         content.addView(CheckBox(this).apply {
-            text = "Conversación fluida al abrir SKY (opcional)"
+            text = "Escuchar automáticamente al abrir SKY (conversación en pantalla)"
             isChecked = getSharedPreferences("sky_voice_settings", MODE_PRIVATE)
                 .getBoolean("fluid_opt_in", false)
             setOnCheckedChangeListener { _, enabled ->
@@ -2914,8 +2914,8 @@ class MainActivity : Activity() {
                     .edit().putBoolean("fluid_opt_in", enabled).apply()
                 voicePanel.setConversationMode(enabled)
                 home.showMessage(if (enabled)
-                    "Conversación fluida activada. Tocá los ojos para comenzar."
-                    else "Conversación fluida desactivada.")
+                    "Escucha automática activada mientras SKY esté visible y Android lo permita."
+                    else "Escucha automática desactivada.")
             }
         })
         content.addView(CheckBox(this).apply {
@@ -3038,10 +3038,12 @@ class MainActivity : Activity() {
     }
 
     private fun showHandsFreeFirstRun() {
-        if (handsFreePrefs.getBoolean("hands_free_prompt_shown", false) ||
+        // Surface the revised no-touch choice once to installations that
+        // dismissed the previous dialog; never silently enable the microphone.
+        if (handsFreePrefs.getBoolean("hands_free_prompt_shown_v0842", false) ||
             handsFreePrefs.getBoolean("hands_free_opt_in", false) ||
             !visible || isFinishing || settingsDialog?.isShowing == true) return
-        handsFreePrefs.edit().putBoolean("hands_free_prompt_shown", true).apply()
+        handsFreePrefs.edit().putBoolean("hands_free_prompt_shown_v0842", true).apply()
         AlertDialog.Builder(this)
             .setTitle("SKY · Activación por voz")
             .setMessage("¿Querés activar SKY manos libres? Escuchará la palabra «SKY» " +
@@ -3053,7 +3055,7 @@ class MainActivity : Activity() {
                 "o Ajustes de SKY.")
             .setPositiveButton("Activar manos libres") { _, _ -> setHandsFreeEnabled(true) }
             .setNegativeButton("Ahora no") { _, _ ->
-                home.showMessage("Manos libres apagadas. Tocá los ojos para hablar o escribí.")
+                home.showMessage("Manos libres desactivadas. Podés activarlas desde Ajustes → Voz.")
             }
             .show()
     }
@@ -3998,8 +4000,17 @@ class MainActivity : Activity() {
             memoryPrompt + documentGuide + cognitionGuide + factCheckGuide +
             evidenceRecall + skillsPrompt
         val messageLimit = if (selection.tier == SkyGeminiModes.Tier.DEEP) 16000 else 4000
-        val personalizedMessage = prefix.take((messageLimit - selection.prompt.length).coerceAtLeast(0)) +
-            selection.prompt.takeLast(messageLimit)
+        if (selection.prompt.length > messageLimit) {
+            val detail = "Tu prompt contiene ${selection.prompt.length} caracteres; el límite " +
+                "del proveedor y modo elegidos es $messageLimit. No recorté ni envié " +
+                "tu texto. Usá un modo compatible o dividilo en partes."
+            home.showMessage(detail)
+            voicePanel.showError("Prompt extenso: se conserva completo sin enviar.")
+            return
+        }
+        val personalizedMessage =
+            prefix.take((messageLimit - selection.prompt.length).coerceAtLeast(0)) +
+            selection.prompt
         cloudConsent.isChecked = false
         privateConsent.isChecked = false
         chatPending = true
