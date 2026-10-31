@@ -137,7 +137,7 @@ assert len(provider_calls) == 1  # no model inference performed by status
 # Dedicated local-only inference is isolated from any third-party provider.
 def fake_inference(messages, max_output_tokens):
     assert messages[-1]["content"] == "explica el método científico"
-    assert max_output_tokens == 1200
+    assert max_output_tokens == 2048
     return {"respuesta": "Inferencia autenticada desde SKY", "proveedor": "ollama",
             "nube": False, "acciones_ejecutadas": False, "operacion": "test"}
 endpoint.inference.generate = fake_inference
