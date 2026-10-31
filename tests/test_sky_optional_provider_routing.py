@@ -44,7 +44,7 @@ for name in cloud.OPTIONAL_PROVIDERS:
 assert [x[0] for x in used] == list(cloud.OPTIONAL_PROVIDERS)
 assert all(x[2] == 1200 for x in used)
 
-def quota(_provider, _messages, _max_output_tokens):
+def quota(provider, messages, max_output_tokens):
     raise cloud.CloudProviderRateLimited("Simulated 429")
 cloud.reply = quota
 try:
