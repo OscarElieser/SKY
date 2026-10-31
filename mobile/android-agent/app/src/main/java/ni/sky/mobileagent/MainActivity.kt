@@ -3992,6 +3992,20 @@ class MainActivity : Activity() {
         }
         if (showSafeFileBackups(message)) return
         if (previewSafeFileProposal(message)) return
+        val workPlan = SkyLongWorkPlanner.prepare(message)
+        if (workPlan != null) {
+            // Previewable and exportable from the existing SQLite chat history.
+            // No network request, document fabrication or external action.
+            chatInput.setText("")
+            val keepFace = voiceReplyOnFace
+            voiceReplyOnFace = false
+            home.addExchange(message, workPlan.markdown,
+                "SKY · plan profesional editable local", revealPanel = !keepFace)
+            if (voicePanel.isVoiceEnabled()) voicePanel.speakReply(
+                "Preparé el plan por etapas. Podés revisarlo y exportarlo " +
+                    "desde el historial, sin perder tus avances.")
+            return
+        }
         if (processOwnerProfileImport(message)) {
             chatInput.setText("")
             return
