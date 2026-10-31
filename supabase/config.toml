@@ -2,3 +2,7 @@
 # Every state-changing owner endpoint verifies its own 32+ character owner key.
 [functions.sky-instagram]
 verify_jwt = false
+
+# Authenticated operational status; does not expose the Ollama model.
+[functions.sky-platform-readiness]
+verify_jwt = true
