@@ -2260,6 +2260,7 @@ class MainActivity : Activity() {
         })
         content.addView(actionButton("MOTOR SKY API · ELEGIR MODELO") {
             val names = arrayOf("Ollama (modelo propio · principal)",
+                "Gemini (integración existente · cuotas externas)",
                 "OpenRouter (modelos gratuitos limitados)",
                 "Mistral (cuotas externas)",
                 "Groq (cuotas externas)",
