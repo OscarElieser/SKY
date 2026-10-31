@@ -1,3 +1,11 @@
+## SKY Android 0.8.46 — interfaz premium legible y estados que se limpian
+
+**En revisión:** respuestas nativas sin WebView de 56 dp ni texto oculto, Markdown con títulos/listas/código legibles, visor completo y aislado para fórmulas, tablas y documentos largos, botones de lectura y copia. Las notificaciones temporales se pueden cerrar y desaparecen tras ocho segundos; volver al chat no restaura avisos viejos. El desplazamiento del chat ya no salta al final en cada redibujado. Un fallo de SQLite no debe ocultar una respuesta y nunca se exporta por error un documento anterior como nuevo. Se conserva todo el historial real y la seguridad de Play Protect de 0.8.45.
+
+**Criterio de publicación:** backend/Kotlin verdes, firma real auditada y emuladores Android 15/16. La instalación y uso físico en Samsung todavía deben probarse; no confundir pruebas virtualizadas con micrófono/voz real. [Auditoría UI y pruebas](docs/SKY_ANDROID_0846_VISUAL_RESPUESTAS_Y_LIMPIEZA.md).
+
+---
+
 ## SKY Android 0.8.45 — integridad de investigaciones extensas (código en validación)
 
 **Se corrigió un defecto P0 de continuidad:** aunque SQLite archivaba el texto completo de cada trabajo, el contexto enviado para continuarlo podía exceder el contrato del servidor y producir errores **422**. La ruta privada ahora limita el contexto a **8 turnos × 4.000 caracteres**, con extractos **marcados explícitamente** y sin borrar los originales del historial; las nubes externas mantienen 8 × 2.000 caracteres y sus consentimientos. Se mejoró el transporte de respuestas Unicode hasta 512 KB con corte seguro, y se conserva el identificador auténtico de operación de Ollama en el metadato de historial.
