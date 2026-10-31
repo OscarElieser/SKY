@@ -130,3 +130,26 @@ def test_reject_invalid_turn_before_any_model(monkeypatch):
                         (_ for _ in ()).throw(AssertionError("unexpected")))
     with pytest.raises(ValueError):
         router.generate([{"role": "tool", "content": "run"}])
+
+
+@pytest.mark.parametrize("secret_text", [
+    "API_KEY=abc12345verysecret",
+    "Authorization: Bearer abcdef1234567890EXAMPLE",
+    "password: SuperPrivateLongValue",
+    "sk-1234567890abcdefghijklmnop",
+])
+def test_never_send_obvious_credentials_to_external_models(
+        monkeypatch, secret_text):
+    monkeypatch.setattr(inference, "generate",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            inference.InferenceUnavailable("offline")))
+    monkeypatch.setenv("SKY_AUTO_CLOUD_ORDER", "groq,openrouter")
+    monkeypatch.setattr(router, "_configured", lambda _: True)
+    calls = []
+    monkeypatch.setattr(router, "_try_cloud",
+                        lambda name, msgs: calls.append(name))
+    with pytest.raises(router.AutoRouteUnavailable):
+        router.generate([{"role": "system", "content": "Eres SKY"},
+                         {"role": "user", "content": secret_text}],
+                        cloud_consent=True, private_cloud_consent=True)
+    assert calls == []
