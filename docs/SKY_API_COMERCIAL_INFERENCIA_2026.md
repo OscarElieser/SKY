@@ -1,3 +1,11 @@
+## SKY Automático — elección sin tocar proveedores
+
+La ruta móvil `sky_auto` es **nueva e independiente** de las rutas anteriores. `neural_core/sky_smart_router.py` prioriza inferencia Ollama real en infraestructura de SKY; si no hay capacidad y existe autorización del usuario **más** lista blanca del operador, evalúa respaldos externos sin cambiar manualmente la aplicación. Los límites de cuota de cada proveedor se registran temporalmente en memoria para no insistir. No existe un SLA comercial, cola distribuida ni facturación multiusuario en esta etapa.
+
+La variable `SKY_AUTO_CLOUD_ORDER` está vacía por defecto: no se seleccionan servicios remotos solo por existir claves. La autorización persistente en Android se debe conceder explícitamente y puede abarcar el texto y contexto enviados, incluso contenido privado; el consentimiento viene apagado. Las rutas heredadas no cambian. [Diseño, pruebas y pendientes](SKY_API_AUTOMATICA_2026.md).
+
+---
+
 ## 0A. Conectores externos opcionales (no reemplazan el motor propio)
 
 `neural_core/sky_optional_cloud_providers.py` incorpora adaptadores de texto para **OpenRouter**, **Mistral**, **Groq** y **Cloudflare Workers AI**, accesibles mediante `SKY Home /chat` y la API móvil autenticada, únicamente cuando el usuario selecciona el proveedor y consiente transferir el mensaje. Ollama permanece predeterminado, sin dependencia externa. El módulo no abre herramientas ni ejecuta acciones del teléfono; claves solo en el servidor y endpoints HTTPS de lista cerrada. **Gemini** sigue disponible por la integración anterior; no se ha reconstruido ni probado aquí. Se exige un token de Cloudflare restringido a Workers AI y se bloquean por defecto modelos OpenRouter de pago. Las cuotas gratuitas son limitadas y no sirven como presupuesto de producción.
