@@ -35,3 +35,23 @@ No hay evidencia de que el usuario tenga el consentimiento hands-free activado n
 El servicio de micrófono solo se inicia por interacción visible/autorizada, respetando las restricciones Android 14–16 para foreground service y permisos while-in-use. No se eluden restricciones de Android, Play Protect, biometría, bloqueos ni autenticación. **No se modifica SKY Windows ni BAQUEANO.** La conexión a Ollama necesita un servidor realmente disponible, con HTTPS, token limitado y verificación de un modelo. El repositorio por sí mismo no prueba que ese servicio exista.
 
 **Estado:** corrección en rama y PR de revisión; no equivale a APK compilada, instalada, probada ni a producto comercial validado.
+
+## Independencia de Android frente a SKY Windows y HTTPS (10/11/2026)
+
+El HTTPS **no es requisito de la app Android** para ejecutar herramientas locales; solo protege la conexión cuando se selecciona voluntariamente una API remota. SKY Windows permanece independiente y no se modifica.
+
+Hallazgo verificado en el flujo `MainActivity.sendChatText`: un dispositivo podía tener token histórico de SKY Core y llegar a la rama genérica `SkyNetwork.requestChat(...)` aunque se hubiese desactivado `prefer_self_hosted_ollama`. Esto producía una dependencia remota oculta.
+
+Corrección de enrutamiento:
+- `prefer_self_hosted_ollama` tiene valor por defecto **false** en Ajustes y envío. Los consentimientos guardados previamente no se eliminan ni cambian.
+- Si se selecciona expresamente SKY API, sigue requiriendo emparejamiento y autorización HTTPS (sin fallback a nube oculta).
+- Si no se selecciona SKY API, los tokens previamente emparejados **no autorizan** conexiones al servidor. Se aceptan como motores independientes solo Gemini/Groq que el propietario haya configurado.
+- Si no hay motor generativo autorizado, SKY informa lo que falta y conserva la consulta en el editor; no inventa un LLM local ni remite la consulta a Windows.
+- Se elimina la rama genérica de chat que intentaba un `requestChat` al servidor sin una ruta verificada.
+- La UI ofrece una prueba de respuesta local (hora del teléfono), que **no** equivale a LLM ni demuestra comprensión generativa offline.
+- El diagnóstico distingue el modo Android independiente de la API privada opcional.
+- Tests de `SkyOwnApiRoutingPolicyTest` cubren tokens históricos, elección voluntaria de API privada, Gemini/Groq configurados y ausencia total de motor generativo.
+
+**Límite vigente:** la APK actual no lleva un modelo generativo nativo en Android. Operaciones locales como el reconocimiento de voz y los comandos locales pueden funcionar independientemente; cualquier función dependiente de nube, búsqueda actualizada, servidor o API necesita las condiciones reales respectivas. Para investigación/tesis y respuestas abiertas sin internet, se necesita una implementación y prueba separadas de modelo local compatible con el hardware. No degradar esto a respuestas enlatadas presentadas como IA.
+
+Aceptación: pruebas de Android y backend verdes, ausencia de conexiones privadas en modo independiente (prueba con servidor inalcanzable), consulta no local con ningún proveedor debe conservar el borrador, prueba con clave configurada y consentimiento, prueba de aviso de SKY API seleccionada sin autorización, Play Protect y prueba física de Samsung. No afirmar «funciona al 100 %» por pasar tests estáticos.
