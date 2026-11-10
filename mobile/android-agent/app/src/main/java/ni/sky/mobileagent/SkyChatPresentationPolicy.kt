@@ -25,4 +25,11 @@ internal object SkyChatPresentationPolicy {
     else text
 
     fun hasFullViewer(text: String) = text.length > PREVIEW_CHARS
+
+    /** Expose an explicit setup action; never convert a missing private API into AI success. */
+    fun needsPrivateApiSetup(info: String): Boolean {
+        val text = info.lowercase(java.util.Locale.ROOT)
+        return ("sky api" in text || "servidor https" in text) &&
+            ("autoriz" in text || "configur" in text || "vincul" in text)
+    }
 }
