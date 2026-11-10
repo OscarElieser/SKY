@@ -625,6 +625,15 @@ class SkyMobileHome(
                     leftMargin = dp(8)
                 })
             conversationRows.addView(notice)
+            if (SkyChatPresentationPolicy.needsPrivateApiSetup(info)) {
+                conversationRows.addView(pill(
+                    "Abrir Ajustes · autorizar SKY API", Color.rgb(39, 102, 141)
+                ) { onChatAccess() }.apply {
+                    contentDescription = "Configurar autorización del chat HTTPS de SKY"
+                }, LinearLayout.LayoutParams(-1, dp(44)).apply {
+                    topMargin = dp(8)
+                })
+            }
         }
         progressLabel.text = when {
             pendingQuestion != null -> "● SKY está pensando…"
