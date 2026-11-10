@@ -874,6 +874,8 @@ class MainActivity : Activity() {
         val unlocked = !(getSystemService(KEYGUARD_SERVICE) as
             android.app.KeyguardManager).isKeyguardLocked
         val voiceHealth = SkyHandsFreeService.health()
+        val handsFreeConsent = handsFreePrefs.getBoolean("hands_free_opt_in", false)
+        val chatReady = tokens.chatToken().isNotBlank() && tokens.server().isNotBlank()
         val musicAudio = SkyMusicAudioCheck.read(this)
         val lastVoice = if (voiceHealth.lastPhraseAtMs <= 0L) "sin registro" else
             java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss",
@@ -891,8 +893,8 @@ class MainActivity : Activity() {
             "Reconocimiento de voz: " + if (speechAvailable) "Disponible" else "No disponible",
             "Reconocimiento local sin nube: " + if (offlineSpeech) "Disponible" else "No disponible",
             "Servicio manos libres vivo: " + if (voiceHealth.active) "Sí" else "No",
-            "Presencia solicitada: " + (handsFreePrefs.getString("sky_presence_mode",
-                "WAKE_ONLY") ?: "WAKE_ONLY"),
+            "Modo configurado (no equivale a escucha activa): " +
+                (handsFreePrefs.getString("sky_presence_mode", "WAKE_ONLY") ?: "WAKE_ONLY"),
             "Identificación biométrica de voz: NO DISPONIBLE (no confundir voz a texto con voz del propietario)",
             "Confirmación de órdenes fuera de pantalla: SKY confirmo / SKY cancela",
             "Reconocedor escuchando: " + if (voiceHealth.recognizing) "Sí" else "No",
@@ -907,31 +909,84 @@ class MainActivity : Activity() {
                 else "No configurado",
             "Gemini: " + if (tokens.cloudEnabled()) "Configurado (conexión no comprobada)"
                 else "No configurado",
-            "Manos libres: " + if (handsFreePrefs.getBoolean("hands_free_opt_in", false))
-                "Activado" else "Desactivado",
+            "Consentimiento manos libres: " + if (handsFreeConsent) "Concedido" else "No concedido",
+            "Chat privado HTTPS: " + if (chatReady) "Configurado; conexión sin verificar"
+                else "Sin configurar / sin autorización",
+            "Acción recomendada: " + when {
+                !handsFreeConsent -> "Activar manos libres desde Voz, si lo deseás."
+                !micAllowed -> "Autorizar micrófono en Android."
+                !voiceHealth.active -> "El servicio no está vivo; probar reinicio supervisado."
+                !voiceHealth.recognizing -> "Servicio vivo; verificar escucha en la prueba física."
+                else -> "Reconocedor activo; dictar y comprobar una frase."
+            },
             "--- Reproductores ---"
         ).joinToString("\n") + "\n" + players.joinToString("\n") +
             "\n\nEl reproductor puede rechazar una orden aunque esté instalado. " +
             "Play Protect verifica las APK fuera de SKY; esta pantalla no certifica " +
             "la seguridad, no comprueba el audio ni prueba automáticamente servicios remotos."
-        AlertDialog.Builder(this)
-            .setTitle("SKY · Diagnóstico del Galaxy")
-            .setMessage(lines)
-            .setNeutralButton("Copiar diagnóstico") { _, _ ->
+        // En pantallas pequeñas el AlertDialog de 3 botones recortaba acciones.
+        // Un único panel fijo con lectura desplazable mantiene todos los controles visibles.
+        val diagnosticBody = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 12, 24, 10)
+        }
+        val diagnosticScroll = ScrollView(this).apply {
+            isFillViewport = false
+            isVerticalScrollBarEnabled = true
+            addView(TextView(this@MainActivity).apply {
+                text = lines
+                textSize = 15f
+                setTextIsSelectable(true)
+                setPadding(8, 8, 8, 16)
+            })
+        }
+        diagnosticBody.addView(diagnosticScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        lateinit var diagnosticDialog: AlertDialog
+        diagnosticBody.addView(Button(this).apply {
+            text = "Configurar / comprobar SKY API"
+            setOnClickListener {
+                diagnosticDialog.dismiss()
+                showSettings()
+            }
+        }, LinearLayout.LayoutParams(-1, -2))
+        if (!voiceHealth.active) {
+            diagnosticBody.addView(Button(this).apply {
+                text = "Activar / reiniciar manos libres"
+                setOnClickListener {
+                    diagnosticDialog.dismiss()
+                    // Acción explícita del propietario, nunca activar en secreto.
+                    setHandsFreeEnabled(true)
+                }
+            }, LinearLayout.LayoutParams(-1, -2))
+        }
+        diagnosticBody.addView(Button(this).apply {
+            text = "Control de volumen"
+            setOnClickListener { SkyMusicAudioCheck.showVolumePanel(this@MainActivity) }
+        }, LinearLayout.LayoutParams(-1, -2))
+        diagnosticBody.addView(Button(this).apply {
+            text = "Copiar diagnóstico"
+            setOnClickListener {
                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as
                     android.content.ClipboardManager
                 clipboard.setPrimaryClip(
                     android.content.ClipData.newPlainText("Diagnóstico SKY Android", lines)
                 )
-                android.widget.Toast.makeText(this,
+                android.widget.Toast.makeText(this@MainActivity,
                     "Diagnóstico copiado sin claves ni identificadores privados.",
                     android.widget.Toast.LENGTH_SHORT).show()
             }
-            .setNegativeButton("Control de volumen") { _, _ ->
-                SkyMusicAudioCheck.showVolumePanel(this)
-            }
+        }, LinearLayout.LayoutParams(-1, -2))
+        diagnosticDialog = AlertDialog.Builder(this)
+            .setTitle("SKY · Diagnóstico del Galaxy")
+            .setView(diagnosticBody)
             .setPositiveButton("Cerrar", null)
-            .show()
+            .create()
+        diagnosticDialog.show()
+        // El cuerpo usa weight=1: desplazar contenido nunca oculta las acciones.
+        diagnosticDialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.94f).toInt(),
+            (resources.displayMetrics.heightPixels * 0.83f).toInt()
+        )
     }
 
     /**
@@ -3221,8 +3276,18 @@ class MainActivity : Activity() {
             startForegroundService(android.content.Intent(this, SkyHandsFreeService::class.java)
                 .setAction(SkyHandsFreeService.ACTION_START))
             voicePanel.setConversationMode(false)
-            home.setHandsFreeActive(true)
-            voicePanel.showHandsFreeState("SKY duerme hasta que digás su nombre.")
+            // startForegroundService solo solicita arrancar: no prueba escucha viva.
+            home.setHandsFreeActive(false)
+            voicePanel.showHandsFreeState("Iniciando manos libres; comprobando el servicio…")
+            handler.postDelayed({
+                if (!isFinishing && ::home.isInitialized) {
+                    val health = SkyHandsFreeService.health()
+                    home.setHandsFreeActive(health.active)
+                    if (health.active) updatePresenceVisual()
+                    else voicePanel.showError("No se confirmó el servicio manos libres. " +
+                        "Abrí Autodiagnóstico Android y revisá la notificación.")
+                }
+            }, 1600L)
             if (android.os.Build.VERSION.SDK_INT >= 33 &&
                 checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
                     android.content.pm.PackageManager.PERMISSION_GRANTED &&
@@ -3293,7 +3358,7 @@ class MainActivity : Activity() {
             checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
                 android.content.pm.PackageManager.PERMISSION_GRANTED) startHandsFree()
         if (::home.isInitialized) home.setHandsFreeActive(
-            handsFreePrefs.getBoolean("hands_free_opt_in", false))
+            SkyHandsFreeService.health().active)
         updatePresenceVisual()
         handler.postDelayed({ showHandsFreeFirstRun() }, 1100L)
         companionController.onResume()
