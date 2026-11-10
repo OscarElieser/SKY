@@ -2298,17 +2298,21 @@ class MainActivity : Activity() {
         }
         val linked = tokens.token().isNotEmpty() && tokens.deviceId().isNotEmpty()
         content.addView(SkyPremiumUi.section(this, "Motor",
-            "SKY Automático · motor propio y respaldo supervisado", "⚡"))
+            "SKY Android independiente · servidores opcionales", "⚡"))
         content.addView(description("SKY Android · Ajustes y permisos"))
-        content.addView(description("MODO INDEPENDIENTE · No necesitás Windows ni una PC para " +
-            "usar las funciones locales del teléfono. El cerebro Ollama del servidor es opcional."))
+        content.addView(description("MODO ANDROID INDEPENDIENTE · Voz, funciones locales, " +
+            "comandos y archivos no requieren Windows ni emparejamiento HTTPS. " +
+            "Las respuestas de un modelo generativo necesitan un motor configurado; " +
+            "todavía no existe un LLM integrado y verificado sin conexión en esta APK."))
+        content.addView(actionButton("PROBAR UNA RESPUESTA LOCAL · SIN SERVIDOR") {
+            val answer = SkyLocalConversation.reply("¿Qué hora es ahora?")
+                ?: "La prueba de hora local no está disponible."
+            home.showMessage("Prueba local del teléfono, no de un modelo IA: " + answer)
+        })
         content.addView(CheckBox(this).apply {
-            text = "SKY Automático · priorizar nuestra API sin elegir modelos"
+            text = "Usar SKY API privada opcional (requiere servidor HTTPS)"
             isChecked = getSharedPreferences("sky_own_api", MODE_PRIVATE)
-                .getBoolean("prefer_self_hosted_ollama",
-                    tokens.deviceId().isNotBlank() &&
-                        tokens.chatToken().isNotBlank() &&
-                        tokens.server().isNotBlank())
+                .getBoolean("prefer_self_hosted_ollama", false)
             setOnCheckedChangeListener { _, enabled ->
                 getSharedPreferences("sky_own_api", MODE_PRIVATE).edit()
                     .putBoolean("prefer_self_hosted_ollama", enabled).apply()
@@ -4227,8 +4231,7 @@ class MainActivity : Activity() {
         val id = tokens.deviceId()
         val token = tokens.chatToken()
         val ownApiPrefs = getSharedPreferences("sky_own_api", MODE_PRIVATE)
-        val ownApiPreferred = ownApiPrefs.getBoolean("prefer_self_hosted_ollama",
-            id.isNotBlank() && token.isNotBlank() && tokens.server().isNotBlank())
+        val ownApiPreferred = ownApiPrefs.getBoolean("prefer_self_hosted_ollama", false)
         val selectedSkyApiProvider = if (
             ownApiPrefs.getBoolean("automatic_routing", true)) "sky_auto"
             else SkyOwnApiRoutingPolicy.chosenProvider(
@@ -4239,9 +4242,19 @@ class MainActivity : Activity() {
                 "servidor HTTPS desde Ajustes. No se cambiará automáticamente a Gemini.")
             return
         }
-        if (!mobileCloud && !groqReady && (id.isEmpty() || token.isEmpty())) {
-            setStatus("Configurá SKY móvil independiente desde Ajustes.")
-            showSettings()
+        // A historical pairing token is never a reason to contact a remote server
+        // if the owner is using independent Android mode.
+        if (!SkyOwnApiRoutingPolicy.hasAuthorizedGenerativeRoute(
+                privateServerOptIn = ownApiPreferred,
+                pairedChatToken = id.isNotBlank() && token.isNotBlank() &&
+                    tokens.server().isNotBlank(),
+                geminiConfigured = mobileCloud,
+                groqConfigured = groqReady)) {
+            home.showMessage("SKY Android está activa con sus funciones locales. " +
+                "Esta pregunta requiere un modelo generativo que aún no está " +
+                "disponible sin conexión en la APK. Para responderla podés " +
+                "configurar voluntariamente Gemini, Groq o la SKY API privada " +
+                "en Ajustes. Conservé tu texto; no lo envié ni cambié de motor.")
             return
         }
         val cloud = cloudConsent.isChecked
@@ -4544,20 +4557,10 @@ class MainActivity : Activity() {
                         searchSuggestions = ""
                     }
                     else -> {
-                        val payload = JSONObject()
-                            .put("device_id", id)
-                            .put("texto", personalizedMessage)
-                            .put("historial", history)
-                            .put("proveedor", "auto")
-                            .put("datos", "privados")
-                            .put("autorizar_nube", cloud)
-                            .put("autorizar_datos_privados", privateData)
-                        val reply = SkyNetwork.requestChat(tokens.server(),
-                            "/api/sky/mobile-chat/chat", token, payload)
-                        answer = reply.optString("respuesta", "SKY no devolvió texto.")
-                        provider = reply.optString("proveedor", "SKY Core")
-                        sources = emptyList()
-                        searchSuggestions = ""
+                        // Never turn a historical device pairing into implicit
+                        // remote chat. All external engines need an explicit route.
+                        error("No existe un motor generativo autorizado para este mensaje. " +
+                            "Tu consulta no se envió a ningún servidor.")
                     }
                 }
                 chatHistory.put(JSONObject().put("role", "user").put("content",
