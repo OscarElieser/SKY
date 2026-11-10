@@ -911,8 +911,12 @@ class MainActivity : Activity() {
             "Gemini: " + if (tokens.cloudEnabled()) "Configurado (conexión no comprobada)"
                 else "No configurado",
             "Consentimiento manos libres: " + if (handsFreeConsent) "Concedido" else "No concedido",
-            "Chat privado HTTPS: " + if (chatReady) "Configurado; conexión sin verificar"
-                else "Sin configurar / sin autorización",
+            "Chat privado HTTPS (OPCIONAL): " + if (chatReady) "Configurado; conexión sin verificar"
+                else "No vinculado",
+            "SKY API elegida para generar respuestas: " +
+                if (getSharedPreferences("sky_own_api", MODE_PRIVATE)
+                    .getBoolean("prefer_self_hosted_ollama", false)) "Sí; servidor opcional"
+                else "No; Android independiente",
             "Acción recomendada: " + when {
                 !handsFreeConsent -> "Activar manos libres desde Voz, si lo deseás."
                 !micAllowed -> "Autorizar micrófono en Android."
