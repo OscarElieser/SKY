@@ -941,7 +941,9 @@ class MainActivity : Activity() {
                 setPadding(8, 8, 8, 16)
             })
         }
-        diagnosticBody.addView(diagnosticScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        // Altura explícita: funciona también cuando el AlertDialog mide su contenido como WRAP_CONTENT.
+        diagnosticBody.addView(diagnosticScroll, LinearLayout.LayoutParams(-1,
+            (resources.displayMetrics.heightPixels * 0.40f).toInt()))
         lateinit var diagnosticDialog: AlertDialog
         diagnosticBody.addView(Button(this).apply {
             text = "Configurar / comprobar SKY API"
@@ -983,7 +985,7 @@ class MainActivity : Activity() {
             .setPositiveButton("Cerrar", null)
             .create()
         diagnosticDialog.show()
-        // El cuerpo usa weight=1: desplazar contenido nunca oculta las acciones.
+        // Lectura desplazable; las acciones quedan fuera del ScrollView y siempre accesibles.
         diagnosticDialog.window?.setLayout(
             (resources.displayMetrics.widthPixels * 0.94f).toInt(),
             (resources.displayMetrics.heightPixels * 0.83f).toInt()
