@@ -88,6 +88,32 @@ class SkyOwnApiRoutingPolicyTest {
         }
     }
 
+    @Test fun androidNeverUsesPreviouslyPairedServerWithoutExplicitPreference() {
+        assertFalse(SkyOwnApiRoutingPolicy.hasAuthorizedGenerativeRoute(
+            privateServerOptIn = false, pairedChatToken = true,
+            geminiConfigured = false, groqConfigured = false))
+        assertFalse(SkyOwnApiRoutingPolicy.hasAuthorizedGenerativeRoute(
+            privateServerOptIn = false, pairedChatToken = false,
+            geminiConfigured = false, groqConfigured = false))
+        assertTrue(SkyOwnApiRoutingPolicy.hasAuthorizedGenerativeRoute(
+            privateServerOptIn = true, pairedChatToken = true,
+            geminiConfigured = false, groqConfigured = false))
+    }
+
+    @Test fun directAndroidCloudIsIndependentOfPrivateSkyServer() {
+        assertTrue(SkyOwnApiRoutingPolicy.hasAuthorizedGenerativeRoute(
+            privateServerOptIn = false, pairedChatToken = false,
+            geminiConfigured = true, groqConfigured = false))
+        assertTrue(SkyOwnApiRoutingPolicy.hasAuthorizedGenerativeRoute(
+            privateServerOptIn = false, pairedChatToken = false,
+            geminiConfigured = false, groqConfigured = true))
+        // An explicitly selected private route must not silently transfer data
+        // to existing cloud keys if its server pairing is missing.
+        assertFalse(SkyOwnApiRoutingPolicy.hasAuthorizedGenerativeRoute(
+            privateServerOptIn = true, pairedChatToken = false,
+            geminiConfigured = true, groqConfigured = true))
+    }
+
     @Test fun noHiddenFallbackToCloudOrUnverifiedSearch() {
         assertFalse(SkyOwnApiRoutingPolicy.useExternalViaSkyApi(
             true, true, "ollama", false, false, true, true, 100))
