@@ -600,6 +600,12 @@ class SkyMobileHome(
             ).apply { setPadding(dp(10), dp(14), dp(7), dp(3)) })
             conversationRows.addView(makeBubble(exchange.question, true))
             conversationRows.addView(makeBubble(exchange.answer, false))
+            // Una respuesta local ("Hola") no es prueba de Ollama o Gemini.
+            // Mostrar el motor registrado impide presentar saludos estáticos como IA remota.
+            conversationRows.addView(text(
+                "Origen: " + exchange.engine.ifBlank { "no identificado" }.take(90),
+                11f, soft
+            ).apply { setPadding(dp(12), dp(3), dp(12), dp(8)) })
             addVerifiedSources(exchange)
             if (index == entries.lastIndex) showGoogleSearchSuggestions(exchange.googleSearchHtml)
         }
