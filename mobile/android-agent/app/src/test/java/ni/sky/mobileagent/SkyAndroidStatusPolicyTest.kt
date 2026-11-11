@@ -54,4 +54,23 @@ class SkyAndroidStatusPolicyTest {
             active = true, startRequested = true,
             readyCallback = true, speechSuspended = false))
     }
+
+    @Test fun canceledRecognizerCannotChangeStateOrExecuteCommands() {
+        assertFalse(SkyAndroidStatusPolicy.acceptRecognitionCallback(
+            active = true, listening = true,
+            sameEngine = false, speechSuspended = false))
+        assertFalse(SkyAndroidStatusPolicy.acceptRecognitionCallback(
+            active = true, listening = false,
+            sameEngine = true, speechSuspended = false))
+        assertFalse(SkyAndroidStatusPolicy.acceptRecognitionCallback(
+            active = true, listening = true,
+            sameEngine = true, speechSuspended = true))
+        assertFalse(SkyAndroidStatusPolicy.acceptRecognitionCallback(
+            active = false, listening = true,
+            sameEngine = true, speechSuspended = false))
+        assertTrue(SkyAndroidStatusPolicy.acceptRecognitionCallback(
+            active = true, listening = true,
+            sameEngine = true, speechSuspended = false))
+    }
+
 }
