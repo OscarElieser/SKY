@@ -83,7 +83,11 @@ class SkyEyeVoicePanel(
                 recognizer?.destroy()
                 recognizer = null
             }
-            setMode(EyeMode.IDLE, "SKY durmiendo · decí SKY")
+            setMode(EyeMode.IDLE, "SKY en espera · decí SKY")
+        } else if (!listening && !voiceSpeaking) {
+            // The service was actually stopped: do not leave the character
+            // visually asleep when no microphone session is running.
+            setMode(EyeMode.IDLE, "SKY lista · tocá los ojos para hablar")
         }
     }
 
