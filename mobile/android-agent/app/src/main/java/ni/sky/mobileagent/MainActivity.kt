@@ -897,7 +897,8 @@ class MainActivity : Activity() {
                 (handsFreePrefs.getString("sky_presence_mode", "WAKE_ONLY") ?: "WAKE_ONLY"),
             "Identificación biométrica de voz: NO DISPONIBLE (no confundir voz a texto con voz del propietario)",
             "Confirmación de órdenes fuera de pantalla: SKY confirmo / SKY cancela",
-            "Reconocedor escuchando: " + if (voiceHealth.recognizing) "Sí" else "No",
+            "Reconocedor preparado (callback real de Android): " +
+                if (voiceHealth.recognizing) "Sí" else "No",
             "Última detección de voz (fecha/hora): $lastVoice",
             "Último error de reconocimiento: ${voiceHealth.errorCode} · reintentos ${voiceHealth.retries}",
             "Motor TTS de SKY (no prueba audio audible): " +
@@ -2288,8 +2289,16 @@ class MainActivity : Activity() {
     }
 
     private fun refreshConnection() {
-        home.setConnection(tokens.token().isNotEmpty(), tokens.chatToken().isNotEmpty(),
-            tokens.cloudEnabled() || tokens.groqEnabled())
+        val privateApiSelected = getSharedPreferences("sky_own_api", MODE_PRIVATE)
+            .getBoolean("prefer_self_hosted_ollama", false)
+        val chatConfigured = tokens.deviceId().isNotBlank() &&
+            tokens.chatToken().isNotBlank() && tokens.server().isNotBlank()
+        home.setConnection(
+            linked = tokens.token().isNotEmpty(),
+            chatReady = chatConfigured,
+            mobileCloud = tokens.cloudEnabled() || tokens.groqEnabled(),
+            privateApiSelected = privateApiSelected
+        )
     }
 
     /** La vinculación solo se muestra si aún no existe un token válido. */
@@ -2324,6 +2333,7 @@ class MainActivity : Activity() {
                     "SKY Automático elegirá Ollama primero. Requiere chat HTTPS " +
                         "emparejado. No enviará datos a proveedores externos sin permiso."
                     else "Priorización automática desactivada. Se conservan las conexiones.")
+                refreshConnection()
             }
         })
         content.addView(actionButton("AJUSTE AVANZADO · FIJAR PROVEEDOR") {
