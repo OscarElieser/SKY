@@ -70,3 +70,16 @@ Correcciones en esta rama:
 - La UI actualiza el estado del motor cuando el propietario activa o desactiva la API privada; no modifica las credenciales ni elimina los ajustes anteriores.
 
 **Aceptación:** CI completo Android en el commit final y prueba física Samsung Android 16. Comparar prueba con modo atenta/dormida, cambio de opciones sin red, arranque/suspensión de micrófono, reconocimiento que entrega respuesta real y notificación persistente. Probar que la UI nunca afirma servidor «en línea» sin efectuar un health check autenticado. No declarar lista una APK de depuración.
+
+
+## Integridad de sesiones de reconocimiento de voz
+
+El callback de un `SpeechRecognizer` viejo podría llegar después de `cancel()`/`destroy()` y cuando ya se haya armado un reconocedor nuevo. Sin comprobar la instancia emisora, `onResults` podría procesar una transcripción de una sesión que el usuario pensaba finalizada.
+
+Se añadió una verificación de identidad de instancia activa en `onReadyForSpeech`, `onError` y `onResults`. Los callbacks de instancias canceladas o durante la suspensión TTS se descartan. Pruebas en `SkyAndroidStatusPolicyTest` cubren callback atrasado, servicio detenido, pausa de voz, sesión actual y ausencia de escucha.
+
+En Autodiagnóstico Android, si el servicio está activo pero el reconocedor no llega a preparar la escucha, el dueño puede pulsar **Reintentar reconocimiento local**. La acción solicita un nuevo ciclo del reconocedor existente sin crear otro servicio de micrófono ni activar permisos ocultos; la pantalla se vuelve a leer después, sin considerar que el simple intento ya fue exitoso.
+
+Además, al apagar manos libres, los ojos de SKY dejan de mostrar el estado «durmiendo» cuando no hay ninguna escucha activa.
+
+Prueba física obligatoria: iniciar y parar varias sesiones, alternar TTS y escucha, cortar/reanudar la app, pronunciar órdenes durante reinicios, confirmar que no se ejecutan transcripciones de reconocedores cancelados, que el botón no corta una respuesta oral activa y que el micrófono respeta Android 16. Un unit test no simula perfectamente la carrera real de callbacks del servicio de voz.
