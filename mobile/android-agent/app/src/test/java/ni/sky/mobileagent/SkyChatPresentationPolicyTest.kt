@@ -36,6 +36,17 @@ class SkyChatPresentationPolicyTest {
         assertTrue(original.endsWith("Final.")) // full viewer receives original, not preview
     }
 
+    @Test fun privateApiSetupWarningMustOfferExplicitSettingsInsteadOfFakeFallback() {
+        assertTrue(SkyChatPresentationPolicy.needsPrivateApiSetup(
+            "Para usar tu SKY API primero autorizá el chat del servidor HTTPS desde Ajustes."))
+        assertTrue(SkyChatPresentationPolicy.needsPrivateApiSetup(
+            "Vinculá tu servidor HTTPS antes de enviar."))
+        assertFalse(SkyChatPresentationPolicy.needsPrivateApiSetup(
+            "SKY IA: respuesta correcta generada por modelo local."))
+        assertFalse(SkyChatPresentationPolicy.needsPrivateApiSetup(
+            "No pude reproducir audio; el volumen multimedia es bajo."))
+    }
+
     @Test fun shortMultilineTextHasNoArtificialPreviewOrTruncation() {
         val original = "Línea uno\nLínea dos\nLínea tres"
         assertEquals(original, SkyChatPresentationPolicy.preview(original))

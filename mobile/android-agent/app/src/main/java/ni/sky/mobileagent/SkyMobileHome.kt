@@ -319,8 +319,11 @@ class SkyMobileHome(
     fun setHandsFreeActive(enabled: Boolean) {
         handsFreeActive = enabled
         voicePanel.setHandsFreeActive(enabled)
-        faceCaption.text = if (enabled) "SKY DURMIENDO · DECÍ SKY" else
-            "SKY LISTA · TOCÁ LOS OJOS O ACTIVÁ MANOS LIBRES"
+        val presence = host.getSharedPreferences("sky_voice_settings", Context.MODE_PRIVATE)
+            .getString("sky_presence_mode", "WAKE_ONLY")
+        val label = SkyAndroidStatusPolicy.voiceCaption(enabled, presence)
+        faceCaption.text = label
+        if (enabled) voicePanel.showHandsFreeState(label)
     }
 
     /**
@@ -600,6 +603,12 @@ class SkyMobileHome(
             ).apply { setPadding(dp(10), dp(14), dp(7), dp(3)) })
             conversationRows.addView(makeBubble(exchange.question, true))
             conversationRows.addView(makeBubble(exchange.answer, false))
+            // Una respuesta local ("Hola") no es prueba de Ollama o Gemini.
+            // Mostrar el motor registrado impide presentar saludos estáticos como IA remota.
+            conversationRows.addView(text(
+                "Origen: " + exchange.engine.ifBlank { "no identificado" }.take(90),
+                11f, soft
+            ).apply { setPadding(dp(12), dp(3), dp(12), dp(8)) })
             addVerifiedSources(exchange)
             if (index == entries.lastIndex) showGoogleSearchSuggestions(exchange.googleSearchHtml)
         }
@@ -625,6 +634,15 @@ class SkyMobileHome(
                     leftMargin = dp(8)
                 })
             conversationRows.addView(notice)
+            if (SkyChatPresentationPolicy.needsPrivateApiSetup(info)) {
+                conversationRows.addView(pill(
+                    "Abrir Ajustes · autorizar SKY API", Color.rgb(39, 102, 141)
+                ) { onChatAccess() }.apply {
+                    contentDescription = "Configurar autorización del chat HTTPS de SKY"
+                }, LinearLayout.LayoutParams(-1, dp(44)).apply {
+                    topMargin = dp(8)
+                })
+            }
         }
         progressLabel.text = when {
             pendingQuestion != null -> "● SKY está pensando…"
@@ -876,14 +894,19 @@ class SkyMobileHome(
         renderConversation()
     }
 
-    fun setConnection(linked: Boolean, chatReady: Boolean, mobileCloud: Boolean = false) {
-        connected.text = if (mobileCloud || chatReady) "●" else if (linked) "◉" else "○"
-        connected.setTextColor(
-            if (mobileCloud || chatReady) Color.rgb(139, 234, 191) else cyan
+    fun setConnection(linked: Boolean, chatReady: Boolean, mobileCloud: Boolean = false,
+                      privateApiSelected: Boolean = false) {
+        val configured = if (privateApiSelected) chatReady else mobileCloud
+        // Tokens may exist from historical Windows pairing, but this is not a
+        // successful HTTPS or LLM health check. Never use a green "online" dot.
+        connected.text = if (configured) "◉" else "○"
+        connected.setTextColor(cyan)
+        status.text = SkyAndroidStatusPolicy.engineStatus(
+            privateApiSelected = privateApiSelected,
+            privateChatConfigured = chatReady,
+            externalModelConfigured = mobileCloud
         )
-        status.text = if (mobileCloud) "SKY Android lista"
-            else if (linked) "SKY vinculada" else "SKY sin configurar"
-        connected.contentDescription = status.text
+        connected.contentDescription = "Estado de configuración: " + status.text
     }
 
     fun showMessage(s: String) {

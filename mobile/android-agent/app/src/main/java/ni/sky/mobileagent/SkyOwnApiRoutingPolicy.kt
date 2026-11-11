@@ -63,4 +63,18 @@ internal object SkyOwnApiRoutingPolicy {
 
     fun canPromptForSetup(optedIn: Boolean, pairedChatToken: Boolean): Boolean =
         optedIn && !pairedChatToken
+
+    /**
+     * A previously paired Windows/SKY server never becomes a hidden fallback.
+     * Android built-in actions are handled before choosing a generative engine.
+     * Cloud keys are independent from private-server pairing.
+     */
+    fun hasAuthorizedGenerativeRoute(
+        privateServerOptIn: Boolean,
+        pairedChatToken: Boolean,
+        geminiConfigured: Boolean,
+        groqConfigured: Boolean
+    ): Boolean =
+        if (privateServerOptIn) pairedChatToken
+        else geminiConfigured || groqConfigured
 }

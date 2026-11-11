@@ -874,6 +874,8 @@ class MainActivity : Activity() {
         val unlocked = !(getSystemService(KEYGUARD_SERVICE) as
             android.app.KeyguardManager).isKeyguardLocked
         val voiceHealth = SkyHandsFreeService.health()
+        val handsFreeConsent = handsFreePrefs.getBoolean("hands_free_opt_in", false)
+        val chatReady = tokens.chatToken().isNotBlank() && tokens.server().isNotBlank()
         val musicAudio = SkyMusicAudioCheck.read(this)
         val lastVoice = if (voiceHealth.lastPhraseAtMs <= 0L) "sin registro" else
             java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss",
@@ -888,17 +890,19 @@ class MainActivity : Activity() {
                 if (accessibilityInstalled) "SÍ · REVISAR" else "No (esperado)",
             "Micrófono autorizado: " + if (micAllowed) "Sí" else "No",
             "Notificaciones autorizadas: " + if (notificationsAllowed) "Sí" else "No",
-            "Reconocimiento de voz: " + if (speechAvailable) "Disponible" else "No disponible",
-            "Reconocimiento local sin nube: " + if (offlineSpeech) "Disponible" else "No disponible",
+            "Reconocimiento de voz (capacidad del equipo): " + if (speechAvailable) "Disponible" else "No disponible",
+            "Reconocimiento local sin nube (capacidad): " + if (offlineSpeech) "Disponible" else "No disponible",
             "Servicio manos libres vivo: " + if (voiceHealth.active) "Sí" else "No",
-            "Presencia solicitada: " + (handsFreePrefs.getString("sky_presence_mode",
-                "WAKE_ONLY") ?: "WAKE_ONLY"),
+            "Modo configurado (no equivale a escucha activa): " +
+                (handsFreePrefs.getString("sky_presence_mode", "WAKE_ONLY") ?: "WAKE_ONLY"),
             "Identificación biométrica de voz: NO DISPONIBLE (no confundir voz a texto con voz del propietario)",
             "Confirmación de órdenes fuera de pantalla: SKY confirmo / SKY cancela",
-            "Reconocedor escuchando: " + if (voiceHealth.recognizing) "Sí" else "No",
-            "Última frase detectada: $lastVoice",
+            "Reconocedor preparado (callback real de Android): " +
+                if (voiceHealth.recognizing) "Sí" else "No",
+            "Última detección de voz (fecha/hora): $lastVoice",
             "Último error de reconocimiento: ${voiceHealth.errorCode} · reintentos ${voiceHealth.retries}",
-            "Voz de SKY: " + if (voicePanel.isSpeechEngineReady()) "Lista" else "Pendiente",
+            "Motor TTS de SKY (no prueba audio audible): " +
+                if (voicePanel.isSpeechEngineReady()) "Inicializado" else "Pendiente",
             "Audio multimedia: " + musicAudio.evidence(),
             "Audio: " + musicAudio.guidance(),
             "Apps visibles para abrir: ${installedApps.discover().size}",
@@ -907,31 +911,107 @@ class MainActivity : Activity() {
                 else "No configurado",
             "Gemini: " + if (tokens.cloudEnabled()) "Configurado (conexión no comprobada)"
                 else "No configurado",
-            "Manos libres: " + if (handsFreePrefs.getBoolean("hands_free_opt_in", false))
-                "Activado" else "Desactivado",
+            "Consentimiento manos libres: " + if (handsFreeConsent) "Concedido" else "No concedido",
+            "Chat privado HTTPS (OPCIONAL): " + if (chatReady) "Configurado; conexión sin verificar"
+                else "No vinculado",
+            "SKY API elegida para generar respuestas: " +
+                if (getSharedPreferences("sky_own_api", MODE_PRIVATE)
+                    .getBoolean("prefer_self_hosted_ollama", false)) "Sí; servidor opcional"
+                else "No; Android independiente",
+            "Acción recomendada: " + when {
+                !handsFreeConsent -> "Activar manos libres desde Voz, si lo deseás."
+                !micAllowed -> "Autorizar micrófono en Android."
+                !voiceHealth.active -> "El servicio no está vivo; probar reinicio supervisado."
+                !voiceHealth.recognizing -> "Servicio vivo; verificar escucha en la prueba física."
+                else -> "Reconocedor activo; dictar y comprobar una frase."
+            },
             "--- Reproductores ---"
         ).joinToString("\n") + "\n" + players.joinToString("\n") +
             "\n\nEl reproductor puede rechazar una orden aunque esté instalado. " +
             "Play Protect verifica las APK fuera de SKY; esta pantalla no certifica " +
             "la seguridad, no comprueba el audio ni prueba automáticamente servicios remotos."
-        AlertDialog.Builder(this)
-            .setTitle("SKY · Diagnóstico del Galaxy")
-            .setMessage(lines)
-            .setNeutralButton("Copiar diagnóstico") { _, _ ->
+        // En pantallas pequeñas el AlertDialog de 3 botones recortaba acciones.
+        // Un único panel fijo con lectura desplazable mantiene todos los controles visibles.
+        val diagnosticBody = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 12, 24, 10)
+        }
+        val diagnosticScroll = ScrollView(this).apply {
+            isFillViewport = false
+            isVerticalScrollBarEnabled = true
+            addView(TextView(this@MainActivity).apply {
+                text = lines
+                textSize = 15f
+                setTextIsSelectable(true)
+                setPadding(8, 8, 8, 16)
+            })
+        }
+        // Altura explícita: funciona también cuando el AlertDialog mide su contenido como WRAP_CONTENT.
+        diagnosticBody.addView(diagnosticScroll, LinearLayout.LayoutParams(-1,
+            (resources.displayMetrics.heightPixels * 0.40f).toInt()))
+        lateinit var diagnosticDialog: AlertDialog
+        diagnosticBody.addView(Button(this).apply {
+            text = "Configurar / comprobar SKY API"
+            setOnClickListener {
+                diagnosticDialog.dismiss()
+                showSettings()
+            }
+        }, LinearLayout.LayoutParams(-1, -2))
+        if (!voiceHealth.active) {
+            diagnosticBody.addView(Button(this).apply {
+                text = "Activar manos libres"
+                setOnClickListener {
+                    diagnosticDialog.dismiss()
+                    // Acción explícita del propietario, nunca activar en secreto.
+                    setHandsFreeEnabled(true)
+                }
+            }, LinearLayout.LayoutParams(-1, -2))
+        } else if (!voiceHealth.recognizing) {
+            diagnosticBody.addView(Button(this).apply {
+                text = "Reintentar reconocimiento local"
+                setOnClickListener {
+                    if (SkyHandsFreeService.retryRecognizerFromUi()) {
+                        diagnosticDialog.dismiss()
+                        home.showMessage("Se solicitó reiniciar el reconocedor. " +
+                            "Aún falta confirmar que Android lo prepare.")
+                        handler.postDelayed({
+                            if (!isFinishing && !isDestroyed) showDeviceDiagnostics()
+                        }, 1600L)
+                    } else {
+                        home.showMessage("SKY está hablando o el servicio ya se detuvo. " +
+                            "Revisá el estado antes de reintentar.")
+                    }
+                }
+            }, LinearLayout.LayoutParams(-1, -2))
+        }
+        diagnosticBody.addView(Button(this).apply {
+            text = "Control de volumen"
+            setOnClickListener { SkyMusicAudioCheck.showVolumePanel(this@MainActivity) }
+        }, LinearLayout.LayoutParams(-1, -2))
+        diagnosticBody.addView(Button(this).apply {
+            text = "Copiar diagnóstico"
+            setOnClickListener {
                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as
                     android.content.ClipboardManager
                 clipboard.setPrimaryClip(
                     android.content.ClipData.newPlainText("Diagnóstico SKY Android", lines)
                 )
-                android.widget.Toast.makeText(this,
+                android.widget.Toast.makeText(this@MainActivity,
                     "Diagnóstico copiado sin claves ni identificadores privados.",
                     android.widget.Toast.LENGTH_SHORT).show()
             }
-            .setNegativeButton("Control de volumen") { _, _ ->
-                SkyMusicAudioCheck.showVolumePanel(this)
-            }
+        }, LinearLayout.LayoutParams(-1, -2))
+        diagnosticDialog = AlertDialog.Builder(this)
+            .setTitle("SKY · Diagnóstico del Galaxy")
+            .setView(diagnosticBody)
             .setPositiveButton("Cerrar", null)
-            .show()
+            .create()
+        diagnosticDialog.show()
+        // Lectura desplazable; las acciones quedan fuera del ScrollView y siempre accesibles.
+        diagnosticDialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.94f).toInt(),
+            (resources.displayMetrics.heightPixels * 0.83f).toInt()
+        )
     }
 
     /**
@@ -2226,8 +2306,16 @@ class MainActivity : Activity() {
     }
 
     private fun refreshConnection() {
-        home.setConnection(tokens.token().isNotEmpty(), tokens.chatToken().isNotEmpty(),
-            tokens.cloudEnabled() || tokens.groqEnabled())
+        val privateApiSelected = getSharedPreferences("sky_own_api", MODE_PRIVATE)
+            .getBoolean("prefer_self_hosted_ollama", false)
+        val chatConfigured = tokens.deviceId().isNotBlank() &&
+            tokens.chatToken().isNotBlank() && tokens.server().isNotBlank()
+        home.setConnection(
+            linked = tokens.token().isNotEmpty(),
+            chatReady = chatConfigured,
+            mobileCloud = tokens.cloudEnabled() || tokens.groqEnabled(),
+            privateApiSelected = privateApiSelected
+        )
     }
 
     /** La vinculación solo se muestra si aún no existe un token válido. */
@@ -2240,17 +2328,21 @@ class MainActivity : Activity() {
         }
         val linked = tokens.token().isNotEmpty() && tokens.deviceId().isNotEmpty()
         content.addView(SkyPremiumUi.section(this, "Motor",
-            "SKY Automático · motor propio y respaldo supervisado", "⚡"))
+            "SKY Android independiente · servidores opcionales", "⚡"))
         content.addView(description("SKY Android · Ajustes y permisos"))
-        content.addView(description("MODO INDEPENDIENTE · No necesitás Windows ni una PC para " +
-            "usar las funciones locales del teléfono. El cerebro Ollama del servidor es opcional."))
+        content.addView(description("MODO ANDROID INDEPENDIENTE · Voz, funciones locales, " +
+            "comandos y archivos no requieren Windows ni emparejamiento HTTPS. " +
+            "Las respuestas de un modelo generativo necesitan un motor configurado; " +
+            "todavía no existe un LLM integrado y verificado sin conexión en esta APK."))
+        content.addView(actionButton("PROBAR UNA RESPUESTA LOCAL · SIN SERVIDOR") {
+            val answer = SkyLocalConversation.reply("¿Qué hora es ahora?")
+                ?: "La prueba de hora local no está disponible."
+            home.showMessage("Prueba local del teléfono, no de un modelo IA: " + answer)
+        })
         content.addView(CheckBox(this).apply {
-            text = "SKY Automático · priorizar nuestra API sin elegir modelos"
+            text = "Usar SKY API privada opcional (requiere servidor HTTPS)"
             isChecked = getSharedPreferences("sky_own_api", MODE_PRIVATE)
-                .getBoolean("prefer_self_hosted_ollama",
-                    tokens.deviceId().isNotBlank() &&
-                        tokens.chatToken().isNotBlank() &&
-                        tokens.server().isNotBlank())
+                .getBoolean("prefer_self_hosted_ollama", false)
             setOnCheckedChangeListener { _, enabled ->
                 getSharedPreferences("sky_own_api", MODE_PRIVATE).edit()
                     .putBoolean("prefer_self_hosted_ollama", enabled).apply()
@@ -2258,6 +2350,7 @@ class MainActivity : Activity() {
                     "SKY Automático elegirá Ollama primero. Requiere chat HTTPS " +
                         "emparejado. No enviará datos a proveedores externos sin permiso."
                     else "Priorización automática desactivada. Se conservan las conexiones.")
+                refreshConnection()
             }
         })
         content.addView(actionButton("AJUSTE AVANZADO · FIJAR PROVEEDOR") {
@@ -3221,8 +3314,18 @@ class MainActivity : Activity() {
             startForegroundService(android.content.Intent(this, SkyHandsFreeService::class.java)
                 .setAction(SkyHandsFreeService.ACTION_START))
             voicePanel.setConversationMode(false)
-            home.setHandsFreeActive(true)
-            voicePanel.showHandsFreeState("SKY duerme hasta que digás su nombre.")
+            // startForegroundService solo solicita arrancar: no prueba escucha viva.
+            home.setHandsFreeActive(false)
+            voicePanel.showHandsFreeState("Iniciando manos libres; comprobando el servicio…")
+            handler.postDelayed({
+                if (!isFinishing && ::home.isInitialized) {
+                    val health = SkyHandsFreeService.health()
+                    home.setHandsFreeActive(health.active)
+                    if (health.active) updatePresenceVisual()
+                    else voicePanel.showError("No se confirmó el servicio manos libres. " +
+                        "Abrí Autodiagnóstico Android y revisá la notificación.")
+                }
+            }, 1600L)
             if (android.os.Build.VERSION.SDK_INT >= 33 &&
                 checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
                     android.content.pm.PackageManager.PERMISSION_GRANTED &&
@@ -3293,7 +3396,7 @@ class MainActivity : Activity() {
             checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
                 android.content.pm.PackageManager.PERMISSION_GRANTED) startHandsFree()
         if (::home.isInitialized) home.setHandsFreeActive(
-            handsFreePrefs.getBoolean("hands_free_opt_in", false))
+            SkyHandsFreeService.health().active)
         updatePresenceVisual()
         handler.postDelayed({ showHandsFreeFirstRun() }, 1100L)
         companionController.onResume()
@@ -4159,8 +4262,7 @@ class MainActivity : Activity() {
         val id = tokens.deviceId()
         val token = tokens.chatToken()
         val ownApiPrefs = getSharedPreferences("sky_own_api", MODE_PRIVATE)
-        val ownApiPreferred = ownApiPrefs.getBoolean("prefer_self_hosted_ollama",
-            id.isNotBlank() && token.isNotBlank() && tokens.server().isNotBlank())
+        val ownApiPreferred = ownApiPrefs.getBoolean("prefer_self_hosted_ollama", false)
         val selectedSkyApiProvider = if (
             ownApiPrefs.getBoolean("automatic_routing", true)) "sky_auto"
             else SkyOwnApiRoutingPolicy.chosenProvider(
@@ -4171,9 +4273,19 @@ class MainActivity : Activity() {
                 "servidor HTTPS desde Ajustes. No se cambiará automáticamente a Gemini.")
             return
         }
-        if (!mobileCloud && !groqReady && (id.isEmpty() || token.isEmpty())) {
-            setStatus("Configurá SKY móvil independiente desde Ajustes.")
-            showSettings()
+        // A historical pairing token is never a reason to contact a remote server
+        // if the owner is using independent Android mode.
+        if (!SkyOwnApiRoutingPolicy.hasAuthorizedGenerativeRoute(
+                privateServerOptIn = ownApiPreferred,
+                pairedChatToken = id.isNotBlank() && token.isNotBlank() &&
+                    tokens.server().isNotBlank(),
+                geminiConfigured = mobileCloud,
+                groqConfigured = groqReady)) {
+            home.showMessage("SKY Android está activa con sus funciones locales. " +
+                "Esta pregunta requiere un modelo generativo que aún no está " +
+                "disponible sin conexión en la APK. Para responderla podés " +
+                "configurar voluntariamente Gemini, Groq o la SKY API privada " +
+                "en Ajustes. Conservé tu texto; no lo envié ni cambié de motor.")
             return
         }
         val cloud = cloudConsent.isChecked
@@ -4476,20 +4588,10 @@ class MainActivity : Activity() {
                         searchSuggestions = ""
                     }
                     else -> {
-                        val payload = JSONObject()
-                            .put("device_id", id)
-                            .put("texto", personalizedMessage)
-                            .put("historial", history)
-                            .put("proveedor", "auto")
-                            .put("datos", "privados")
-                            .put("autorizar_nube", cloud)
-                            .put("autorizar_datos_privados", privateData)
-                        val reply = SkyNetwork.requestChat(tokens.server(),
-                            "/api/sky/mobile-chat/chat", token, payload)
-                        answer = reply.optString("respuesta", "SKY no devolvió texto.")
-                        provider = reply.optString("proveedor", "SKY Core")
-                        sources = emptyList()
-                        searchSuggestions = ""
+                        // Never turn a historical device pairing into implicit
+                        // remote chat. All external engines need an explicit route.
+                        error("No existe un motor generativo autorizado para este mensaje. " +
+                            "Tu consulta no se envió a ningún servidor.")
                     }
                 }
                 chatHistory.put(JSONObject().put("role", "user").put("content",

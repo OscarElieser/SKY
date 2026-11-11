@@ -1,3 +1,11 @@
+## SKY Android 0.8.48 — diagnóstico veraz y controles visibles (candidato en revisión)
+
+Desde capturas de un Galaxy con 0.8.47 instalado: el chat informa falta de autorización SKY API HTTPS, las manos libres no están vivas, el reconocimiento no escucha y el diagnóstico se recorta. La 0.8.48 candidata separa capacidades de estados comprobados, presenta acciones desplazables sin cortar controles, incluye acceso a configuración de chat y verifica arranque real del servicio de voz. **No declara Ollama operativo, audio audible, ni APK certificada.** Sigue sin modificar SKY Windows o BAQUEANO.
+
+[Correcciones y pruebas físicas exigidas](docs/SKY_ANDROID_0848_DIAGNOSTICO_REAL_SAMSUNG.md) · [Acciones](https://github.com/OscarElieser/SKY/actions).
+
+---
+
 ## SKY Android 0.8.47 — limpieza visual y exportación sin confusiones (código en revisión)
 
 Se conserva el diseño premium introducido por 0.8.46. Los avisos se descartan con `×` o expiran en 8 segundos, y se redibujan correctamente al cerrar/reabrir; los mensajes antiguos dejan de saltar al final. El lector seguro de respuestas, tablas y fórmulas ahora utiliza hasta 94 % de la altura con botones de lectura completa, copiar y cerrar. Ante errores de SQLite, SKY muestra la respuesta sin afirmar que está archivada. Word solo exporta la consulta recién guardada, nunca otra anterior; los errores transitorios de los ojos se limpian sin interrumpir la voz.

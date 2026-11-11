@@ -43,8 +43,13 @@ class SkyHandsFreeService : Service() {
                           val errorCode: Int, val retries: Int)
         fun health(): Health {
             val service = current ?: return Health(false, false, false, 0, 0, 0)
-            return Health(service.running, service.listening, service.awake,
-                service.lastPhraseAtMs, service.lastErrorCode, service.retryCount)
+            return Health(service.running, SkyAndroidStatusPolicy.recognizerPrepared(
+                active = service.running,
+                startRequested = service.listening,
+                readyCallback = service.recognizerReady,
+                speechSuspended = service.speechSuspended),
+                service.awake, service.lastPhraseAtMs,
+                service.lastErrorCode, service.retryCount)
         }
         @Volatile var onPhrase: ((String) -> Unit)? = null
         @Volatile var onWake: (() -> Unit)? = null
@@ -81,6 +86,22 @@ class SkyHandsFreeService : Service() {
             context.startService(Intent(context, SkyHandsFreeService::class.java)
                 .setAction(ACTION_STOP))
         }
+
+        /** Visible-owner recovery only; no new background microphone start. */
+        fun retryRecognizerFromUi(): Boolean {
+            val service = current ?: return false
+            if (!service.running || service.speechSuspended) return false
+            service.handler.post {
+                if (service.running && !service.speechSuspended) {
+                    service.handler.removeCallbacks(service.nextListen)
+                    service.stopRecognizer()
+                    service.retryCount = 0
+                    service.lastErrorCode = 0
+                    service.schedule(350L)
+                }
+            }
+            return true
+        }
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -88,6 +109,7 @@ class SkyHandsFreeService : Service() {
     private var tts: TextToSpeech? = null
     private var running = false
     private var listening = false
+    private var recognizerReady = false
     private var awake = false
     private var presence = SkyVoicePresence.Mode.WAKE_ONLY
     private val voiceSettings by lazy { getSharedPreferences("sky_voice_settings", MODE_PRIVATE) }
@@ -246,6 +268,7 @@ class SkyHandsFreeService : Service() {
 
     private fun stopRecognizer() {
         listening = false
+        recognizerReady = false
         val old = recognizer
         recognizer = null
         runCatching { old?.cancel() }
@@ -263,7 +286,12 @@ class SkyHandsFreeService : Service() {
             val engine = SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
             recognizer = engine
             engine.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {}
+                override fun onReadyForSpeech(params: Bundle?) {
+                    if (SkyAndroidStatusPolicy.acceptRecognitionCallback(
+                            active = running, listening = listening,
+                            sameEngine = recognizer === engine,
+                            speechSuspended = speechSuspended)) recognizerReady = true
+                }
                 override fun onBeginningOfSpeech() {}
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
@@ -272,8 +300,11 @@ class SkyHandsFreeService : Service() {
                 override fun onEvent(eventType: Int, params: Bundle?) {}
 
                 override fun onError(error: Int) {
+                    if (!SkyAndroidStatusPolicy.acceptRecognitionCallback(
+                            active = running, listening = listening,
+                            sameEngine = recognizer === engine,
+                            speechSuspended = speechSuspended)) return
                     lastErrorCode = error
-                    if (!listening) return
                     stopRecognizer()
                     if (!running) return
                     if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ||
@@ -293,7 +324,10 @@ class SkyHandsFreeService : Service() {
                 }
 
                 override fun onResults(results: Bundle?) {
-                    if (!listening) return
+                    if (!SkyAndroidStatusPolicy.acceptRecognitionCallback(
+                            active = running, listening = listening,
+                            sameEngine = recognizer === engine,
+                            speechSuspended = speechSuspended)) return
                     val heard = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         ?.firstOrNull().orEmpty()
                     stopRecognizer()
