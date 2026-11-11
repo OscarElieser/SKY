@@ -32,4 +32,13 @@ internal object SkyAndroidStatusPolicy {
     fun recognizerPrepared(active: Boolean, startRequested: Boolean,
                            readyCallback: Boolean, speechSuspended: Boolean): Boolean =
         active && startRequested && readyCallback && !speechSuspended
+
+    /**
+     * Discard callbacks from a canceled recognizer (old Android session).
+     * Without this guard an old onResults may execute a command during a
+     * newer listen cycle. No transcript or personal data is persisted.
+     */
+    fun acceptRecognitionCallback(active: Boolean, listening: Boolean,
+                                  sameEngine: Boolean, speechSuspended: Boolean): Boolean =
+        active && listening && sameEngine && !speechSuspended
 }
