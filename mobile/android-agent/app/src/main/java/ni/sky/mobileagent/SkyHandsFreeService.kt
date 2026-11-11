@@ -43,8 +43,13 @@ class SkyHandsFreeService : Service() {
                           val errorCode: Int, val retries: Int)
         fun health(): Health {
             val service = current ?: return Health(false, false, false, 0, 0, 0)
-            return Health(service.running, service.listening, service.awake,
-                service.lastPhraseAtMs, service.lastErrorCode, service.retryCount)
+            return Health(service.running, SkyAndroidStatusPolicy.recognizerPrepared(
+                active = service.running,
+                startRequested = service.listening,
+                readyCallback = service.recognizerReady,
+                speechSuspended = service.speechSuspended),
+                service.awake, service.lastPhraseAtMs,
+                service.lastErrorCode, service.retryCount)
         }
         @Volatile var onPhrase: ((String) -> Unit)? = null
         @Volatile var onWake: (() -> Unit)? = null
@@ -88,6 +93,7 @@ class SkyHandsFreeService : Service() {
     private var tts: TextToSpeech? = null
     private var running = false
     private var listening = false
+    private var recognizerReady = false
     private var awake = false
     private var presence = SkyVoicePresence.Mode.WAKE_ONLY
     private val voiceSettings by lazy { getSharedPreferences("sky_voice_settings", MODE_PRIVATE) }
@@ -246,6 +252,7 @@ class SkyHandsFreeService : Service() {
 
     private fun stopRecognizer() {
         listening = false
+        recognizerReady = false
         val old = recognizer
         recognizer = null
         runCatching { old?.cancel() }
@@ -263,7 +270,9 @@ class SkyHandsFreeService : Service() {
             val engine = SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
             recognizer = engine
             engine.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {}
+                override fun onReadyForSpeech(params: Bundle?) {
+                    if (running && listening && !speechSuspended) recognizerReady = true
+                }
                 override fun onBeginningOfSpeech() {}
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
