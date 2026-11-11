@@ -959,11 +959,28 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(-1, -2))
         if (!voiceHealth.active) {
             diagnosticBody.addView(Button(this).apply {
-                text = "Activar / reiniciar manos libres"
+                text = "Activar manos libres"
                 setOnClickListener {
                     diagnosticDialog.dismiss()
                     // Acción explícita del propietario, nunca activar en secreto.
                     setHandsFreeEnabled(true)
+                }
+            }, LinearLayout.LayoutParams(-1, -2))
+        } else if (!voiceHealth.recognizing) {
+            diagnosticBody.addView(Button(this).apply {
+                text = "Reintentar reconocimiento local"
+                setOnClickListener {
+                    if (SkyHandsFreeService.retryRecognizerFromUi()) {
+                        diagnosticDialog.dismiss()
+                        home.showMessage("Se solicitó reiniciar el reconocedor. " +
+                            "Aún falta confirmar que Android lo prepare.")
+                        handler.postDelayed({
+                            if (!isFinishing && !isDestroyed) showDeviceDiagnostics()
+                        }, 1600L)
+                    } else {
+                        home.showMessage("SKY está hablando o el servicio ya se detuvo. " +
+                            "Revisá el estado antes de reintentar.")
+                    }
                 }
             }, LinearLayout.LayoutParams(-1, -2))
         }
