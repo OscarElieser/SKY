@@ -55,3 +55,18 @@ Corrección de enrutamiento:
 **Límite vigente:** la APK actual no lleva un modelo generativo nativo en Android. Operaciones locales como el reconocimiento de voz y los comandos locales pueden funcionar independientemente; cualquier función dependiente de nube, búsqueda actualizada, servidor o API necesita las condiciones reales respectivas. Para investigación/tesis y respuestas abiertas sin internet, se necesita una implementación y prueba separadas de modelo local compatible con el hardware. No degradar esto a respuestas enlatadas presentadas como IA.
 
 Aceptación: pruebas de Android y backend verdes, ausencia de conexiones privadas en modo independiente (prueba con servidor inalcanzable), consulta no local con ningún proveedor debe conservar el borrador, prueba con clave configurada y consentimiento, prueba de aviso de SKY API seleccionada sin autorización, Play Protect y prueba física de Samsung. No afirmar «funciona al 100 %» por pasar tests estáticos.
+
+
+## Refuerzo de diagnósticos e indicadores (10/11/2026)
+
+Se verificó un problema adicional de representación: `SkyMobileHome.setConnection` pintaba un punto verde y mostraba «Android lista»/«SKY vinculada» basándose en credenciales guardadas, **no en un resultado HTTP real**. Por otra parte, el caption mostraba «SKY durmiendo» siempre que el servicio manos libres estuviese activo, incluso cuando `sky_presence_mode=ATTENTIVE`.
+
+Correcciones en esta rama:
+- Nueva `SkyAndroidStatusPolicy` con pruebas unitarias: separa funciones locales disponibles, API privada seleccionada pero sin autorizar, API privada configurada sin verificación en vivo y motor externo configurado sin prueba de conexión.
+- El indicador deja de utilizar el punto verde como prueba de conectividad: usa señal neutra hasta que exista una comprobación en vivo. Un emparejamiento histórico de Windows no implica conexión.
+- Los captions de voz usan el modo solicitado `SLEEP_LOCKED`, `ATTENTIVE` o `WAKE_ONLY`, y estado real de servicio. «Activo» no equivale a «captó una frase».
+- `SkyHandsFreeService.health().recognizing` solo es verdadero tras `RecognitionListener.onReadyForSpeech`, y se anula al detener el reconocedor o al suspender voz para TTS. La mera solicitud `startListening()` ya no se interpreta como éxito. El callback significa que el motor está preparado, no que exista una transcripción reconocida.
+- El diagnóstico Android etiqueta esta distinción para que no aparezca «escuchando» sin la confirmación del motor.
+- La UI actualiza el estado del motor cuando el propietario activa o desactiva la API privada; no modifica las credenciales ni elimina los ajustes anteriores.
+
+**Aceptación:** CI completo Android en el commit final y prueba física Samsung Android 16. Comparar prueba con modo atenta/dormida, cambio de opciones sin red, arranque/suspensión de micrófono, reconocimiento que entrega respuesta real y notificación persistente. Probar que la UI nunca afirma servidor «en línea» sin efectuar un health check autenticado. No declarar lista una APK de depuración.
