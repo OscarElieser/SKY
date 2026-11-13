@@ -2663,6 +2663,45 @@ class MainActivity : Activity() {
             }
             content.addView(groqButton)
         }
+        // Independent Android cloud routing: one explicitly selected provider
+        // per turn. A quota or network failure must never send the same text
+        // to another vendor without a new owner action.
+        content.addView(SkyPremiumUi.section(this, "Motor de IA en Android",
+            "Selección directa · sin cambios ocultos de proveedor", "◈"))
+        val directPrefs = getSharedPreferences("sky_mobile_provider", MODE_PRIVATE)
+        val directChoice = SkyMobileProviderPolicy.preference(
+            directPrefs.getString("preference", SkyMobileProviderPolicy.AUTO))
+        content.addView(description("Modo actual: $directChoice. Automático elige " +
+            "Groq si está configurado o Gemini en caso contrario, UNA SOLA VEZ " +
+            "antes de enviar. Si falla, SKY conserva la consulta; no cambia " +
+            "de proveedor ni consume otra cuota sin que vuelvas a elegir. " +
+            "La gratuidad real depende de las condiciones de tu cuenta."))
+        content.addView(actionButton("ELEGIR MOTOR DIRECTO DE ANDROID") {
+            val labels = arrayOf(
+                "Automático inicial · Groq si está configurado; si no, Gemini",
+                "Solo Groq · sin sustitución por Gemini",
+                "Solo Gemini · sin sustitución por Groq")
+            val selected = SkyMobileProviderPolicy.OPTIONS.indexOf(
+                SkyMobileProviderPolicy.preference(
+                    directPrefs.getString("preference", SkyMobileProviderPolicy.AUTO)))
+            AlertDialog.Builder(this)
+                .setTitle("SKY Android · Motor de conversación")
+                .setMessage("Esta elección no cambia la SKY API privada. " +
+                    "Las investigaciones con fuentes verificables y los modos " +
+                    "Gemini solicitados explícitamente requieren Gemini. " +
+                    "El proveedor no se sustituirá tras un fallo o límite de cuota.")
+                .setSingleChoiceItems(labels, selected) { dialog, which ->
+                    val chosen = SkyMobileProviderPolicy.OPTIONS[which]
+                    directPrefs.edit().putString("preference", chosen).apply()
+                    dialog.dismiss()
+                    settingsDialog?.dismiss()
+                    home.showMessage("Proveedor directo elegido: $chosen. " +
+                        "No habrá reintentos automáticos con otro servicio.")
+                    showSettings()
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        })
         content.addView(SkyPremiumUi.section(this, "Privacidad",
             "Permisos individuales · No compartas datos sin autorización", "◈"))
         content.addView(CheckBox(this).apply {
@@ -4338,6 +4377,22 @@ class MainActivity : Activity() {
         val needsVerifiedSources = SkyPhoneCloud.requiresLiveVerification(message) ||
             SkyEvidencePolicy.needsVerification(message) ||
             (cognitionEnabled() && SkyAndroidCognition.classify(message).verifyWithSources)
+        // Resolve the direct provider exactly once, before network activity.
+        // Existing keys and quotas cannot silently authorize cross-provider
+        // fallback after an error (SKY API has its own consent-aware policy).
+        val directProvider = SkyMobileProviderPolicy.choose(
+            preferred = getSharedPreferences("sky_mobile_provider", MODE_PRIVATE)
+                .getString("preference", SkyMobileProviderPolicy.AUTO),
+            groqConfigured = groqReady, geminiConfigured = mobileCloud,
+            explicitGemini = selection.explicit,
+            verifiedWebRequired = needsVerifiedSources)
+        if (!ownApiPreferred && !selection.explicit && !needsVerifiedSources &&
+            directProvider == null) {
+            home.showMessage("El proveedor directo que elegiste no está configurado. " +
+                "Seleccioná y verificá una clave en Ajustes. " +
+                "Conservé tu mensaje y no lo envié a otro servicio.")
+            return
+        }
         if (ownApiPreferred && !selection.explicit && needsVerifiedSources) {
             home.showMessage("Pediste información que necesita fuentes verificables. " +
                 "SKY API local no dispone de búsqueda web confirmada, y tu preferencia " +
@@ -4549,41 +4604,19 @@ class MainActivity : Activity() {
                         sources = emptyList()
                         searchSuggestions = ""
                     }
-                    groqReady -> {
-                        val result = try {
-                            Pair(SkyGroqCloud.reply(tokens.groqKey(), personalizedMessage, history),
-                                "Groq · Llama 3.1")
-                        } catch (error: Exception) {
-                            if (!mobileCloud) throw error
-                            // Gemini fallback only for normal conversation: no
-                            // accidental paid/grounded search on simple messages.
-                            Pair(SkyPhoneCloud.reply(tokens.personalCloudKey(), personalizedMessage, history),
-                                "Gemini · respaldo")
-                        }
-                        answer = result.first
-                        provider = result.second
+                    directProvider == SkyMobileProviderPolicy.GROQ -> {
+                        // A failed call ends this turn; do not reuse the
+                        // owner's message with Gemini or another cloud vendor.
+                        answer = SkyGroqCloud.reply(tokens.groqKey(),
+                            personalizedMessage, history)
+                        provider = "Groq · Llama 3.1 · motor directo elegido"
                         sources = emptyList()
                         searchSuggestions = ""
                     }
-                    mobileCloud -> {
-                        val response = try {
-                            Pair(SkyPhoneCloud.reply(tokens.personalCloudKey(), personalizedMessage,
-                                history, selectedMode = selection),
-                                "Gemini · " + selection.model)
-                        } catch (quota: SkyPhoneCloud.GeminiQuotaException) {
-                            if (!SkyProviderFallbackPolicy.canUseGroq(
-                                    groqAuthorized = groqReady,
-                                    explicitGemini = selection.explicit,
-                                    needsVerifiedWeb = needsLiveSources,
-                                    promptLength = personalizedMessage.length
-                                )) throw quota
-                            // Groq was explicitly enabled by its owner in
-                            // Settings; this never retries against Gemini's quota.
-                            Pair(SkyGroqCloud.reply(tokens.groqKey(), personalizedMessage,
-                                history), "Groq · alternativa autorizada (Gemini sin cuota)")
-                        }
-                        answer = response.first
-                        provider = response.second
+                    directProvider == SkyMobileProviderPolicy.GEMINI -> {
+                        answer = SkyPhoneCloud.reply(tokens.personalCloudKey(),
+                            personalizedMessage, history, selectedMode = selection)
+                        provider = "Gemini · " + selection.model + " · motor directo elegido"
                         sources = emptyList()
                         searchSuggestions = ""
                     }
