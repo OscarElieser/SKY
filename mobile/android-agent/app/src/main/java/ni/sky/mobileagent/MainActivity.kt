@@ -1052,20 +1052,23 @@ class MainActivity : Activity() {
         return true
     }
 
-    /** Private text tasks use Groq first; Gemini is a consented fallback. */
+    /** Draft and social requests obey the SAME selected provider as chat. */
     private fun generateMobileText(prompt: String): String {
         val history = JSONArray()
-        if (tokens.groqEnabled()) {
-            try {
-                return SkyGroqCloud.reply(tokens.groqKey(), prompt, history)
-            } catch (error: Exception) {
-                if (!tokens.cloudEnabled()) throw error
-            }
+        val route = SkyMobileProviderPolicy.choose(
+            preferred = getSharedPreferences("sky_mobile_provider", MODE_PRIVATE)
+                .getString("preference", SkyMobileProviderPolicy.AUTO),
+            groqConfigured = tokens.groqEnabled(),
+            geminiConfigured = tokens.cloudEnabled(),
+            explicitGemini = false, verifiedWebRequired = false)
+        if (route == null) {
+            throw IllegalStateException("El motor seleccionado no está configurado. " +
+                "Elegí y verificá Groq o Gemini desde Ajustes.")
         }
-        if (tokens.cloudEnabled()) {
-            return SkyPhoneCloud.reply(tokens.personalCloudKey(), prompt, history)
-        }
-        throw IllegalStateException("Configurá Groq o Gemini en Ajustes.")
+        return SkyMobileProviderPolicy.runSelected(
+            route = route,
+            useGroq = { SkyGroqCloud.reply(tokens.groqKey(), prompt, history) },
+            useGemini = { SkyPhoneCloud.reply(tokens.personalCloudKey(), prompt, history) })
     }
 
     private fun createReplyDraft(request: SkyContextReply.Request) {
@@ -3556,8 +3559,8 @@ class MainActivity : Activity() {
         val token = tokens.token()
         if (tokens.groqEnabled() || tokens.cloudEnabled()) {
             setStatus("SKY Android independiente · " +
-                (if (tokens.groqEnabled()) "Groq activo" else "Gemini activo") +
-                ". Windows no es necesario.")
+                (if (tokens.groqEnabled()) "Groq configurado" else "Gemini configurado") +
+                " (conexión y cuota sin comprobar). Windows no es necesario.")
             return
         }
         if (id.isEmpty() || token.isEmpty()) {
