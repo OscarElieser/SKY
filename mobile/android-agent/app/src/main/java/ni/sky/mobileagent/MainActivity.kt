@@ -4604,19 +4604,19 @@ class MainActivity : Activity() {
                         sources = emptyList()
                         searchSuggestions = ""
                     }
-                    directProvider == SkyMobileProviderPolicy.GROQ -> {
-                        // A failed call ends this turn; do not reuse the
-                        // owner's message with Gemini or another cloud vendor.
-                        answer = SkyGroqCloud.reply(tokens.groqKey(),
-                            personalizedMessage, history)
-                        provider = "Groq · Llama 3.1 · motor directo elegido"
-                        sources = emptyList()
-                        searchSuggestions = ""
-                    }
-                    directProvider == SkyMobileProviderPolicy.GEMINI -> {
-                        answer = SkyPhoneCloud.reply(tokens.personalCloudKey(),
-                            personalizedMessage, history, selectedMode = selection)
-                        provider = "Gemini · " + selection.model + " · motor directo elegido"
+                    directProvider != null -> {
+                        // Execute exactly one authorized provider. A 429, timeout
+                        // or other failure propagates to failSending: no hidden
+                        // second request, no discarded owner text.
+                        answer = SkyMobileProviderPolicy.runSelected(
+                            route = directProvider,
+                            useGroq = { SkyGroqCloud.reply(tokens.groqKey(),
+                                personalizedMessage, history) },
+                            useGemini = { SkyPhoneCloud.reply(tokens.personalCloudKey(),
+                                personalizedMessage, history, selectedMode = selection) })
+                        provider = if (directProvider == SkyMobileProviderPolicy.GROQ)
+                            "Groq · Llama 3.1 · motor directo elegido"
+                        else "Gemini · " + selection.model + " · motor directo elegido"
                         sources = emptyList()
                         searchSuggestions = ""
                     }
