@@ -38,6 +38,18 @@ internal object SkyMobileProviderPolicy {
         }
     }
 
-    /** A failure is final for this turn: re-routing needs a new owner action. */
-    fun allowRetryOnAnotherProvider(): Boolean = false
+    /**
+     * Execute exactly ONE chosen backend. If it fails, the exception reaches
+     * the Android chat error handler, which keeps the owner's unsent draft.
+     * There is intentionally no retry/else-to-second-provider branch.
+     */
+    fun <T> runSelected(
+        route: String?,
+        useGroq: () -> T,
+        useGemini: () -> T
+    ): T = when (route) {
+        GROQ -> useGroq()
+        GEMINI -> useGemini()
+        else -> throw IllegalStateException("No hay proveedor directo autorizado")
+    }
 }
