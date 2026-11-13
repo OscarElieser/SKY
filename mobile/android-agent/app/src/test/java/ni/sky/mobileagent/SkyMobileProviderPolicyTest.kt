@@ -50,6 +50,60 @@ class SkyMobileProviderPolicyTest {
         assertEquals("auto", SkyMobileProviderPolicy.preference("other"))
         assertEquals("auto", SkyMobileProviderPolicy.preference(null))
         assertEquals("groq", SkyMobileProviderPolicy.preference("groq"))
-        assertFalse(SkyMobileProviderPolicy.allowRetryOnAnotherProvider())
+        assertEquals("ok", SkyMobileProviderPolicy.runSelected(
+            "gemini", useGroq = { error("Groq must not run") }, useGemini = { "ok" }))
     }
+    @Test fun failedSelectedGroqNeverContactsGemini() {
+        val invoked = mutableListOf<String>()
+        try {
+            SkyMobileProviderPolicy.runSelected(
+                route = "groq",
+                useGroq = {
+                    invoked += "groq"
+                    throw IllegalStateException("HTTP 429")
+                },
+                useGemini = {
+                    invoked += "gemini"
+                    "would be a hidden fallback"
+                })
+            fail("The original Groq failure must propagate")
+        } catch (error: IllegalStateException) {
+            assertEquals("HTTP 429", error.message)
+        }
+        assertEquals(listOf("groq"), invoked)
+    }
+
+    @Test fun failedSelectedGeminiNeverContactsGroq() {
+        val invoked = mutableListOf<String>()
+        try {
+            SkyMobileProviderPolicy.runSelected(
+                route = "gemini",
+                useGroq = {
+                    invoked += "groq"
+                    "would be a hidden fallback"
+                },
+                useGemini = {
+                    invoked += "gemini"
+                    throw IllegalStateException("network offline")
+                })
+            fail("The original Gemini failure must propagate")
+        } catch (error: IllegalStateException) {
+            assertEquals("network offline", error.message)
+        }
+        assertEquals(listOf("gemini"), invoked)
+    }
+
+    @Test fun unselectedRouteCallsNoCloudProvider() {
+        val invoked = mutableListOf<String>()
+        try {
+            SkyMobileProviderPolicy.runSelected(
+                route = null,
+                useGroq = { invoked += "groq"; "bad" },
+                useGemini = { invoked += "gemini"; "bad" })
+            fail("Missing route must not contact cloud")
+        } catch (_: IllegalStateException) {
+            assertTrue(invoked.isEmpty())
+        }
+    }
+
 }
