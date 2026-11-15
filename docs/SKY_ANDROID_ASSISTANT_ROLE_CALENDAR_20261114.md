@@ -11,6 +11,7 @@
 - Se comprueba el resultado real mediante `isRoleHeld`; aceptar un diálogo no equivale a haber obtenido el rol.
 - Al recibir `ACTION_ASSIST`, SKY abre la conversación solo si el dispositivo está desbloqueado. Ignora cualquier contexto suministrado por otras aplicaciones.
 - Esta primera etapa **NO implementa** `VoiceInteractionService`, DSP, captura automática del micrófono ni interrupción de la pantalla bloqueada. La escucha local actual se habilita por separado y con consentimiento.
+- Ajuste opcional «Al invocar SKY como asistente, iniciar un turno de voz»: solo al recibir el gesto explícito `ACTION_ASSIST`, con teléfono desbloqueado, y respetando permiso `RECORD_AUDIO`. Se reutiliza `SkyEyeVoicePanel.listen()`; no configura un servicio de escucha ilimitado ni autoriza hotword en segundo plano.
 - Android/Samsung pueden no ofrecer el rol: la interfaz debe decirlo claramente.
 - Las configuraciones de Android pueden revocar o sustituir el rol en cualquier momento.
 
