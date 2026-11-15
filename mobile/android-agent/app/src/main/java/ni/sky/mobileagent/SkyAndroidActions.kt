@@ -82,6 +82,10 @@ class SkyAndroidActions(
             is SkyDailyCommandParser.Command.Alarm -> alarm(action)
             is SkyDailyCommandParser.Command.Timer -> timer(action.seconds)
             is SkyDailyCommandParser.Command.OpenApp -> installedApps.requestLaunch(action.app)
+            is SkyDailyCommandParser.Command.Dial -> dial(action.target)
+            is SkyDailyCommandParser.Command.ComposeSms -> composeSms(action.recipient, action.body)
+            is SkyDailyCommandParser.Command.Navigate -> navigate(action.destination)
+            is SkyDailyCommandParser.Command.OpenSetting -> openSetting(action.section)
             SkyDailyCommandParser.Command.ShowApps -> installedApps.showCatalog()
             SkyDailyCommandParser.Command.Capabilities -> explainCapabilities()
             is SkyDailyCommandParser.Command.Note -> confirmNote(action.value, origin)
@@ -104,6 +108,9 @@ class SkyAndroidActions(
                 "o «pon una canción en Spotify». " +
                 "También puedo solicitar alarmas, guardar notas, preparar textos " +
                 "para compartir y controlar la música. " +
+                "Puedo abrir el marcador, preparar un SMS, buscar una ruta en mapas " +
+                "y abrir ajustes del teléfono. Las llamadas y mensajes nunca " +
+                "se ejecutan ni envían sin tu intervención final. " +
                 "Para noticias e información actual puedo consultar Google con internet. " +
                 "Todavía no puedo navegar ni escribir libremente dentro de todas " +
                 "las aplicaciones o confirmar una reproducción sin comprobarla. " +
@@ -152,6 +159,100 @@ class SkyAndroidActions(
                 feedback("No solicité ningún temporizador.")
             }
             .show()
+    }
+
+    /**
+     * No READ_CONTACTS ni CALL_PHONE: si el propietario dice un nombre,
+     * Android muestra el marcador para que escoja el contacto por sí mismo.
+     */
+    private fun dial(target: String) {
+        val dialNumber = target.replace(Regex("""[\\s().-]"""), "")
+            .takeIf { Regex("""\\+?[0-9]{7,15}""").matches(it) }
+        val message = if (dialNumber != null)
+            "Voy a abrir el marcador con ${target.take(55)}. La llamada solo se realiza si la confirmás en Teléfono."
+        else "Voy a abrir el marcador. Buscá a «${target.take(55)}» y confirmá la llamada en Teléfono. SKY no accede a tus contactos."
+        AlertDialog.Builder(host)
+            .setTitle("SKY · Preparar llamada")
+            .setMessage(message)
+            .setPositiveButton("ABRIR MARCADOR") { _, _ ->
+                val intent = if (dialNumber != null)
+                    Intent(Intent.ACTION_DIAL,
+                        android.net.Uri.fromParts("tel", dialNumber, null))
+                else Intent(Intent.ACTION_DIAL)
+                launch(intent, "Abrí el marcador. La llamada todavía no se realizó; confirmala allí.")
+            }
+            .setNegativeButton("Cancelar") { _, _ ->
+                receipt("Marcador Android", "REJECTED", "El propietario canceló la llamada")
+                feedback("No se abrió el marcador.")
+            }
+            .show()
+    }
+
+    /**
+     * No SEND_SMS: entrega el borrador a la aplicación SMS; el usuario elige
+     * destinatario si indicó un nombre y pulsa Enviar en esa aplicación.
+     */
+    private fun composeSms(recipient: String, body: String) {
+        val number = recipient.replace(Regex("""[\\s().-]"""), "")
+            .takeIf { Regex("""\\+?[0-9]{7,15}""").matches(it) }
+        AlertDialog.Builder(host)
+            .setTitle("SKY · Preparar SMS")
+            .setMessage("Destinatario solicitado: ${recipient.take(70)}" +
+                if (number == null)
+                    "\\nSeleccioná manualmente el contacto dentro de Mensajes: SKY no lee tu agenda."
+                else "" +
+                "\\n\\nTexto: ${body.take(600)}" +
+                "\\n\\nSKY no enviará el SMS. Debés revisarlo y pulsar Enviar.")
+            .setPositiveButton("REVISAR EN MENSAJES") { _, _ ->
+                val intent = Intent(Intent.ACTION_SENDTO,
+                    android.net.Uri.fromParts("smsto", number.orEmpty(), null)).apply {
+                    putExtra("sms_body", body.take(600))
+                }
+                launch(intent, "Abrí Mensajes con el borrador. Revisá el destinatario y enviá solo si estás de acuerdo.")
+            }
+            .setNegativeButton("Cancelar") { _, _ ->
+                receipt("Borrador SMS", "REJECTED", "El propietario canceló la preparación")
+                feedback("No preparé ningún SMS.")
+            }
+            .show()
+    }
+
+    private fun navigate(destination: String) {
+        AlertDialog.Builder(host)
+            .setTitle("SKY · Navegación")
+            .setMessage("Voy a buscar «${destination.take(130)}» en una aplicación de mapas. " +
+                "Verificá el destino e iniciá la ruta allí. SKY no usa tu ubicación sin permiso.")
+            .setPositiveButton("ABRIR MAPAS") { _, _ ->
+                val uri = android.net.Uri.parse("geo:0,0?q=" +
+                    android.net.Uri.encode(destination))
+                launch(Intent(Intent.ACTION_VIEW, uri),
+                    "Abrí la búsqueda del destino en Mapas. Revisá e iniciá la navegación allí.")
+            }
+            .setNegativeButton("Cancelar") { _, _ ->
+                receipt("Navegación Android", "REJECTED", "El propietario canceló el destino")
+                feedback("No se abrió Mapas.")
+            }
+            .show()
+    }
+
+    /** Android no permite activar silenciosamente Wi-Fi o Bluetooth desde una app común. */
+    private fun openSetting(section: SkyDailyCommandParser.DeviceSetting) {
+        val action = when (section) {
+            SkyDailyCommandParser.DeviceSetting.WIFI ->
+                android.provider.Settings.ACTION_WIFI_SETTINGS
+            SkyDailyCommandParser.DeviceSetting.BLUETOOTH ->
+                android.provider.Settings.ACTION_BLUETOOTH_SETTINGS
+            SkyDailyCommandParser.DeviceSetting.DISPLAY ->
+                android.provider.Settings.ACTION_DISPLAY_SETTINGS
+            SkyDailyCommandParser.DeviceSetting.SOUND ->
+                android.provider.Settings.ACTION_SOUND_SETTINGS
+            SkyDailyCommandParser.DeviceSetting.BATTERY ->
+                android.provider.Settings.ACTION_BATTERY_SAVER_SETTINGS
+            SkyDailyCommandParser.DeviceSetting.GENERAL ->
+                android.provider.Settings.ACTION_SETTINGS
+        }
+        launch(Intent(action), "Abrí los ajustes de Android. Realizá y verificá el cambio " +
+            "en esa pantalla; SKY no modificó la configuración automáticamente.")
     }
 
     private fun webSearch(query: String) {
