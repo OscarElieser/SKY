@@ -630,7 +630,7 @@ class MainActivity : Activity() {
                 !processQuickCommand(transcript) &&
                 !processMusicCommand(transcript) &&
                 !processExpressionCommand(transcript) &&
-                !processReplyCommand(transcript) &&
+                (localConversationOnly() || !processReplyCommand(transcript)) &&
                 (localConversationOnly() || !processCreatorCommand(transcript)) &&
                 !processMessagingCommand(transcript) &&
                 (localConversationOnly() || !processInstagramCommand(transcript)) &&
@@ -640,7 +640,7 @@ class MainActivity : Activity() {
                 !processStatisticsCalculation(transcript) &&
                 !processQuadraticCalculation(transcript) &&
                 !processLocalPanelCommand(transcript, spoken = true) &&
-                !processCompanionCommand(transcript) &&
+                (localConversationOnly() || !processCompanionCommand(transcript)) &&
                 !processDailyCommand(transcript, spoken = true)) {
                 // Keep the animated face visible during spoken conversation.
                 voiceReplyOnFace = true
@@ -2315,7 +2315,7 @@ class MainActivity : Activity() {
                     ownApiPaired = connected,
                     geminiKeyReady = tokens.cloudEnabled(),
                     groqKeyReady = tokens.groqEnabled()
-                ) + "\\n\\nModo actual: " +
+                ) + "\n\nModo actual: " +
                     if (localConversationOnly()) "SOLO CONVERSACIÓN LOCAL."
                     else "HÍBRIDO CON AUTORIZACIÓN.")
                 .setPositiveButton("Entendido", null)
@@ -4248,12 +4248,13 @@ class MainActivity : Activity() {
         if (processQuickCommand(message) ||
             processMusicCommand(message) ||
             processExpressionCommand(message) ||
-            processReplyCommand(message) ||
+            (!localConversationOnly() && processReplyCommand(message)) ||
             (!localConversationOnly() && processCreatorCommand(message)) ||
             processMessagingCommand(message) ||
             (!localConversationOnly() && processInstagramCommand(message)) ||
             processLocalPanelCommand(message, spoken = false) ||
-            processCompanionCommand(message) || processDailyCommand(message, spoken = voiceReplyOnFace)) {
+            (!localConversationOnly() && processCompanionCommand(message)) ||
+            processDailyCommand(message, spoken = voiceReplyOnFace)) {
             chatInput.setText("")
             return
         }
