@@ -71,6 +71,9 @@ android {
 }
 
 dependencies {
+    // Official on-device text inference; no LLM weights bundled in the APK.
+    // Kotlin 2.3 is required for LiteRT-LM 0.18.x metadata compatibility.
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
