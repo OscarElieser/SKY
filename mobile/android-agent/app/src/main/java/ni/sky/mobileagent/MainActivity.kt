@@ -86,6 +86,16 @@ class MainActivity : Activity() {
     private var visible = false
     private var showOptionalWindowsLink = false
     private val handsFreePrefs by lazy { getSharedPreferences("sky_voice_settings", MODE_PRIVATE) }
+    private val conversationModePrefs by lazy {
+        getSharedPreferences(SkyConversationMode.PREFS, MODE_PRIVATE)
+    }
+    private fun localConversationOnly(): Boolean =
+        conversationModePrefs.getBoolean(SkyConversationMode.KEY_LOCAL_ONLY, false)
+    private fun explainLocalOnly() {
+        val reply = SkyConversationMode.offlineMessage()
+        home.showMessage(reply)
+        if (::voicePanel.isInitialized && voicePanel.isVoiceEnabled()) voicePanel.speakReply(reply)
+    }
     private val apps = linkedMapOf(
         "youtube" to Pair("YouTube", "com.google.android.youtube"),
         "chrome" to Pair("Chrome", "com.android.chrome"),
@@ -621,9 +631,9 @@ class MainActivity : Activity() {
                 !processMusicCommand(transcript) &&
                 !processExpressionCommand(transcript) &&
                 !processReplyCommand(transcript) &&
-                !processCreatorCommand(transcript) &&
+                (localConversationOnly() || !processCreatorCommand(transcript)) &&
                 !processMessagingCommand(transcript) &&
-                !processInstagramCommand(transcript) &&
+                (localConversationOnly() || !processInstagramCommand(transcript)) &&
                 !processOwnerQuestion(transcript) &&
                 !processOwnerProfileImport(transcript) &&
                 !processScientificCalculation(transcript) &&
@@ -635,7 +645,8 @@ class MainActivity : Activity() {
                 // Keep the animated face visible during spoken conversation.
                 voiceReplyOnFace = true
                 chatInput.setText(transcript)
-                if (!tokens.cloudEnabled() && !tokens.groqEnabled() &&
+                if (!localConversationOnly() &&
+                    !tokens.cloudEnabled() && !tokens.groqEnabled() &&
                     tokens.chatToken().isEmpty() &&
                     !SkyLocalConversation.handles(transcript) &&
                     SkyAdaptiveMemory.correctionFromCommand(transcript) == null &&
@@ -2281,6 +2292,35 @@ class MainActivity : Activity() {
         content.addView(description("SKY Android · Ajustes y permisos"))
         content.addView(description("MODO INDEPENDIENTE · No necesitás Windows ni una PC para " +
             "usar las funciones locales del teléfono. El cerebro Ollama del servidor es opcional."))
+        content.addView(CheckBox(this).apply {
+            text = "CONVERSACIÓN SOLO LOCAL · nunca enviar mis mensajes a una IA en internet"
+            isChecked = localConversationOnly()
+            setOnCheckedChangeListener { _, enabled ->
+                conversationModePrefs.edit()
+                    .putBoolean(SkyConversationMode.KEY_LOCAL_ONLY, enabled).apply()
+                home.showMessage(if (enabled)
+                    "SKY usará solo funciones y respuestas locales para la conversación. " +
+                        "No equivale a tener un LLM completo instalado en el Samsung. " +
+                        "Otras apps (YouTube, WhatsApp, etc.) conservan sus propias conexiones."
+                    else "Conversación híbrida reactivada. Cada motor sigue sujeto a " +
+                        "sus permisos, disponibilidad y consentimiento.")
+            }
+        })
+        content.addView(actionButton("DIAGNÓSTICO REAL · MOTORES DE IA") {
+            val connected = tokens.chatToken().isNotBlank() &&
+                tokens.deviceId().isNotBlank() && tokens.server().isNotBlank()
+            AlertDialog.Builder(this)
+                .setTitle("SKY · Estado de motores")
+                .setMessage(SkyConversationMode.engineStatus(
+                    ownApiPaired = connected,
+                    geminiKeyReady = tokens.cloudEnabled(),
+                    groqKeyReady = tokens.groqEnabled()
+                ) + "\\n\\nModo actual: " +
+                    if (localConversationOnly()) "SOLO CONVERSACIÓN LOCAL."
+                    else "HÍBRIDO CON AUTORIZACIÓN.")
+                .setPositiveButton("Entendido", null)
+                .show()
+        })
         content.addView(CheckBox(this).apply {
             text = "SKY Automático · priorizar nuestra API sin elegir modelos"
             isChecked = getSharedPreferences("sky_own_api", MODE_PRIVATE)
@@ -4107,6 +4147,14 @@ class MainActivity : Activity() {
             chatInput.setText("")
             return
         }
+        if (localConversationOnly() &&
+            (SkyAcademicResearch.explicit(message) ||
+                SkyPublicNews.explicit(message) ||
+                SkyPublicResearch.explicit(message) ||
+                SkyPublicResearch.encyclopedic(message))) {
+            explainLocalOnly()
+            return
+        }
         if (SkyAcademicResearch.explicit(message)) {
             chatInput.setText("")
             requestAcademicResearch(message)
@@ -4123,7 +4171,7 @@ class MainActivity : Activity() {
             requestPublicResearch(message)
             return
         }
-        if (processInstagramCommand(message)) {
+        if (!localConversationOnly() && processInstagramCommand(message)) {
             chatInput.setText("")
             return
         }
@@ -4189,7 +4237,8 @@ class MainActivity : Activity() {
                 home.addExchange(message, ask, "SKY · clima")
                 voicePanel.speakReply(ask)
             } else {
-                requestLiveWeather(message, city)
+                if (localConversationOnly()) explainLocalOnly()
+                else requestLiveWeather(message, city)
             }
             return
         }
@@ -4200,9 +4249,9 @@ class MainActivity : Activity() {
             processMusicCommand(message) ||
             processExpressionCommand(message) ||
             processReplyCommand(message) ||
-            processCreatorCommand(message) ||
+            (!localConversationOnly() && processCreatorCommand(message)) ||
             processMessagingCommand(message) ||
-            processInstagramCommand(message) ||
+            (!localConversationOnly() && processInstagramCommand(message)) ||
             processLocalPanelCommand(message, spoken = false) ||
             processCompanionCommand(message) || processDailyCommand(message, spoken = voiceReplyOnFace)) {
             chatInput.setText("")
@@ -4234,6 +4283,14 @@ class MainActivity : Activity() {
                 voicePanel.speakReply(approved.answer)
                 return
             }
+        }
+        // Intentional, auditable no-cloud mode: all local commands,
+        // calculations and private memory above were offered first.
+        // Keep the user's draft intact instead of silently using HTTPS.
+        if (!SkyConversationMode.mayUseRemoteAi(SkyConversationMode.select(
+                localConversationOnly()))) {
+            explainLocalOnly()
+            return
         }
         val mobileCloud = tokens.cloudEnabled()
         val groqReady = tokens.groqEnabled()
