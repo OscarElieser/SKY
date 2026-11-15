@@ -3724,6 +3724,9 @@ class MainActivity : Activity() {
         getSharedPreferences("sky_chat_session", MODE_PRIVATE).edit()
             .putLong("after_id", newestSavedId).apply()
         while (chatHistory.length() > 0) chatHistory.remove(0)
+        // El historial privado y el contexto de inferencia local comparten
+        // la frontera de sesión; no reutilizar conversación anterior.
+        onDeviceLm.resetConversation()
         selectedAttachments.clear()
         refreshSelectedAttachments()
         voiceReplyOnFace = false
