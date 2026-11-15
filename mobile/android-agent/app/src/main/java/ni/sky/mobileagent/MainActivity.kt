@@ -2636,6 +2636,18 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             showAssistantRoleDisclosure()
         })
+        content.addView(CheckBox(this).apply {
+            text = "Al invocar SKY como asistente, iniciar un turno de voz " +
+                "solo con el teléfono desbloqueado y mi permiso de micrófono"
+            isChecked = handsFreePrefs.getBoolean("assistant_voice_entry_opt_in", false)
+            setOnCheckedChangeListener { _, enabled ->
+                handsFreePrefs.edit().putBoolean("assistant_voice_entry_opt_in", enabled).apply()
+                home.showMessage(if (enabled)
+                    "Turno de voz al invocar asistente autorizado. Android puede pedir " +
+                        "el permiso de micrófono si todavía no lo concediste."
+                    else "Turno de voz al invocar asistente desactivado.")
+            }
+        })
         content.addView(description(
             "Una sola autorización local para abrir las aplicaciones actuales y futuras " +
             "cuando vos lo pidás. No autoriza automáticamente editar, borrar ni " +
@@ -3290,8 +3302,21 @@ class MainActivity : Activity() {
                 home.showMessage("Desbloqueá Android para usar SKY como asistente.")
             } else {
                 home.openChat()
-                home.showMessage("SKY está disponible. Podés hablar si tenés manos libres " +
-                    "autorizado o usar el chat. La activación no abre el micrófono a escondidas.")
+                val voiceByAssistant = handsFreePrefs
+                    .getBoolean("assistant_voice_entry_opt_in", false)
+                home.showMessage(if (voiceByAssistant)
+                    "Invocaste a SKY como asistente. Preparando un turno de voz autorizado."
+                else "SKY está disponible. Usá el chat o activá el turno de voz " +
+                    "para el gesto de asistente desde Ajustes.")
+                if (voiceByAssistant &&
+                    !handsFreePrefs.getBoolean("hands_free_opt_in", false) &&
+                    ::voicePanel.isInitialized) {
+                    handler.postDelayed({
+                        val stillUnlocked = !(getSystemService(KEYGUARD_SERVICE) as
+                            android.app.KeyguardManager).isDeviceLocked
+                        if (visible && !isFinishing && stillUnlocked) voicePanel.listen()
+                    }, 350L)
+                }
             }
         }
         if (openIntent?.getBooleanExtra(SkyInstagramAlerts.EXTRA_READ, false) == true) {
