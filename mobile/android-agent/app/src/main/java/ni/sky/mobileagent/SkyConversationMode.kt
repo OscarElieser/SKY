@@ -26,7 +26,8 @@ internal object SkyConversationMode {
         "SKY está en modo conversación local. Puedo usar las herramientas " +
             "del teléfono, recordar datos guardados, calcular y responder " +
             "a consultas locales conocidas sin enviar tu conversación a un servidor. " +
-            "Aún NO hay un modelo generativo completo instalado dentro del teléfono. " +
+            "SKY admite el motor local LiteRT-LM, pero falta importar " +
+            "y validar un modelo .litertlm en este teléfono. " +
             "Para esta petición necesito ese motor o que autorices un proveedor " +
             "externo en Ajustes. Conservé tu texto, sin enviarlo ni borrarlo."
 
@@ -42,8 +43,8 @@ internal object SkyConversationMode {
     ): String = listOf(
         "Herramientas locales Android: disponibles sin servicio de IA externo.",
         "Modelo generativo dentro del teléfono: " +
-            if (localOnDeviceLlmReady) "motor disponible, requiere pruebas reales."
-            else "no integrado todavía.",
+            if (localOnDeviceLlmReady) "archivo importado; ejecución sin validar."
+            else "runtime integrado; falta importar un .litertlm.",
         "SKY API privada / Ollama en servidor: " +
             if (ownApiPaired) "emparejada; verificar servicio y modelo." else "sin emparejar.",
         "Gemini: " + if (geminiKeyReady) "clave configurada; cuota por verificar."

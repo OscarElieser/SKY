@@ -33,7 +33,7 @@ class SkyLongTermMemory(context: Context) :
         require(text.length in 5..1800) { "El recuerdo debe tener entre 5 y 1800 caracteres." }
         val db = writableDatabase
         db.execSQL("INSERT OR IGNORE INTO owner_facts(content,created_at,source) VALUES(?,?,?)",
-            arrayOf(text, System.currentTimeMillis(), "owner_explicit"))
+            arrayOf<Any>(text, System.currentTimeMillis(), "owner_explicit"))
         db.rawQuery("SELECT id, content, created_at, source FROM owner_facts WHERE content = ?",
             arrayOf(text)).use { cursor ->
             check(cursor.moveToFirst()) { "No se guardó el recuerdo." }

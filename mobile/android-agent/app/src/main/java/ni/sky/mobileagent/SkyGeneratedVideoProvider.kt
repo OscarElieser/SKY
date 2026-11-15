@@ -33,7 +33,7 @@ class SkyGeneratedVideoProvider : ContentProvider() {
                        selectionArgs: Array<out String>?, sortOrder: String?): Cursor {
         val f = file(uri)
         return MatrixCursor(arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE)).apply {
-            addRow(arrayOf("SKY-Video-Vertical.mp4", f.length()))
+            addRow(arrayOf<Any?>("SKY-Video-Vertical.mp4", f.length()))
         }
     }
     override fun insert(uri: Uri, values: ContentValues?): Uri? = null

@@ -67,10 +67,19 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+
+} 
+// Kotlin 2.3 migration: the previous kotlinOptions DSL is no longer supported.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
 }
 
 dependencies {
+    // Official on-device text inference; no LLM weights bundled in the APK.
+    // Kotlin 2.3 is required for LiteRT-LM 0.18.x metadata compatibility.
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
