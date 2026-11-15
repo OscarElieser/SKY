@@ -12,6 +12,7 @@ object SkyDailyCommandParser {
         data class Alarm(val hour: Int, val minute: Int, val label: String) : Command()
         data class Timer(val seconds: Int) : Command()
         data class OpenApp(val app: String) : Command()
+        data class Reminder(val request: SkyReminderCommand.Request) : Command()
         data class Dial(val target: String) : Command()
         data class ComposeSms(val recipient: String, val body: String) : Command()
         data class Navigate(val destination: String) : Command()
@@ -113,6 +114,9 @@ object SkyDailyCommandParser {
             }
             return Command.OpenSetting(section)
         }
+
+        // Fecha completa: se prepara en Calendario y el propietario confirma el evento.
+        SkyReminderCommand.parse(raw)?.let { return Command.Reminder(it) }
 
         val timer = Regex("^(?:(?:pon|pone|ponme|crea|crear|activa|activar|configura|programa) (?:un |el )?)?(?:temporizador|timer|cuenta regresiva)(?: de| para)? (\\d{1,4}) (segundos?|minutos?|horas?)$")
             .matchEntire(action)
