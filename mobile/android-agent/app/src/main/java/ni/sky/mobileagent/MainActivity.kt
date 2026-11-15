@@ -1614,6 +1614,13 @@ class MainActivity : Activity() {
     @Deprecated("Uses the Android camera thumbnail; no image is stored.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == SkyAssistantRole.REQUEST_CODE) {
+            val state = SkyAssistantRole.state(this)
+            home.showMessage(if (state == SkyAssistantRole.State.SELECTED)
+                "Android confirmó que SKY es tu asistente. Manos libres se configura aparte."
+                else "SKY no quedó seleccionada como asistente. Podés intentarlo en Ajustes.")
+            return
+        }
         if (requestCode == attachmentRequest) {
             if (resultCode == RESULT_OK && data != null) {
                 val chosen = mutableListOf<android.net.Uri>()
@@ -2230,6 +2237,36 @@ class MainActivity : Activity() {
             tokens.cloudEnabled() || tokens.groqEnabled())
     }
 
+    /**
+     * El rol de asistente se concede exclusivamente desde la interfaz de Android.
+     * Esto no activa la escucha automática ni autoriza lectura del contexto ajeno.
+     */
+    private fun showAssistantRoleDisclosure() {
+        val current = SkyAssistantRole.state(this)
+        if (current != SkyAssistantRole.State.AVAILABLE) {
+            home.showMessage(SkyAssistantRole.description(current))
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Asistente predeterminada")
+            .setMessage("Android puede ofrecer SKY como asistente cuando invocás " +
+                "la función de asistencia del teléfono. El sistema controla la " +
+                "elección y podrás revertirla en sus Ajustes.\n\n" +
+                "SKY no leerá pantalla, contactos, llamadas ni mensajes de otras " +
+                "aplicaciones mediante esta integración. El rol puede conceder " +
+                "privilegios del sistema, pero no activamos esas lecturas.\n\n" +
+                "La escucha de «Hola SKY» es otra opción independiente: " +
+                "requiere tu permiso de micrófono y puede estar restringida " +
+                "por Android 15/16 o Samsung.")
+            .setPositiveButton("ELEGIR EN ANDROID") { _, _ ->
+                settingsDialog?.dismiss()
+                if (!SkyAssistantRole.request(this)) home.showMessage(
+                    "Android no pudo presentar el selector de asistente en este dispositivo.")
+            }
+            .setNegativeButton("Ahora no", null)
+            .show()
+    }
+
     /** La vinculación solo se muestra si aún no existe un token válido. */
     private fun showSettings() {
         if (isFinishing) return
@@ -2592,6 +2629,25 @@ class MainActivity : Activity() {
 
         content.addView(SkyPremiumUi.section(this, "Acceso",
             "Control supervisado de aplicaciones y conexión opcional", "◉"))
+        val assistantState = SkyAssistantRole.state(this)
+        content.addView(description("ASISTENTE PREDETERMINADA · " +
+            SkyAssistantRole.description(assistantState)))
+        content.addView(actionButton("ELEGIR SKY COMO ASISTENTE DE ANDROID") {
+            settingsDialog?.dismiss()
+            showAssistantRoleDisclosure()
+        })
+        content.addView(CheckBox(this).apply {
+            text = "Al invocar SKY como asistente, iniciar un turno de voz " +
+                "solo con el teléfono desbloqueado y mi permiso de micrófono"
+            isChecked = handsFreePrefs.getBoolean("assistant_voice_entry_opt_in", false)
+            setOnCheckedChangeListener { _, enabled ->
+                handsFreePrefs.edit().putBoolean("assistant_voice_entry_opt_in", enabled).apply()
+                home.showMessage(if (enabled)
+                    "Turno de voz al invocar asistente autorizado. Android puede pedir " +
+                        "el permiso de micrófono si todavía no lo concediste."
+                    else "Turno de voz al invocar asistente desactivado.")
+            }
+        })
         content.addView(description(
             "Una sola autorización local para abrir las aplicaciones actuales y futuras " +
             "cuando vos lo pidás. No autoriza automáticamente editar, borrar ni " +
@@ -3238,6 +3294,31 @@ class MainActivity : Activity() {
     }
 
     private fun acceptPendingVoiceIntent(openIntent: android.content.Intent?) {
+        if (openIntent?.action == android.content.Intent.ACTION_ASSIST &&
+            ::home.isInitialized && !isFinishing) {
+            val locked = (getSystemService(KEYGUARD_SERVICE) as
+                android.app.KeyguardManager).isDeviceLocked
+            if (locked) {
+                home.showMessage("Desbloqueá Android para usar SKY como asistente.")
+            } else {
+                home.openChat()
+                val voiceByAssistant = handsFreePrefs
+                    .getBoolean("assistant_voice_entry_opt_in", false)
+                home.showMessage(if (voiceByAssistant)
+                    "Invocaste a SKY como asistente. Preparando un turno de voz autorizado."
+                else "SKY está disponible. Usá el chat o activá el turno de voz " +
+                    "para el gesto de asistente desde Ajustes.")
+                if (voiceByAssistant &&
+                    !handsFreePrefs.getBoolean("hands_free_opt_in", false) &&
+                    ::voicePanel.isInitialized) {
+                    handler.postDelayed({
+                        val stillUnlocked = !(getSystemService(KEYGUARD_SERVICE) as
+                            android.app.KeyguardManager).isDeviceLocked
+                        if (visible && !isFinishing && stillUnlocked) voicePanel.listen()
+                    }, 350L)
+                }
+            }
+        }
         if (openIntent?.getBooleanExtra(SkyInstagramAlerts.EXTRA_READ, false) == true) {
             openIntent.removeExtra(SkyInstagramAlerts.EXTRA_READ)
             readInstagramNow()

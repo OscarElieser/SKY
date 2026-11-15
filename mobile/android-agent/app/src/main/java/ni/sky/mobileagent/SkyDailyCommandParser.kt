@@ -12,6 +12,11 @@ object SkyDailyCommandParser {
         data class Alarm(val hour: Int, val minute: Int, val label: String) : Command()
         data class Timer(val seconds: Int) : Command()
         data class OpenApp(val app: String) : Command()
+        data class Reminder(val request: SkyReminderCommand.Request) : Command()
+        data class Dial(val target: String) : Command()
+        data class ComposeSms(val recipient: String, val body: String) : Command()
+        data class Navigate(val destination: String) : Command()
+        data class OpenSetting(val section: DeviceSetting) : Command()
         object ShowApps : Command()
         object Capabilities : Command()
         data class Note(val value: String) : Command()
@@ -20,6 +25,8 @@ object SkyDailyCommandParser {
         data class Share(val app: String, val value: String) : Command()
         data class Unsupported(val reason: String) : Command()
     }
+
+    enum class DeviceSetting { GENERAL, WIFI, BLUETOOTH, DISPLAY, SOUND, BATTERY }
 
     fun canonical(raw: String) = Normalizer
         .normalize(raw.lowercase(Locale.ROOT), Normalizer.Form.NFD)
@@ -53,6 +60,63 @@ object SkyDailyCommandParser {
             return Command.Unsupported("Este comando corresponde al agente de Windows. " +
                 "La app Android aún no tiene permiso para ejecutar herramientas remotas del PC.")
         }
+
+        // Funciones estilo Siri/Bixby: solo órdenes explícitas del usuario.
+        // No hay permisos de llamadas, SMS ni contactos: Android conserva la acción final.
+        val original = raw.trim()
+            .replace(Regex("(?i)^(?:oye |hey |ey )?sky[ ,.:!]+"), "")
+            .trimStart('¿', '¡', ' ', ',', ':').trim()
+        val sms = Regex(
+            """^(?:env[ií]a|enviar|manda|mandar|redacta|redactar|prepara|preparar)\s+(?:un\s+)?(?:sms|mensaje(?:\s+de\s+texto)?)\s+(?:a|al|para)\s+(.{1,80}?)\s+(?:que\s+diga|con\s+el\s+texto|diciendo)\s+(.{1,600})$""",
+            RegexOption.IGNORE_CASE
+        ).matchEntire(original)
+        if (sms != null) {
+            val recipient = sms.groupValues[1].trim()
+            val message = sms.groupValues[2].trim()
+            if (recipient.isNotEmpty() && message.isNotEmpty() &&
+                !Regex("""\b(?:luego|despues|elimina|borra|paga|instala)\b""")
+                    .containsMatchIn(canonical(recipient))) {
+                return Command.ComposeSms(recipient, message)
+            }
+        }
+        val dial = Regex(
+            """^(?:llama|llamar|marca|marcar|telefonea|telefonear)\s+(?:(?:a|al|a mi|al numero|al numero de)\s+)?(.{2,80})$"""
+        ).matchEntire(action)
+        if (dial != null) {
+            val target = dial.groupValues[1].trim()
+            if (!Regex("""\b(?:y luego|y despues|elimina|borra|instala|paga)\b""")
+                    .containsMatchIn(target)) return Command.Dial(target)
+        }
+        val direction = Regex(
+            """^(?:llevame a|navega a|guiame a|indicame como llegar a|como llego a|muestrame la ruta a|ruta a)\s+(.{2,130})$"""
+        ).matchEntire(action)
+        if (direction != null) {
+            val place = direction.groupValues[1].trim()
+            if (!Regex("""\b(?:y luego|y despues|elimina|borra|instala|paga)\b""")
+                    .containsMatchIn(place)) return Command.Navigate(place)
+        }
+        val settings = Regex(
+            """^(?:abre|abrir|muestra|mostrar|ve a|entra a|entra en|configura|configurar)\s+(?:(?:los|las|la|el)\s+)?(?:ajustes|configuracion)(?:\s+(?:(?:del|de|de la|para)\s+)?(wifi|wi fi|bluetooth|pantalla|sonido|volumen|bateria))?$"""
+        ).matchEntire(action)
+        val toggle = Regex(
+            """^(?:activa|activar|enciende|encender|desactiva|desactivar|apaga|apagar)\s+(?:(?:el|la)\s+)?(wifi|wi fi|bluetooth)$"""
+        ).matchEntire(action)
+        val settingName = settings?.groupValues?.get(1).orEmpty()
+            .ifBlank { toggle?.groupValues?.get(1).orEmpty() }
+        if (settings != null || toggle != null) {
+            val section = when (settingName) {
+                "wifi", "wi fi" -> DeviceSetting.WIFI
+                "bluetooth" -> DeviceSetting.BLUETOOTH
+                "pantalla" -> DeviceSetting.DISPLAY
+                "sonido", "volumen" -> DeviceSetting.SOUND
+                "bateria" -> DeviceSetting.BATTERY
+                else -> DeviceSetting.GENERAL
+            }
+            return Command.OpenSetting(section)
+        }
+
+        // Fecha completa: se prepara en Calendario y el propietario confirma el evento.
+        SkyReminderCommand.parse(raw)?.let { return Command.Reminder(it) }
 
         val timer = Regex("^(?:(?:pon|pone|ponme|crea|crear|activa|activar|configura|programa) (?:un |el )?)?(?:temporizador|timer|cuenta regresiva)(?: de| para)? (\\d{1,4}) (segundos?|minutos?|horas?)$")
             .matchEntire(action)
