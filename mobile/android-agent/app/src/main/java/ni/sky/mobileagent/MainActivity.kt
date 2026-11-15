@@ -89,12 +89,115 @@ class MainActivity : Activity() {
     private val conversationModePrefs by lazy {
         getSharedPreferences(SkyConversationMode.PREFS, MODE_PRIVATE)
     }
+    private val onDeviceLm by lazy { SkyOnDeviceLm(applicationContext) }
+    private val localModelPickerRequest = 1689
     private fun localConversationOnly(): Boolean =
         conversationModePrefs.getBoolean(SkyConversationMode.KEY_LOCAL_ONLY, false)
     private fun explainLocalOnly() {
         val reply = SkyConversationMode.offlineMessage()
         home.showMessage(reply)
         if (::voicePanel.isInitialized && voicePanel.isVoiceEnabled()) voicePanel.speakReply(reply)
+    }
+
+    /** Una consulta realmente generada en el Samsung; no hay petición HTTP. */
+    private fun sendOnDeviceChat(question: String) {
+        if (chatPending) {
+            home.showMessage("SKY está terminando el turno anterior.")
+            return
+        }
+        if (!SkyOnDeviceLm.acceptedPrompt(question)) {
+            home.showMessage("El modelo local permite hasta " +
+                SkyOnDeviceLm.PROMPT_MAX + " caracteres por turno. " +
+                "Tu texto se conservó sin recortar ni enviar.")
+            return
+        }
+        chatPending = true
+        val start = android.os.SystemClock.elapsedRealtime()
+        home.beginSending(question)
+        voicePanel.showThinking()
+        onDeviceLm.generate(question) { result ->
+            runOnUiThread {
+                if (isFinishing || isDestroyed) {
+                    chatPending = false
+                    return@runOnUiThread
+                }
+                result.onSuccess { answer ->
+                    val keepFace = voiceReplyOnFace
+                    voiceReplyOnFace = false
+                    chatInput.setText("")
+                    chatHistory.put(JSONObject().put("role", "user")
+                        .put("content", SkyPrivateHistoryPolicy.excerpt(question,
+                            SkyPrivateHistoryPolicy.SESSION_TURN_MAX)))
+                    chatHistory.put(JSONObject().put("role", "assistant")
+                        .put("content", SkyPrivateHistoryPolicy.excerpt(answer,
+                            SkyPrivateHistoryPolicy.SESSION_TURN_MAX)))
+                    while (chatHistory.length() > 80) chatHistory.remove(0)
+                    val elapsed = (android.os.SystemClock.elapsedRealtime() - start) / 1000.0
+                    home.addExchange(question, answer,
+                        "SKY · LiteRT-LM · 100 % teléfono · " +
+                        String.format(java.util.Locale.US, "%.1f s", elapsed),
+                        revealPanel = !keepFace)
+                    voicePanel.express(answer)
+                    voicePanel.speakReply(answer)
+                }.onFailure { problem ->
+                    voiceReplyOnFace = false
+                    home.failSending("El modelo local no pudo generar respuesta: " +
+                        (problem.message ?: "Revisá el modelo y la memoria disponible."),
+                        question)
+                    voicePanel.showError("Modelo local no disponible; no se envió a la nube.")
+                }
+                chatPending = false
+            }
+        }
+    }
+
+    private fun chooseOnDeviceModel() {
+        AlertDialog.Builder(this)
+            .setTitle("SKY · Motor generativo local")
+            .setMessage("Elegí un archivo .litertlm de una fuente confiable. " +
+                "SKY lo copiará únicamente al almacenamiento privado del teléfono " +
+                "y mostrará su SHA-256. El archivo puede ocupar cientos de MB " +
+                "y su rendimiento dependerá de la RAM. No se enviará a Internet. " +
+                "Un archivo importado no garantiza que sea compatible hasta " +
+                "generar la primera respuesta.")
+            .setPositiveButton("SELECCIONAR MODELO") { _, _ ->
+                val picker = android.content.Intent(
+                    android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                    type = "*/*"
+                }
+                startActivityForResult(picker, localModelPickerRequest)
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun importOnDeviceModel(uri: android.net.Uri) {
+        val cursor = contentResolver.query(uri,
+            arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+        val name = cursor?.use {
+            if (it.moveToFirst()) it.getString(0) else null
+        }.orEmpty()
+        if (!name.lowercase(java.util.Locale.ROOT).endsWith(".litertlm")) {
+            home.showMessage("Seleccioná un archivo con extensión .litertlm, " +
+                "compatible con LiteRT-LM. No se aceptan archivos GGUF.")
+            return
+        }
+        home.showMessage("Importando un modelo local al almacenamiento privado. " +
+            "SKY no enviará el archivo a Internet.")
+        onDeviceLm.importModel(uri) { result ->
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                result.onSuccess { info ->
+                    home.showMessage("Modelo local importado: " +
+                        (info.bytes / (1024 * 1024)) + " MiB. SHA-256: " +
+                        info.sha256 + ". Activá Conversación solo local para probarlo.")
+                }.onFailure { error ->
+                    home.showMessage("No pude importar el modelo: " +
+                        (error.message ?: "archivo o almacenamiento incompatible."))
+                }
+            }
+        }
     }
     private val apps = linkedMapOf(
         "youtube" to Pair("YouTube", "com.google.android.youtube"),
@@ -1625,6 +1728,12 @@ class MainActivity : Activity() {
     @Deprecated("Uses the Android camera thumbnail; no image is stored.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == localModelPickerRequest) {
+            if (resultCode == RESULT_OK && data?.data != null) {
+                importOnDeviceModel(data.data!!)
+            }
+            return
+        }
         if (requestCode == SkyAssistantRole.REQUEST_CODE) {
             val state = SkyAssistantRole.state(this)
             home.showMessage(if (state == SkyAssistantRole.State.SELECTED)
@@ -2292,6 +2401,13 @@ class MainActivity : Activity() {
         content.addView(description("SKY Android · Ajustes y permisos"))
         content.addView(description("MODO INDEPENDIENTE · No necesitás Windows ni una PC para " +
             "usar las funciones locales del teléfono. El cerebro Ollama del servidor es opcional."))
+        content.addView(actionButton("IMPORTAR / REEMPLAZAR MODELO IA EN EL TELÉFONO") {
+            settingsDialog?.dismiss()
+            chooseOnDeviceModel()
+        })
+        content.addView(description(if (onDeviceLm.hasImportedModel())
+            "MODELO LOCAL · archivo importado; ejecutá una consulta para validarlo."
+        else "MODELO LOCAL · faltan los pesos .litertlm; las funciones básicas siguen disponibles."))
         content.addView(CheckBox(this).apply {
             text = "CONVERSACIÓN SOLO LOCAL · nunca enviar mis mensajes a una IA en internet"
             isChecked = localConversationOnly()
@@ -2314,7 +2430,8 @@ class MainActivity : Activity() {
                 .setMessage(SkyConversationMode.engineStatus(
                     ownApiPaired = connected,
                     geminiKeyReady = tokens.cloudEnabled(),
-                    groqKeyReady = tokens.groqEnabled()
+                    groqKeyReady = tokens.groqEnabled(),
+                    localOnDeviceLlmReady = onDeviceLm.hasImportedModel()
                 ) + "\n\nModo actual: " +
                     if (localConversationOnly()) "SOLO CONVERSACIÓN LOCAL."
                     else "HÍBRIDO CON AUTORIZACIÓN.")
@@ -3443,6 +3560,8 @@ class MainActivity : Activity() {
         super.onPause()
     }
     override fun onDestroy() {
+        // Una sola cola interna libera conversación y motor al cerrar la actividad.
+        if (::onDeviceLm.isInitialized) onDeviceLm.shutdown()
         if (::musicLauncher.isInitialized) musicLauncher.close()
         handler.removeCallbacks(instagramPoll)
         handler.removeCallbacks(pollLoop)
@@ -4305,7 +4424,10 @@ class MainActivity : Activity() {
         // Keep the user's draft intact instead of silently using HTTPS.
         if (!SkyConversationMode.mayUseRemoteAi(SkyConversationMode.select(
                 localConversationOnly()))) {
-            explainLocalOnly()
+            // Primero se ejecutaron las herramientas locales ya existentes.
+            // Si hay un modelo importado, éste genera texto dentro de Android.
+            if (onDeviceLm.hasImportedModel()) sendOnDeviceChat(message)
+            else explainLocalOnly()
             return
         }
         val mobileCloud = tokens.cloudEnabled()
