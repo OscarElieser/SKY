@@ -3618,6 +3618,12 @@ class MainActivity : Activity() {
             sendChatText(query)
             return
         }
+        // El usuario podría haber activado modo local después de adjuntar.
+        // No presentar siquiera la autorización Gemini en ese caso.
+        if (localConversationOnly()) {
+            explainLocalOnly()
+            return
+        }
         if (chatPending) return
         if (!tokens.cloudEnabled()) {
             home.showMessage("Configurá Gemini en Ajustes para analizar varios archivos de hasta 100 MB.")
@@ -3653,6 +3659,15 @@ class MainActivity : Activity() {
     }
 
     private fun sendAttachmentBatch(instruction: String, selected: List<SkyAttachmentBatch.Item>) {
+        // Revalidar consentimiento justo antes de la subida; el diálogo pudo
+        // permanecer abierto mientras se cambiaba la opción de privacidad.
+        if (localConversationOnly()) {
+            selectedAttachments.clear()
+            selectedAttachments.addAll(selected)
+            refreshSelectedAttachments()
+            explainLocalOnly()
+            return
+        }
         if (chatPending) return
         chatPending = true
         val cancel = SkyGeminiFiles.CancelToken()
