@@ -190,6 +190,16 @@ internal class SkyOnDeviceLm(private val context: Context) {
         }
     }
 
+    /**
+     * "Nuevo chat" debe destruir el contexto interno del modelo, no solo
+     * borrar la lista en pantalla. Se recarga desde cero en el próximo turno.
+     * La operación queda ordenada detrás de cualquier inferencia en progreso.
+     */
+    fun resetConversation() {
+        if (closed.get()) return
+        executor.execute { runCatching { releaseEngine() } }
+    }
+
     fun shutdown() {
         if (!closed.compareAndSet(false, true)) return
         executor.execute { runCatching { releaseEngine() } }
