@@ -81,6 +81,7 @@ class SkyAndroidActions(
         when (action) {
             is SkyDailyCommandParser.Command.Alarm -> alarm(action)
             is SkyDailyCommandParser.Command.Timer -> timer(action.seconds)
+            is SkyDailyCommandParser.Command.Reminder -> prepareCalendarReminder(action.request)
             is SkyDailyCommandParser.Command.OpenApp -> installedApps.requestLaunch(action.app)
             is SkyDailyCommandParser.Command.Dial -> dial(action.target)
             is SkyDailyCommandParser.Command.ComposeSms -> composeSms(action.recipient, action.body)
@@ -109,7 +110,8 @@ class SkyAndroidActions(
                 "También puedo solicitar alarmas, guardar notas, preparar textos " +
                 "para compartir y controlar la música. " +
                 "Puedo abrir el marcador, preparar un SMS, buscar una ruta en mapas " +
-                "y abrir ajustes del teléfono. Las llamadas y mensajes nunca " +
+                "y abrir ajustes del teléfono, además de preparar recordatorios " +
+                "con fecha en Calendario. Las llamadas y mensajes nunca " +
                 "se ejecutan ni envían sin tu intervención final. " +
                 "Para noticias e información actual puedo consultar Google con internet. " +
                 "Todavía no puedo navegar ni escribir libremente dentro de todas " +
@@ -256,6 +258,54 @@ class SkyAndroidActions(
         }
         launch(Intent(action), "Abrí los ajustes de Android. Realizá y verificá el cambio " +
             "en esa pantalla; SKY no modificó la configuración automáticamente.")
+    }
+
+    /**
+     * Recordatorio con fecha: Android Calendar gestiona la creación real,
+     * alertas, sincronización y notificaciones. SKY solo prepara el formulario.
+     */
+    private fun prepareCalendarReminder(request: SkyReminderCommand.Request) {
+        val localTime = java.time.LocalDate.now()
+            .plusDays(request.daysAhead.toLong())
+            .atTime(request.hour, request.minute)
+        val startMs = localTime.atZone(java.time.ZoneId.systemDefault())
+            .toInstant().toEpochMilli()
+        if (startMs <= System.currentTimeMillis()) {
+            receipt("Recordatorio Calendario", "REJECTED", "La hora solicitada ya pasó")
+            feedback("Esa hora ya pasó. Indicá una hora futura para el recordatorio.")
+            return
+        }
+        val title = request.title.take(160)
+        val displayTime = "%02d:%02d".format(java.util.Locale.ROOT,
+            request.hour, request.minute)
+        val displayDay = when (request.daysAhead) {
+            0 -> "hoy"
+            1 -> "mañana"
+            else -> "pasado mañana"
+        }
+        AlertDialog.Builder(host)
+            .setTitle("SKY · Recordatorio en Calendario")
+            .setMessage("Voy a preparar un evento para $displayDay a las $displayTime:" +
+                "\n\n$title\n\nRevisá la fecha, activá una alerta " +
+                "y pulsá Guardar dentro de Calendario. SKY no lo crea por sí sola.")
+            .setPositiveButton("ABRIR CALENDARIO") { _, _ ->
+                val intent = Intent(Intent.ACTION_INSERT).apply {
+                    data = android.provider.CalendarContract.Events.CONTENT_URI
+                    putExtra(android.provider.CalendarContract.Events.TITLE, title)
+                    putExtra(android.provider.CalendarContract.Events.DESCRIPTION,
+                        "Recordatorio solicitado a SKY. Verificar notificación antes de guardar.")
+                    putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, startMs)
+                    putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME,
+                        startMs + 15 * 60 * 1000L)
+                }
+                launch(intent, "Preparé el evento en Calendario. Guardalo y configurá " +
+                    "la alerta allí para recibir un recordatorio.")
+            }
+            .setNegativeButton("Cancelar") { _, _ ->
+                receipt("Recordatorio Calendario", "REJECTED", "El propietario canceló")
+                feedback("No preparé el recordatorio.")
+            }
+            .show()
     }
 
     private fun webSearch(query: String) {
