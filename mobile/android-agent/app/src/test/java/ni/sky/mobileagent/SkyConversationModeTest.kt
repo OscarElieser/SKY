@@ -15,14 +15,14 @@ class SkyConversationModeTest {
 
     @Test fun noCloudModeMustBeHonestAboutUnimplementedLlm() {
         val explanation = SkyConversationMode.offlineMessage()
-        assertTrue(explanation.contains("NO hay un modelo generativo completo"))
+        assertTrue(explanation.contains("falta importar"))
         assertTrue(explanation.contains("Conservé tu texto"))
         assertTrue(explanation.contains("sin enviarlo ni borrarlo"))
     }
 
     @Test fun statusDistinguishesConfiguredFromProvenWorking() {
         val none = SkyConversationMode.engineStatus(false, false, false)
-        assertTrue(none.contains("Modelo generativo dentro del teléfono: no integrado todavía"))
+        assertTrue(none.contains("Modelo generativo dentro del teléfono: runtime integrado"))
         assertTrue(none.contains("Claude y Grok: adaptadores Android no integrados"))
         val configured = SkyConversationMode.engineStatus(true, true, true)
         assertTrue(configured.contains("emparejada; verificar"))
