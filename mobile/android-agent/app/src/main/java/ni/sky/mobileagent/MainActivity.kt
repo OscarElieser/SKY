@@ -3561,7 +3561,7 @@ class MainActivity : Activity() {
     }
     override fun onDestroy() {
         // Una sola cola interna libera conversación y motor al cerrar la actividad.
-        if (::onDeviceLm.isInitialized) onDeviceLm.shutdown()
+        onDeviceLm.shutdown()
         if (::musicLauncher.isInitialized) musicLauncher.close()
         handler.removeCallbacks(instagramPoll)
         handler.removeCallbacks(pollLoop)
