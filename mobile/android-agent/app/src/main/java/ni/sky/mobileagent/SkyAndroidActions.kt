@@ -166,8 +166,8 @@ class SkyAndroidActions(
      * Android muestra el marcador para que escoja el contacto por sí mismo.
      */
     private fun dial(target: String) {
-        val dialNumber = target.replace(Regex("""[\\s().-]"""), "")
-            .takeIf { Regex("""\\+?[0-9]{7,15}""").matches(it) }
+        val dialNumber = target.replace(Regex("""[\s().-]"""), "")
+            .takeIf { Regex("""\+?[0-9]{7,15}""").matches(it) }
         val message = if (dialNumber != null)
             "Voy a abrir el marcador con ${target.take(55)}. La llamada solo se realiza si la confirmás en Teléfono."
         else "Voy a abrir el marcador. Buscá a «${target.take(55)}» y confirmá la llamada en Teléfono. SKY no accede a tus contactos."
@@ -193,16 +193,19 @@ class SkyAndroidActions(
      * destinatario si indicó un nombre y pulsa Enviar en esa aplicación.
      */
     private fun composeSms(recipient: String, body: String) {
-        val number = recipient.replace(Regex("""[\\s().-]"""), "")
-            .takeIf { Regex("""\\+?[0-9]{7,15}""").matches(it) }
+        val number = recipient.replace(Regex("""[\s().-]"""), "")
+            .takeIf { Regex("""\+?[0-9]{7,15}""").matches(it) }
+        val recipientNotice = if (number == null)
+            "Seleccioná manualmente el contacto dentro de Mensajes: SKY no lee tu agenda."
+        else "El número queda precargado en el borrador; verificá que sea correcto."
         AlertDialog.Builder(host)
             .setTitle("SKY · Preparar SMS")
-            .setMessage("Destinatario solicitado: ${recipient.take(70)}" +
-                if (number == null)
-                    "\\nSeleccioná manualmente el contacto dentro de Mensajes: SKY no lee tu agenda."
-                else "" +
-                "\\n\\nTexto: ${body.take(600)}" +
-                "\\n\\nSKY no enviará el SMS. Debés revisarlo y pulsar Enviar.")
+            .setMessage(listOf(
+                "Destinatario solicitado: ${recipient.take(70)}",
+                recipientNotice,
+                "Texto: ${body.take(600)}",
+                "SKY no enviará el SMS. Debés revisarlo y pulsar Enviar."
+            ).joinToString("\n\n"))
             .setPositiveButton("REVISAR EN MENSAJES") { _, _ ->
                 val intent = Intent(Intent.ACTION_SENDTO,
                     android.net.Uri.fromParts("smsto", number.orEmpty(), null)).apply {
