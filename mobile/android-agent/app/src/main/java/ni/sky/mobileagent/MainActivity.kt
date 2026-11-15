@@ -2251,10 +2251,10 @@ class MainActivity : Activity() {
             .setTitle("SKY · Asistente predeterminada")
             .setMessage("Android puede ofrecer SKY como asistente cuando invocás " +
                 "la función de asistencia del teléfono. El sistema controla la " +
-                "elección y podrás revertirla en sus Ajustes.\\n\\n" +
+                "elección y podrás revertirla en sus Ajustes.\n\n" +
                 "SKY no leerá pantalla, contactos, llamadas ni mensajes de otras " +
                 "aplicaciones mediante esta integración. El rol puede conceder " +
-                "privilegios del sistema, pero no activamos esas lecturas.\\n\\n" +
+                "privilegios del sistema, pero no activamos esas lecturas.\n\n" +
                 "La escucha de «Hola SKY» es otra opción independiente: " +
                 "requiere tu permiso de micrófono y puede estar restringida " +
                 "por Android 15/16 o Samsung.")
